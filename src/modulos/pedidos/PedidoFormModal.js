@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { collection, getDocs, addDoc, updateDoc, doc } from "firebase/firestore";
-import { db } from "../firebase";
+import { db } from "../../firebase";
 import "./PedidoFormModal.css";
 
 export default function PedidoFormModal({ onClose, onPedidoCreado, pedido }) {

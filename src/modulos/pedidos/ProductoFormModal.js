@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { collection, addDoc, updateDoc, doc, getDoc, getDocs } from "firebase/firestore";
-import { db } from "../firebase";
+import { db } from "../../firebase";
 import "./ProductoFormModal.css";
 
 export default function ProductoFormModal({
