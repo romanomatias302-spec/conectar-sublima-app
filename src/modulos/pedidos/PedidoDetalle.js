@@ -91,7 +91,7 @@ export default function PedidoDetalle({ pedido, onVolver }) {
         <tbody>
           {productos.map((p) => (
             <tr key={p.id} className="fila-producto">
-              <td>{p.producto}</td>
+              <td>{p.productoNombre || p.producto}</td>
               <td>{p.color}</td>
               <td>{p.detalle}</td>
               <td>{p.cantidad}</td>
