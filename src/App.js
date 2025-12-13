@@ -6,7 +6,7 @@ import ClienteDetalle from "./modulos/clientes/ClienteDetalle";
 import PedidosList from "./modulos/pedidos/PedidosList";
 import PedidoDetalle from "./modulos/pedidos/PedidoDetalle";
 import Inicio from "./components/Inicio";
-import Configuracion from "./components/Configuracion";
+import Configuracion from "./modulos/configuracion/Configuracion";
 import MobileMenu from "./comunes/componentes/MobileMenu";
 import "./App.css";
 

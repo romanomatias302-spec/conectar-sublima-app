@@ -1,13 +1,12 @@
 // 🧩 ConfiguracionProductoIndividual.js
 import React, { useState, useEffect } from "react";
-import { db } from "../firebase";
+import { db } from "../../firebase";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { FaCog, FaArrowLeft } from "react-icons/fa";
 import "./ConfiguracionProductos.css";
 import ZonasConfigEditor from "./ZonasConfigEditor";
 import TallesConfigEditor from "./TallesConfigEditor";
 import ColoresConfigEditor from "./ColoresConfigEditor";
-import TipoImpresionSelector from "./TipoImpresionSelector";
 import AtributosExtraConfigEditor from "./AtributosExtraConfigEditor";
 import DetallesPorTalleConfigEditor from "./DetallesPorTalleConfigEditor";
 
