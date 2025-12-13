@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { collection, getDocs, deleteDoc, doc } from "firebase/firestore";
 import { db } from "../../firebase";
 import "./ClientesList.css";
-import ActionMenu from "../../components/ActionMenu";
+import ActionMenu from "../../comunes/componentes/ActionMenu";
 
 export default function ClientesList({ onNuevo, onEditar, onVer }) {
   const [clientes, setClientes] = useState([]);

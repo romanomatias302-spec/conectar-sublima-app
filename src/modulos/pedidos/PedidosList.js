@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { collection, getDocs, deleteDoc, doc, updateDoc } from "firebase/firestore";
 import { db } from "../../firebase";
 import PedidoFormModal from "./PedidoFormModal";
-import ActionMenu from "../../components/ActionMenu"; // 👈 mismo componente usado en Clientes
+import ActionMenu from "../../comunes/componentes/ActionMenu"; // 👈 mismo componente usado en Clientes
 import "./PedidosList.css";
 
 export default function PedidosList({ onVerDetalle = () => {} }) {

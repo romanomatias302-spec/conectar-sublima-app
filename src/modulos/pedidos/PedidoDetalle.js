@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { collection, getDocs, deleteDoc, doc } from "firebase/firestore";
 import { db } from "../../firebase";
 import ProductoFormModal from "./ProductoFormModal";
-import ActionMenu from "../../components/ActionMenu";
+import ActionMenu from "../../comunes/componentes/ActionMenu";
 import "./PedidoDetalle.css";
 
 export default function PedidoDetalle({ pedido, onVolver }) {
