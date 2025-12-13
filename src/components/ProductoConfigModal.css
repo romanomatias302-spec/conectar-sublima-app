@@ -1,0 +1,30 @@
+/* 📁 src/components/ProductoConfigModal.css */
+
+.producto-config-modal {
+  max-width: 600px;
+  padding: 25px;
+}
+
+.checkbox-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.checkbox-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #333;
+}
+
+.checkbox-item input {
+  accent-color: #0096d1;
+  transform: scale(1.1);
+}
+
+body.dark-mode .checkbox-item {
+  color: #eaeaea;
+}

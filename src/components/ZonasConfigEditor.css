@@ -1,0 +1,114 @@
+.zonas-editor {
+padding: 20px;
+}
+
+.referencia-img {
+text-align: center;
+margin-bottom: 20px;
+}
+
+.remera-zonas {
+max-width: 320px;
+width: 100%;
+border-radius: 8px;
+box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.zona-grupo {
+background: #f8fafc;
+border: 1px solid #ddd;
+border-radius: 8px;
+padding: 12px 14px;
+margin-bottom: 14px;
+}
+
+.zona-header {
+display: flex;
+justify-content: space-between;
+align-items: center;
+}
+
+.lista-editable {
+list-style: none;
+padding-left: 0;
+}
+
+.lista-editable li {
+display: flex;
+justify-content: space-between;
+background: #fff;
+padding: 5px 10px;
+margin-top: 6px;
+border-radius: 6px;
+border: 1px solid #eee;
+}
+
+.btn-mini-eliminar {
+background: none;
+border: none;
+color: #999;
+cursor: pointer;
+}
+
+.btn-mini-eliminar:hover {
+color: #e74c3c;
+}
+
+.btn-mini-agregar,
+.btn-agregar,
+.btn-guardar,
+.cancelar {
+margin-top: 10px;
+margin-right: 8px;
+padding: 8px 12px;
+border: none;
+border-radius: 6px;
+cursor: pointer;
+font-weight: 600;
+}
+
+.btn-agregar {
+background-color: #0096d1;
+color: white;
+}
+.btn-guardar {
+background-color: #2ecc71;
+color: white;
+}
+.cancelar {
+background-color: #aaa;
+color: white;
+}
+
+/* Vista previa */
+.preview-box {
+margin-top: 25px;
+padding: 15px;
+border: 1px solid #ccc;
+border-radius: 8px;
+background: #fdfdfd;
+}
+.preview-zona {
+margin-bottom: 10px;
+}
+.preview-subzona-item {
+display: flex;
+align-items: center;
+gap: 6px;
+}
+.preview-subzona-item input {
+flex: 1;
+padding: 5px 8px;
+border: 1px solid #ccc;
+border-radius: 5px;
+}
+
+/* 🌙 Modo oscuro */
+body.dark-mode .zona-grupo {
+background: #2a2a2a;
+border-color: #444;
+}
+body.dark-mode .preview-box {
+background: #2b2b2b;
+border-color: #444;
+}

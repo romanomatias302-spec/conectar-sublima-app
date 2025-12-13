@@ -1,0 +1,147 @@
+/* ============================================
+   🎯 MENÚ DE ACCIONES (estilo minimal y limpio)
+   ============================================ */
+
+/* Contenedor */
+.action-menu-container {
+  position: relative;
+  display: inline-block;
+}
+
+/* Botón de los tres puntos */
+.action-menu-trigger {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  color: #555;
+  padding: 4px;
+  transition: color 0.2s ease, transform 0.15s ease;
+}
+
+.action-menu-trigger:hover {
+  color: #0096d1;
+  transform: scale(1.1);
+}
+
+.action-menu-trigger.active {
+  color: #0096d1;
+}
+
+/* Dropdown */
+.action-menu-dropdown {
+  position: absolute;
+  top: 28px;
+  right: 0;
+  background: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  min-width: 140px;
+  z-index: 20;
+  animation: fadeIn 0.15s ease-out;
+}
+
+/* Animación */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Botones dentro del menú */
+.action-menu-dropdown button {
+  background: none;
+  border: none;
+  text-align: left;
+  padding: 10px 12px;
+  color: #0096d1;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.action-menu-dropdown button:hover {
+  background-color: #eaf7ff;
+}
+
+/* Íconos */
+.action-menu-dropdown .icono {
+  font-size: 15px;
+}
+
+/* ============================================
+   🌙 MODO OSCURO COHERENTE
+   ============================================ */
+body.dark-mode .action-menu-trigger {
+  color: #e0e0e0;
+}
+
+body.dark-mode .action-menu-trigger:hover {
+  color: #00b4ff;
+}
+
+body.dark-mode .action-menu-dropdown {
+  background-color: #2f2f2f;
+  border: 1px solid #444;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+body.dark-mode .action-menu-dropdown button {
+  color: #eaeaea;
+}
+
+body.dark-mode .action-menu-dropdown button:hover {
+  background-color: #3b3b3b;
+  color: #00b4ff;
+}
+/* ================================
+   🧭 CORRECCIÓN VISUAL DEL MENÚ
+   ================================ */
+
+/* Asegura que el menú se muestre por fuera del contenedor */
+.action-menu-container {
+  position: relative;
+  display: inline-block;
+  overflow: visible !important; /* ✅ clave: permite que se vea el dropdown */
+}
+
+/* El menú flotante siempre encima de otros elementos */
+.action-menu-dropdown {
+  position: absolute;
+  top: 28px;
+  right: 0;
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+  z-index: 9999 !important; /* ✅ se asegura de estar arriba de todo */
+  display: flex;
+  flex-direction: column;
+  min-width: 150px;
+  overflow: hidden;
+}
+
+/* 🌙 Modo oscuro */
+body.dark-mode .action-menu-dropdown {
+  background-color: #2f2f2f !important;
+  border: 1px solid #444 !important;
+  color: #eaeaea !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+body.dark-mode .action-menu-dropdown button {
+  color: #eaeaea !important;
+}
+
+body.dark-mode .action-menu-dropdown button:hover {
+  background-color: #3b3b3b !important;
+}

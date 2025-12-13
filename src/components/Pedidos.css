@@ -1,0 +1,76 @@
+.tabla-pedidos {
+  padding: 20px;
+}
+
+.tabla-pedidos table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: "Inter", sans-serif;
+  background-color: #ffffff;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+}
+
+.tabla-pedidos th {
+  background-color: #f1f5f9;
+  text-align: left;
+  padding: 12px;
+  color: #475569;
+  font-weight: 600;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.tabla-pedidos td {
+  padding: 12px;
+  border-bottom: 1px solid #e2e8f0;
+  color: #334155;
+}
+
+.tabla-pedidos tr:hover {
+  background-color: #f8fafc;
+}
+
+.btn-editar {
+  background-color: #00aeef;
+  color: white;
+  border: none;
+  padding: 6px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  margin-right: 6px;
+}
+
+.btn-eliminar {
+  background-color: #ef4444;
+  color: white;
+  border: none;
+  padding: 6px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.link {
+  color: #00aeef;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.estado {
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.estado.pendiente {
+  background-color: #fef3c7;
+  color: #92400e;
+}
+
+.estado.terminado {
+  background-color: #dcfce7;
+  color: #166534;
+}

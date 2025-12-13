@@ -1,0 +1,140 @@
+.clientes-lista {
+  background-color: #fff;
+  border-radius: 10px;
+  padding: 25px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+
+.encabezado-lista {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.acciones-lista {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.buscador {
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 15px;
+  width: 220px;
+  transition: 0.3s;
+}
+
+.buscador:focus {
+  outline: none;
+  border-color: #00aeef;
+  box-shadow: 0 0 0 3px rgba(0, 174, 239, 0.2);
+}
+
+.btn-nuevo {
+  background-color: #00aeef;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.btn-nuevo:hover {
+  background-color: #0093cc;
+}
+
+.acciones button {
+  margin-right: 5px;
+  border-radius: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+  border: none;
+  font-weight: 500;
+  transition: 0.2s;
+}
+
+.btn-ver {
+  background-color: #ffffff;
+  border: 1.5px solid #00aeef;
+  color: #00aeef;
+}
+
+.btn-ver:hover {
+  background-color: #00aeef;
+  color: white;
+}
+
+.btn-editar {
+  background-color: #00aeef;
+  color: #fff;
+}
+
+.btn-editar:hover {
+  background-color: #0093cc;
+}
+
+.btn-eliminar {
+  background-color: #e53e3e;
+  color: #fff;
+}
+
+.btn-eliminar:hover {
+  background-color: #c53030;
+}
+/* Fila clickeable */
+.fila-clickable {
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.fila-clickable:hover {
+  background-color: #eaf7ff !important; /* mismo tono celeste que tu diseño */
+}
+/* ==========================================
+   🌙 MODO OSCURO – LISTADO DE CLIENTES
+   ========================================== */
+body.dark-mode .clientes-lista {
+  background-color: #2b2b2b !important;
+  color: #eaeaea !important;
+  border: 1px solid #3a3a3a;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+}
+
+body.dark-mode .clientes-lista h1 {
+  color: #f5f5f5 !important;
+}
+
+body.dark-mode .clientes-lista .buscador {
+  background-color: #1f1f1f !important;
+  border: 1px solid #555 !important;
+  color: #eaeaea !important;
+}
+
+body.dark-mode .clientes-lista .buscador::placeholder {
+  color: #9ca3af !important;
+}
+
+body.dark-mode .clientes-lista table {
+  background-color: #252525 !important;
+  color: #e5e5e5 !important;
+  border-radius: 8px;
+}
+
+body.dark-mode .clientes-lista thead {
+  background-color: #0096d1 !important;
+  color: #fff !important;
+}
+
+body.dark-mode .clientes-lista tr:hover {
+  background-color: #2f2f2f !important;
+}
+
+body.dark-mode .clientes-lista td,
+body.dark-mode .clientes-lista th {
+  border-color: #3a3a3a !important;
+}

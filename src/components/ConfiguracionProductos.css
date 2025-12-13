@@ -1,0 +1,1852 @@
+/* ================================
+   🎨 CONFIGURACIÓN GENERAL
+===================================*/
+.config-productos {
+  padding: 25px;
+}
+
+.config-productos h1 {
+  font-size: 22px;
+  margin-bottom: 20px;
+  color: #0096d1;
+}
+
+.descripcion {
+  color: #666;
+  font-size: 15px;
+  margin-bottom: 15px;
+}
+
+/* ================================
+   ⚙️ SWITCHES
+===================================*/
+.switch-lista {
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.switch-fila {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 12px 16px;
+  transition: background-color 0.2s ease;
+}
+
+.switch-fila:hover {
+  background: #eef6fa;
+}
+
+.switch-label {
+  font-size: 15px;
+  font-weight: 500;
+  color: #333;
+}
+
+.switch-acciones {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+/* ⚙️ Icono de configuración */
+.icono-config {
+  font-size: 18px;
+  color: #777;
+  cursor: pointer;
+  transition: color 0.25s ease, transform 0.2s ease;
+}
+.icono-config:hover {
+  color: #0096d1;
+  transform: rotate(30deg);
+}
+
+/* Toggle moderno tipo iOS */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 46px;
+  height: 24px;
+}
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  transition: 0.3s;
+  border-radius: 34px;
+}
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: 0.3s;
+  border-radius: 50%;
+}
+.switch input:checked + .slider {
+  background-color: #0096d1;
+}
+.switch input:checked + .slider:before {
+  transform: translateX(22px);
+}
+
+/* 🌙 Modo oscuro */
+body.dark-mode .switch-fila {
+  background-color: #2b2b2b;
+  border-color: #444;
+}
+body.dark-mode .switch-label {
+  color: #eaeaea;
+}
+body.dark-mode .icono-config {
+  color: #bbb;
+}
+body.dark-mode .icono-config:hover {
+  color: #00aaff;
+}
+
+/* ================================
+   🧩 ZONAS / TALLES / IMÁGENES
+===================================*/
+.btn-mini-agregar,
+.btn-mini-eliminar {
+  background-color: #0096d1;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.btn-mini-eliminar {
+  background-color: #e74c3c;
+  margin-left: 8px;
+}
+.btn-mini-eliminar:hover {
+  background-color: #c0392b;
+}
+.btn-mini-agregar:hover {
+  background-color: #007bb2;
+}
+
+.preview-box {
+  background: #f9f9f9;
+  border: 1px solid #e0e0e0;
+  border-radius: 10px;
+  padding: 15px;
+  margin-top: 20px;
+}
+.preview-box h4 {
+  font-size: 15px;
+  margin-bottom: 10px;
+  color: #333;
+}
+.preview-subzonas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.preview-subzona-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 90px;
+}
+.preview-subzona-item label {
+  font-size: 13px;
+  color: #555;
+}
+.preview-subzona-item input {
+  width: 100%;
+  padding: 4px 6px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+}
+
+/* ================================
+   🌈 TABLA DE COLORES
+===================================*/
+.colores-editor {
+  padding: 15px 0;
+}
+
+.colores-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.color-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #f8fafc;
+  border: 1px solid #e3e8ec;
+  border-radius: 8px;
+  padding: 8px 12px;
+  transition: background-color 0.2s ease;
+}
+
+.color-item:hover {
+  background: #eef6fa;
+}
+
+.color-nombre {
+  font-weight: 500;
+  font-size: 14px;
+  color: #333;
+}
+
+.color-preview {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid #ccc;
+  margin-right: 8px;
+}
+
+.color-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.btn-color-add {
+  margin-top: 10px;
+  background-color: #0096d1;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn-color-add:hover {
+  background-color: #007bb2;
+}
+
+/* 🌙 Modo oscuro */
+body.dark-mode .color-item {
+  background-color: #2b2b2b;
+  border-color: #444;
+}
+body.dark-mode .color-nombre {
+  color: #eaeaea;
+}
+body.dark-mode .color-preview {
+  border-color: #666;
+}
+
+/* ================================
+   💾 BOTONES Y MODAL
+===================================*/
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.btn-guardar {
+  background-color: #2ecc71;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn-guardar:hover {
+  background-color: #27ae60;
+}
+
+.cancelar {
+  background-color: #aaa;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.cancelar:hover {
+  background-color: #888;
+}
+
+/* ================================
+   🪟 MODAL
+===================================*/
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 12px;
+  padding: 25px;
+  max-width: 600px;
+  width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+body.dark-mode .modal-content {
+  background: #2a2a2a;
+  color: #eaeaea;
+}
+/* =============================
+   🎯 Editor de Talles
+   ============================= */
+.talles-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.talles-editor h2 {
+  font-size: 20px;
+  color: #0096d1;
+  margin-bottom: 8px;
+}
+
+.talles-lista {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.talle-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 6px 10px;
+  min-width: 120px;
+  font-size: 14px;
+}
+
+.talle-item span {
+  font-weight: 500;
+  color: #333;
+}
+
+.btn-mini-eliminar {
+  background: none;
+  border: none;
+  color: #e74c3c;
+  font-weight: bold;
+  cursor: pointer;
+  font-size: 14px;
+  margin-left: 6px;
+  transition: 0.2s;
+}
+.btn-mini-eliminar:hover {
+  color: #c0392b;
+}
+
+.btn-mini-agregar {
+  background-color: #0096d1;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 14px;
+  cursor: pointer;
+  font-weight: 600;
+  margin-top: 8px;
+  transition: background 0.2s;
+}
+.btn-mini-agregar:hover {
+  background-color: #007bb2;
+}
+
+.preview-box {
+  margin-top: 20px;
+  padding: 12px;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
+.preview-box h4 {
+  margin-bottom: 10px;
+  font-size: 15px;
+  color: #0096d1;
+}
+.preview-subzonas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.preview-subzona-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  padding: 6px 10px;
+  min-width: 100px;
+}
+.preview-subzona-item label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #333;
+}
+.preview-subzona-item input {
+  width: 80px;
+  margin-top: 4px;
+  padding: 4px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+/* 🌙 Modo oscuro */
+body.dark-mode .talles-editor h2 {
+  color: #00aaff;
+}
+body.dark-mode .talle-item {
+  background-color: #2f2f2f;
+  border-color: #444;
+}
+body.dark-mode .talle-item span {
+  color: #eaeaea;
+}
+body.dark-mode .preview-box {
+  background-color: #2b2b2b;
+  border-color: #444;
+}
+body.dark-mode .preview-subzona-item {
+  background-color: #333;
+  border-color: #555;
+}
+body.dark-mode .preview-subzona-item label {
+  color: #eaeaea;
+}
+/* 🎨 Editor de Colores */
+.colores-editor {
+  padding: 10px;
+}
+
+.colores-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 15px;
+}
+
+.color-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f9fafb;
+}
+
+.color-preview {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  border: 1px solid #ddd;
+}
+
+.color-item span {
+  flex: 1;
+  font-size: 15px;
+  font-weight: 500;
+  color: #333;
+}
+
+/* Vista previa de colores */
+.preview-colores {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.preview-color-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.preview-color-item label {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* 🌙 Modo oscuro */
+body.dark-mode .color-item {
+  background-color: #2b2b2b;
+  border-color: #444;
+}
+
+body.dark-mode .color-item span {
+  color: #eaeaea;
+}
+/* 🎨 Editor de colores */
+.colores-editor {
+  padding: 20px;
+}
+
+.colores-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.color-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #f8fafc;
+  border: 1px solid #e3e8ec;
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+
+.color-preview {
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  margin-right: 10px;
+}
+
+.color-item span {
+  flex: 1;
+  font-weight: 500;
+  color: #333;
+}
+
+.preview-colores {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.preview-color-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.color-preview-mini {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+}
+/* 🎨 Selector de colores */
+.selector-color {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  font-size: 15px;
+  margin-top: 10px;
+  background-color: #fff;
+}
+
+.colores-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.preview-color {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #f8fafc;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  margin-top: 8px;
+}
+
+.color-muestra {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+}
+/* 🎨 Selector de colores */
+.selector-color {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  font-size: 15px;
+  margin-top: 10px;
+  background-color: #fff;
+}
+
+.colores-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.preview-color {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #f8fafc;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  margin-top: 8px;
+}
+
+.color-muestra {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+}
+.colores-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.colores-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.color-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #f8fafc;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+.selector-color {
+  width: 100%;
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  background: #fff;
+  font-size: 15px;
+}
+/* 🎨 EDITOR DE COLORES */
+.colores-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.colores-editor h2 {
+  font-size: 18px;
+  color: #0096d1;
+  margin-bottom: 4px;
+}
+
+.colores-editor .descripcion {
+  font-size: 14px;
+  color: #555;
+  line-height: 1.5;
+}
+
+.colores-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: #f8fafc;
+  border: 1px solid #e3e8ec;
+  border-radius: 10px;
+  padding: 14px;
+}
+
+.color-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  background-color: #fff;
+  border: 1px solid #e2e2e2;
+  border-radius: 6px;
+  transition: background 0.25s ease;
+}
+
+.color-item:hover {
+  background: #eef6fa;
+}
+
+.color-item span {
+  font-weight: 500;
+  color: #333;
+}
+
+/* Botones mini */
+.btn-mini-eliminar {
+  background: none;
+  border: none;
+  color: #ff4d4d;
+  font-size: 16px;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.btn-mini-eliminar:hover {
+  transform: scale(1.2);
+}
+
+.btn-mini-agregar {
+  margin-top: 8px;
+  align-self: flex-start;
+  background: #0096d1;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.25s ease;
+}
+
+.btn-mini-agregar:hover {
+  background: #007bb2;
+}
+
+/* 🧩 Vista previa */
+.preview-box {
+  margin-top: 20px;
+  padding: 14px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+
+.preview-box h4 {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 10px;
+  color: #333;
+}
+
+.selector-color {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  background: white;
+  font-size: 14px;
+  color: #333;
+}
+
+/* 🌙 Modo oscuro */
+body.dark-mode .colores-lista {
+  background: #2a2a2a;
+  border-color: #444;
+}
+
+body.dark-mode .color-item {
+  background-color: #333;
+  border-color: #555;
+}
+
+body.dark-mode .color-item span {
+  color: #eee;
+}
+
+body.dark-mode .preview-box {
+  background: #2f2f2f;
+  border-color: #444;
+}
+
+body.dark-mode .selector-color {
+  background: #3a3a3a;
+  color: #eee;
+  border-color: #555;
+}
+/* ==========================================================
+   🧱 ESTILOS MEJORADOS PARA ZONAS DE IMPRESIÓN
+   ========================================================== */
+
+/* Contenedor general del editor */
+.zonas-editor {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* Títulos */
+.zonas-editor h2 {
+  color: #0096d1;
+  font-size: 20px;
+  margin-bottom: 6px;
+}
+
+.zonas-editor .descripcion {
+  color: #555;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+/* Imagen de referencia */
+.referencia-img {
+  text-align: center;
+  margin: 18px 0;
+  padding: 10px;
+  background: #f9fafb;
+  border: 1px solid #e0e0e0;
+  border-radius: 10px;
+}
+
+.remera-zonas {
+  width: 280px;
+  max-width: 100%;
+  border-radius: 10px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+}
+
+.img-subtexto {
+  font-size: 13px;
+  color: #666;
+  margin-top: 10px;
+  text-align: center;
+}
+
+/* Bloque de cada zona */
+.zona-grupo {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 14px;
+  transition: box-shadow 0.2s ease;
+}
+.zona-grupo:hover {
+  box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+}
+
+/* Encabezado de zona */
+.zona-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.zona-header h4 {
+  font-size: 16px;
+  color: #0096d1;
+  font-weight: 600;
+  margin: 0;
+}
+
+/* Lista editable de subzonas */
+.lista-editable {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.lista-editable li {
+  background: #eef6fa;
+  border: 1px solid #cde5f3;
+  color: #0077aa;
+  border-radius: 8px;
+  padding: 6px 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+}
+
+/* Botones mini */
+.btn-mini-agregar,
+.btn-mini-eliminar {
+  border: none;
+  cursor: pointer;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.25s ease;
+}
+
+.btn-mini-agregar {
+  background-color: #0096d1;
+  color: white;
+  padding: 6px 10px;
+  margin-top: 10px;
+}
+
+.btn-mini-agregar:hover {
+  background-color: #007bb2;
+}
+
+.btn-mini-eliminar {
+  background: transparent;
+  color: #999;
+  font-size: 16px;
+  line-height: 1;
+  padding: 2px 4px;
+}
+.btn-mini-eliminar:hover {
+  color: #e63946;
+}
+
+/* Botones principales */
+.zonas-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.zonas-actions .btn-agregar {
+  background: #00b894;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.zonas-actions .btn-agregar:hover {
+  background: #009f7a;
+}
+
+.zonas-actions .btn-guardar {
+  background: #0096d1;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 14px;
+  font-weight: 600;
+}
+.zonas-actions .btn-guardar:hover {
+  background: #007bb2;
+}
+
+.zonas-actions .cancelar {
+  background: #f3f3f3;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+.zonas-actions .cancelar:hover {
+  background: #e8e8e8;
+}
+
+/* Vista previa */
+.preview-box {
+  background: #f8fafc;
+  border: 1px solid #e3e8ec;
+  border-radius: 10px;
+  padding: 16px;
+  margin-top: 20px;
+}
+
+.preview-box h4 {
+  color: #0096d1;
+  font-size: 16px;
+  margin-bottom: 10px;
+}
+
+.preview-zona {
+  margin-bottom: 10px;
+}
+
+.preview-subzonas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.preview-subzona-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 110px;
+}
+
+.preview-subzona-item label {
+  font-size: 13px;
+  color: #333;
+}
+
+.preview-subzona-item input {
+  padding: 6px 8px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #555;
+}
+
+/* 🌙 Modo oscuro */
+body.dark-mode .zonas-editor {
+  background: #1f1f1f;
+}
+body.dark-mode .zona-grupo {
+  background: #2a2a2a;
+  border-color: #444;
+}
+body.dark-mode .preview-box {
+  background: #2a2a2a;
+  border-color: #444;
+}
+body.dark-mode .preview-subzona-item input {
+  background: #3a3a3a;
+  color: #eee;
+  border-color: #555;
+}
+/* =========================================================
+   🎨 ESTILO MEJORADO PARA ZONAS DE IMPRESIÓN Y SELECTOR DE ÁREA
+   ========================================================= */
+
+/* Contenedor principal del editor de zonas */
+.zonas-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 10px 5px 25px;
+}
+
+.zonas-editor h2 {
+  font-size: 20px;
+  color: #0096d1;
+  margin-bottom: 5px;
+}
+
+.zonas-editor .descripcion {
+  font-size: 15px;
+  color: #444;
+  margin-bottom: 10px;
+  line-height: 1.5;
+}
+
+/* Imagen de referencia */
+.referencia-img {
+  text-align: center;
+  background: #f9f9f9;
+  border-radius: 10px;
+  padding: 16px;
+  border: 1px solid #e3e8ec;
+}
+
+.remera-zonas {
+  max-width: 240px;
+  height: auto;
+  display: block;
+  margin: 0 auto 10px;
+}
+
+.img-subtexto {
+  color: #777;
+  font-size: 13px;
+}
+
+/* Zonas */
+.zona-grupo {
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-top: 10px;
+}
+
+.zona-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.zona-header h4 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+
+.lista-editable {
+  list-style: none;
+  padding-left: 0;
+  margin: 0;
+}
+
+.lista-editable li {
+  background: #fff;
+  border-radius: 6px;
+  border: 1px solid #e0e0e0;
+  margin-bottom: 6px;
+  padding: 6px 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.btn-mini-agregar,
+.btn-mini-eliminar {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  transition: color 0.2s ease;
+}
+
+.btn-mini-agregar {
+  color: #0096d1;
+  margin-top: 6px;
+}
+
+.btn-mini-agregar:hover {
+  color: #007bb2;
+}
+
+.btn-mini-eliminar {
+  color: #999;
+}
+
+.btn-mini-eliminar:hover {
+  color: #ff4d4d;
+}
+
+/* Acciones inferiores */
+.zonas-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.btn-agregar,
+.btn-guardar,
+.cancelar {
+  border-radius: 8px;
+  font-weight: 600;
+  padding: 8px 14px;
+  cursor: pointer;
+  border: none;
+  transition: 0.25s ease;
+}
+
+.btn-agregar {
+  background: #e5f7ff;
+  color: #0096d1;
+}
+.btn-agregar:hover {
+  background: #d0f0ff;
+}
+
+.btn-guardar {
+  background: #0096d1;
+  color: #fff;
+}
+.btn-guardar:hover {
+  background: #007bb2;
+}
+
+.cancelar {
+  background: #f2f2f2;
+  color: #555;
+}
+.cancelar:hover {
+  background: #e0e0e0;
+}
+
+/* Vista previa */
+.preview-box {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 15px;
+  margin-top: 15px;
+}
+
+.preview-box h4 {
+  font-size: 15px;
+  margin-bottom: 10px;
+  color: #333;
+}
+
+.preview-zona {
+  margin-bottom: 10px;
+}
+
+.preview-subzonas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.preview-subzona-item {
+  background: #fff;
+  border: 1px solid #ddd;
+  padding: 5px 8px;
+  border-radius: 6px;
+  width: 130px;
+}
+
+.preview-subzona-item label {
+  display: block;
+  font-size: 13px;
+  color: #555;
+  margin-bottom: 4px;
+}
+
+.preview-subzona-item input {
+  width: 100%;
+  padding: 5px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+/* 🌙 Modo oscuro */
+body.dark-mode .zonas-editor,
+body.dark-mode .preview-box,
+body.dark-mode .zona-grupo {
+  background-color: #2a2a2a;
+  border-color: #444;
+  color: #eaeaea;
+}
+
+body.dark-mode .lista-editable li {
+  background: #333;
+  border-color: #555;
+  color: #eee;
+}
+
+body.dark-mode .preview-subzona-item {
+  background: #333;
+  border-color: #555;
+}
+
+body.dark-mode .btn-agregar {
+  background: #003d52;
+  color: #00aaff;
+}
+
+body.dark-mode .btn-guardar {
+  background: #006fa1;
+}
+
+body.dark-mode .cancelar {
+  background: #444;
+  color: #ddd;
+}
+/* ===============================
+   🎨 Estilos para área única (A1)
+   =============================== */
+
+.referencia-img.unica {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin: 20px 0;
+  padding: 20px;
+  background: #f8f9fb;
+  border-radius: 10px;
+  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+.area-unica-demo {
+  width: 120px;
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #e9efff, #d3e2ff);
+  border: 2px solid #0077ff;
+  color: #0077ff;
+  font-weight: bold;
+  font-size: 28px;
+  border-radius: 12px;
+  margin-bottom: 10px;
+  transition: all 0.3s ease;
+}
+
+.area-unica-demo:hover {
+  transform: scale(1.05);
+  background: linear-gradient(135deg, #d9e8ff, #bcd1ff);
+}
+
+.img-subtexto {
+  font-size: 14px;
+  color: #555;
+  text-align: center;
+  margin-top: 8px;
+  max-width: 380px;
+}
+.preview-imagenes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.preview-imagen-item {
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 8px;
+  background: #fafafa;
+  width: 120px;
+  height: 120px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+}
+
+.preview-img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.texto-secundario {
+  color: #777;
+  font-size: 0.9em;
+  margin-top: 5px;
+}
+/* ================================
+   🎨 Atributos adicionales
+   ================================ */
+
+.atributos-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+}
+
+.atributos-editor h2 {
+  font-size: 1.4rem;
+  margin-bottom: 0.2rem;
+  color: #333;
+}
+
+.atributos-editor .descripcion {
+  font-size: 0.95rem;
+  color: #555;
+  line-height: 1.5;
+  margin-bottom: 1.5rem;
+}
+
+/* 🧱 Lista de campos */
+.atributos-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.atributo-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #f9f9f9;
+  border: 1px solid #e1e1e1;
+  border-radius: 6px;
+  padding: 8px 10px;
+  transition: background 0.2s ease;
+}
+
+.atributo-item:hover {
+  background: #f2faff;
+}
+
+/* 🔤 Texto */
+.atributo-nombre {
+  flex-grow: 1;
+  font-weight: 500;
+  font-size: 0.95rem;
+  color: #333;
+}
+
+/* 🔼🔽 Botones de orden */
+.atributo-controles {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.btn-mover {
+  background: #e9f4ff;
+  border: 1px solid #bcdfff;
+  border-radius: 4px;
+  padding: 3px 6px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #007bff;
+  transition: all 0.15s ease;
+}
+
+.btn-mover:hover {
+  background: #007bff;
+  color: white;
+}
+
+/* ❌ Botón eliminar */
+.btn-mini-eliminar {
+  background: #ffebee;
+  border: 1px solid #ffb3b3;
+  color: #d32f2f;
+  border-radius: 4px;
+  padding: 3px 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.15s ease;
+}
+
+.btn-mini-eliminar:hover {
+  background: #d32f2f;
+  color: white;
+}
+
+/* ➕ Botón agregar campo */
+.btn-mini-agregar {
+  background: #e8f5e9;
+  border: 1px solid #a5d6a7;
+  color: #2e7d32;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  align-self: flex-start;
+  transition: all 0.2s ease;
+}
+
+.btn-mini-agregar:hover {
+  background: #2e7d32;
+  color: white;
+}
+
+/* 💾 Botones finales */
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.btn-guardar {
+  background: #007bff;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.btn-guardar:hover {
+  background: #0056b3;
+}
+
+.cancelar {
+  background: #e0e0e0;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.cancelar:hover {
+  background: #c2c2c2;
+}
+/* ================================
+   👁️ Vista previa de atributos
+   ================================ */
+
+.preview-box {
+  margin-top: 25px;
+  background: #f8f9fa;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.preview-box h4 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: #333;
+}
+
+/* 🧾 Contenedor de atributos en vista previa */
+.preview-atributos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 15px;
+  margin-top: 5px;
+}
+
+/* 🎯 Ítem individual de atributo */
+.preview-atributo-item {
+  flex: 1 1 calc(50% - 10px);
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 10px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 220px;
+}
+
+.preview-atributo-item label {
+  font-weight: 500;
+  font-size: 0.9rem;
+  color: #333;
+}
+
+.preview-atributo-item input {
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 6px 8px;
+  font-size: 0.9rem;
+  background: #fafafa;
+}
+/* =========================
+   🧩 Atributos Extra
+========================= */
+.atributos-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+}
+
+.atributos-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.atributo-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #f8f9fa;
+  border: 1px solid #e0e0e0;
+  padding: 0.6rem 0.8rem;
+  border-radius: 8px;
+}
+
+.acciones-atributo button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.1rem;
+  margin-left: 5px;
+}
+
+.preview-atributos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1rem;
+  margin-top: 0.8rem;
+}
+
+.preview-atributo-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  background: #fafafa;
+  padding: 0.7rem;
+  border-radius: 8px;
+  border: 1px solid #e3e3e3;
+}
+
+.preview-atributo-item label {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: #333;
+}
+
+.preview-atributo-item input {
+  border: 1px solid #d0d0d0;
+  padding: 0.4rem 0.5rem;
+  border-radius: 6px;
+  background: #fdfdfd;
+}
+/* 🎨 COLORES CONFIGURACIÓN */
+.colores-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.colores-editor h2 {
+  font-size: 1.4rem;
+  color: #222;
+}
+
+.colores-editor .descripcion {
+  color: #555;
+  font-size: 0.95rem;
+  margin-bottom: 0.5rem;
+}
+
+.colores-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  background: #fafafa;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  padding: 10px 15px;
+}
+
+.color-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background-color: #fff;
+  border: 1px solid #e0e0e0;
+  font-size: 0.95rem;
+}
+
+.color-item span {
+  font-weight: 500;
+  color: #333;
+}
+
+.btn-mini-eliminar {
+  border: none;
+  background: #ff5b5b;
+  color: white;
+  border-radius: 4px;
+  cursor: pointer;
+  padding: 2px 6px;
+  transition: 0.2s;
+}
+
+.btn-mini-eliminar:hover {
+  background: #e04848;
+}
+
+.btn-mini-agregar {
+  border: 1px dashed #00a884;
+  background: transparent;
+  color: #00a884;
+  border-radius: 6px;
+  cursor: pointer;
+  padding: 6px;
+  margin-top: 4px;
+  font-weight: 600;
+  transition: 0.3s;
+}
+
+.btn-mini-agregar:hover {
+  background-color: #00a884;
+  color: #fff;
+}
+
+/* 💾 Botones inferiores */
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 1rem;
+}
+
+.btn-guardar {
+  background-color: #00a884;
+  border: none;
+  color: #fff;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: 0.2s;
+}
+
+.btn-guardar:hover {
+  background-color: #019871;
+}
+
+.cancelar {
+  border: 1px solid #ccc;
+  background: #f4f4f4;
+  padding: 8px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+/* 👁️ Vista previa */
+.preview-box {
+  margin-top: 1rem;
+  border-top: 1px solid #ddd;
+  padding-top: 1rem;
+}
+
+.preview-box h4 {
+  color: #333;
+  font-size: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.selector-color {
+  width: 100%;
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  background: #fff;
+  color: #333;
+}
+/* ==============================
+   🎽 DETALLES POR TALLE
+============================== */
+
+.detalle-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #f9fafc;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-bottom: 8px;
+  transition: background 0.2s ease;
+}
+
+.detalle-item:hover {
+  background: #f1f3f6;
+}
+
+.talle-nombre {
+  font-weight: 600;
+  color: #333;
+  width: 90px;
+}
+
+.detalle-item input[type="text"] {
+  flex: 1;
+  margin-left: 12px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 14px;
+}
+
+.detalle-item input[type="text"]:focus {
+  border-color: #007bff;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.2);
+}
+
+/* ==============================
+   👁️ Vista previa Detalles
+============================== */
+
+.preview-box {
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  padding: 15px;
+  margin-top: 20px;
+}
+
+.preview-box h4 {
+  font-size: 15px;
+  color: #222;
+  margin-bottom: 10px;
+}
+
+.preview-subzona-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.preview-subzona-item strong {
+  color: #333;
+  font-weight: 600;
+}
+
+.preview-subzona-item p {
+  color: #555;
+  margin: 0;
+  font-size: 13px;
+}
+
+.texto-secundario {
+  color: #888;
+  font-size: 13px;
+  font-style: italic;
+  margin: 10px 0;
+}
+.talle-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #f8f8f8;
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-bottom: 6px;
+  border: 1px solid #ddd;
+}
+
+.preview-subzona-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.preview-subzona-item input {
+  flex: 1;
+  padding: 6px 8px;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+}

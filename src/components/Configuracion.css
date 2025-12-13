@@ -1,0 +1,160 @@
+.config-container {
+  background: var(--fondo, #ffffff);
+  border-radius: 14px;
+  padding: 25px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+  max-width: 800px;
+  margin: 0 auto;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.config-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 25px;
+}
+
+.config-icon {
+  color: #0096d1;
+  font-size: 24px;
+}
+
+.config-section {
+  margin-bottom: 30px;
+}
+
+.config-section h2 {
+  font-size: 16px;
+  color: #333;
+  margin-bottom: 10px;
+  border-left: 4px solid #0096d1;
+  padding-left: 8px;
+}
+
+.config-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #f8fafc;
+  border: 1px solid #e3e8ec;
+  border-radius: 10px;
+  padding: 14px 18px;
+  transition: all 0.3s ease;
+}
+
+.config-item:hover {
+  background: #f0f8ff;
+}
+
+.btn-modo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background-color: #eaf7ff;
+  border: 2px solid #0096d1;
+  color: #0096d1;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.btn-modo:hover {
+  background-color: #0096d1;
+  color: white;
+}
+
+.btn-modo.activo {
+  background-color: #0096d1;
+  color: white;
+}
+
+/* 🌗 MODO OSCURO */
+body.dark-mode .config-container {
+  background: #1f1f1f;
+  color: #eaeaea;
+}
+body.dark-mode .config-item {
+  background: #2a2a2a;
+  border-color: #3a3a3a;
+}
+body.dark-mode .config-section h2 {
+  color: #f0f0f0;
+}
+body.dark-mode .btn-modo {
+  background-color: #2b2b2b;
+  border-color: #0096d1;
+  color: #eaeaea;
+}
+body.dark-mode .btn-modo:hover {
+  background-color: #0096d1;
+  color: white;
+}
+
+.config-note {
+  font-size: 14px;
+  color: #777;
+}
+body.dark-mode .config-note {
+  color: #aaa;
+}
+/* ============================================
+   🧭 PESTAÑAS DE CONFIGURACIÓN
+   ============================================ */
+.config-tabs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.tab-btn {
+  background: #f1f5f9;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 8px 14px;
+  cursor: pointer;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #333;
+  transition: all 0.2s ease;
+}
+
+.tab-btn:hover {
+  background: #e2e8f0;
+}
+
+.tab-btn.activo {
+  background: #0096d1;
+  color: #fff;
+  border-color: #007bb2;
+}
+
+/* 🌙 MODO OSCURO */
+body.dark-mode .tab-btn {
+  background: #2a2a2a;
+  border-color: #3a3a3a;
+  color: #eaeaea;
+}
+
+body.dark-mode .tab-btn.activo {
+  background: #0096d1;
+  color: #fff;
+}
+
+/* 📱 RESPONSIVE */
+@media (max-width: 768px) {
+  .config-tabs {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+  .tab-btn {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+}
