@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
 import Sidebar from "./comunes/componentes/Sidebar";
-import ClientesList from "./components/ClientesList";
-import ClienteForm from "./components/ClienteForm";
-import ClienteDetalle from "./components/ClienteDetalle";
+import ClientesList from "./modulos/clientes/ClientesList";
+import ClienteForm from "./modulos/clientes/ClienteForm";
+import ClienteDetalle from "./modulos/clientes/ClienteDetalle";
 import PedidosList from "./components/PedidosList";
 import PedidoDetalle from "./components/PedidoDetalle";
 import Inicio from "./components/Inicio";

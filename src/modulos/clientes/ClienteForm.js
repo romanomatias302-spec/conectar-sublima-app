@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { collection, doc, setDoc, updateDoc, getDoc } from "firebase/firestore";
-import { db } from "../firebase";
+import { db } from "../../firebase";
 
 export default function ClienteForm({ cliente, onVolver, onCancelar, onGuardar }) {
   const [formData, setFormData] = useState(
