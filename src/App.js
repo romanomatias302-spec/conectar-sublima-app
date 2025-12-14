@@ -18,7 +18,9 @@ export default function App() {
   const [vista, setVista] = useState("inicio");
   const [clienteSeleccionado, setClienteSeleccionado] = useState(null);
   const [pedidoSeleccionado, setPedidoSeleccionado] = useState(null);
-  const [colapsada, setColapsada] = useState(false);
+  const [sidebarExpandido, setSidebarExpandido] = useState(true);
+  
+
   
 
   // ✅ Estado global de modo oscuro (persistente)
@@ -64,16 +66,24 @@ export default function App() {
 
   
   return (
-    <div className={`app-layout ${modoOscuro ? "dark-layout" : ""}`}>
+    <div
+  className={`app-layout ${modoOscuro ? "dark-layout" : ""} ${
+    sidebarExpandido ? "sidebar-expandido" : "sidebar-colapsado"
+  }`}
+>
+
       {/* 🧭 Sidebar lateral */}
       <Sidebar
-        onSelect={manejarSeleccionSidebar}
-        colapsada={colapsada}
-        onToggle={() => setColapsada(!colapsada)}
-      />
+  onSelect={manejarSeleccionSidebar}
+  expandido={sidebarExpandido}
+  onToggle={() => setSidebarExpandido(!sidebarExpandido)}
+/>
+
+
 
       {/* 🧱 Contenido principal */}
-      <main className={`main-content ${colapsada ? "collapsed" : ""}`}>
+      <main className={`main-content ${sidebarExpandido ? "sidebar-expandido" : "sidebar-colapsado"}`}>
+
         {vista === "inicio" && (
           <Inicio onNavigate={manejarNavegacionDesdeInicio} />
         )}

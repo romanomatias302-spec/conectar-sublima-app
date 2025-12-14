@@ -1,27 +1,8 @@
-import React, { useState } from "react";
+import React from "react";
 import "./Inicio.css";
-import {
-  FaBox,
-  FaUsers,
-  FaClipboardList,
-  FaChartBar,
-  FaPlus,
-  FaCog,
-  FaHome,
-  FaFileInvoice,
-} from "react-icons/fa";
+import { FaBox, FaUsers, FaClipboardList, FaChartBar, FaCog } from "react-icons/fa";
 
 export default function Inicio({ onNavigate }) {
-  const [menuFlotante, setMenuFlotante] = useState(false);
-
-  const toggleMenu = () => setMenuFlotante(!menuFlotante);
-
-  const crearElemento = (tipo) => {
-    setMenuFlotante(false);
-    if (tipo === "pedido") onNavigate("nuevoPedido");
-    if (tipo === "cliente") onNavigate("formulario");
-  };
-
   return (
     <div className="inicio-container">
       {/* 🧭 CABECERA */}
@@ -64,50 +45,11 @@ export default function Inicio({ onNavigate }) {
           <FaChartBar className="icon" />
           <span>Estadísticas</span>
         </div>
-        <div className="modulo">
+        <div onClick={() => onNavigate("configuracion")} className="modulo">
           <FaCog className="icon" />
           <span>Configuración</span>
         </div>
       </section>
-
-      {/* ➕ MENÚ FLOTANTE */}
-      {menuFlotante && (
-        <div className="menu-flotante">
-          <button onClick={() => crearElemento("pedido")}>
-            <FaFileInvoice /> Crear Pedido
-          </button>
-          <button onClick={() => crearElemento("cliente")}>
-            <FaUsers /> Crear Cliente
-          </button>
-        </div>
-      )}
-
-      {/* 🧭 BARRA INFERIOR (MÓVIL) */}
-      <nav className="bottom-nav">
-        <FaHome
-          className="nav-icon"
-          onClick={() => onNavigate("inicio")}
-          title="Inicio"
-        />
-        <FaClipboardList
-          className="nav-icon"
-          onClick={() => onNavigate("pedidos")}
-          title="Pedidos"
-        />
-        <div className="nav-plus" onClick={toggleMenu} title="Crear">
-          <FaPlus />
-        </div>
-        <FaUsers
-          className="nav-icon"
-          onClick={() => onNavigate("listado")}
-          title="Clientes"
-        />
-        <FaCog
-          className="nav-icon"
-          onClick={() => onNavigate("configuracion")}
-          title="Configuración"
-        />
-      </nav>
     </div>
   );
 }

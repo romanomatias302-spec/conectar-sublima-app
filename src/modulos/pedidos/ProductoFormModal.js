@@ -18,7 +18,7 @@ export default function ProductoFormModal({
 }) {
   const [formData, setFormData] = useState({
     producto: "",
-    productoNombre: "", // ✅ nuevo
+    productoNombre: "",
     color: "",
     detalle: "",
     cantidad: 1,
@@ -35,15 +35,17 @@ export default function ProductoFormModal({
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // ✅ NUEVO: colores configurados (para mostrar lista en vez de texto libre)
+  const [coloresDisponibles, setColoresDisponibles] = useState([]);
+
   // ✅ Config dinámica (desde Firestore) para render
-  const [zonasConfig, setZonasConfig] = useState(null); // puede ser array u objeto
-  const [tallesConfig, setTallesConfig] = useState(null); // puede ser array u objeto
+  const [zonasConfig, setZonasConfig] = useState(null);
+  const [tallesConfig, setTallesConfig] = useState(null);
 
   // =========================
-  // Helpers de normalización
+  // Helpers
   // =========================
   const buildBooleanMap = (arrOrObj) => {
-    // ["color","talles"] => { color:true, talles:true } (o false, no importa; usamos truthy)
     if (Array.isArray(arrOrObj)) {
       return arrOrObj.reduce((acc, k) => ({ ...acc, [k]: true }), {});
     }
@@ -54,9 +56,6 @@ export default function ProductoFormModal({
   const ensureObject = (val) => (val && typeof val === "object" ? val : {});
 
   const mergeKeepExisting = (baseKeys, existingObj, defaultValue = "") => {
-    // baseKeys: array de strings
-    // existingObj: {key: value}
-    // devuelve objeto con keys de baseKeys, preservando si ya existía
     const prev = ensureObject(existingObj);
     return (baseKeys || []).reduce((acc, k) => {
       acc[k] = prev[k] ?? defaultValue;
@@ -70,7 +69,7 @@ export default function ProductoFormModal({
   };
 
   // =========================
-  // Fallbacks (para no romper)
+  // Fallbacks (por si falta config)
   // =========================
   const zonasFallback = {
     Frente: ["F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8"],
@@ -100,7 +99,7 @@ export default function ProductoFormModal({
   ];
 
   // =========================
-  // 🔹 Cargar productos configurados
+  // 🔹 Cargar productosBase
   // =========================
   useEffect(() => {
     const cargarProductos = async () => {
@@ -125,7 +124,7 @@ export default function ProductoFormModal({
     if (productoEditando) {
       setFormData({
         producto: productoEditando.producto || "",
-        productoNombre: productoEditando.productoNombre || "", // ✅ nuevo
+        productoNombre: productoEditando.productoNombre || "",
         color: productoEditando.color || "",
         detalle: productoEditando.detalle || "",
         cantidad: productoEditando.cantidad || 1,
@@ -147,52 +146,39 @@ export default function ProductoFormModal({
       try {
         const ref = doc(db, "productosBase", formData.producto);
         const snap = await getDoc(ref);
-
         if (!snap.exists()) return;
 
         const data = snap.data();
 
-        // ✅ switches normalizados
+        // ✅ switches
         const switches = buildBooleanMap(data.switches || {});
         setSwitchesActivos(switches);
 
         // ✅ orden de campos
         setCamposOrden(data.orden_personalizado || data.orden_campos || []);
 
-        // ✅ zonas/talles dinámicos (pueden ser array u objeto)
-        const zonasFromDb = data.zonas ?? null;
-        const tallesFromDb = data.talles ?? null;
+        // ✅ zonas / talles
+        setZonasConfig(data.zonas ?? null);
+        setTallesConfig(data.talles ?? null);
 
-        setZonasConfig(zonasFromDb);
-        setTallesConfig(tallesFromDb);
+        // ✅ colores (para select)
+        setColoresDisponibles(Array.isArray(data.colores) ? data.colores : []);
 
-        // ✅ setear productoNombre si no está (o si quedó vacío)
+        // ✅ set productoNombre si no viene
         setFormData((prev) => ({
           ...prev,
           productoNombre: prev.productoNombre || data.nombre || getProductoNombreById(prev.producto),
         }));
 
-        // ✅ si viene zonas/talles como ARRAY, armamos estructura base (preservando lo ya cargado)
-        //   - zonas: string => value "" (texto)
-        //   - talles: string => value 0 (cantidad)
-        if (Array.isArray(zonasFromDb)) {
+        // ✅ si talles viene como array u objeto -> asegurar keys en formData
+        if (Array.isArray(data.talles)) {
           setFormData((prev) => ({
             ...prev,
-            zonas: mergeKeepExisting(zonasFromDb, prev.zonas, ""),
+            talles: mergeKeepExisting(data.talles, prev.talles, 0),
+            detallePorTalle: mergeKeepExisting(data.talles, prev.detallePorTalle, ""),
           }));
-        }
-
-        if (Array.isArray(tallesFromDb)) {
-          setFormData((prev) => ({
-            ...prev,
-            talles: mergeKeepExisting(tallesFromDb, prev.talles, 0),
-            detallePorTalle: mergeKeepExisting(tallesFromDb, prev.detallePorTalle, ""),
-          }));
-        }
-
-        // ✅ si viene talles como OBJ {XL:true,...} o {XL:0,...} => usamos keys
-        if (tallesFromDb && !Array.isArray(tallesFromDb) && typeof tallesFromDb === "object") {
-          const keys = Object.keys(tallesFromDb);
+        } else if (data.talles && typeof data.talles === "object") {
+          const keys = Object.keys(data.talles);
           setFormData((prev) => ({
             ...prev,
             talles: mergeKeepExisting(keys, prev.talles, 0),
@@ -200,8 +186,8 @@ export default function ProductoFormModal({
           }));
         }
 
-        // ✅ si viene zonas como OBJ agrupado {Frente:[...], Espalda:[...]} => no hace falta tocar formData.zonas
-        // se renderiza por items y se guarda en formData.zonas con keys de cada zona
+        // ✅ si zonas viene como objeto -> no hace falta tocar formData.zonas,
+        // se guardan valores por key cuando el usuario escribe.
       } catch (err) {
         console.error("Error al cargar configuración del producto:", err);
       }
@@ -228,7 +214,7 @@ export default function ProductoFormModal({
   const handleChange = (e) => {
     const { name, value } = e.target;
 
-    // ✅ si cambia producto, reseteo error y seteo productoNombre
+    // ✅ si cambia producto, set productoNombre también
     if (name === "producto") {
       setError("");
       const nombre = getProductoNombreById(value);
@@ -236,6 +222,12 @@ export default function ProductoFormModal({
         ...prev,
         producto: value,
         productoNombre: nombre || prev.productoNombre || "",
+        // opcional: resetear campos dependientes
+        color: "",
+        zonas: {},
+        talles: {},
+        detallePorTalle: {},
+        imagenes: [""],
       }));
       return;
     }
@@ -288,13 +280,12 @@ export default function ProductoFormModal({
       return;
     }
 
-    // ✅ asegurar productoNombre antes de guardar
     const productoNombreFinal =
       formData.productoNombre || getProductoNombreById(formData.producto) || "";
 
     const datosAGuardar = {
       ...formData,
-      productoNombre: productoNombreFinal, // ✅ nuevo
+      productoNombre: productoNombreFinal,
       totalTalles,
     };
 
@@ -319,63 +310,20 @@ export default function ProductoFormModal({
   // =========================
   // Render helpers dinámicos
   // =========================
-  const normalizeZonasToRender = (raw) => {
-  // Caso 1: array de objetos [{grupo, subzonas}]
-  if (Array.isArray(raw)) {
-    if (raw.length > 0 && raw[0] && typeof raw[0] === "object") {
-      // [{grupo:"Frente", subzonas:["F1","F2"]}, ...]
-      if ("grupo" in raw[0] && "subzonas" in raw[0]) {
-        return raw.reduce((acc, item) => {
-          const titulo = item.grupo || "Zonas";
-          const items = Array.isArray(item.subzonas) ? item.subzonas : [];
-          acc[titulo] = items.map((z) => String(z));
-          return acc;
-        }, {});
-      }
-
-      // array de objetos genérico -> intentamos sacar un string
-      return { Zonas: raw.map((x) => String(x.nombre || x.codigo || x.id || "")) };
+  const resolveZonasToRender = () => {
+    // zonas como objeto { Frente:[...], Espalda:[...] }
+    if (zonasConfig && typeof zonasConfig === "object" && !Array.isArray(zonasConfig)) {
+      return zonasConfig;
     }
-
-    // Caso 2: array de strings ["F1","F2"]
-    return { Zonas: raw.map((z) => String(z)) };
-  }
-
-  // Caso 3: objeto { Frente:[...], Espalda:[...] }
-  if (raw && typeof raw === "object") {
-    const out = {};
-    Object.entries(raw).forEach(([titulo, items]) => {
-      if (Array.isArray(items)) {
-        out[titulo] = items.map((z) =>
-          typeof z === "string" ? z : String(z.nombre || z.codigo || z.id || "")
-        );
-      } else {
-        out[titulo] = [];
-      }
-    });
-    return out;
-  }
-
-  // Caso 4: null/undefined
-  return null;
-};
-
-const resolveZonasToRender = () => {
-  const normalizadas = normalizeZonasToRender(zonasConfig);
-  return normalizadas && Object.keys(normalizadas).length > 0
-    ? normalizadas
-    : zonasFallback;
-};
-
+    // si por algún motivo viene mal, fallback
+    return zonasFallback;
+  };
 
   const resolveTallesToRender = () => {
-    // 1) array
+    // talles como array
     if (Array.isArray(tallesConfig)) return tallesConfig;
-
-    // 2) obj -> keys
+    // talles como objeto -> keys
     if (tallesConfig && typeof tallesConfig === "object") return Object.keys(tallesConfig);
-
-    // 3) fallback
     return tallesFallback;
   };
 
@@ -388,13 +336,26 @@ const resolveZonasToRender = () => {
         return (
           <div className="campo-form">
             <label>Color</label>
-            <input
-              type="text"
-              name="color"
-              placeholder="Ej: blanco, negro, rojo..."
-              value={formData.color}
-              onChange={handleChange}
-            />
+
+            {/* ✅ si hay colores configurados -> select */}
+            {coloresDisponibles.length > 0 ? (
+              <select name="color" value={formData.color || ""} onChange={handleChange}>
+                <option value="">Seleccionar color...</option>
+                {coloresDisponibles.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                type="text"
+                name="color"
+                placeholder="Ej: blanco, negro, rojo..."
+                value={formData.color}
+                onChange={handleChange}
+              />
+            )}
           </div>
         );
 
@@ -476,11 +437,7 @@ const resolveZonasToRender = () => {
               </div>
             ))}
             {(formData.imagenes || []).length < 10 && (
-              <button
-                type="button"
-                className="btn-agregar-img"
-                onClick={agregarCampoImagen}
-              >
+              <button type="button" className="btn-agregar-img" onClick={agregarCampoImagen}>
                 + Agregar enlace
               </button>
             )}

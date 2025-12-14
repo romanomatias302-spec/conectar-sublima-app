@@ -7,44 +7,10 @@ body {
   padding: 0;
   transition: background-color 0.3s, color 0.3s;
 }
+
 * {
   transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
-}
-
-
-/* 🌗 MODO OSCURO AUTOMÁTICO */
-@media (prefers-color-scheme: dark) {
-  body {
-    background-color: #1e1e1e;
-    color: #eaeaea;
-  }
-  table {
-    background-color: #262626;
-  }
-  thead {
-    background-color: #007bb2;
-  }
-  th, td {
-    border-color: #333;
-  }
-  input, select, textarea {
-    background-color: #2b2b2b;
-    color: #eaeaea;
-    border-color: #444;
-  }
-  input:focus, select:focus, textarea:focus {
-    border-color: #0096d1;
-  }
-  .container-primaria, .container-secundaria {
-    background-color: #2a2a2a;
-  }
-  .btn-secundario, .cancelar, .btn-volver {
-    background-color: #2b2b2b;
-    border-color: #0096d1;
-  }
-  .btn-secundario:hover, .cancelar:hover, .btn-volver:hover {
-    background-color: #064663;
-  }
+  box-sizing: border-box;
 }
 
 /* 🧱 CONTENEDORES */
@@ -97,69 +63,35 @@ button {
   margin: 4px;
 }
 
-/* Principal */
 .btn-primario,
 .btn-nuevo,
-.btn-guardar {
+.btn-guardar,
+.btn-primary {
   background-color: #0096d1;
   color: #fff;
 }
+
 .btn-primario:hover,
 .btn-nuevo:hover,
-.btn-guardar:hover {
+.btn-guardar:hover,
+.btn-primary:hover {
   background-color: #007bb2;
 }
 
-/* Secundario */
 .btn-secundario,
 .cancelar,
-.btn-volver {
+.btn-volver,
+.btn-cancelar {
   background-color: #fff;
   color: #0096d1;
   border: 2px solid #0096d1;
 }
+
 .btn-secundario:hover,
 .cancelar:hover,
-.btn-volver:hover {
+.btn-volver:hover,
+.btn-cancelar:hover {
   background-color: #eaf7ff;
-}
-
-/* Editar */
-.btn-editar {
-  background-color: #ffb74d;
-  color: #fff;
-}
-.btn-editar:hover {
-  background-color: #ff9f1c;
-}
-
-/* Eliminar */
-.btn-eliminar {
-  background-color: #ff5252;
-  color: #fff;
-}
-.btn-eliminar:hover {
-  background-color: #e04646;
-}
-
-/* Ver */
-.btn-ver {
-  background-color: #6c63ff;
-  color: #fff;
-}
-.btn-ver:hover {
-  background-color: #5349e0;
-}
-
-/* Botón “Agregar enlace” */
-.btn-agregar-img {
-  background-color: #f4f8fb;
-  border: 1px solid #c8d9e5;
-  color: #007bb2;
-  font-size: 13px;
-}
-.btn-agregar-img:hover {
-  background-color: #e8f5fb;
 }
 
 /* 📋 TABLAS */
@@ -198,6 +130,8 @@ input, select, textarea {
   margin-bottom: 14px;
   font-size: 14px;
   transition: all 0.25s ease;
+  background-color: #fff;
+  color: #1a1a1a;
 }
 
 input:focus,
@@ -208,31 +142,7 @@ textarea:focus {
   box-shadow: 0 0 0 2px rgba(0, 150, 209, 0.15);
 }
 
-/* 🧩 SECCIONES */
-h2 {
-  color: #1c1c1c;
-  margin-bottom: 16px;
-}
-
-h3 {
-  color: #333;
-  font-size: 16px;
-  font-weight: 600;
-}
-
-/* 📸 IMÁGENES DENTRO DE MODALES */
-.remera-zonas {
-  width: 100%;
-  max-width: 400px;
-  margin: 15px auto;
-  display: block;
-  border-radius: 8px;
-  border: 1px solid #e0e0e0;
-  background: #fff;
-  padding: 10px;
-}
-
-/* 🧾 MODAL (PRODUCTO, CLIENTE, ETC.) */
+/* 🧾 MODAL */
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -257,37 +167,52 @@ h3 {
   box-shadow: 0 4px 18px rgba(0, 0, 0, 0.15);
 }
 
-/* Barra de desplazamiento */
-.modal-content::-webkit-scrollbar {
-  width: 8px;
-}
+.modal-content::-webkit-scrollbar { width: 8px; }
 .modal-content::-webkit-scrollbar-thumb {
   background-color: rgba(0, 0, 0, 0.2);
   border-radius: 6px;
 }
 
-/* 🧾 ACORDEÓN para zonas/talles */
-.zona-grupo, .talle-item {
-  margin-bottom: 10px;
-}
-.zona-campos, .talles-grid {
+/* =========================
+   ✅ LAYOUT + SIDEBAR (FIX)
+   ========================= */
+
+/* Contenedor principal */
+.app-layout {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.zona-item, .talle-item {
-  flex: 1 1 80px;
+  min-height: 100vh;
+  background-color: #f4f6f8;
 }
 
-/* 🧩 RESPONSIVE */
+/* Contenido principal */
+.main-content {
+  flex: 1;
+  padding: 25px;
+  transition: margin-left 0.3s ease;
+  padding-bottom: 96px; /* evita que el menú inferior tape contenido */
+}
+
+/* ✅ Main se adapta al ancho real del sidebar (usa clases en <main>) */
+.main-content.sidebar-expandido {
+  margin-left: 230px; /* coincide con Sidebar.css expandido */
+}
+
+.main-content.sidebar-colapsado {
+  margin-left: 75px; /* coincide con Sidebar.css colapsado */
+}
+
+/* ✅ Mobile: nunca dejar margen */
 @media (max-width: 768px) {
-  table {
-    font-size: 13px;
+  .main-content {
+    margin-left: 0 !important;
+    padding: 20px;
   }
+}
 
-  th, td {
-    padding: 8px;
-  }
+/* 🧩 RESPONSIVE GENERAL */
+@media (max-width: 768px) {
+  table { font-size: 13px; }
+  th, td { padding: 8px; }
 
   button {
     width: 100%;
@@ -299,595 +224,15 @@ h3 {
     padding: 18px;
   }
 }
-/* ====== 🧭 CORRECCIÓN DEL SIDEBAR ====== */
 
-/* Contenedor principal de toda la app */
-.app-layout {
-  display: flex;
-  min-height: 100vh;
-  background-color: #f4f6f8;
-}
-
-/* Sidebar (izquierda) */
-.sidebar {
-  width: 240px;
-  background: #111827;
-  color: #fff;
-  display: flex;
-  flex-direction: column;
-  position: fixed;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  transition: all 0.3s ease;
-  z-index: 10;
-}
-
-/* Sidebar colapsado */
-.sidebar.collapsed {
-  width: 70px;
-}
-
-/* Área principal (contenido) */
-.main-content {
-  margin-left: 240px; /* se ajusta según ancho sidebar */
-  flex: 1;
-  padding: 25px;
-  transition: margin-left 0.3s ease;
-}
-
-/* Si el sidebar está colapsado */
-.sidebar.collapsed + .main-content {
-  margin-left: 70px;
-}
-
-/* Responsivo */
-@media (max-width: 768px) {
-  .sidebar {
-    position: fixed;
-    z-index: 20;
-    height: 100%;
-    transform: translateX(-100%);
-  }
-  .sidebar.open {
-    transform: translateX(0);
-  }
-  .main-content {
-    margin-left: 0 !important;
-    padding: 20px;
-  }
-}
-/* Evitar que el bottom-nav tape el final del contenido */
-.main-content { padding-bottom: 96px; }
-
-/* Tarjeta de formulario coherente con tu nueva estética */
-.form-card {
-  background: #ffffff;
-  border-radius: 16px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.06);
-  padding: 20px;
-  max-width: 1100px;
-  margin: 0 auto;
-}
-
-.form-title {
-  font-size: 20px;
-  font-weight: 700;
-  margin: 0 0 16px;
-}
-
-.alert-error {
-  background: #ffe8e8;
-  color: #b40000;
-  border: 1px solid #ffc7c7;
-  padding: 8px 10px;
-  border-radius: 8px;
-  margin-bottom: 12px;
-}
-
-/* Layout del formulario */
-
-
-
-/* Acciones */
-.form-actions {
-  margin-top: 16px;
-  display: flex;
-  justify-content: space-between; /* izq: cancelar | der: guardar */
-  gap: 12px;
-}
-
-/* Botones neutrales/principales (coherentes con tu UI) */
-.btn {
-  height: 42px;
-  padding: 0 16px;
-  border-radius: 10px;
-  border: 1px solid transparent;
-  font-weight: 600;
-  cursor: pointer;
-}
-.btn-ghost {
-  background: #f5f7fb;
-  color: #3a4b6a;
-  border-color: #e6e9ef;
-}
-.btn-ghost:hover { background: #eef2f8; }
-.btn-primary {
-  background: #1e8fff;
-  color: #fff;
-}
-.btn-primary:hover { filter: brightness(0.95); }
-
-/* Responsive: 1 col en mobile */
-@media (max-width: 768px) {
-  
-}
-/* ===========================================
-   🎨 ACTUALIZACIÓN GLOBAL DE ESTÉTICA (v2)
-   =========================================== */
-
-/* 🔹 FORMULARIO ESTÉTICO MEJORADO */
-
-
-
-
-
-
-/* 🔹 Acciones del formulario */
-.form-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-  margin-top: 28px;
-}
-
-/* 🔹 Botones coherentes */
-.btn-primary,
-.btn-primario,
-.btn-guardar {
-  background: #0096d1;
-  color: #fff;
-  border: none;
-  border-radius: 6px;
-  padding: 10px 22px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: 0.25s;
-}
-
-.btn-primary:hover,
-.btn-guardar:hover {
-  background: #007bb2;
-}
-
-.btn-cancelar,
-.cancelar {
-  background: #f1f5f9;
-  color: #444;
-  border-radius: 6px;
-  border: 1px solid #ccd4de;
-  padding: 10px 22px;
-  cursor: pointer;
-}
-
-.btn-cancelar:hover {
-  background: #e2e8f0;
-}
-
-@media (max-width: 768px) {
-  .form-grid {
-    grid-template-columns: 1fr;
-    gap: 18px;
-  }
-}
-
-
-/* Campos del formulario */
-input, select, textarea {
-  width: 100%;
-  padding: 10px 12px;
-  border: 1px solid #cfd8e3;
-  border-radius: 6px; /* 🔻 redondeado más discreto */
-  font-size: 14px;
-  transition: all 0.2s ease;
-  background-color: #fff;
-}
-
-/* Enfocado */
-input:focus, select:focus, textarea:focus {
-  border-color: #0096d1;
-  box-shadow: 0 0 0 3px rgba(0, 150, 209, 0.15);
-  outline: none;
-}
-
-/* Etiquetas */
-label {
-  display: block;
-  font-size: 13px;
-  font-weight: 500;
-  margin-bottom: 4px;
-  color: #444;
-}
-
-/* 🔹 BOTONES */
-button,
-.btn,
-.btn-primario,
-.btn-secundario,
-.btn-nuevo,
-.btn-eliminar,
-.btn-editar,
-.btn-volver,
-.cancelar {
-  border-radius: 6px; /* 🔻 reducción de redondeado global */
-  padding: 10px 18px;
-  font-size: 15px;
-  font-weight: 600;
-  transition: all 0.25s ease;
-}
-
-/* Hover suave */
-button:hover,
-.btn:hover {
-  transform: translateY(-1px);
-}
-
-/* 🔹 CONTENEDORES VISUALES */
-.container-primaria,
-.container-secundaria,
-.form-card {
-  border-radius: 10px; /* 🔻 menos redondeado */
-  padding: 24px;
-}
-
-/* 🔹 TABLAS */
-table {
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-th, td {
-  border-radius: 0;
-}
-
-/* 🔹 MODALES */
-.modal-content {
-  border-radius: 10px; /* 🔻 más recto */
-  max-height: 92vh;
-  overflow-y: auto;
-}
-
-/* 🔹 RESPONSIVE */
-@media (max-width: 768px) {
-  .form-grid {
-    grid-template-columns: 1fr;
-  }
-  button {
-    width: 100%;
-  }
-}
-
-/* ===========================================
-   🌗 MODO OSCURO COHERENTE
-   =========================================== */
-body.dark-mode input,
-body.dark-mode select,
-body.dark-mode textarea {
-  background-color: #2b2b2b;
-  color: #eaeaea;
-  border-color: #444;
-}
-
-body.dark-mode input:focus,
-body.dark-mode select:focus,
-body.dark-mode textarea:focus {
-  border-color: #0096d1;
-  box-shadow: 0 0 0 3px rgba(0, 150, 209, 0.25);
-}
-
-
-
-/* ===================================================
-   🎨 FORMULARIO REFINADO (versión compacta y elegante)
-   =================================================== */
-
-
-
-/* Etiquetas */
-
-
-/* Campos */
-
-/* Hover y Focus */
-
-
-
-
-/* Separación extra entre grupos largos */
-.form-grid + .form-grid {
-  margin-top: 25px;
-}
-
-/* 🔹 Acciones (Guardar / Cancelar) */
-.form-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 22px;
-}
-
-.btn-primary,
-.btn-guardar {
-  background-color: #0096d1;
-  color: #fff;
-  border: none;
-  border-radius: 5px;
-  padding: 9px 18px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background-color 0.2s ease;
-}
-
-.btn-primary:hover,
-.btn-guardar:hover {
-  background-color: #007bb2;
-}
-
-.cancelar,
-.btn-cancelar {
-  background-color: #f8fafc;
-  border: 1px solid #ccd4de;
-  border-radius: 5px;
-  padding: 9px 18px;
-  font-size: 14px;
-  color: #333;
-  cursor: pointer;
-  transition: background-color 0.2s ease;
-}
-
-.cancelar:hover,
-.btn-cancelar:hover {
-  background-color: #e2e8f0;
-}
-
-/* Móvil */
-@media (max-width: 768px) {
-  .form-grid {
-    grid-template-columns: 1fr;
-    gap: 18px;
-  }
-}
-/* ===================================================
-   🎨 FORMULARIOS MODERNOS, COMPACTOS Y ESTÉTICOS
-   =================================================== */
-
-.form-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 20px 26px;
-  margin-top: 20px;
-  align-items: start;
-}
-
-/* Campos */
-.form-field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-/* Etiquetas */
-.form-field label {
-  font-size: 13px;
-  font-weight: 500;
-  color: #444;
-  margin-bottom: 2px;
-}
-
-/* Inputs, Selects y Textareas */
-.form-field input,
-.form-field select,
-.form-field textarea {
-  border: 1px solid #ccd4de;
-  border-radius: 4px; /* 🔹 Redondeado leve */
-  padding: 7px 10px; /* 🔹 Altura más baja */
-  font-size: 14px;
-  background-color: #fff;
-  line-height: 1.4;
-  transition: all 0.2s ease;
-  min-height: 20px;
-}
-
-/* Hover */
-.form-field input:hover,
-.form-field select:hover,
-.form-field textarea:hover {
-  border-color: #b5bcc7;
-}
-
-/* Focus */
-.form-field input:focus,
-.form-field select:focus,
-.form-field textarea:focus {
-  border-color: #0096d1;
-  box-shadow: 0 0 0 2px rgba(0, 150, 209, 0.15);
-  outline: none;
-}
-
-/* 🔹 Botones coherentes con todo el sistema */
-.btn-primary,
-.btn-primario,
-.btn-guardar {
-  background-color: #0096d1;
-  color: #fff;
-  border: none;
-  border-radius: 5px;
-  padding: 9px 18px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background-color 0.2s ease;
-}
-.btn-primary:hover,
-.btn-guardar:hover {
-  background-color: #007bb2;
-}
-
-.cancelar,
-.btn-cancelar {
-  background-color: #f8fafc;
-  border: 1px solid #ccd4de;
-  border-radius: 5px;
-  padding: 9px 18px;
-  font-size: 14px;
-  color: #333;
-  cursor: pointer;
-  transition: background-color 0.2s ease;
-}
-.cancelar:hover,
-.btn-cancelar:hover {
-  background-color: #e2e8f0;
-}
-
-/* 🔹 Layout de botones */
-.form-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 22px;
-}
-
-/* Móvil */
-@media (max-width: 768px) {
-  .form-grid {
-    grid-template-columns: 1fr;
-    gap: 18px;
-  }
-  .form-actions {
-    flex-direction: column;
-    align-items: stretch;
-  }
-}
-/* ===========================================
-   🌙 MODO OSCURO GLOBAL (ACTIVO CON dark-mode)
-   =========================================== */
+/* =========================
+   🌙 MODO OSCURO (dark-mode)
+   ========================= */
 body.dark-mode {
   background-color: #1c1c1c;
   color: #eaeaea;
-  transition: background-color 0.3s, color 0.3s;
 }
 
-/* 🔹 Sidebar */
-body.dark-mode .sidebar {
-  background-color: #111827;
-  color: #eaeaea;
-}
-body.dark-mode .sidebar a,
-body.dark-mode .sidebar button {
-  color: #d1d5db;
-}
-body.dark-mode .sidebar a:hover,
-body.dark-mode .sidebar button:hover {
-  color: #ffffff;
-}
-
-/* 🔹 Contenido principal */
-body.dark-mode .main-content {
-  background-color: #1f1f1f;
-  color: #eaeaea;
-}
-
-/* 🔹 Formularios */
-body.dark-mode input,
-body.dark-mode select,
-body.dark-mode textarea {
-  background-color: #2b2b2b;
-  color: #eaeaea;
-  border-color: #444;
-}
-body.dark-mode input:focus,
-body.dark-mode select:focus,
-body.dark-mode textarea:focus {
-  border-color: #0096d1;
-  box-shadow: 0 0 0 3px rgba(0, 150, 209, 0.3);
-}
-
-/* 🔹 Tablas */
-body.dark-mode table {
-  background-color: #252525;
-  color: #eaeaea;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-}
-body.dark-mode thead {
-  background-color: #0096d1;
-  color: #fff;
-}
-body.dark-mode tr:hover {
-  background-color: #2d2d2d;
-}
-body.dark-mode th,
-body.dark-mode td {
-  border-color: #333;
-}
-
-/* 🔹 Botones */
-body.dark-mode .btn-primario,
-body.dark-mode .btn-primary,
-body.dark-mode .btn-guardar {
-  background-color: #0096d1;
-  color: #fff;
-}
-body.dark-mode .btn-primario:hover,
-body.dark-mode .btn-primary:hover,
-body.dark-mode .btn-guardar:hover {
-  background-color: #007bb2;
-}
-
-body.dark-mode .btn-secundario,
-body.dark-mode .cancelar,
-body.dark-mode .btn-volver {
-  background-color: #2b2b2b;
-  color: #0096d1;
-  border: 1px solid #0096d1;
-}
-body.dark-mode .btn-secundario:hover,
-body.dark-mode .cancelar:hover,
-body.dark-mode .btn-volver:hover {
-  background-color: #064663;
-}
-
-/* 🔹 Formularios y contenedores */
-body.dark-mode .form-card,
-body.dark-mode .container-primaria,
-body.dark-mode .container-secundaria {
-  background-color: #2a2a2a;
-  border-color: #3a3a3a;
-}
-
-/* 🔹 Modal */
-body.dark-mode .modal-content {
-  background-color: #2a2a2a;
-  color: #eaeaea;
-}
-
-/* 🔹 Bottom Nav */
-body.dark-mode .bottom-nav {
-  background-color: #1e1e1e;
-  border-top: 1px solid #333;
-}
-body.dark-mode .nav-icon {
-  color: #eaeaea;
-}
-body.dark-mode .nav-plus {
-  background-color: #0096d1;
-}
-/* ===========================================
-   🎨 AJUSTES DE CONTRASTE Y ACCESOS RÁPIDOS
-   =========================================== */
-
-/* 🔹 Tipografías en gris claro */
-body.dark-mode,
 body.dark-mode h1,
 body.dark-mode h2,
 body.dark-mode h3,
@@ -895,262 +240,35 @@ body.dark-mode h4,
 body.dark-mode p,
 body.dark-mode span,
 body.dark-mode label,
-body.dark-mode td,
-body.dark-mode th {
-  color: #d1d5db !important; /* gris claro legible */
-}
-
-/* 🔹 Hover en filas de tablas (evita texto blanco sobre fondo claro) */
-body.dark-mode tr:hover td {
-  color: #e5e7eb !important; /* gris más claro en hover */
-  background-color: #2b2b2b !important;
-}
-
-/* 🔹 Accesos rápidos en la pantalla de inicio */
-body.dark-mode .accesos-rapidos .modulo {
-  background-color: #2a2a2a; /* gris oscuro elegante */
-  border: 1px solid #3a3a3a;
-  color: #d1d5db;
-  transition: all 0.3s ease;
-}
-
-body.dark-mode .accesos-rapidos .modulo:hover {
-  background-color: #333;
-  transform: translateY(-2px);
-}
-
-/* 🔹 Iconos dentro de accesos rápidos */
-body.dark-mode .accesos-rapidos .icon {
-  color: #0096d1 !important; /* mantiene el azul corporativo */
-}
-
-/* 🔹 Tarjetas de resumen en inicio */
-body.dark-mode .resumen-cards .card {
-  background-color: #2a2a2a;
-  color: #d1d5db;
-  border: 1px solid #3a3a3a;
-}
-
-body.dark-mode .resumen-cards .card h2 {
-  color: #ffffff;
-}
-
-/* 🔹 Inputs de búsqueda */
-body.dark-mode input[type="text"],
-body.dark-mode .buscador {
-  background-color: #2b2b2b;
-  color: #e5e7eb;
-  border-color: #444;
-}
-body.dark-mode input::placeholder,
-body.dark-mode .buscador::placeholder {
-  color: #9ca3af;
-}
-/* ===========================================
-   🌙 FORMULARIOS EN MODO OSCURO
-   =========================================== */
-body.dark-mode .form-card,
-body.dark-mode .container-secundaria,
-body.dark-mode .container-primaria {
-  background-color: #2a2a2a; /* Gris intermedio */
-  color: #e5e5e5; /* Texto gris claro */
-  border: 1px solid #3a3a3a;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.4);
-}
-
-body.dark-mode .form-field label {
-  color: #cfcfcf;
-}
-
-body.dark-mode input,
-body.dark-mode select,
-body.dark-mode textarea {
-  background-color: #1f1f1f;
-  border: 1px solid #3a3a3a;
-  color: #f0f0f0;
-}
-
-body.dark-mode input:focus,
-body.dark-mode select:focus,
-body.dark-mode textarea:focus {
-  border-color: #0096d1;
-  box-shadow: 0 0 0 2px rgba(0, 150, 209, 0.25);
-}
-
-/* Botones dentro de formularios en modo oscuro */
-body.dark-mode .btn-primary,
-body.dark-mode .btn-primario,
-body.dark-mode .btn-guardar {
-  background-color: #0096d1;
-  color: #fff;
-}
-
-body.dark-mode .btn-cancelar,
-body.dark-mode .cancelar {
-  background-color: #383838;
-  border-color: #555;
-  color: #e0e0e0;
-}
-body.dark-mode .btn-cancelar:hover,
-body.dark-mode .cancelar:hover {
-  background-color: #4a4a4a;
-}
-/* =============================================
-   🌙 CORRECCIÓN: Formularios en modo oscuro
-   ============================================= */
-
-body.dark-mode .form-card,
-body.dark-mode .cliente-detalle,
-body.dark-mode .pedido-detalle,
-body.dark-mode .modal-content {
-  background-color: #2b2b2b !important;
-  color: #e0e0e0 !important;
-  border: 1px solid #444;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
-}
-
-/* Campos de texto y bordes */
-body.dark-mode input,
-body.dark-mode select,
-body.dark-mode textarea {
-  background-color: #1f1f1f !important;
-  border-color: #555 !important;
-  color: #eaeaea !important;
-}
-
-body.dark-mode input::placeholder,
-body.dark-mode textarea::placeholder {
-  color: #999 !important;
-}
-
-/* Títulos, etiquetas y texto */
-body.dark-mode h1,
-body.dark-mode h2,
-body.dark-mode h3,
-body.dark-mode label,
-body.dark-mode p,
-body.dark-mode span {
-  color: #eaeaea !important;
-}
-
-/* Botones */
-body.dark-mode .btn-primario,
-body.dark-mode .btn-guardar {
-  background-color: #0096d1 !important;
-  color: #fff !important;
-}
-body.dark-mode .btn-primario:hover,
-body.dark-mode .btn-guardar:hover {
-  background-color: #007bb2 !important;
-}
-
-/* Campos de solo lectura */
-body.dark-mode input[readonly],
-body.dark-mode textarea[readonly] {
-  background-color: #2a2a2a !important;
-  color: #ccc !important;
-  border-color: #555 !important;
-}
-/* 🌗 FONDOS DE FORMULARIOS Y DETALLES EN MODO OSCURO */
-body.dark-mode .form-card,
-body.dark-mode .detalle-contenedor,
-body.dark-mode .container-primaria,
-body.dark-mode .container-secundaria {
-  background-color: #2b2b2b !important;
-  border: 1px solid #444;
-  color: #eaeaea;
-}
-
-/* 🔹 Etiquetas y textos en formularios */
-body.dark-mode label,
-body.dark-mode h1,
-body.dark-mode h2,
-body.dark-mode h3,
-body.dark-mode h4,
-body.dark-mode p,
-body.dark-mode span {
-  color: #e5e5e5 !important;
-}
-
-/* 🔹 Inputs dentro de formularios */
-body.dark-mode input,
-body.dark-mode select,
-body.dark-mode textarea {
-  background-color: #1e1e1e !important;
-  color: #eaeaea !important;
-  border-color: #555;
-}
-
-/* Hover / Focus */
-body.dark-mode input:focus,
-body.dark-mode select:focus,
-body.dark-mode textarea:focus {
-  border-color: #0096d1 !important;
-  box-shadow: 0 0 0 2px rgba(0, 150, 209, 0.3);
-}
-/* ============================================
-   🌙 AJUSTES FINALES DE MODO OSCURO (2025)
-   ============================================ */
-
-/* 🔹 Menú desplegable de acciones (tres puntitos) */
-body.dark-mode .action-dropdown {
-  background-color: #2a2a2a !important;
-  border: 1px solid #444 !important;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
-}
-body.dark-mode .action-dropdown button {
-  color: #eaeaea !important;
-  background: transparent;
-  border: none;
-}
-body.dark-mode .action-dropdown button:hover {
-  background-color: #333 !important;
-  color: #fff !important;
-}
-
-/* 🔹 Formularios de cliente/pedido (fondo gris oscuro coherente) */
-body.dark-mode .form-card,
-body.dark-mode .cliente-detalle,
-body.dark-mode .pedido-detalle {
-  background-color: #262626 !important;
-  border: 1px solid #3d3d3d !important;
-  color: #e0e0e0 !important;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
-}
-
-/* 🔹 Botones dentro de formularios */
-body.dark-mode .btn-primario,
-body.dark-mode .btn-guardar,
-body.dark-mode .btn-primary {
-  background-color: #0096d1 !important;
-  color: #fff !important;
-  border: none !important;
-}
-body.dark-mode .btn-primario:hover,
-body.dark-mode .btn-guardar:hover,
-body.dark-mode .btn-primary:hover {
-  background-color: #007bb2 !important;
-}
-
-/* 🔹 Tipografía y contraste */
-body.dark-mode label,
-body.dark-mode h1,
-body.dark-mode h2,
-body.dark-mode h3,
-body.dark-mode span,
-body.dark-mode p,
 body.dark-mode td,
 body.dark-mode th {
   color: #d1d5db !important;
 }
 
-/* 🔹 Hover en filas de tabla */
+body.dark-mode .main-content {
+  background-color: #1f1f1f;
+}
+
+body.dark-mode table {
+  background-color: #252525;
+  color: #eaeaea;
+}
+
+body.dark-mode thead {
+  background-color: #0096d1;
+  color: #fff;
+}
+
+body.dark-mode th,
+body.dark-mode td {
+  border-color: #333;
+}
+
 body.dark-mode tr:hover td {
   background-color: #2f2f2f !important;
   color: #f0f0f0 !important;
 }
 
-/* 🔹 Campos de entrada */
 body.dark-mode input,
 body.dark-mode select,
 body.dark-mode textarea {
@@ -1158,6 +276,7 @@ body.dark-mode textarea {
   color: #eaeaea !important;
   border-color: #555 !important;
 }
+
 body.dark-mode input:focus,
 body.dark-mode select:focus,
 body.dark-mode textarea:focus {
@@ -1165,8 +284,51 @@ body.dark-mode textarea:focus {
   box-shadow: 0 0 0 2px rgba(0, 150, 209, 0.3);
 }
 
-/* 🔹 Placeholder legible */
-body.dark-mode input::placeholder,
-body.dark-mode textarea::placeholder {
-  color: #9ca3af !important;
+body.dark-mode .modal-content {
+  background-color: #2a2a2a;
+  color: #eaeaea;
+  border: 1px solid #444;
+}
+/* ================================
+   SIDEBAR CONTROLADO POR APP (v3)
+   ================================ */
+
+/* Definimos variable de ancho según estado */
+.app-layout.sidebar-expandido { --sidebar-w: 230px; } /* coincide con Sidebar.css */
+.app-layout.sidebar-colapsado { --sidebar-w: 75px; }
+
+/* Sidebar fijo */
+.sidebar {
+  width: var(--sidebar-w);
+}
+
+/* Main siempre ocupa el espacio real restante */
+.main-content {
+  margin-left: var(--sidebar-w) !important;
+  width: calc(100vw - var(--sidebar-w)) !important;
+}
+
+/* En mobile NO dejamos margen */
+@media (max-width: 768px) {
+  .main-content {
+    margin-left: 0 !important;
+    width: 100vw !important;
+  }
+}
+
+/* ================================
+   MOBILE MENU alineado con sidebar
+   ================================ */
+
+@media (min-width: 900px) {
+  .mobile-menu {
+    left: var(--sidebar-w) !important;
+    width: calc(100vw - var(--sidebar-w)) !important;
+    right: 0 !important;
+  }
+
+  .menu-flotante {
+    left: calc(var(--sidebar-w) + (100vw - var(--sidebar-w)) / 2) !important;
+    transform: translateX(-50%) !important;
+  }
 }

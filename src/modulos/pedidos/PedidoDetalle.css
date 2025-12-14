@@ -314,3 +314,15 @@ body.dark-mode .action-menu-dropdown button:hover {
   background-color: #3b3b3b !important;
   color: #00aaff !important;
 }
+/* 🔥 CRÍTICO: permitir que el menú se vea fuera de la tabla */
+.tabla-productos,
+.tabla-productos tbody,
+.tabla-productos tr,
+.tabla-productos td {
+  overflow: visible !important;
+}
+
+/* Asegura que la celda de acciones no recorte */
+.tabla-productos td {
+  position: relative;
+}

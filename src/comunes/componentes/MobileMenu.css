@@ -1,80 +1,105 @@
+/* ===========================
+   MOBILE MENU (theme aware)
+   Usa: body.dark-mode
+   =========================== */
+
 .mobile-menu {
   position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
+
   height: 70px;
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(10px);
   display: flex;
   justify-content: space-around;
   align-items: center;
-  border-top: 1px solid rgba(0, 0, 0, 0.08);
-  box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.06);
+
+  backdrop-filter: blur(10px);
+  box-sizing: border-box;
+  max-width: 100vw;
+
+  /* 🔥 para que el botón central NO se corte */
+  overflow: visible;
+
   z-index: 100;
+}
+
+/* ✅ En escritorio: si hay sidebar, el menú no debe arrancar en x=0
+   Ajustá este valor al ancho real del sidebar */
+@media (min-width: 900px) {
+  :root {
+    --sidebar-w: 260px; /* 👈 si tu sidebar es 240, poné 240 */
+  }
+
+  .mobile-menu {
+    left: var(--sidebar-w);
+    width: calc(100vw - var(--sidebar-w));
+  }
+
+  /* Menú flotante centrado en el área útil */
+  .menu-flotante {
+    left: calc(var(--sidebar-w) + (100vw - var(--sidebar-w)) / 2);
+    transform: translateX(-50%);
+    max-width: calc(100vw - var(--sidebar-w) - 24px);
+  }
 }
 
 .menu-btn {
   background: none;
   border: none;
   outline: none;
+
   display: flex;
   flex-direction: column;
   align-items: center;
+
   font-size: 12px;
-  color: #555;
+  gap: 4px;
+
   cursor: pointer;
   transition: all 0.3s ease;
 }
 
-.menu-btn.active {
-  color: #0077ff;
-  transform: translateY(-3px);
-}
-
-.menu-btn:hover {
-  color: #0077ff;
-}
-
-/* 🔹 Botón central flotante */
+/* Botón central */
 .btn-central {
-  background-color: #0077ff;
-  color: white;
   border: none;
   border-radius: 50%;
   width: 60px;
   height: 60px;
+
   display: flex;
   align-items: center;
   justify-content: center;
+
   position: relative;
   bottom: 20px;
-  box-shadow: 0 4px 15px rgba(0, 119, 255, 0.4);
+
   cursor: pointer;
   transition: transform 0.25s ease, box-shadow 0.3s ease;
 }
 
 .btn-central:hover {
   transform: scale(1.1);
-  box-shadow: 0 6px 20px rgba(0, 119, 255, 0.5);
 }
 
 .btn-central svg {
   stroke-width: 2.2;
 }
-/* 🔹 Menú flotante */
+
+/* Menú flotante */
 .menu-flotante {
-  position: fixed;
+  position: absolute;
   bottom: 95px;
   left: 50%;
   transform: translateX(-50%);
-  background: white;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+
   border-radius: 12px;
   padding: 10px;
+
   display: flex;
   flex-direction: column;
   gap: 8px;
+
   animation: fadeIn 0.2s ease;
   z-index: 120;
 }
@@ -82,17 +107,14 @@
 .menu-flotante button {
   background: none;
   border: none;
+
   display: flex;
   align-items: center;
   gap: 8px;
+
   font-size: 14px;
-  color: #333;
   cursor: pointer;
   transition: all 0.2s ease;
-}
-
-.menu-flotante button:hover {
-  color: #0077ff;
 }
 
 @keyframes fadeIn {
@@ -104,4 +126,85 @@
     opacity: 1;
     transform: translate(-50%, 0);
   }
+}
+
+/* ======================================================
+   🌞 MODO CLARO (cuando NO existe body.dark-mode)
+   ====================================================== */
+body:not(.dark-mode) .mobile-menu {
+  background: rgba(245, 245, 245, 0.95);
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.08);
+}
+
+body:not(.dark-mode) .menu-btn,
+body:not(.dark-mode) .menu-btn svg {
+  color: #0077ff;
+}
+
+body:not(.dark-mode) .menu-btn.active,
+body:not(.dark-mode) .menu-btn:hover,
+body:not(.dark-mode) .menu-btn.active svg,
+body:not(.dark-mode) .menu-btn:hover svg {
+  color: #005fcc;
+}
+
+body:not(.dark-mode) .btn-central {
+  background-color: #0077ff;
+  color: #fff;
+  box-shadow: 0 4px 15px rgba(0, 119, 255, 0.35);
+}
+
+body:not(.dark-mode) .menu-flotante {
+  background: #fff;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+body:not(.dark-mode) .menu-flotante button {
+  color: #333;
+}
+
+body:not(.dark-mode) .menu-flotante button:hover {
+  color: #0077ff;
+}
+
+/* ======================================================
+   🌙 MODO OSCURO (cuando existe body.dark-mode)
+   ====================================================== */
+body.dark-mode .mobile-menu {
+  background: rgba(35, 35, 35, 0.95);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.35);
+}
+
+body.dark-mode .menu-btn,
+body.dark-mode .menu-btn svg {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+body.dark-mode .menu-btn.active,
+body.dark-mode .menu-btn:hover,
+body.dark-mode .menu-btn.active svg,
+body.dark-mode .menu-btn:hover svg {
+  color: #2da1ff;
+}
+
+body.dark-mode .btn-central {
+  background-color: #0077ff;
+  color: #fff;
+  box-shadow: 0 4px 15px rgba(0, 119, 255, 0.45);
+}
+
+body.dark-mode .menu-flotante {
+  background: #1f1f1f;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+body.dark-mode .menu-flotante button {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+body.dark-mode .menu-flotante button:hover {
+  color: #2da1ff;
 }

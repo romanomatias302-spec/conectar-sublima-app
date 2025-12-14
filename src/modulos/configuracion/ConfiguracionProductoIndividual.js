@@ -31,18 +31,28 @@ useEffect(() => {
       if (snap.exists()) {
         let data = snap.data();
 
-        // ✅ Precarga de zonas base
-        if (!data.zonas || data.zonas.length === 0) {
-          if (data.nombre?.toLowerCase().includes("remera")) {
-            data.zonas = [
-              { grupo: "Frente", subzonas: ["F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8"] },
-              { grupo: "Espalda", subzonas: ["E1", "E2", "E3", "E4"] },
-              { grupo: "Mangas", subzonas: ["M1", "M2"] },
-            ];
-          } else if (data.nombre?.toLowerCase().includes("taza")) {
-            data.zonas = [{ grupo: "Frente", subzonas: ["A1"] }];
-          }
-        }
+        // ✅ Precarga de zonas base (FORMATO OBJETO)
+const zonasVacias =
+  !data.zonas ||
+  (Array.isArray(data.zonas) && data.zonas.length === 0) ||
+  (typeof data.zonas === "object" && !Array.isArray(data.zonas) && Object.keys(data.zonas).length === 0);
+
+if (zonasVacias) {
+  const nombre = (data.nombre || "").toLowerCase();
+
+  if (nombre.includes("remera")) {
+    data.zonas = {
+      Frente: ["F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8"],
+      Espalda: ["E1", "E2", "E3", "E4"],
+      Mangas: ["M1", "M2"],
+    };
+  } else if (nombre.includes("taza")) {
+    data.zonas = {
+      General: ["Zona única de impresión"],
+    };
+  }
+}
+
 
         // ✅ Precarga de talles base
         if (!data.talles || data.talles.length === 0) {

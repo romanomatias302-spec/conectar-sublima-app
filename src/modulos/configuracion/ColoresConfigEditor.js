@@ -9,38 +9,31 @@ export default function ColoresConfigEditor({
   const [colores, setColores] = useState([]);
 
   useEffect(() => {
-    // Normalizar: si vienen strings, los convertimos a objetos con código vacío
-    const normalizados = coloresIniciales.map((c) =>
-      typeof c === "string" ? { nombre: c, codigo: "" } : c
+    // Si no hay colores cargados, se cargan algunos por defecto
+    setColores(
+      coloresIniciales.length > 0
+        ? coloresIniciales
+        : ["Negro", "Blanco", "Rojo", "Azul", "Verde"]
     );
-    setColores(normalizados);
   }, [coloresIniciales]);
 
   // ➕ Agregar nuevo color
   const agregarColor = () => {
-    const nombre = prompt("Ingresá el nombre del color (ej. Bordó, Celeste, Amarillo):");
-    if (!nombre) return;
-
-    if (colores.some((c) => c.nombre.toLowerCase() === nombre.toLowerCase())) {
+    const nuevo = prompt("Ingresá el nombre del color (ejemplo: Bordó, Celeste, Amarillo):");
+    if (!nuevo) return;
+    const colorNormalizado = nuevo.trim();
+    if (colores.includes(colorNormalizado)) {
       alert("Ese color ya está en la lista.");
       return;
     }
-
-    setColores([...colores, { nombre, codigo: "" }]);
+    setColores([...colores, colorNormalizado]);
   };
 
   // ❌ Eliminar color
-  const eliminarColor = (nombre) => {
-    if (window.confirm(`¿Eliminar el color "${nombre}"?`)) {
-      setColores(colores.filter((c) => c.nombre !== nombre));
+  const eliminarColor = (color) => {
+    if (window.confirm(`¿Eliminar el color "${color}" de la lista?`)) {
+      setColores(colores.filter((c) => c !== color));
     }
-  };
-
-  // 🎨 Editar código de color
-  const cambiarCodigo = (index, valor) => {
-    const nuevos = [...colores];
-    nuevos[index].codigo = valor;
-    setColores(nuevos);
   };
 
   // 💾 Guardar cambios
@@ -54,38 +47,20 @@ export default function ColoresConfigEditor({
       <h2>Colores del producto</h2>
       <p className="descripcion">
         Agregá colores a la lista desplegable que verás en tu formulario de pedidos.  
-        Cada color que agregues acá aparecerá como opción disponible para tus productos.
+        Cada color que agregues acá aparecerá como opción disponible cuando crees o edites un producto.
       </p>
 
       {/* 📋 Lista de colores */}
       <div className="colores-lista">
         {colores.map((c, i) => (
           <div key={i} className="color-item">
-            <div className="color-info">
-              <span>{c.nombre}</span>
-              {c.codigo && (
-                <div
-                  className="color-preview"
-                  style={{ backgroundColor: c.codigo }}
-                  title={c.codigo}
-                />
-              )}
-            </div>
-
-            <div className="color-actions">
-              <input
-                type="color"
-                value={c.codigo || "#ffffff"}
-                onChange={(e) => cambiarCodigo(i, e.target.value)}
-                title="Seleccionar color"
-              />
-              <button
-                className="btn-mini-eliminar"
-                onClick={() => eliminarColor(c.nombre)}
-              >
-                ✕
-              </button>
-            </div>
+            <span>{c}</span>
+            <button
+              className="btn-mini-eliminar"
+              onClick={() => eliminarColor(c)}
+            >
+              ✕
+            </button>
           </div>
         ))}
         <button className="btn-mini-agregar" onClick={agregarColor}>
@@ -109,7 +84,7 @@ export default function ColoresConfigEditor({
         <select className="selector-color" disabled>
           <option>Seleccionar color...</option>
           {colores.map((c, i) => (
-            <option key={i}>{c.nombre}</option>
+            <option key={i}>{c}</option>
           ))}
         </select>
       </div>
