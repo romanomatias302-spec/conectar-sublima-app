@@ -1,9 +1,17 @@
 .pedido-detalle {
-  background: #fff;
   padding: 25px;
   border-radius: 12px;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+  background: #fff; /* claro por defecto */
 }
+
+/* ✅ MODO OSCURO */
+body.dark-mode .pedido-detalle {
+  background: #1f1f1f !important;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.45) !important;
+  color: #e5e7eb !important;
+}
+
 
 .pedido-detalle h1 {
   color: #0a74da;
@@ -325,4 +333,151 @@ body.dark-mode .action-menu-dropdown button:hover {
 /* Asegura que la celda de acciones no recorte */
 .tabla-productos td {
   position: relative;
+}
+/* ===============================
+   HEADER DETALLE PEDIDO (THEME)
+   =============================== */
+
+.pedido-header-bar{
+  display: grid;
+  grid-template-columns: repeat(4, minmax(180px, 1fr));
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  margin: 12px 0 18px;
+  align-items: center;
+}
+
+.pedido-header-item{
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.pedido-header-label{
+  font-size: 13px;
+  opacity: 0.85;
+  white-space: nowrap;
+}
+
+.pedido-header-value{
+  font-size: 14px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Badge de estado */
+.pedido-status-badge{
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 10px;
+  border-radius: 999px;
+  line-height: 1;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Light */
+body:not(.dark-mode) .pedido-header-bar{
+  background: #ffffff;
+  border: 1px solid rgba(0,0,0,0.08);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.06);
+  color: #111827;
+}
+
+body:not(.dark-mode) .pedido-header-label{ color:#334155; }
+body:not(.dark-mode) .pedido-header-value{ color:#0f172a; }
+
+body:not(.dark-mode) .pedido-status-badge{
+  background: rgba(0,150,209,0.10);
+  color: #007bb2;
+  border: 1px solid rgba(0,150,209,0.35);
+}
+
+/* Dark */
+body.dark-mode .pedido-header-bar{
+  background: #232323; /* carbón */
+  border: 1px solid rgba(255,255,255,0.08);
+  box-shadow: 0 8px 22px rgba(0,0,0,0.45);
+  color: #e5e7eb;
+}
+
+body.dark-mode .pedido-header-label{ color:#cbd5e1; }
+body.dark-mode .pedido-header-value{ color:#f1f5f9; }
+
+body.dark-mode .pedido-status-badge{
+  background: rgba(45,161,255,0.15);
+  color: #2da1ff;
+  border: 1px solid rgba(45,161,255,0.35);
+}
+
+/* Estados opcionales */
+body.dark-mode .estado-entregado{
+  background: rgba(34,197,94,0.14);
+  color:#22c55e;
+  border: 1px solid rgba(34,197,94,0.35);
+}
+body.dark-mode .estado-cancelado{
+  background: rgba(239,68,68,0.14);
+  color:#ef4444;
+  border: 1px solid rgba(239,68,68,0.35);
+}
+
+/* Responsive */
+@media (max-width: 1100px){
+  .pedido-header-bar{ grid-template-columns: repeat(2, minmax(180px, 1fr)); }
+}
+@media (max-width: 640px){
+  .pedido-header-bar{ grid-template-columns: 1fr; }
+}
+/* =====================================================
+   FIX BLINDADO: header del pedido en modo oscuro
+   (gana contra reglas globales con !important)
+   ===================================================== */
+
+body.dark-mode .pedido-detalle .pedido-header-bar{
+  background: #232323 !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+  box-shadow: 0 8px 22px rgba(0,0,0,0.45) !important;
+  color: #e5e7eb !important;
+}
+
+body.dark-mode .pedido-detalle .pedido-header-label{
+  color: #cbd5e1 !important;
+}
+
+body.dark-mode .pedido-detalle .pedido-header-value{
+  color: #f1f5f9 !important;
+}
+
+body.dark-mode .pedido-detalle .pedido-status-badge{
+  background: rgba(45,161,255,0.15) !important;
+  color: #2da1ff !important;
+  border: 1px solid rgba(45,161,255,0.35) !important;
+}
+
+/* Si por algún motivo todavía existe .info-pedido en tu CSS/JS, lo forzamos también */
+body.dark-mode .pedido-detalle .info-pedido{
+  background: #232323 !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+  color: #e5e7eb !important;
+}
+body.dark-mode .pedido-detalle .info-pedido strong,
+body.dark-mode .pedido-detalle .info-pedido p{
+  color: #e5e7eb !important;
+}
+body.dark-mode .pedido-detalle .info-pedido {
+  background: #232323 !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+  color: #e5e7eb !important;
+}
+
+body.dark-mode .pedido-detalle h1,
+body.dark-mode .pedido-detalle p,
+body.dark-mode .pedido-detalle strong {
+  color: #e5e7eb !important;
 }

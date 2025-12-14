@@ -60,12 +60,35 @@ export default function PedidoDetalle({ pedido, onVolver }) {
       <h1>Detalles del Pedido #{pedido.id}</h1>
 
       {/* 🔹 Contenedor gris claro para datos del pedido */}
-      <div className="info-pedido">
-        <p><strong>Cliente:</strong> {pedido.cliente}</p>
-        <p><strong>Estado:</strong> {pedido.estado}</p>
-        <p><strong>Fecha de Pedido:</strong> {pedido.fechaPedido}</p>
-        <p><strong>Fecha de Entrega:</strong> {pedido.fechaEntrega}</p>
-      </div>
+      {/* 🔹 Header del pedido (theme-aware) */}
+<div className="pedido-header-bar">
+  <div className="pedido-header-item">
+    <span className="pedido-header-label">Cliente:</span>
+    <span className="pedido-header-value">{pedido?.cliente || "-"}</span>
+  </div>
+
+  <div className="pedido-header-item">
+    <span className="pedido-header-label">Estado:</span>
+    <span
+      className={`pedido-status-badge estado-${(pedido?.estado || "en-proceso")
+        .toLowerCase()
+        .replace(/\s+/g, "-")}`}
+    >
+      {pedido?.estado || "En proceso"}
+    </span>
+  </div>
+
+  <div className="pedido-header-item">
+    <span className="pedido-header-label">Fecha de Pedido:</span>
+    <span className="pedido-header-value">{pedido?.fechaPedido || "-"}</span>
+  </div>
+
+  <div className="pedido-header-item">
+    <span className="pedido-header-label">Fecha de Entrega:</span>
+    <span className="pedido-header-value">{pedido?.fechaEntrega || "-"}</span>
+  </div>
+</div>
+
 
       {/* 🔹 Acciones principales */}
       <div className="acciones-detalle">
