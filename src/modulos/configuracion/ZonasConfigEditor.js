@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import "./ConfiguracionProductos.css";
 
 export default function ZonasConfigEditor({
-  zonasIniciales = [],
+  zonasIniciales = null, // ahora puede ser array u objeto
   productoNombre = "",
   onGuardar,
   onCerrar,
@@ -10,27 +10,64 @@ export default function ZonasConfigEditor({
   const [zonas, setZonas] = useState([]);
   const [tipoArea, setTipoArea] = useState("multiple"); // multiple | unica | personalizada
 
-  // 🟢 Inicialización inmediata (si no hay zonas cargadas)
+  // ✅ Helpers: convertir formatos
+  const objectToArray = (obj) => {
+    if (!obj || typeof obj !== "object" || Array.isArray(obj)) return [];
+    return Object.entries(obj).map(([grupo, subzonas]) => ({
+      grupo,
+      subzonas: Array.isArray(subzonas) ? subzonas : [],
+    }));
+  };
+
+  const arrayToObject = (arr) => {
+    if (!Array.isArray(arr)) return {};
+    return arr.reduce((acc, item) => {
+      const grupo = item?.grupo ? String(item.grupo) : "Zonas";
+      const subzonas = Array.isArray(item?.subzonas) ? item.subzonas : [];
+      acc[grupo] = subzonas.map((s) => String(s));
+      return acc;
+    }, {});
+  };
+
+  const detectarTipoArea = (arr) => {
+    // heurística simple: si es 1 grupo con 1 subzona => unica, si hay varios => multiple
+    if (!Array.isArray(arr) || arr.length === 0) return "personalizada";
+    if (arr.length === 1) return "unica";
+    return "multiple";
+  };
+
+  // 🟢 Inicialización inmediata (acepta zonasIniciales objeto o array)
   useEffect(() => {
-    if (zonasIniciales && zonasIniciales.length > 0) {
+    // 1) Si zonasIniciales viene como OBJETO {Frente:[...]}
+    if (zonasIniciales && !Array.isArray(zonasIniciales) && typeof zonasIniciales === "object") {
+      const arr = objectToArray(zonasIniciales);
+      setZonas(arr);
+      setTipoArea(detectarTipoArea(arr));
+      return;
+    }
+
+    // 2) Si zonasIniciales viene como ARRAY [{grupo, subzonas}]
+    if (Array.isArray(zonasIniciales) && zonasIniciales.length > 0) {
       setZonas(zonasIniciales);
+      setTipoArea(detectarTipoArea(zonasIniciales));
+      return;
+    }
+
+    // 3) Si no hay zonas cargadas: precarga por nombre
+    const nombre = (productoNombre || "").toLowerCase();
+    if (nombre.includes("remera") || nombre.includes("camiseta")) {
+      setTipoArea("multiple");
+      setZonas([
+        { grupo: "Frente", subzonas: ["F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8"] },
+        { grupo: "Espalda", subzonas: ["E1", "E2", "E3", "E4"] },
+        { grupo: "Mangas", subzonas: ["M1", "M2"] },
+      ]);
+    } else if (nombre.includes("taza") || nombre.includes("gorra")) {
+      setTipoArea("unica");
+      setZonas([{ grupo: "General", subzonas: ["Zona única de impresión"] }]);
     } else {
-      // Detecta tipo de producto y precarga automáticamente
-      const nombre = productoNombre.toLowerCase();
-      if (nombre.includes("remera") || nombre.includes("camiseta")) {
-        setTipoArea("multiple");
-        setZonas([
-          { grupo: "Frente", subzonas: ["F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8"] },
-          { grupo: "Espalda", subzonas: ["E1", "E2", "E3", "E4"] },
-          { grupo: "Mangas", subzonas: ["M1", "M2"] },
-        ]);
-      } else if (nombre.includes("taza") || nombre.includes("gorra")) {
-        setTipoArea("unica");
-        setZonas([{ grupo: "Área única", subzonas: ["A1"] }]);
-      } else {
-        setTipoArea("personalizada");
-        setZonas([]);
-      }
+      setTipoArea("personalizada");
+      setZonas([]);
     }
   }, [zonasIniciales, productoNombre]);
 
@@ -43,7 +80,7 @@ export default function ZonasConfigEditor({
         { grupo: "Mangas", subzonas: ["M1", "M2"] },
       ]);
     } else if (tipoArea === "unica") {
-      setZonas([{ grupo: "Área única", subzonas: ["A1"] }]);
+      setZonas([{ grupo: "General", subzonas: ["Zona única de impresión"] }]);
     } else if (tipoArea === "personalizada") {
       setZonas([]);
     }
@@ -84,8 +121,10 @@ export default function ZonasConfigEditor({
     );
   };
 
+  // ✅ Guardar: mandamos OBJETO al padre (formato único en Firestore)
   const guardarCambios = () => {
-    onGuardar(zonas);
+    const zonasObjeto = arrayToObject(zonas);
+    onGuardar(zonasObjeto); // ✅ ahora Firestore queda {Frente:[...], ...}
     onCerrar();
   };
 
@@ -93,11 +132,10 @@ export default function ZonasConfigEditor({
     <div className="zonas-editor">
       <h2>Zonas de impresión</h2>
       <p className="descripcion">
-        Configurá las áreas donde se imprimen tus productos.  
+        Configurá las áreas donde se imprimen tus productos.
         Podés elegir entre múltiples zonas, un área única o crear tus propias zonas.
       </p>
 
-      {/* 🔽 Selector de tipo de área */}
       <div className="tipo-area">
         <label><strong>Tipo de área de impresión:</strong></label>
         <select value={tipoArea} onChange={(e) => setTipoArea(e.target.value)}>
@@ -107,7 +145,6 @@ export default function ZonasConfigEditor({
         </select>
       </div>
 
-      {/* 🖼️ Imagen / referencia */}
       {tipoArea === "multiple" && (
         <div className="referencia-img">
           <img
@@ -125,7 +162,7 @@ export default function ZonasConfigEditor({
         <div className="referencia-img unica">
           <div className="area-unica-demo">A1</div>
           <p className="img-subtexto">
-            Este producto tiene una única zona de impresión (A1).  
+            Este producto tiene una única zona de impresión.
             Ideal para tazas, gorras o productos con un solo frente imprimible.
           </p>
         </div>
@@ -134,7 +171,7 @@ export default function ZonasConfigEditor({
       {tipoArea === "personalizada" && (
         <div className="referencia-img personalizada">
           <p className="img-subtexto">
-            Creá tus propias zonas de impresión según el producto que necesites.  
+            Creá tus propias zonas de impresión según el producto que necesites.
             Podés agregar zonas y subzonas libremente.
           </p>
         </div>
@@ -183,7 +220,6 @@ export default function ZonasConfigEditor({
           </div>
         ))}
 
-      {/* 🟢 Botones generales */}
       <div className="zonas-actions">
         {tipoArea === "personalizada" && (
           <button className="btn-agregar" onClick={agregarZona}>
@@ -198,7 +234,6 @@ export default function ZonasConfigEditor({
         </button>
       </div>
 
-      {/* 👁️ Vista previa */}
       <div className="preview-box">
         <h4>Vista previa (como se verá al crear el pedido)</h4>
         {zonas.map((zona, i) => (
