@@ -113,20 +113,35 @@ export default function PedidoDetalle({ pedido, onVolver }) {
         </thead>
         <tbody>
           {productos.map((p) => (
-            <tr key={p.id} className="fila-producto">
-              <td>{p.productoNombre || p.producto}</td>
-              <td>{p.color}</td>
-              <td>{p.detalle}</td>
-              <td>{p.cantidad}</td>
-              <td onClick={(e) => e.stopPropagation()}>
-                <ActionMenu
-                  onVer={() => manejarVerProducto(p)}
-                  onEditar={() => manejarEditarProducto(p)}
-                  onEliminar={() => manejarEliminarProducto(p.id)}
-                />
-              </td>
-            </tr>
-          ))}
+  <tr
+    key={p.id}
+    className="fila-producto"
+    onClick={() => manejarVerProducto(p)}
+    role="button"
+    tabIndex={0}
+    onKeyDown={(e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        manejarVerProducto(p);
+      }
+    }}
+  >
+    <td>{p.productoNombre || p.producto}</td>
+    <td>{p.color}</td>
+    <td>{p.detalle}</td>
+    <td>{p.cantidad}</td>
+
+    {/* IMPORTANTE: seguimos frenando el click dentro del menú */}
+    <td onClick={(e) => e.stopPropagation()}>
+      <ActionMenu
+        onVer={() => manejarVerProducto(p)}
+        onEditar={() => manejarEditarProducto(p)}
+        onEliminar={() => manejarEliminarProducto(p.id)}
+      />
+    </td>
+  </tr>
+))}
+
         </tbody>
       </table>
 

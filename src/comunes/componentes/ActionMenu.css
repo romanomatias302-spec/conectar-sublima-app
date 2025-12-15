@@ -9,6 +9,7 @@
   padding: 6px;
   font-size: 16px;
   color: #666;
+  transition: color 0.15s ease;
 }
 
 .action-menu-trigger:hover,
@@ -20,14 +21,15 @@
 .action-menu-dropdown.fixed {
   position: fixed;
   z-index: 999999;
-  width: 160px;
+  width: 180px;
   background: #fff;
   border-radius: 10px;
   padding: 6px 0;
-  box-shadow: 0 10px 25px rgba(0,0,0,0.2);
-  border: 1px solid rgba(0,0,0,0.08);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(0, 0, 0, 0.08);
 }
 
+/* Botones del menú */
 .action-menu-dropdown.fixed button {
   width: 100%;
   background: none;
@@ -37,18 +39,70 @@
   align-items: center;
   gap: 10px;
   cursor: pointer;
-  color: #111;
+
+  /* fuerza de color (evita overrides globales) */
+  color: #111 !important;
+
   text-align: left;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
-.action-menu-dropdown.fixed button:hover {
-  background: rgba(0,0,0,0.06);
-}
-
-.action-menu-dropdown.fixed button.danger {
-  color: #d64545;
+/* Hover visible */
+.action-menu-dropdown.fixed button:hover,
+.action-menu-dropdown.fixed button:focus-visible {
+  background: rgba(0, 0, 0, 0.06) !important;
+  color: #111 !important;
 }
 
 .icono {
   font-size: 14px;
+}
+
+/* 🔹 Eliminar: mismo estilo que los demás (sin rojo).
+   Si querés que "marque" al pasar el mouse, lo hacemos suave abajo. */
+.action-menu-dropdown.fixed button:last-child:hover {
+  background: rgba(0, 0, 0, 0.06) !important;
+}
+
+/* =========================
+   DARK MODE
+========================= */
+
+body.dark-mode .action-menu-trigger {
+  color: #aaa;
+}
+
+body.dark-mode .action-menu-trigger:hover,
+body.dark-mode .action-menu-trigger.active {
+  color: #fff;
+}
+
+body.dark-mode .action-menu-dropdown.fixed {
+  background: #1e1e1e;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6);
+}
+
+body.dark-mode .action-menu-dropdown.fixed button {
+  color: #f1f1f1 !important;
+}
+
+body.dark-mode .action-menu-dropdown.fixed button:hover,
+body.dark-mode .action-menu-dropdown.fixed button:focus-visible {
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: #fff !important;
+}
+/* Blindaje contra App.css (button global) */
+.action-menu-dropdown.fixed button {
+  margin: 0 !important;
+  padding: 10px 12px !important;
+  border-radius: 0 !important;
+  font-size: 14px !important;
+  width: 100% !important;
+}
+
+/* Evitar que transiciones globales hagan “parpadeos” */
+.action-menu-dropdown.fixed button,
+.action-menu-dropdown.fixed {
+  transition: none !important;
 }
