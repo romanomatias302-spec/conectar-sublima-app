@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import {
   collection,
   addDoc,
@@ -42,8 +42,8 @@ export default function ProductoFormModal({
   const [zonasConfig, setZonasConfig] = useState(null);
   const [tallesConfig, setTallesConfig] = useState(null);
 
-  // ✅ NUEVO: tipoArea que viene de productosBase (multiple | unica | personalizada)
-  const [tipoAreaProducto, setTipoAreaProducto] = useState(null);
+  // ✅ NUEVO: tipo de área para mostrar referencia (multiple | unica | personalizada)
+  const [tipoArea, setTipoArea] = useState("");
 
   // =========================
   // Helpers
@@ -71,25 +71,24 @@ export default function ProductoFormModal({
     return p?.nombre || "";
   };
 
-  const inferTipoAreaDesdeZonas = (zCfg) => {
-    if (!zCfg) return null;
-
-    // zonas como objeto {Frente:[...], Espalda:[...]}
-    if (typeof zCfg === "object" && !Array.isArray(zCfg)) {
-      const keys = Object.keys(zCfg);
-      if (keys.length === 0) return "personalizada";
-      if (keys.length === 1) return "unica";
-      return "multiple";
-    }
+  // ✅ Inferir tipoArea desde zonas si falta o viene mal
+  const inferTipoAreaFromZonas = (zonas) => {
+    if (!zonas) return "";
 
     // zonas como array [{grupo, subzonas}]
-    if (Array.isArray(zCfg)) {
-      if (zCfg.length === 0) return "personalizada";
-      if (zCfg.length === 1) return "unica";
+    if (Array.isArray(zonas)) {
+      if (zonas.length <= 1) return "unica";
       return "multiple";
     }
 
-    return null;
+    // zonas como objeto { Frente:[...], Espalda:[...], ... }
+    if (typeof zonas === "object") {
+      const keys = Object.keys(zonas);
+      if (keys.length <= 1) return "unica";
+      return "multiple";
+    }
+
+    return "";
   };
 
   // =========================
@@ -170,11 +169,21 @@ export default function ProductoFormModal({
         setZonasConfig(data.zonas ?? null);
         setTallesConfig(data.talles ?? null);
 
-        // ✅ tipoArea (lo guardás como tipoArea según tu captura)
-        setTipoAreaProducto(data.tipoArea || data.tipo_area || null);
-
         // ✅ colores
         setColoresDisponibles(Array.isArray(data.colores) ? data.colores : []);
+
+        // ✅ tipoArea: lee Firestore o lo infiere desde zonas
+        const tipoDirecto = data.tipoArea || data.tipo_area || "";
+        const tipoInferido = inferTipoAreaFromZonas(data.zonas);
+        const tipoFinal = (tipoDirecto || tipoInferido || "").toLowerCase();
+
+        // normalizamos solo valores válidos
+        const tipoNormalizado =
+          tipoFinal === "multiple" || tipoFinal === "unica" || tipoFinal === "personalizada"
+            ? tipoFinal
+            : "";
+
+        setTipoArea(tipoNormalizado);
 
         // ✅ productoNombre
         setFormData((prev) => ({
@@ -238,6 +247,9 @@ export default function ProductoFormModal({
         detallePorTalle: {},
         imagenes: [""],
       }));
+
+      // importante: reseteamos referencia hasta cargar el doc nuevo
+      setTipoArea("");
       return;
     }
 
@@ -332,37 +344,28 @@ export default function ProductoFormModal({
     return tallesFallback;
   };
 
-  const tipoAreaFinal = useMemo(() => {
-    return tipoAreaProducto || inferTipoAreaDesdeZonas(zonasConfig) || null;
-  }, [tipoAreaProducto, zonasConfig]);
+  // ✅ Referencia (derecha)
+  const renderReferencia = () => {
+    // si todavía no sabemos, no mostramos nada (para evitar “A1” incorrecto)
+    if (!tipoArea) return null;
 
-  // ✅ Para no duplicar: si mostramos imágenes arriba, sacamos "imagenes" del render dinámico
-  const camposOrdenFiltrados = useMemo(() => {
-    return (camposOrden || []).filter((c) => c !== "imagenes");
-  }, [camposOrden]);
-
-  const renderReferenciaZonas = () => {
-    // Solo mostrar si tiene sentido (si existe zonas o tipoArea o el switch de zonas)
-    const habilitado = Boolean(switchesActivos?.zonas || zonasConfig || tipoAreaFinal);
-    if (!habilitado) return null;
-
-    if (tipoAreaFinal === "multiple") {
+    if (tipoArea === "multiple") {
       return (
         <div className="pfm-ref-card">
-          <div className="pfm-ref-title">Referencia zonas</div>
+          <div className="pfm-ref-title">Referencia zonas múltiples</div>
           <img
             src="/imagenes/remera_vectorial.png"
             alt="Referencia de zonas"
             className="pfm-ref-img"
           />
           <div className="pfm-ref-sub">
-            Esquema de impresión para productos con múltiples áreas (Frente, Espalda, Mangas).
+            Ejemplo de esquema de impresión para productos con múltiples áreas (Frente, Espalda, Mangas).
           </div>
         </div>
       );
     }
 
-    if (tipoAreaFinal === "unica") {
+    if (tipoArea === "unica") {
       return (
         <div className="pfm-ref-card">
           <div className="pfm-ref-title">Referencia zona única</div>
@@ -374,18 +377,17 @@ export default function ProductoFormModal({
       );
     }
 
-    if (tipoAreaFinal === "personalizada") {
+    if (tipoArea === "personalizada") {
       return (
         <div className="pfm-ref-card">
           <div className="pfm-ref-title">Referencia personalizada</div>
           <div className="pfm-ref-sub">
-            Zonas creadas manualmente. Usá el listado de zonas para cargar detalles.
+            Las zonas son personalizadas para este producto.
           </div>
         </div>
       );
     }
 
-    // Si aún no viene tipoArea: no mostramos nada (o podés mostrar un placeholder)
     return null;
   };
 
@@ -556,7 +558,7 @@ export default function ProductoFormModal({
 
         {error && <div className="pfm-error">{error}</div>}
 
-        {/* ✅ TOP: izquierda (producto/detalle/enlaces) + derecha (referencia) */}
+        {/* ✅ TOP GRID: izq campos base + der referencia */}
         <div className="pfm-top-grid">
           <div className="pfm-top-left">
             {/* Producto */}
@@ -589,20 +591,56 @@ export default function ProductoFormModal({
               />
             </div>
 
-            {/* Enlaces arriba (si el switch está activo) */}
-            {switchesActivos?.imagenes ? renderCampo("imagenes") : null}
+            {/* Links */}
+            <div className="pfm-field">
+              <div className="pfm-label">Imágenes / Enlaces</div>
+              <div className="pfm-links">
+                {(formData.imagenes || []).map((img, index) => (
+                  <div key={index} className="pfm-link-row">
+                    <input
+                      className="pfm-control"
+                      type="text"
+                      placeholder="https://drive.google.com/..."
+                      value={img}
+                      onChange={(e) => handleImagenChange(index, e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      className="pfm-link-remove"
+                      onClick={() => eliminarCampoImagen(index)}
+                      title="Eliminar"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+
+                {(formData.imagenes || []).length < 10 && (
+                  <button
+                    type="button"
+                    className="pfm-link-add"
+                    onClick={agregarCampoImagen}
+                  >
+                    + Agregar enlace
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
 
           <div className="pfm-top-right">
-            {renderReferenciaZonas()}
+            {renderReferencia()}
           </div>
         </div>
 
         {/* Campos dinámicos */}
         {Object.values(switchesActivos).some((v) => v) ? (
           <div className="pfm-dynamic">
-            {camposOrdenFiltrados.map((campo) => (
-              <React.Fragment key={campo}>{renderCampo(campo)}</React.Fragment>
+            {camposOrden.map((campo) => (
+              <React.Fragment key={campo}>
+                {/* evitamos duplicar “imagenes” porque ya está arriba */}
+                {campo === "imagenes" ? null : renderCampo(campo)}
+              </React.Fragment>
             ))}
           </div>
         ) : (
