@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   collection,
   addDoc,
@@ -35,12 +35,15 @@ export default function ProductoFormModal({
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // ✅ NUEVO: colores configurados (para mostrar lista en vez de texto libre)
+  // ✅ colores configurados
   const [coloresDisponibles, setColoresDisponibles] = useState([]);
 
-  // ✅ Config dinámica (desde Firestore) para render
+  // ✅ Config dinámica
   const [zonasConfig, setZonasConfig] = useState(null);
   const [tallesConfig, setTallesConfig] = useState(null);
+
+  // ✅ NUEVO: tipoArea que viene de productosBase (multiple | unica | personalizada)
+  const [tipoAreaProducto, setTipoAreaProducto] = useState(null);
 
   // =========================
   // Helpers
@@ -68,8 +71,29 @@ export default function ProductoFormModal({
     return p?.nombre || "";
   };
 
+  const inferTipoAreaDesdeZonas = (zCfg) => {
+    if (!zCfg) return null;
+
+    // zonas como objeto {Frente:[...], Espalda:[...]}
+    if (typeof zCfg === "object" && !Array.isArray(zCfg)) {
+      const keys = Object.keys(zCfg);
+      if (keys.length === 0) return "personalizada";
+      if (keys.length === 1) return "unica";
+      return "multiple";
+    }
+
+    // zonas como array [{grupo, subzonas}]
+    if (Array.isArray(zCfg)) {
+      if (zCfg.length === 0) return "personalizada";
+      if (zCfg.length === 1) return "unica";
+      return "multiple";
+    }
+
+    return null;
+  };
+
   // =========================
-  // Fallbacks (por si falta config)
+  // Fallbacks
   // =========================
   const zonasFallback = {
     Frente: ["F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8"],
@@ -78,24 +102,9 @@ export default function ProductoFormModal({
   };
 
   const tallesFallback = [
-    "XS",
-    "S",
-    "M",
-    "L",
-    "XL",
-    "XXL",
-    "3XL",
-    "4XL",
-    "5XL",
-    "XL Mujer",
-    "XXL Mujer",
-    "T4",
-    "T6",
-    "T8",
-    "T10",
-    "T12",
-    "T14",
-    "T16",
+    "XS","S","M","L","XL","XXL","3XL","4XL","5XL",
+    "XL Mujer","XXL Mujer",
+    "T4","T6","T8","T10","T12","T14","T16",
   ];
 
   // =========================
@@ -118,7 +127,7 @@ export default function ProductoFormModal({
   }, []);
 
   // =========================
-  // 🔹 Si estamos editando un producto dentro del pedido
+  // 🔹 Si editamos
   // =========================
   useEffect(() => {
     if (productoEditando) {
@@ -137,7 +146,7 @@ export default function ProductoFormModal({
   }, [productoEditando]);
 
   // =========================
-  // 🔹 Cuando se selecciona un producto base -> cargar config desde Firestore
+  // 🔹 Al seleccionar producto: cargar config
   // =========================
   useEffect(() => {
     const cargarConfiguracionProducto = async () => {
@@ -161,16 +170,20 @@ export default function ProductoFormModal({
         setZonasConfig(data.zonas ?? null);
         setTallesConfig(data.talles ?? null);
 
-        // ✅ colores (para select)
+        // ✅ tipoArea (lo guardás como tipoArea según tu captura)
+        setTipoAreaProducto(data.tipoArea || data.tipo_area || null);
+
+        // ✅ colores
         setColoresDisponibles(Array.isArray(data.colores) ? data.colores : []);
 
-        // ✅ set productoNombre si no viene
+        // ✅ productoNombre
         setFormData((prev) => ({
           ...prev,
-          productoNombre: prev.productoNombre || data.nombre || getProductoNombreById(prev.producto),
+          productoNombre:
+            prev.productoNombre || data.nombre || getProductoNombreById(prev.producto),
         }));
 
-        // ✅ si talles viene como array u objeto -> asegurar keys en formData
+        // ✅ asegurar keys talles
         if (Array.isArray(data.talles)) {
           setFormData((prev) => ({
             ...prev,
@@ -185,9 +198,6 @@ export default function ProductoFormModal({
             detallePorTalle: mergeKeepExisting(keys, prev.detallePorTalle, ""),
           }));
         }
-
-        // ✅ si zonas viene como objeto -> no hace falta tocar formData.zonas,
-        // se guardan valores por key cuando el usuario escribe.
       } catch (err) {
         console.error("Error al cargar configuración del producto:", err);
       }
@@ -198,7 +208,7 @@ export default function ProductoFormModal({
   }, [formData.producto]);
 
   // =========================
-  // 🔹 Calcular total de talles
+  // 🔹 Calcular total talles
   // =========================
   useEffect(() => {
     const total = Object.values(formData.talles || {}).reduce(
@@ -209,20 +219,19 @@ export default function ProductoFormModal({
   }, [formData.talles]);
 
   // =========================
-  // 🔹 Manejo general
+  // 🔹 Handlers
   // =========================
   const handleChange = (e) => {
     const { name, value } = e.target;
 
-    // ✅ si cambia producto, set productoNombre también
     if (name === "producto") {
       setError("");
       const nombre = getProductoNombreById(value);
+
       setFormData((prev) => ({
         ...prev,
         producto: value,
         productoNombre: nombre || prev.productoNombre || "",
-        // opcional: resetear campos dependientes
         color: "",
         zonas: {},
         talles: {},
@@ -232,47 +241,47 @@ export default function ProductoFormModal({
       return;
     }
 
-    setFormData({ ...formData, [name]: value });
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleZonaChange = (zona, value) => {
-    setFormData({ ...formData, zonas: { ...formData.zonas, [zona]: value } });
+    setFormData((prev) => ({ ...prev, zonas: { ...prev.zonas, [zona]: value } }));
   };
 
   const handleTalleChange = (talle, value) => {
-    setFormData({
-      ...formData,
-      talles: { ...formData.talles, [talle]: parseInt(value) || 0 },
-    });
+    setFormData((prev) => ({
+      ...prev,
+      talles: { ...prev.talles, [talle]: parseInt(value) || 0 },
+    }));
   };
 
   const handleDetalleTalleChange = (talle, value) => {
-    setFormData({
-      ...formData,
-      detallePorTalle: { ...formData.detallePorTalle, [talle]: value },
-    });
+    setFormData((prev) => ({
+      ...prev,
+      detallePorTalle: { ...prev.detallePorTalle, [talle]: value },
+    }));
   };
 
   const handleImagenChange = (index, value) => {
     const nuevas = [...(formData.imagenes || [""])];
     nuevas[index] = value;
-    setFormData({ ...formData, imagenes: nuevas });
+    setFormData((prev) => ({ ...prev, imagenes: nuevas }));
   };
 
   const agregarCampoImagen = () => {
     const nuevas = [...(formData.imagenes || [""])];
     if (nuevas.length < 10) nuevas.push("");
-    setFormData({ ...formData, imagenes: nuevas });
+    setFormData((prev) => ({ ...prev, imagenes: nuevas }));
   };
 
   const eliminarCampoImagen = (index) => {
     const nuevas = [...(formData.imagenes || [])];
     nuevas.splice(index, 1);
-    setFormData({ ...formData, imagenes: nuevas });
+    setFormData((prev) => ({ ...prev, imagenes: nuevas.length ? nuevas : [""] }));
   };
 
   // =========================
-  // 🔹 Guardar producto
+  // 🔹 Guardar
   // =========================
   const guardarProducto = async () => {
     if (!formData.producto) {
@@ -308,23 +317,76 @@ export default function ProductoFormModal({
   };
 
   // =========================
-  // Render helpers dinámicos
+  // Render helpers
   // =========================
   const resolveZonasToRender = () => {
-    // zonas como objeto { Frente:[...], Espalda:[...] }
     if (zonasConfig && typeof zonasConfig === "object" && !Array.isArray(zonasConfig)) {
       return zonasConfig;
     }
-    // si por algún motivo viene mal, fallback
     return zonasFallback;
   };
 
   const resolveTallesToRender = () => {
-    // talles como array
     if (Array.isArray(tallesConfig)) return tallesConfig;
-    // talles como objeto -> keys
     if (tallesConfig && typeof tallesConfig === "object") return Object.keys(tallesConfig);
     return tallesFallback;
+  };
+
+  const tipoAreaFinal = useMemo(() => {
+    return tipoAreaProducto || inferTipoAreaDesdeZonas(zonasConfig) || null;
+  }, [tipoAreaProducto, zonasConfig]);
+
+  // ✅ Para no duplicar: si mostramos imágenes arriba, sacamos "imagenes" del render dinámico
+  const camposOrdenFiltrados = useMemo(() => {
+    return (camposOrden || []).filter((c) => c !== "imagenes");
+  }, [camposOrden]);
+
+  const renderReferenciaZonas = () => {
+    // Solo mostrar si tiene sentido (si existe zonas o tipoArea o el switch de zonas)
+    const habilitado = Boolean(switchesActivos?.zonas || zonasConfig || tipoAreaFinal);
+    if (!habilitado) return null;
+
+    if (tipoAreaFinal === "multiple") {
+      return (
+        <div className="pfm-ref-card">
+          <div className="pfm-ref-title">Referencia zonas</div>
+          <img
+            src="/imagenes/remera_vectorial.png"
+            alt="Referencia de zonas"
+            className="pfm-ref-img"
+          />
+          <div className="pfm-ref-sub">
+            Esquema de impresión para productos con múltiples áreas (Frente, Espalda, Mangas).
+          </div>
+        </div>
+      );
+    }
+
+    if (tipoAreaFinal === "unica") {
+      return (
+        <div className="pfm-ref-card">
+          <div className="pfm-ref-title">Referencia zona única</div>
+          <div className="pfm-ref-unica">A1</div>
+          <div className="pfm-ref-sub">
+            Este producto tiene una sola zona de impresión.
+          </div>
+        </div>
+      );
+    }
+
+    if (tipoAreaFinal === "personalizada") {
+      return (
+        <div className="pfm-ref-card">
+          <div className="pfm-ref-title">Referencia personalizada</div>
+          <div className="pfm-ref-sub">
+            Zonas creadas manualmente. Usá el listado de zonas para cargar detalles.
+          </div>
+        </div>
+      );
+    }
+
+    // Si aún no viene tipoArea: no mostramos nada (o podés mostrar un placeholder)
+    return null;
   };
 
   const renderCampo = (campo) => {
@@ -334,12 +396,16 @@ export default function ProductoFormModal({
       case "color":
       case "colores":
         return (
-          <div className="campo-form">
-            <label>Color</label>
+          <div className="pfm-field">
+            <div className="pfm-label">Color</div>
 
-            {/* ✅ si hay colores configurados -> select */}
             {coloresDisponibles.length > 0 ? (
-              <select name="color" value={formData.color || ""} onChange={handleChange}>
+              <select
+                className="pfm-control"
+                name="color"
+                value={formData.color || ""}
+                onChange={handleChange}
+              >
                 <option value="">Seleccionar color...</option>
                 {coloresDisponibles.map((c) => (
                   <option key={c} value={c}>
@@ -349,6 +415,7 @@ export default function ProductoFormModal({
               </select>
             ) : (
               <input
+                className="pfm-control"
                 type="text"
                 name="color"
                 placeholder="Ej: blanco, negro, rojo..."
@@ -362,25 +429,31 @@ export default function ProductoFormModal({
       case "zonas": {
         const zonas = resolveZonasToRender();
         return (
-          <div className="campo-form">
-            <label>Zonas de impresión</label>
-            {Object.entries(zonas).map(([titulo, items]) => (
-              <div key={titulo} className="zona-grupo">
-                <h4>{titulo}</h4>
-                <div className="zona-campos">
-                  {(items || []).map((zona) => (
-                    <div key={zona} className="zona-item">
-                      <label>{zona}</label>
-                      <input
-                        type="text"
-                        value={formData.zonas?.[zona] || ""}
-                        onChange={(e) => handleZonaChange(zona, e.target.value)}
-                      />
-                    </div>
-                  ))}
+          <div className="pfm-field">
+            <div className="pfm-label">Zonas de impresión</div>
+
+            <div className="pfm-zonas">
+              {Object.entries(zonas).map(([titulo, items]) => (
+                <div key={titulo} className="pfm-zona-card">
+                  <div className="pfm-zona-title">{titulo}</div>
+
+                  <div className="pfm-zona-grid">
+                    {(items || []).map((zona) => (
+                      <div key={zona} className="pfm-zona-row">
+                        <div className="pfm-zona-tag">{zona}</div>
+                        <input
+                          className="pfm-control pfm-control-sm"
+                          type="text"
+                          value={formData.zonas?.[zona] || ""}
+                          onChange={(e) => handleZonaChange(zona, e.target.value)}
+                          placeholder="Detalle..."
+                        />
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         );
       }
@@ -388,18 +461,24 @@ export default function ProductoFormModal({
       case "talles": {
         const talles = resolveTallesToRender();
         return (
-          <div className="campo-form">
-            <label>Talles disponibles</label>
-            <div className="talles-grid">
+          <div className="pfm-field">
+            <div className="pfm-label">Talles disponibles</div>
+
+            <div className="pfm-talles">
               {talles.map((t) => (
-                <div key={t} className="talle-item">
-                  <label>{t}</label>
+                <div key={t} className="pfm-talle-row">
+                  <div className="pfm-talle-name">{t}</div>
+
                   <input
+                    className="pfm-control pfm-control-qty"
                     type="number"
-                    value={formData.talles?.[t] ?? ""}
+                    min="0"
+                    value={formData.talles?.[t] ?? 0}
                     onChange={(e) => handleTalleChange(t, e.target.value)}
                   />
+
                   <input
+                    className="pfm-control pfm-control-detail"
                     type="text"
                     placeholder="Detalle por talle..."
                     value={formData.detallePorTalle?.[t] ?? ""}
@@ -408,39 +487,50 @@ export default function ProductoFormModal({
                 </div>
               ))}
             </div>
-            <p className="total-talles">
+
+            <div className="pfm-total">
               📊 Total de unidades: <strong>{totalTalles}</strong>
-            </p>
+            </div>
           </div>
         );
       }
 
       case "imagenes":
         return (
-          <div className="campo-form">
-            <label>Imágenes / Enlaces</label>
-            {(formData.imagenes || []).map((img, index) => (
-              <div key={index} className="imagen-item">
-                <input
-                  type="text"
-                  placeholder="https://drive.google.com/..."
-                  value={img}
-                  onChange={(e) => handleImagenChange(index, e.target.value)}
-                />
+          <div className="pfm-field">
+            <div className="pfm-label">Imágenes / Enlaces</div>
+
+            <div className="pfm-links">
+              {(formData.imagenes || []).map((img, index) => (
+                <div key={index} className="pfm-link-row">
+                  <input
+                    className="pfm-control"
+                    type="text"
+                    placeholder="https://drive.google.com/..."
+                    value={img}
+                    onChange={(e) => handleImagenChange(index, e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    className="pfm-link-remove"
+                    onClick={() => eliminarCampoImagen(index)}
+                    title="Eliminar"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+
+              {(formData.imagenes || []).length < 10 && (
                 <button
                   type="button"
-                  className="btn-eliminar-img"
-                  onClick={() => eliminarCampoImagen(index)}
+                  className="pfm-link-add"
+                  onClick={agregarCampoImagen}
                 >
-                  ✕
+                  + Agregar enlace
                 </button>
-              </div>
-            ))}
-            {(formData.imagenes || []).length < 10 && (
-              <button type="button" className="btn-agregar-img" onClick={agregarCampoImagen}>
-                + Agregar enlace
-              </button>
-            )}
+              )}
+            </div>
           </div>
         );
 
@@ -450,56 +540,91 @@ export default function ProductoFormModal({
   };
 
   return (
-    <div className="modal-overlay">
-      <div className="modal-content producto-form scrollable-modal">
-        <h2>{productoEditando ? "Editar Producto" : "Agregar Producto"}</h2>
+    <div className="pfm-overlay" onMouseDown={onClose}>
+      <div
+        className="pfm-modal scrollable-modal"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <div className="pfm-header">
+          <h2 className="pfm-title">
+            {productoEditando ? "Editar Producto" : "Agregar Producto"}
+          </h2>
+          <button className="pfm-close" onClick={onClose} type="button" title="Cerrar">
+            ✕
+          </button>
+        </div>
 
-        {error && <div className="error">{error}</div>}
+        {error && <div className="pfm-error">{error}</div>}
 
-        {/* 🔹 Selección de producto */}
-        <label>Producto</label>
-        <select name="producto" value={formData.producto} onChange={handleChange}>
-          <option value="">Seleccionar producto...</option>
-          {productosDisponibles.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.nombre}
-            </option>
-          ))}
-        </select>
+        {/* ✅ TOP: izquierda (producto/detalle/enlaces) + derecha (referencia) */}
+        <div className="pfm-top-grid">
+          <div className="pfm-top-left">
+            {/* Producto */}
+            <div className="pfm-field">
+              <div className="pfm-label">Producto</div>
+              <select
+                className="pfm-control"
+                name="producto"
+                value={formData.producto}
+                onChange={handleChange}
+              >
+                <option value="">Seleccionar producto...</option>
+                {productosDisponibles.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-        {/* 🔹 Detalle general */}
-        <label>Detalle general</label>
-        <textarea
-          name="detalle"
-          placeholder="Ej: diseño personalizado, logo en frente..."
-          value={formData.detalle}
-          onChange={handleChange}
-        ></textarea>
+            {/* Detalle general */}
+            <div className="pfm-field">
+              <div className="pfm-label">Detalle general</div>
+              <textarea
+                className="pfm-control pfm-textarea"
+                name="detalle"
+                placeholder="Ej: diseño personalizado, logo en frente..."
+                value={formData.detalle}
+                onChange={handleChange}
+              />
+            </div>
 
-        {/* 🔹 Campos configurados dinámicamente */}
+            {/* Enlaces arriba (si el switch está activo) */}
+            {switchesActivos?.imagenes ? renderCampo("imagenes") : null}
+          </div>
+
+          <div className="pfm-top-right">
+            {renderReferenciaZonas()}
+          </div>
+        </div>
+
+        {/* Campos dinámicos */}
         {Object.values(switchesActivos).some((v) => v) ? (
-          camposOrden.map((campo) => (
-            <React.Fragment key={campo}>{renderCampo(campo)}</React.Fragment>
-          ))
+          <div className="pfm-dynamic">
+            {camposOrdenFiltrados.map((campo) => (
+              <React.Fragment key={campo}>{renderCampo(campo)}</React.Fragment>
+            ))}
+          </div>
         ) : (
-          <div className="mensaje-sin-campos">
+          <div className="pfm-empty">
             ⚙️ Este producto no tiene campos configurados.
             <br />
-            Editalo desde la sección <strong>Configuración de Productos</strong>.
+            Editalo desde <strong>Configuración de Productos</strong>.
           </div>
         )}
 
-        {/* 🔹 Botones */}
-        <div className="modal-buttons">
-          <button className="cancelar" onClick={onClose} type="button">
+        {/* Botones */}
+        <div className="pfm-actions">
+          <button className="pfm-btn pfm-btn-secondary" onClick={onClose} type="button">
             Cancelar
           </button>
-          <button onClick={guardarProducto} disabled={loading} type="button">
-            {loading
-              ? "Guardando..."
-              : productoEditando
-              ? "Guardar Cambios"
-              : "Guardar Producto"}
+          <button
+            className="pfm-btn pfm-btn-primary"
+            onClick={guardarProducto}
+            disabled={loading}
+            type="button"
+          >
+            {loading ? "Guardando..." : productoEditando ? "Guardar Cambios" : "Guardar Producto"}
           </button>
         </div>
       </div>

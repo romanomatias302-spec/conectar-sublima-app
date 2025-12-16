@@ -1,467 +1,446 @@
-.modal-overlay {
+/* =========================================================
+   ProductoFormModal (SCOPED)
+   - No pisa estilos globales de label/input/table, etc.
+   ========================================================= */
+
+.pfm-overlay{
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.4);
+  inset: 0;
+  background: rgba(0,0,0,0.45);
   display: flex;
-  justify-content: center;
   align-items: center;
-  z-index: 1000;
+  justify-content: center;
+  z-index: 2000;
+  padding: 14px;
 }
 
-.modal-contenido {
-  background: #fff;
-  padding: 25px;
-  border-radius: 10px;
-  width: 480px;
-  max-height: 90vh;
-  overflow-y: auto;
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2);
+.pfm-modal{
+  width: min(980px, 96vw);
+  max-height: 92vh;
+  overflow: auto;
+  background: #ffffff;
+  border-radius: 14px;
+  box-shadow: 0 18px 50px rgba(0,0,0,0.35);
+  border: 1px solid rgba(0,0,0,0.10);
+  padding: 16px 16px 14px;
 }
 
-.modal-contenido h2 {
-  color: #007bff;
-  margin-bottom: 10px;
+body.dark-mode .pfm-modal{
+  background: #2a2a2a;
+  border: 1px solid rgba(255,255,255,0.10);
+  box-shadow: 0 22px 55px rgba(0,0,0,0.55);
+  color: #eaeaea;
 }
 
-.subseccion h3 {
-  margin-top: 15px;
-  color: #0a74da;
+.scrollable-modal::-webkit-scrollbar{ width: 10px; }
+.scrollable-modal::-webkit-scrollbar-thumb{
+  background: rgba(255,255,255,0.18);
+  border-radius: 999px;
+}
+body:not(.dark-mode) .scrollable-modal::-webkit-scrollbar-thumb{
+  background: rgba(0,0,0,0.18);
 }
 
-label {
-  display: block;
-  margin-top: 10px;
-  font-weight: 600;
-}
-
-input,
-select,
-textarea {
-  width: 100%;
-  padding: 8px;
-  border: 1px solid #ccc;
-  border-radius: 6px;
-  margin-top: 4px;
-}
-
-textarea {
-  resize: none;
-  height: 80px;
-}
-
-.acciones-modal {
+.pfm-header{
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  margin-top: 20px;
-}
-
-.btn-cancelar {
-  background-color: #ccc;
-  color: #333;
-  border: none;
-  border-radius: 6px;
-  padding: 8px 12px;
-  cursor: pointer;
-  font-weight: 600;
-}
-
-.btn-guardar {
-  background-color: #007bff;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  padding: 8px 12px;
-  cursor: pointer;
-  font-weight: 600;
-}
-.scrollable-modal {
-  max-height: 85vh;      /* Altura máxima en viewport */
-  overflow-y: auto;       /* Scroll interno */
-  padding-right: 10px;    /* Evita que tape el scroll */
-}
-
-.acordeon-item {
-  margin-top: 10px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  overflow: hidden;
-}
-
-.acordeon-titulo {
-  width: 100%;
-  text-align: left;
-  background-color: #f5f5f5;
-  padding: 10px;
-  border: none;
-  font-weight: bold;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.acordeon-titulo:hover {
-  background-color: #e9e9e9;
-}
-
-.acordeon-contenido {
-  padding: 10px;
-  background-color: #fff;
-}
-/* =======================
-   🔷 ZONAS DE IMPRESIÓN
-   ======================= */
-
-.zona-grupo {
-  background: #f9f9f9;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  margin-bottom: 20px;
-  padding: 12px 16px;
-}
-
-.zona-grupo h4 {
-  font-weight: 600;
-  margin-bottom: 10px;
-}
-
-.zona-campos {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr); /* ✅ Dos columnas */
-  gap: 10px 15px;
-}
-
-.zona-item label {
-  font-size: 13px;
-  color: #555;
-}
-
-.zona-item input {
-  width: 100%;
-  padding: 8px;
-  border: 1px solid #ccc;
-  border-radius: 5px;
-  font-size: 14px;
-}
-
-/* =======================
-   🟩 TALLES DISPONIBLES
-   ======================= */
-
-.talles-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr); /* ✅ Dos talles por fila */
-  gap: 15px 20px;
-  margin-top: 10px;
-}
-
-.talle-item {
-  display: flex;
-  flex-direction: column;
-  background: #f9f9f9;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  padding: 10px;
-  transition: all 0.2s ease;
-}
-
-.talle-item:hover {
-  background: #f2f2f2;
-}
-
-.talle-item label {
-  font-weight: 600;
-  font-size: 13px;
-  color: #333;
-  margin-bottom: 4px;
-}
-
-/* Campo de cantidad (pequeño) */
-.talle-item input[type="number"] {
-  width: 80px;
-  margin-bottom: 6px;
-  border: 1px solid #bbb;
-  border-radius: 4px;
-  padding: 6px;
-  font-size: 14px;
-}
-
-/* Campo de detalle (ancho) */
-.talle-item input[type="text"] {
-  width: 100%;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  padding: 8px 10px;
-  font-size: 14px;
-}
-
-.total-talles {
-  margin-top: 15px;
-  text-align: left;
-  font-weight: 600;
-  font-size: 14px;
-}
-
-/* =======================
-   ⚙️ CAMPOS GENERALES
-   ======================= */
-
-.campo-form label {
-  font-weight: 600;
-  margin-top: 15px;
-  margin-bottom: 6px;
-  display: block;
-}
-
-.campo-form {
-  margin-bottom: 25px;
-}
-
-/* =======================
-   📱 VERSIÓN RESPONSIVE
-   ======================= */
-
-@media (max-width: 768px) {
-  .zona-campos {
-    grid-template-columns: 1fr; /* ✅ Una sola columna */
-  }
-
-  .talles-grid {
-    grid-template-columns: 1fr; /* ✅ Un talle por fila */
-  }
-
-  .talle-item {
-    padding: 8px;
-  }
-
-  .talle-item input[type="number"] {
-    width: 100%;
-  }
-
-  .total-talles {
-    text-align: center;
-  }
-}
-/* =======================
-   🔷 ZONAS DE IMPRESIÓN
-   ======================= */
-
-.zona-campos {
-  display: grid;
-  grid-template-columns: 1fr 1fr; /* ✅ Dos columnas amplias */
-  gap: 20px;
-}
-
-.zona-item {
-  display: flex;
-  flex-direction: column;
-}
-
-.zona-item input {
-  width: 100%;
-  min-height: 60px; /* más alto para texto */
-  padding: 10px;
-  border: 1px solid #ccc;
-  border-radius: 6px;
-  font-size: 14px;
-  resize: vertical; /* permite agrandar */
-  white-space: pre-wrap;
-}
-
-/* =======================
-   🟩 TALLES DISPONIBLES
-   ======================= */
-
-.talles-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr); /* ✅ tres talles por fila */
-  gap: 18px 20px;
-  margin-top: 10px;
-}
-
-.talle-item {
-  display: flex;
-  flex-direction: column;
-  background: #fafafa;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  padding: 12px;
-}
-
-.talle-item input[type="number"] {
-  width: 90px;
-  margin-bottom: 8px;
-  border: 1px solid #bbb;
-  border-radius: 4px;
-  padding: 6px;
-  font-size: 14px;
-}
-
-.talle-item input[type="text"],
-.talle-item textarea {
-  width: 100%;
-  min-height: 60px; /* ✅ campo más alto */
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  padding: 8px 10px;
-  font-size: 14px;
-  resize: vertical; /* ✅ permite agrandar si se escribe mucho */
-  overflow-y: auto;
-  line-height: 1.4;
-}
-
-/* =======================
-   📱 RESPONSIVE (MOBILE)
-   ======================= */
-
-@media (max-width: 768px) {
-  .zona-campos {
-    grid-template-columns: 1fr; /* ✅ una columna en celular */
-  }
-
-  .talles-grid {
-    grid-template-columns: 1fr; /* ✅ un talle por fila */
-  }
-
-  .zona-item input,
-  .talle-item textarea {
-    min-height: 80px;
-  }
-}
-/* =======================
-   🔷 ZONAS DE IMPRESIÓN
-   ======================= */
-
-.zona-grupo {
-  background: #fafafa;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  margin-bottom: 25px;
-  padding: 15px 20px;
-}
-
-.zona-grupo h4 {
-  font-size: 15px;
-  font-weight: 600;
-  color: #333;
+  gap: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(0,0,0,0.08);
   margin-bottom: 12px;
 }
+body.dark-mode .pfm-header{
+  border-bottom: 1px solid rgba(255,255,255,0.10);
+}
 
-/* ✅ cada grupo tiene columnas propias */
-.zona-campos {
+.pfm-title{
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.pfm-close{
+  background: transparent;
+  border: 1px solid rgba(0,0,0,0.12);
+  color: inherit;
+  border-radius: 10px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+body.dark-mode .pfm-close{
+  border-color: rgba(255,255,255,0.15);
+}
+.pfm-close:hover{
+  filter: brightness(1.06);
+}
+
+.pfm-error{
+  background: rgba(239,68,68,0.12);
+  border: 1px solid rgba(239,68,68,0.25);
+  color: #ef4444;
+  padding: 10px 12px;
+  border-radius: 10px;
+  margin: 10px 0 12px;
+  font-weight: 600;
+}
+
+/* ---------- Fields ---------- */
+
+.pfm-dynamic{
   display: grid;
   gap: 12px;
 }
 
-/* 🟦 frente y espalda divididos en dos columnas */
-.zona-grupo:nth-child(1) .zona-campos,
-.zona-grupo:nth-child(2) .zona-campos {
-  grid-template-columns: repeat(2, 1fr);
+.pfm-field{
+  display: grid;
+  gap: 6px;
+  margin-bottom: 10px;
 }
 
-/* 🟩 mangas: solo dos campos uno al lado del otro */
-.zona-grupo:nth-child(3) .zona-campos {
-  grid-template-columns: repeat(2, 1fr);
-}
-
-.zona-item {
-  display: flex;
-  flex-direction: column;
-}
-
-.zona-item label {
+.pfm-label{
   font-size: 13px;
-  margin-bottom: 5px;
-  color: #555;
+  font-weight: 700;
+  opacity: 0.95;
 }
 
-.zona-item input {
+.pfm-control{
   width: 100%;
-  min-height: 40px;
-  padding: 8px 10px;
-  border: 1px solid #ccc;
-  border-radius: 5px;
-  font-size: 14px;
-  resize: vertical;
-  line-height: 1.4;
-}
-
-/* =======================
-   🟩 TALLES DISPONIBLES
-   ======================= */
-
-.talles-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr); /* ✅ tres talles por fila */
-  gap: 16px 20px;
-  margin-top: 10px;
-}
-
-.talle-item {
-  display: grid;
-  grid-template-columns: 80px 1fr; /* cantidad + detalle */
-  align-items: start;
-  background: #fdfdfd;
-  border: 1px solid #ddd;
-  border-radius: 6px;
   padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(0,0,0,0.18);
+  background: #ffffff;
+  color: #111;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  font-size: 14px;
+}
+
+body.dark-mode .pfm-control{
+  background: #1f1f1f;
+  color: #eaeaea;
+  border: 1px solid rgba(255,255,255,0.16);
+}
+
+.pfm-control:focus{
+  border-color: rgba(0,150,209,0.7);
+  box-shadow: 0 0 0 2px rgba(0,150,209,0.18);
+}
+
+.pfm-textarea{
+  min-height: 78px;
+  resize: vertical;
+  line-height: 1.35;
+}
+
+/* ---------- Empty state ---------- */
+
+.pfm-empty{
+  margin-top: 6px;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(0,150,209,0.08);
+  border: 1px solid rgba(0,150,209,0.18);
+}
+body.dark-mode .pfm-empty{
+  background: rgba(0,150,209,0.10);
+  border-color: rgba(0,150,209,0.22);
+}
+
+/* ---------- Links ---------- */
+
+.pfm-links{
+  display: grid;
+  gap: 8px;
+}
+
+.pfm-link-row{
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.pfm-link-remove{
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  border: 1px solid rgba(0,0,0,0.14);
+  background: transparent;
+  cursor: pointer;
+  color: inherit;
+}
+body.dark-mode .pfm-link-remove{
+  border-color: rgba(255,255,255,0.16);
+}
+.pfm-link-remove:hover{
+  filter: brightness(1.08);
+}
+
+.pfm-link-add{
+  justify-self: start;
+  border-radius: 10px;
+  padding: 10px 12px;
+  border: 1px solid rgba(0,150,209,0.35);
+  background: rgba(0,150,209,0.10);
+  color: inherit;
+  cursor: pointer;
+  font-weight: 700;
+}
+.pfm-link-add:hover{
+  background: rgba(0,150,209,0.14);
+}
+
+/* ---------- Zonas (compacto) ---------- */
+
+.pfm-zonas{
+  display: grid;
   gap: 10px;
 }
 
-.talle-item label {
-  grid-column: 1 / -1;
-  font-weight: 600;
+.pfm-zona-card{
+  border-radius: 12px;
+  padding: 10px;
+  border: 1px solid rgba(0,0,0,0.10);
+  background: rgba(0,0,0,0.03);
+}
+body.dark-mode .pfm-zona-card{
+  border-color: rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.04);
+}
+
+.pfm-zona-title{
+  font-weight: 800;
   font-size: 13px;
-  color: #333;
-  margin-bottom: 5px;
+  margin-bottom: 8px;
+  opacity: 0.95;
 }
 
-/* cantidad */
-.talle-item input[type="number"] {
-  width: 100%;
-  border: 1px solid #bbb;
-  border-radius: 4px;
-  padding: 6px;
-  font-size: 14px;
+.pfm-zona-grid{
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
 }
 
-/* detalle: textarea para escribir mucho texto */
-.talle-item input[type="text"] {
-  width: 100%;
-  min-height: 60px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
+.pfm-zona-row{
+  display: grid;
+  grid-template-columns: 42px 1fr;
+  gap: 8px;
+  align-items: center;
+}
+
+.pfm-zona-tag{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 34px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 800;
+  background: rgba(0,150,209,0.12);
+  border: 1px solid rgba(0,150,209,0.25);
+  color: inherit;
+}
+
+.pfm-control-sm{
   padding: 8px 10px;
-  font-size: 14px;
-  resize: vertical;
-  line-height: 1.4;
+  border-radius: 10px;
+  height: 34px;
 }
 
-/* total de unidades */
-.total-talles {
-  margin-top: 15px;
-  font-weight: 600;
-  font-size: 14px;
-  text-align: left;
+/* ---------- Talles (fila compacta, SIEMPRE visible) ---------- */
+
+.pfm-talles{
+  display: grid;
+  gap: 8px;
 }
 
-/* =======================
-   📱 RESPONSIVE MOBILE
-   ======================= */
-
-@media (max-width: 900px) {
-  .zona-grupo:nth-child(1) .zona-campos,
-  .zona-grupo:nth-child(2) .zona-campos,
-  .zona-grupo:nth-child(3) .zona-campos {
-    grid-template-columns: 1fr; /* ✅ una sola columna en celular */
+/* 2 columnas en desktop para que entre en menos scroll */
+@media (min-width: 980px){
+  .pfm-talles{
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px 12px;
   }
+}
 
-  .talles-grid {
-    grid-template-columns: 1fr; /* ✅ un talle por fila */
+.pfm-talle-row{
+  display: grid;
+  grid-template-columns: 86px 86px 1fr;
+  gap: 8px;
+  align-items: center;
+  padding: 8px;
+  border-radius: 12px;
+  border: 1px solid rgba(0,0,0,0.10);
+  background: rgba(0,0,0,0.03);
+}
+body.dark-mode .pfm-talle-row{
+  border-color: rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.04);
+}
+
+.pfm-talle-name{
+  font-weight: 900;
+  font-size: 13px;
+  opacity: 0.95;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pfm-control-qty{
+  height: 36px;
+  padding: 8px 10px;
+}
+
+.pfm-control-detail{
+  height: 36px;
+  padding: 8px 10px;
+}
+
+/* Mobile: una columna y detalle abajo si hace falta */
+@media (max-width: 520px){
+  .pfm-talle-row{
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto auto;
   }
+  .pfm-talle-name{
+    grid-column: 1 / -1;
+  }
+  .pfm-control-detail{
+    grid-column: 1 / -1;
+  }
+}
 
-  .talle-item {
+.pfm-total{
+  margin-top: 10px;
+  font-weight: 800;
+  font-size: 14px;
+}
+
+/* ---------- Actions ---------- */
+
+.pfm-actions{
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 12px;
+  margin-top: 10px;
+  border-top: 1px solid rgba(0,0,0,0.08);
+}
+body.dark-mode .pfm-actions{
+  border-top: 1px solid rgba(255,255,255,0.10);
+}
+
+.pfm-btn{
+  border-radius: 12px;
+  padding: 10px 14px;
+  cursor: pointer;
+  font-weight: 800;
+  border: 1px solid transparent;
+}
+
+.pfm-btn-secondary{
+  background: transparent;
+  border-color: rgba(0,150,209,0.40);
+  color: inherit;
+}
+.pfm-btn-secondary:hover{
+  background: rgba(0,150,209,0.10);
+}
+
+.pfm-btn-primary{
+  background: #0096d1;
+  border-color: rgba(0,150,209,0.40);
+  color: #fff;
+}
+.pfm-btn-primary:hover{
+  background: #007bb2;
+}
+.pfm-btn:disabled{
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* =========================================================
+   ✅ TOP GRID (Producto/Detalle/Enlaces + Referencia)
+   - Una sola definición (sin duplicados)
+   ========================================================= */
+
+.pfm-top-grid{
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr; /* izq más ancha */
+  gap: 12px;
+  align-items: start;
+  margin-bottom: 10px;
+}
+
+/* En mobile apilamos */
+@media (max-width: 900px){
+  .pfm-top-grid{
     grid-template-columns: 1fr;
   }
+}
+
+.pfm-top-left{
+  display: grid;
+  gap: 10px;
+}
+
+.pfm-top-right{
+  display: grid;
+  gap: 10px;
+}
+
+/* Tarjeta referencia (usa las clases del JS: pfm-ref-*) */
+.pfm-ref-card{
+  border-radius: 14px;
+  padding: 12px;
+  border: 1px solid rgba(0,0,0,0.10);
+  background: rgba(0,0,0,0.03);
+}
+
+body.dark-mode .pfm-ref-card{
+  border-color: rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.04);
+}
+
+.pfm-ref-title{
+  font-weight: 900;
+  font-size: 13px;
+  margin-bottom: 10px;
+  opacity: 0.95;
+}
+
+.pfm-ref-img{
+  width: 100%;
+  max-height: 260px;
+  object-fit: contain;
+  border-radius: 12px;
+  display: block;
+  background: rgba(255,255,255,0.35);
+  border: 1px solid rgba(0,0,0,0.08);
+}
+
+body.dark-mode .pfm-ref-img{
+  background: rgba(0,0,0,0.20);
+  border-color: rgba(255,255,255,0.10);
+}
+
+.pfm-ref-sub{
+  margin-top: 10px;
+  font-size: 12px;
+  opacity: 0.85;
+  line-height: 1.35;
+}
+
+/* Zona única demo */
+.pfm-ref-unica{
+  width: 64px;
+  height: 64px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  font-weight: 900;
+  background: rgba(0,150,209,0.14);
+  border: 1px solid rgba(0,150,209,0.28);
 }
