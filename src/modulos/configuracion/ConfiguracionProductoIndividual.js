@@ -223,20 +223,29 @@ if (!producto) return <p>Cargando producto...</p>;
     
 
     <ZonasConfigEditor
-      zonasIniciales={producto.zonas}
-      productoNombre={producto.nombre}
-      onGuardar={async (nuevasZonas) => {
-        try {
-          await updateDoc(doc(db, "productosBase", productoId), {
-            zonas: nuevasZonas,
-          });
-          setProducto({ ...producto, zonas: nuevasZonas });
-        } catch (error) {
-          console.error("Error al guardar zonas:", error);
-        }
-      }}
-      onCerrar={() => setMostrarModal(false)}
-    />
+  zonasIniciales={producto.zonas}
+  productoNombre={producto.nombre}
+  onGuardar={async ({ zonas, tipoArea }) => {
+    try {
+      await updateDoc(doc(db, "productosBase", productoId), {
+        zonas,
+        tipoArea, // ✅ clave
+      });
+
+      setProducto((prev) => ({
+        ...prev,
+        zonas,
+        tipoArea,
+      }));
+
+      setTipoArea(tipoArea); // opcional (tu state local)
+    } catch (error) {
+      console.error("Error al guardar zonas:", error);
+    }
+  }}
+  onCerrar={() => setMostrarModal(false)}
+/>
+
   </>
     ) : campoSeleccionado === "talles" ? (
               <TallesConfigEditor

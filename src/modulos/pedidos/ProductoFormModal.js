@@ -397,6 +397,42 @@ export default function ProductoFormModal({
     switch (campo) {
       case "color":
       case "colores":
+        // =========================
+// ✅ Helper: resumen de zonas (para referencia "personalizada")
+// =========================
+const countZonas = (z) => {
+  if (!z) return { grupos: 0, subzonas: 0, resumen: [] };
+
+  // Formato array: [{grupo, subzonas}]
+  if (Array.isArray(z)) {
+    const resumen = z.map((x) => ({
+      grupo: x?.grupo || "Zona",
+      cant: Array.isArray(x?.subzonas) ? x.subzonas.length : 0,
+    }));
+    return {
+      grupos: resumen.length,
+      subzonas: resumen.reduce((a, b) => a + b.cant, 0),
+      resumen,
+    };
+  }
+
+  // Formato objeto: { Frente:[...], Espalda:[...] }
+  if (typeof z === "object") {
+    const entries = Object.entries(z);
+    const resumen = entries.map(([grupo, arr]) => ({
+      grupo,
+      cant: Array.isArray(arr) ? arr.length : 0,
+    }));
+    return {
+      grupos: resumen.length,
+      subzonas: resumen.reduce((a, b) => a + b.cant, 0),
+      resumen,
+    };
+  }
+
+  return { grupos: 0, subzonas: 0, resumen: [] };
+};
+
         return (
           <div className="pfm-field">
             <div className="pfm-label">Color</div>

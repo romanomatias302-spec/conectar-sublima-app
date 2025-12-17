@@ -123,10 +123,17 @@ export default function ZonasConfigEditor({
 
   // ✅ Guardar: mandamos OBJETO al padre (formato único en Firestore)
   const guardarCambios = () => {
-    const zonasObjeto = arrayToObject(zonas);
-    onGuardar(zonasObjeto); // ✅ ahora Firestore queda {Frente:[...], ...}
-    onCerrar();
-  };
+  const zonasObjeto = arrayToObject(zonas);
+
+  // ✅ ahora también mandamos tipoArea
+  onGuardar({
+    zonas: zonasObjeto,
+    tipoArea,
+  });
+
+  onCerrar();
+};
+
 
   return (
     <div className="zonas-editor">
