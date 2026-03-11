@@ -55,6 +55,8 @@ export default function PedidoDetalle({ pedido, onVolver }) {
     setMostrarModal(true);
   };
 
+  
+
   return (
     <div className="pedido-detalle">
       <h1>Detalles del Pedido #{pedido.id}</h1>
@@ -129,7 +131,7 @@ export default function PedidoDetalle({ pedido, onVolver }) {
     <td>{p.productoNombre || p.producto}</td>
     <td>{p.color}</td>
     <td>{p.detalle}</td>
-    <td>{p.cantidad}</td>
+    <td>{p.totalTalles || p.cantidad || "-"}</td>
 
     {/* IMPORTANTE: seguimos frenando el click dentro del menú */}
     <td onClick={(e) => e.stopPropagation()}>

@@ -65,7 +65,13 @@ if (zonasVacias) {
 
         // ✅ Precarga de colores base
         if (!data.colores || data.colores.length === 0) {
-          data.colores = ["Blanco", "Negro", "Rojo", "Azul", "Amarillo"];
+          data.colores = [
+            { nombre: "Blanco", codigo: "#FFFFFF" },
+            { nombre: "Negro", codigo: "#000000" },
+            { nombre: "Rojo", codigo: "#FF0000" },
+            { nombre: "Azul", codigo: "#0000FF" },
+            { nombre: "Amarillo", codigo: "#FFFF00" },
+          ];
         }
 
         // ✅ Precarga de switches

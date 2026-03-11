@@ -25,6 +25,7 @@ export default function ProductoFormModal({
     zonas: {},
     talles: {},
     detallePorTalle: {},
+    atributosExtra: {},
     imagenes: [""],
   });
 
@@ -34,6 +35,8 @@ export default function ProductoFormModal({
   const [totalTalles, setTotalTalles] = useState(0);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [tipoAreaConfig, setTipoAreaConfig] = useState(""); // multiple | unica | personalizada
+
 
   // ✅ colores configurados
   const [coloresDisponibles, setColoresDisponibles] = useState([]);
@@ -41,6 +44,8 @@ export default function ProductoFormModal({
   // ✅ Config dinámica
   const [zonasConfig, setZonasConfig] = useState(null);
   const [tallesConfig, setTallesConfig] = useState(null);
+
+  const [atributosExtraConfig, setAtributosExtraConfig] = useState([]);
 
   // ✅ NUEVO: tipo de área para mostrar referencia (multiple | unica | personalizada)
   const [tipoArea, setTipoArea] = useState("");
@@ -139,6 +144,7 @@ export default function ProductoFormModal({
         zonas: productoEditando.zonas || {},
         talles: productoEditando.talles || {},
         detallePorTalle: productoEditando.detallePorTalle || {},
+        atributosExtra: productoEditando.atributosExtra || {},
         imagenes: productoEditando.imagenes || [""],
       });
     }
@@ -165,9 +171,10 @@ export default function ProductoFormModal({
         // ✅ orden de campos
         setCamposOrden(data.orden_personalizado || data.orden_campos || []);
 
-        // ✅ zonas / talles
+       // ✅ zonas / talles / atributos
         setZonasConfig(data.zonas ?? null);
         setTallesConfig(data.talles ?? null);
+        setAtributosExtraConfig(Array.isArray(data.atributosExtra) ? data.atributosExtra : []);
 
         // ✅ colores
         setColoresDisponibles(Array.isArray(data.colores) ? data.colores : []);
@@ -207,9 +214,22 @@ export default function ProductoFormModal({
             detallePorTalle: mergeKeepExisting(keys, prev.detallePorTalle, ""),
           }));
         }
+        // ✅ asegurar keys atributos extra
+        if (Array.isArray(data.atributosExtra)) {
+          const atributosKeys = data.atributosExtra
+            .map((a) => a?.nombre)
+            .filter(Boolean);
+
+          setFormData((prev) => ({
+            ...prev,
+            atributosExtra: mergeKeepExisting(atributosKeys, prev.atributosExtra, ""),
+          }));
+        }
       } catch (err) {
         console.error("Error al cargar configuración del producto:", err);
       }
+
+
     };
 
     cargarConfiguracionProducto();
@@ -245,6 +265,7 @@ export default function ProductoFormModal({
         zonas: {},
         talles: {},
         detallePorTalle: {},
+        atributosExtra: {},
         imagenes: [""],
       }));
 
@@ -271,6 +292,16 @@ export default function ProductoFormModal({
     setFormData((prev) => ({
       ...prev,
       detallePorTalle: { ...prev.detallePorTalle, [talle]: value },
+    }));
+  };
+
+  const handleAtributoExtraChange = (nombre, value) => {
+    setFormData((prev) => ({
+      ...prev,
+      atributosExtra: {
+        ...prev.atributosExtra,
+        [nombre]: value,
+      },
     }));
   };
 
@@ -432,6 +463,8 @@ const countZonas = (z) => {
 
   return { grupos: 0, subzonas: 0, resumen: [] };
 };
+      case "color":
+      case "colores":
 
         return (
           <div className="pfm-field">
@@ -445,11 +478,16 @@ const countZonas = (z) => {
                 onChange={handleChange}
               >
                 <option value="">Seleccionar color...</option>
-                {coloresDisponibles.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
+                {coloresDisponibles.map((c, i) => {
+                  const nombreColor = typeof c === "string" ? c : c?.nombre || "";
+                  const codigoColor = typeof c === "string" ? "" : c?.codigo || "";
+
+                  return (
+                    <option key={`${nombreColor}-${i}`} value={nombreColor}>
+                      {codigoColor ? `${nombreColor}` : nombreColor}
+                    </option>
+                  );
+                })}
               </select>
             ) : (
               <input
@@ -532,6 +570,34 @@ const countZonas = (z) => {
           </div>
         );
       }
+
+            case "atributosExtra":
+        return (
+          <div className="pfm-field">
+            <div className="pfm-label">Atributos adicionales</div>
+
+            <div className="pfm-atributos-extra">
+              {(atributosExtraConfig || []).map((attr, i) => {
+                const nombreAttr = attr?.nombre || `Campo ${i + 1}`;
+
+                return (
+                  <div key={`${nombreAttr}-${i}`} className="pfm-atributo-row">
+                    <div className="pfm-atributo-name">{nombreAttr}</div>
+                    <input
+                      className="pfm-control"
+                      type="text"
+                      placeholder={`Ingresar ${nombreAttr.toLowerCase()}...`}
+                      value={formData.atributosExtra?.[nombreAttr] || ""}
+                      onChange={(e) =>
+                        handleAtributoExtraChange(nombreAttr, e.target.value)
+                      }
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
 
       case "imagenes":
         return (
