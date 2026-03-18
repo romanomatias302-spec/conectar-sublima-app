@@ -1,8 +1,8 @@
 import React, { useState } from "react";
-import { collection, doc, setDoc, updateDoc, getDoc } from "firebase/firestore";
+import { collection, doc, addDoc, updateDoc } from "firebase/firestore";
 import { db } from "../../firebase";
 
-export default function ClienteForm({ cliente, onVolver, onCancelar, onGuardar }) {
+export default function ClienteForm({ cliente, onVolver, onCancelar, onGuardar, perfil }) {
   const [formData, setFormData] = useState(
     cliente || {
       dni: "",
@@ -27,29 +27,48 @@ export default function ClienteForm({ cliente, onVolver, onCancelar, onGuardar }
       setError("El DNI es obligatorio.");
       return;
     }
+
+    if (!perfil?.clienteId && perfil?.rol !== "superadmin") {
+      setError("No se encontró el clienteId del usuario.");
+      return;
+    }
+
     try {
-      const ref = doc(collection(db, "clientes"), formData.dni.toString());
-      const docSnap = await getDoc(ref);
+      console.log("PERFIL EN ClienteForm:", perfil);
+      const datosAGuardar = {
+        ...formData,
+        dni: formData.dni.toString(),
+        clienteId: perfil?.clienteId || "",
+      };
+        console.log("DATOS A GUARDAR CLIENTE:", datosAGuardar);
 
-      // si es nuevo y ya existe ese DNI
-      if (!cliente && docSnap.exists()) {
-        setError("Ya existe un cliente con ese DNI.");
-        return;
-      }
 
-      if (cliente) {
-        await updateDoc(ref, formData);
+      let clienteGuardado;
+
+      if (cliente?.firebaseId) {
+        const ref = doc(db, "clientes", cliente.firebaseId);
+        await updateDoc(ref, datosAGuardar);
+
+        clienteGuardado = {
+          firebaseId: cliente.firebaseId,
+          ...datosAGuardar,
+        };
       } else {
-        await setDoc(ref, formData);
+        const docRef = await addDoc(collection(db, "clientes"), datosAGuardar);
+
+        clienteGuardado = {
+          firebaseId: docRef.id,
+          ...datosAGuardar,
+        };
       }
+
       setError("");
 
-      // compatibilidad con ambas APIs de navegación
-      if (onGuardar) onGuardar(formData);
+      if (onGuardar) onGuardar(clienteGuardado);
       else volver();
     } catch (e) {
       console.error("Error al guardar cliente:", e);
-      setError("Error al guardar el cliente.");
+      setError(`Error al guardar el cliente: ${e.message}`);
     }
   };
 
@@ -67,7 +86,7 @@ export default function ClienteForm({ cliente, onVolver, onCancelar, onGuardar }
             placeholder="Ej: 37256489"
             value={formData.dni}
             onChange={handleChange}
-            type="number"
+            type="text"
             disabled={!!cliente}
           />
         </div>

@@ -1,6 +1,5 @@
 /* 🌍 GENERAL */
 body {
-  font-family: "Inter", "Segoe UI", Roboto, sans-serif;
   background-color: #f4f6f8;
   color: #1a1a1a;
   margin: 0;
@@ -117,7 +116,7 @@ th, td {
   font-size: 14px;
 }
 
-tr:hover {
+tbody tr:hover {
   background-color: #f3f9fc;
 }
 
@@ -332,3 +331,54 @@ body.dark-mode .modal-content {
     transform: translateX(-50%) !important;
   }
 }
+
+/* Mejora visual para todas las tablas */
+
+th {
+  user-select: none;
+}
+
+th[style*="cursor: pointer"] {
+  transition: background-color 0.2s ease;
+}
+
+
+/* ultimo */
+
+body.dark-mode .form-card {
+  background-color: #2a2a2a !important;
+  color: #f3f4f6 !important;
+  border: 1px solid #444;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+}
+
+body.dark-mode .form-title,
+body.dark-mode .form-card h1,
+body.dark-mode .form-card h2,
+body.dark-mode .form-card h3,
+body.dark-mode .form-card label,
+body.dark-mode .form-card p,
+body.dark-mode .form-card span,
+body.dark-mode .form-field label {
+  color: #f3f4f6 !important;
+}
+
+body.dark-mode .form-card input,
+body.dark-mode .form-card select,
+body.dark-mode .form-card textarea {
+  background-color: #1f1f1f !important;
+  color: #f3f4f6 !important;
+  border: 1px solid #555 !important;
+}
+
+body.dark-mode .form-card input::placeholder,
+body.dark-mode .form-card textarea::placeholder {
+  color: #9ca3af !important;
+}
+
+body.dark-mode .alert-error {
+  background-color: rgba(220, 38, 38, 0.15);
+  color: #fecaca !important;
+  border: 1px solid rgba(248, 113, 113, 0.35);
+}
+

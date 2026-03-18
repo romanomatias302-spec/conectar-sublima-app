@@ -1,19 +1,17 @@
-// Importar funciones desde Firebase
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
+import { getAuth } from "firebase/auth";
 
-// Configuración de tu proyecto Firebase (reemplazá con tus datos reales)
 const firebaseConfig = {
-  apiKey: "AIzaSyC4JyAiVxQ1lHBfTlUEQLRHISMjevoQz8c",
+  apiKey: "AIzaSyC4JyAiVxQ1lHBFtUIEQLRHISMjevoQz8c",
   authDomain: "conectarsublimados-7881e.firebaseapp.com",
   projectId: "conectarsublimados-7881e",
-  storageBucket: "conectarsublimados-7881e.appspot.com",
+  storageBucket: "conectarsublimados-7881e.firebasestorage.app",
   messagingSenderId: "581268637988",
   appId: "1:581268637988:web:e341af5e071daa736d4bb1"
 };
 
-// Inicializar Firebase
 const app = initializeApp(firebaseConfig);
 
-// Exportar la base de datos
 export const db = getFirestore(app);
+export const auth = getAuth(app);

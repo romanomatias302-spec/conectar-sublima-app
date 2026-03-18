@@ -1,50 +1,166 @@
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import "./Inicio.css";
-import { FaBox, FaUsers, FaClipboardList, FaChartBar, FaCog } from "react-icons/fa";
+import {
+  FaBox,
+  FaUsers,
+  FaClipboardList,
+  FaChartBar,
+  FaCog,
+} from "react-icons/fa";
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  where,
+} from "firebase/firestore";
+import { db } from "../../firebase";
 
-export default function Inicio({ onNavigate }) {
+export default function Inicio({ onNavigate, perfil }) {
+  const [stats, setStats] = useState({
+    pedidosHoy: 0,
+    clientesTotales: 0,
+    pedidosPendientes: 0,
+    pedidosTotales: 0,
+  });
+
+  const [nombreEmpresa, setNombreEmpresa] = useState("Mi Empresa");
+  const [logoUrl, setLogoUrl] = useState("");
+
+  const hoy = useMemo(() => {
+    const fecha = new Date();
+    const yyyy = fecha.getFullYear();
+    const mm = String(fecha.getMonth() + 1).padStart(2, "0");
+    const dd = String(fecha.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  }, []);
+
+  useEffect(() => {
+    const cargarDashboard = async () => {
+      try {
+        if (!perfil) return;
+
+        // superadmin: si querés después armamos un dashboard distinto
+        if (perfil.rol === "superadmin") {
+          setNombreEmpresa("Panel Dueño SaaS");
+          setLogoUrl("");
+          return;
+        }
+
+        const clienteId = perfil.clienteId;
+        if (!clienteId) return;
+
+        // Datos del tenant
+        const clienteSaasRef = doc(db, "clientes-saas", clienteId);
+        const clienteSaasSnap = await getDoc(clienteSaasRef);
+
+        if (clienteSaasSnap.exists()) {
+          const data = clienteSaasSnap.data();
+          setNombreEmpresa(data.nombreVisible || data.nombre || "Mi Empresa");
+          setLogoUrl(data.logoUrl || "");
+        }
+
+        // Pedidos
+        const pedidosQ = query(
+          collection(db, "pedidos"),
+          where("clienteId", "==", clienteId)
+        );
+        const pedidosSnap = await getDocs(pedidosQ);
+        const pedidos = pedidosSnap.docs.map((d) => d.data());
+
+        // Clientes
+        const clientesQ = query(
+          collection(db, "clientes"),
+          where("clienteId", "==", clienteId)
+        );
+        const clientesSnap = await getDocs(clientesQ);
+
+        const pedidosHoy = pedidos.filter((p) => p.fechaPedido === hoy).length;
+        const pedidosPendientes = pedidos.filter(
+          (p) => p.estado === "Pendiente"
+        ).length;
+
+        setStats({
+          pedidosHoy,
+          clientesTotales: clientesSnap.size,
+          pedidosPendientes,
+          pedidosTotales: pedidos.length,
+        });
+      } catch (error) {
+        console.error("Error al cargar dashboard:", error);
+      }
+    };
+
+    cargarDashboard();
+  }, [perfil, hoy]);
+
   return (
     <div className="inicio-container">
-      {/* 🧭 CABECERA */}
       <header className="inicio-header">
-        <h1>Conectar Sublima</h1>
-        <input className="search-bar" placeholder="Buscar o escribir..." />
+        <div className="inicio-header-left">
+          <div className="inicio-logo-wrap">
+            {logoUrl ? (
+              <img src={logoUrl} alt="Logo cliente" className="inicio-logo" />
+            ) : (
+              <div className="inicio-logo inicio-logo-fallback">
+                {nombreEmpresa?.charAt(0)?.toUpperCase() || "M"}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <h1>{nombreEmpresa}</h1>
+            
+          </div>
+        </div>
+
+        
       </header>
 
-      {/* 📊 RESUMEN */}
       <section className="resumen-cards">
-        <div className="card">
+        <div className="card kpi-card">
           <p>Pedidos Hoy</p>
-          <h2>8</h2>
+          <h2>{stats.pedidosHoy}</h2>
         </div>
-        <div className="card">
-          <p>Clientes Nuevos</p>
-          <h2>3</h2>
+
+        <div className="card kpi-card">
+          <p>Clientes Totales</p>
+          <h2>{stats.clientesTotales}</h2>
         </div>
-        <div className="card">
+
+        <div className="card kpi-card">
           <p>Pedidos Pendientes</p>
-          <h2>5</h2>
+          <h2>{stats.pedidosPendientes}</h2>
+        </div>
+
+        <div className="card kpi-card">
+          <p>Pedidos Totales</p>
+          <h2>{stats.pedidosTotales}</h2>
         </div>
       </section>
 
-      {/* ⚡ ACCESOS RÁPIDOS */}
       <section className="accesos-rapidos">
         <div onClick={() => onNavigate("pedidos")} className="modulo">
           <FaClipboardList className="icon" />
           <span>Pedidos</span>
         </div>
+
         <div onClick={() => onNavigate("listado")} className="modulo">
           <FaUsers className="icon" />
           <span>Clientes</span>
         </div>
+
         <div className="modulo">
           <FaBox className="icon" />
           <span>Productos</span>
         </div>
+
         <div className="modulo">
           <FaChartBar className="icon" />
           <span>Estadísticas</span>
         </div>
+
         <div onClick={() => onNavigate("configuracion")} className="modulo">
           <FaCog className="icon" />
           <span>Configuración</span>

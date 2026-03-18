@@ -1,20 +1,34 @@
 import React, { useEffect, useState } from "react";
-import { collection, getDocs, deleteDoc, doc } from "firebase/firestore";
+import { collection, getDocs, deleteDoc, doc, query, where } from "firebase/firestore";
 import { db } from "../../firebase";
 import "./ClientesList.css";
 import ActionMenu from "../../comunes/componentes/ActionMenu";
 
-export default function ClientesList({ onNuevo, onEditar, onVer }) {
+export default function ClientesList({ onNuevo, onEditar, onVer, perfil }) {
   const [clientes, setClientes] = useState([]);
   const [busqueda, setBusqueda] = useState("");
 
   const cargarClientes = async () => {
     try {
-      const querySnapshot = await getDocs(collection(db, "clientes"));
-      const lista = querySnapshot.docs.map((docu) => ({
-        id: docu.id, // en este caso es el DNI
+      if (!perfil) return;
+
+      const clientesRef = collection(db, "clientes");
+
+      const q =
+        perfil.rol === "superadmin"
+          ? query(clientesRef)
+          : query(
+              clientesRef,
+              where("clienteId", "==", perfil.clienteId)
+            );
+
+      const snapshot = await getDocs(q);
+
+      const lista = snapshot.docs.map((docu) => ({
+        firebaseId: docu.id,
         ...docu.data(),
       }));
+
       setClientes(lista);
     } catch (error) {
       console.error("Error al cargar clientes:", error);
@@ -23,14 +37,14 @@ export default function ClientesList({ onNuevo, onEditar, onVer }) {
 
   useEffect(() => {
     cargarClientes();
-  }, []);
+  }, [perfil]);
 
   const eliminarCliente = async (id) => {
     if (window.confirm("¿Seguro que querés eliminar este cliente?")) {
       try {
         await deleteDoc(doc(db, "clientes", id));
         // eliminar visualmente el cliente sin recargar todo
-        setClientes((prev) => prev.filter((c) => c.id !== id));
+        setClientes((prev) => prev.filter((c) => c.firebaseId !== id));
       } catch (e) {
         console.error("Error al eliminar cliente:", e);
       }
@@ -77,31 +91,31 @@ export default function ClientesList({ onNuevo, onEditar, onVer }) {
           </tr>
         </thead>
         <tbody>
-  {clientesFiltrados.map((cliente) => (
-    <tr
-      key={cliente.id}
-      className="fila-clickable"
-      onClick={() => onVer(cliente)}
-    >
-      <td>{cliente.dni}</td>
-      <td>{cliente.nombre} {cliente.apellido}</td>
-      <td>{cliente.telefono}</td>
-      <td>{cliente.direccion}</td>
-      <td>{cliente.localidad}</td>
-      <td>{cliente.provincia}</td>
-      <td
-        className="acciones"
-        onClick={(e) => e.stopPropagation()} // evita que al hacer click en los 3 puntos abra el detalle
-      >
-        <ActionMenu
-          onVer={() => onVer(cliente)}
-          onEditar={() => onEditar(cliente)}
-          onEliminar={() => eliminarCliente(cliente.id)}
-        />
-      </td>
-    </tr>
-  ))}
-</tbody>
+          {clientesFiltrados.map((cliente) => (
+            <tr
+              key={cliente.firebaseId}
+              className="fila-clickable"
+              onClick={() => onVer(cliente)}
+            >
+              <td>{cliente.dni}</td>
+              <td>{cliente.nombre} {cliente.apellido}</td>
+              <td>{cliente.telefono}</td>
+              <td>{cliente.direccion}</td>
+              <td>{cliente.localidad}</td>
+              <td>{cliente.provincia}</td>
+              <td
+                className="acciones"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <ActionMenu
+                  onVer={() => onVer(cliente)}
+                  onEditar={() => onEditar(cliente)}
+                  onEliminar={() => eliminarCliente(cliente.firebaseId)}
+                />
+              </td>
+            </tr>
+          ))}
+        </tbody>
 
       </table>
 

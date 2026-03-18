@@ -1,9 +1,17 @@
 import React, { useState, useEffect } from "react";
-import { collection, getDocs, addDoc, updateDoc, doc } from "firebase/firestore";
+import {
+  collection,
+  getDocs,
+  addDoc,
+  updateDoc,
+  doc,
+  query,
+  where,
+} from "firebase/firestore";
 import { db } from "../../firebase";
 import "./PedidoFormModal.css";
 
-export default function PedidoFormModal({ onClose, onPedidoCreado, pedido }) {
+export default function PedidoFormModal({ onClose, onPedidoCreado, pedido, perfil }) {
   const [clientes, setClientes] = useState([]);
   const [formData, setFormData] = useState({
     id: "",
@@ -20,11 +28,34 @@ export default function PedidoFormModal({ onClose, onPedidoCreado, pedido }) {
   // 🔹 Cargar lista de clientes
   useEffect(() => {
     const fetchClientes = async () => {
-      const snapshot = await getDocs(collection(db, "clientes"));
-      setClientes(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+      try {
+        if (!perfil) return;
+
+        const clientesRef = collection(db, "clientes");
+
+        const q =
+          perfil.rol === "superadmin"
+            ? query(clientesRef)
+            : query(
+                clientesRef,
+                where("clienteId", "==", perfil.clienteId)
+              );
+
+        const snapshot = await getDocs(q);
+
+        setClientes(
+          snapshot.docs.map((docu) => ({
+            id: docu.id,
+            ...docu.data(),
+          }))
+        );
+      } catch (error) {
+        console.error("Error al cargar clientes:", error);
+      }
     };
+
     fetchClientes();
-  }, []);
+  }, [perfil]);
 
   // 🔹 Si estamos editando, precargar datos
   useEffect(() => {
@@ -52,6 +83,11 @@ export default function PedidoFormModal({ onClose, onPedidoCreado, pedido }) {
       return;
     }
 
+    if (!pedido && perfil?.rol !== "superadmin" && !perfil?.clienteId) {
+      setError("No se encontró el clienteId del usuario.");
+      return;
+    }
+
     setLoading(true);
     setError("");
 
@@ -61,21 +97,44 @@ export default function PedidoFormModal({ onClose, onPedidoCreado, pedido }) {
       // 🔹 EDITAR pedido existente
       if (pedido && pedido.firebaseId) {
         const ref = doc(db, "pedidos", pedido.firebaseId);
-        await updateDoc(ref, formData);
-        setExito(true); // ✅ muestra mensaje
+
+        await updateDoc(ref, {
+          ...formData,
+          clienteId: pedido.clienteId || perfil?.clienteId || "",
+        });
+
+        const pedidoActualizado = {
+          ...pedido,
+          ...formData,
+          clienteId: pedido.clienteId || perfil?.clienteId || "",
+        };
+
+        setExito(true);
+
         setTimeout(() => {
-          onPedidoCreado(pedido);
+          onPedidoCreado(pedidoActualizado);
           onClose();
         }, 1500);
+
         return;
       }
 
       // 🔹 CREAR nuevo pedido
-      const snapshot = await getDocs(pedidosRef);
+      const pedidosQuery =
+        perfil?.rol === "superadmin"
+          ? query(pedidosRef)
+          : query(
+              pedidosRef,
+              where("clienteId", "==", perfil.clienteId)
+            );
+
+      const snapshot = await getDocs(pedidosQuery);
+
       const ultimoID =
         snapshot.docs.length > 0
-          ? Math.max(...snapshot.docs.map((doc) => parseInt(doc.data().id) || 0))
+          ? Math.max(...snapshot.docs.map((docu) => parseInt(docu.data().id) || 0))
           : 0;
+
       const nuevoID = (ultimoID + 1).toString();
 
       const nuevoPedidoData = {
@@ -86,6 +145,7 @@ export default function PedidoFormModal({ onClose, onPedidoCreado, pedido }) {
         fechaEntrega: formData.fechaEntrega,
         estado: formData.estado,
         productos: [],
+        clienteId: perfil?.clienteId || "",
       };
 
       const docRef = await addDoc(pedidosRef, nuevoPedidoData);

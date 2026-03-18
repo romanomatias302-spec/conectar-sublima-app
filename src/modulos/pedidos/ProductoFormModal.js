@@ -6,6 +6,8 @@ import {
   doc,
   getDoc,
   getDocs,
+  query,
+  where,
 } from "firebase/firestore";
 import { db } from "../../firebase";
 import "./ProductoFormModal.css";
@@ -15,6 +17,7 @@ export default function ProductoFormModal({
   productoEditando,
   onClose,
   onProductoGuardado,
+  perfil,
 }) {
   const [formData, setFormData] = useState({
     producto: "",
@@ -117,18 +120,33 @@ export default function ProductoFormModal({
   useEffect(() => {
     const cargarProductos = async () => {
       try {
-        const snapshot = await getDocs(collection(db, "productosBase"));
+        if (!perfil) return;
+
+        const productosRef = collection(db, "productosBase");
+
+        const q =
+          perfil.rol === "superadmin"
+            ? query(productosRef)
+            : query(
+                productosRef,
+                where("clienteId", "==", perfil.clienteId)
+              );
+
+        const snapshot = await getDocs(q);
+
         const lista = snapshot.docs.map((d) => ({
           id: d.id,
           ...d.data(),
         }));
+
         setProductosDisponibles(lista);
       } catch (err) {
         console.error("Error al cargar productosBase:", err);
       }
     };
+
     cargarProductos();
-  }, []);
+  }, [perfil]);
 
   // =========================
   // 🔹 Si editamos
@@ -332,6 +350,11 @@ export default function ProductoFormModal({
       return;
     }
 
+    if (!perfil?.clienteId && perfil?.rol !== "superadmin") {
+      setError("No se encontró el clienteId del usuario.");
+      return;
+    }
+
     const productoNombreFinal =
       formData.productoNombre || getProductoNombreById(formData.producto) || "";
 
@@ -339,21 +362,26 @@ export default function ProductoFormModal({
       ...formData,
       productoNombre: productoNombreFinal,
       totalTalles,
+      clienteId: perfil?.clienteId || "",
     };
 
     setLoading(true);
+    setError("");
+
     try {
       const productosRef = collection(db, `pedidos/${pedidoId}/productos`);
+
       if (productoEditando) {
         await updateDoc(doc(productosRef, productoEditando.id), datosAGuardar);
       } else {
         await addDoc(productosRef, datosAGuardar);
       }
+
       onProductoGuardado();
       onClose();
     } catch (err) {
       console.error("Error al guardar producto:", err);
-      setError("Error al guardar producto.");
+      setError(`Error al guardar producto: ${err.message}`);
     } finally {
       setLoading(false);
     }

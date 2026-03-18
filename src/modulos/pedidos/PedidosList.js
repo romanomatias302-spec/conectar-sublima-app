@@ -1,25 +1,50 @@
 import React, { useState, useEffect } from "react";
-import { collection, getDocs, deleteDoc, doc, updateDoc } from "firebase/firestore";
+import {
+  collection,
+  getDocs,
+  deleteDoc,
+  doc,
+  updateDoc,
+  query,
+  where,
+} from "firebase/firestore";
 import { db } from "../../firebase";
 import PedidoFormModal from "./PedidoFormModal";
 import ActionMenu from "../../comunes/componentes/ActionMenu"; // 👈 mismo componente usado en Clientes
 import "./PedidosList.css";
 
-export default function PedidosList({ onVerDetalle = () => {} }) {
+export default function PedidosList({ onVerDetalle = () => {}, perfil }) {
   const [pedidos, setPedidos] = useState([]);
   const [busqueda, setBusqueda] = useState("");
   const [estadoFiltro, setEstadoFiltro] = useState("");
   const [mostrarModal, setMostrarModal] = useState(false);
   const [pedidoEditar, setPedidoEditar] = useState(null);
 
+  const [ordenCampo, setOrdenCampo] = useState("id");
+  const [ordenDireccion, setOrdenDireccion] = useState("desc");
+
   // 🔹 Cargar pedidos
   const cargarPedidos = async () => {
     try {
-      const snapshot = await getDocs(collection(db, "pedidos"));
+      if (!perfil) return;
+
+      const pedidosRef = collection(db, "pedidos");
+
+      const q =
+        perfil.rol === "superadmin"
+          ? query(pedidosRef)
+          : query(
+              pedidosRef,
+              where("clienteId", "==", perfil.clienteId)
+            );
+
+      const snapshot = await getDocs(q);
+
       const lista = snapshot.docs.map((docu) => ({
         firebaseId: docu.id,
         ...docu.data(),
       }));
+
       setPedidos(lista);
     } catch (error) {
       console.error("Error al cargar pedidos:", error);
@@ -28,7 +53,7 @@ export default function PedidosList({ onVerDetalle = () => {} }) {
 
   useEffect(() => {
     cargarPedidos();
-  }, []);
+  }, [perfil]);
 
   // 🔹 Eliminar pedido
   const eliminarPedido = async (firebaseId) => {
@@ -65,6 +90,47 @@ export default function PedidosList({ onVerDetalle = () => {} }) {
       p.id?.toString().includes(texto);
     const coincideEstado = estadoFiltro ? p.estado === estadoFiltro : true;
     return coincideBusqueda && coincideEstado;
+  });
+
+  const manejarOrden = (campo) => {
+    if (ordenCampo === campo) {
+      setOrdenDireccion((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setOrdenCampo(campo);
+      setOrdenDireccion("asc");
+    }
+  };
+
+  const normalizarFecha = (fecha) => {
+    if (!fecha) return new Date(0);
+
+    // si viene en formato YYYY-MM-DD
+    const partes = fecha.split("-");
+    if (partes.length === 3) {
+      return new Date(fecha + "T00:00:00");
+    }
+
+    return new Date(fecha);
+  };
+
+  const pedidosOrdenados = [...pedidosFiltrados].sort((a, b) => {
+    let valorA = a[ordenCampo];
+    let valorB = b[ordenCampo];
+
+    if (ordenCampo === "fechaPedido" || ordenCampo === "fechaEntrega") {
+      valorA = normalizarFecha(valorA);
+      valorB = normalizarFecha(valorB);
+    } else if (ordenCampo === "id") {
+      valorA = Number(valorA) || 0;
+      valorB = Number(valorB) || 0;
+    } else {
+      valorA = (valorA || "").toString().toLowerCase();
+      valorB = (valorB || "").toString().toLowerCase();
+    }
+
+    if (valorA < valorB) return ordenDireccion === "asc" ? -1 : 1;
+    if (valorA > valorB) return ordenDireccion === "asc" ? 1 : -1;
+    return 0;
   });
 
   return (
@@ -107,17 +173,27 @@ export default function PedidosList({ onVerDetalle = () => {} }) {
       <table className="tabla-pedidos">
         <thead>
           <tr>
-            <th>ID Pedido</th>
-            <th>Cliente</th>
-            <th>Fecha Pedido</th>
-            <th>Fecha Entrega</th>
-            <th>Estado</th>
+            <th onClick={() => manejarOrden("id")} style={{ cursor: "pointer" }}>
+              ID Pedido {ordenCampo === "id" ? (ordenDireccion === "asc" ? "▲" : "▼") : ""}
+            </th>
+            <th onClick={() => manejarOrden("cliente")} style={{ cursor: "pointer" }}>
+              Cliente {ordenCampo === "cliente" ? (ordenDireccion === "asc" ? "▲" : "▼") : ""}
+            </th>
+            <th onClick={() => manejarOrden("fechaPedido")} style={{ cursor: "pointer" }}>
+              Fecha Pedido {ordenCampo === "fechaPedido" ? (ordenDireccion === "asc" ? "▲" : "▼") : ""}
+            </th>
+            <th onClick={() => manejarOrden("fechaEntrega")} style={{ cursor: "pointer" }}>
+              Fecha Entrega {ordenCampo === "fechaEntrega" ? (ordenDireccion === "asc" ? "▲" : "▼") : ""}
+            </th>
+            <th onClick={() => manejarOrden("estado")} style={{ cursor: "pointer" }}>
+              Estado {ordenCampo === "estado" ? (ordenDireccion === "asc" ? "▲" : "▼") : ""}
+            </th>
             <th>Acciones</th>
           </tr>
         </thead>
 
         <tbody>
-          {pedidosFiltrados.map((p) => (
+          {pedidosOrdenados.map((p) => (
             <tr
               key={p.firebaseId}
               className="fila-clickable"
@@ -169,14 +245,15 @@ export default function PedidosList({ onVerDetalle = () => {} }) {
 
       {mostrarModal && (
         <PedidoFormModal
-  pedido={pedidoEditar}
-  onClose={() => setMostrarModal(false)}
-  onPedidoCreado={(nuevoPedido) => {
-    setMostrarModal(false);
-    cargarPedidos();
-    onVerDetalle(nuevoPedido); // 👈 redirige automáticamente al detalle
-  }}
-/>
+          pedido={pedidoEditar}
+          perfil={perfil}
+          onClose={() => setMostrarModal(false)}
+          onPedidoCreado={(nuevoPedido) => {
+            setMostrarModal(false);
+            cargarPedidos();
+            onVerDetalle(nuevoPedido);
+          }}
+        />
       )}
     </div>
   );

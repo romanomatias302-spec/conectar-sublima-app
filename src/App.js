@@ -1,4 +1,8 @@
 import React, { useState, useEffect } from "react";
+import { onAuthStateChanged, signOut } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
+import { auth, db } from "./firebase";
+import Login from "./modulos/auth/Login";
 import Sidebar from "./comunes/componentes/Sidebar";
 import ClientesList from "./modulos/clientes/ClientesList";
 import ClienteForm from "./modulos/clientes/ClienteForm";
@@ -8,6 +12,7 @@ import PedidoDetalle from "./modulos/pedidos/PedidoDetalle";
 import Inicio from "./modulos/inicio/Inicio";
 import Configuracion from "./modulos/configuracion/Configuracion";
 import MobileMenu from "./comunes/componentes/MobileMenu";
+import DuenoSaasPanel from "./modulos/superadmin/DuenoSaasPanel";
 import "./App.css";
 
 
@@ -15,6 +20,10 @@ import "./App.css";
 
 export default function App() {
   
+  const [usuario, setUsuario] = useState(null);
+  const [perfil, setPerfil] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
   const [vista, setVista] = useState("inicio");
   const [clienteSeleccionado, setClienteSeleccionado] = useState(null);
   const [pedidoSeleccionado, setPedidoSeleccionado] = useState(null);
@@ -33,6 +42,40 @@ export default function App() {
     document.body.classList.toggle("dark-mode", modoOscuro);
     localStorage.setItem("modoOscuro", modoOscuro);
   }, [modoOscuro]);
+
+    useEffect(() => {
+      const unsub = onAuthStateChanged(auth, async (user) => {
+        try {
+          if (!user) {
+            setUsuario(null);
+            setPerfil(null);
+            setAuthLoading(false);
+            return;
+          }
+
+          setUsuario(user);
+
+          const ref = doc(db, "usuarios", user.uid);
+          const snap = await getDoc(ref);
+
+          if (snap.exists()) {
+            const dataPerfil = snap.data();
+            console.log("PERFIL CARGADO:", dataPerfil);
+            setPerfil(dataPerfil);
+          } else {
+            console.log("NO EXISTE PERFIL PARA ESTE USUARIO");
+            setPerfil(null);
+          }
+        } catch (error) {
+          console.error("Error al cargar perfil:", error);
+          setPerfil(null);
+        } finally {
+          setAuthLoading(false);
+        }
+      });
+
+      return () => unsub();
+    }, []);
 
   // 🔹 Navegación desde el sidebar
   const manejarSeleccionSidebar = (modulo) => {
@@ -64,6 +107,27 @@ export default function App() {
     }
   };
 
+    if (authLoading) {
+      return <div style={{ padding: 30 }}>Cargando...</div>;
+    }
+
+    if (!usuario) {
+      return <Login />;
+    }
+
+    if (!perfil) {
+      return (
+        <div style={{ padding: 30 }}>
+          <h2>Usuario sin perfil</h2>
+          <p>No existe un perfil en Firestore para este usuario.</p>
+          <button onClick={() => signOut(auth)}>Cerrar sesión</button>
+        </div>
+      );
+    }
+
+    if (perfil.rol === "superadmin") {
+      return <DuenoSaasPanel perfil={perfil} />;
+    }
   
   return (
     <div
@@ -74,10 +138,11 @@ export default function App() {
 
       {/* 🧭 Sidebar lateral */}
       <Sidebar
-  onSelect={manejarSeleccionSidebar}
-  expandido={sidebarExpandido}
-  onToggle={() => setSidebarExpandido(!sidebarExpandido)}
-/>
+        onSelect={manejarSeleccionSidebar}
+        expandido={sidebarExpandido}
+        perfil={perfil}
+        onToggle={() => setSidebarExpandido(!sidebarExpandido)}
+      />
 
 
 
@@ -85,11 +150,12 @@ export default function App() {
       <main className={`main-content ${sidebarExpandido ? "sidebar-expandido" : "sidebar-colapsado"}`}>
 
         {vista === "inicio" && (
-          <Inicio onNavigate={manejarNavegacionDesdeInicio} />
+          <Inicio onNavigate={manejarNavegacionDesdeInicio} perfil={perfil} />
         )}
 
         {vista === "listado" && (
           <ClientesList
+            perfil={perfil}
             onNuevo={() => {
               setClienteSeleccionado(null);
               setVista("formulario");
@@ -107,6 +173,7 @@ export default function App() {
 
         {vista === "formulario" && (
           <ClienteForm
+             perfil={perfil}
             cliente={clienteSeleccionado}
             onCancelar={() => setVista("listado")}
             onGuardar={() => setVista("listado")}
@@ -115,6 +182,7 @@ export default function App() {
 
         {vista === "detalle" && (
           <ClienteDetalle
+           perfil={perfil}
             cliente={clienteSeleccionado}
             onVolver={() => setVista("listado")}
             onEditar={(cliente) => {
@@ -126,6 +194,7 @@ export default function App() {
 
         {vista === "pedidos" && (
           <PedidosList
+           perfil={perfil}
             onVerDetalle={(pedido) => {
               setPedidoSeleccionado(pedido);
               setVista("detallePedido");
@@ -135,13 +204,18 @@ export default function App() {
 
         {vista === "detallePedido" && (
           <PedidoDetalle
+           perfil={perfil}
             pedido={pedidoSeleccionado}
             onVolver={() => setVista("pedidos")}
           />
         )}
 
         {vista === "configuracion" && (
-          <Configuracion modoOscuro={modoOscuro} setModoOscuro={setModoOscuro} />
+          <Configuracion
+            perfil={perfil}
+            modoOscuro={modoOscuro}
+            setModoOscuro={setModoOscuro}
+          />
         )}
       </main>
 
@@ -152,7 +226,7 @@ export default function App() {
         onCrear={(tipo) => {
           if (tipo === "pedido") {
             setPedidoSeleccionado(null);
-            setVista("detallePedido");
+            setVista("pedidos");
           } else if (tipo === "cliente") {
             setClienteSeleccionado(null);
             setVista("formulario");

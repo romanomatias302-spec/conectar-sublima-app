@@ -8,78 +8,125 @@ import {
   updateDoc,
   deleteDoc,
   doc,
+  query,
+  where,
 } from "firebase/firestore";
 import { FaTrashAlt, FaCog, FaPlus } from "react-icons/fa";
 import "./ConfiguracionProductos.css";
 import ConfiguracionProductoIndividual from "./ConfiguracionProductoIndividual";
+import ActionMenu from "../../comunes/componentes/ActionMenu";
 
-export default function ConfiguracionProductos() {
+export default function ConfiguracionProductos({ perfil }) {
   const [productos, setProductos] = useState([]);
   const [mostrarOnboarding, setMostrarOnboarding] = useState(false);
   const [productoSeleccionado, setProductoSeleccionado] = useState(null);
 
   // 🔹 Cargar productos y crear base si no existen
   const cargarProductos = async () => {
-    const ref = collection(db, "productosBase");
-    const snapshot = await getDocs(ref);
-    const lista = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+    try {
+      if (!perfil) return;
 
-    if (lista.length === 0) {
-      await crearProductosBase();
-      setMostrarOnboarding(true);
+      const ref = collection(db, "productosBase");
+
+      const q =
+        perfil.rol === "superadmin"
+          ? query(ref)
+          : query(ref, where("clienteId", "==", perfil.clienteId));
+
+      const snapshot = await getDocs(q);
+      let lista = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+      if (perfil.rol !== "superadmin" && lista.length === 0) {
+        await crearProductosBase();
+
+        const snapshotRecargado = await getDocs(
+          query(ref, where("clienteId", "==", perfil.clienteId))
+        );
+
+        lista = snapshotRecargado.docs.map((d) => ({
+          id: d.id,
+          ...d.data(),
+        }));
+
+        if (lista.length > 0) {
+          setMostrarOnboarding(true);
+        }
+      }
+
+      setProductos(lista);
+    } catch (error) {
+      console.error("Error al cargar productos:", error);
     }
-
-    setProductos(lista);
   };
 
   // 🧩 Crear productos por defecto (Remera y Taza)
   const crearProductosBase = async () => {
-    const ref = collection(db, "productosBase");
+    try {
+      if (!perfil?.clienteId) return;
 
-    const productosBase = [
-      {
-        nombre: "Remera",
-        tipo: "textil",
-        switches: {
-          talles: true,
-          colores: true,
-          zonas: true,
-          imagenes: true,
-          atributosExtra: false,
-        },
-        zonas: {
-          Frente: ["F1", "F2", "F3", "F4"],
-          Espalda: ["E1", "E2"],
-          Mangas: ["M1", "M2"],
-        },
-        talles: ["XS", "S", "M", "L", "XL", "XXL"],
-      },
-      {
-        nombre: "Taza",
-        tipo: "merchandising",
-        switches: {
-          talles: false,
-          colores: true,
-          zonas: true,
-          imagenes: true,
-          atributosExtra: false,
-        },
-        zonas: {
-          General: ["Zona única de impresión"],
-        },
-      },
-    ];
+      const ref = collection(db, "productosBase");
 
-    for (const p of productosBase) {
-      await addDoc(ref, p);
+      const existentesSnap = await getDocs(
+        query(ref, where("clienteId", "==", perfil.clienteId))
+      );
+
+      const nombresExistentes = existentesSnap.docs.map((d) =>
+        (d.data().nombre || "").trim().toLowerCase()
+      );
+
+      const productosBase = [
+        {
+          nombre: "Remera",
+          tipo: "textil",
+          clienteId: perfil.clienteId,
+          switches: {
+            talles: true,
+            colores: true,
+            zonas: true,
+            imagenes: true,
+            atributosExtra: false,
+          },
+          zonas: {
+            Frente: ["F1", "F2", "F3", "F4"],
+            Espalda: ["E1", "E2"],
+            Mangas: ["M1", "M2"],
+          },
+          talles: ["XS", "S", "M", "L", "XL", "XXL"],
+        },
+        {
+          nombre: "Taza",
+          tipo: "merchandising",
+          clienteId: perfil.clienteId,
+          switches: {
+            talles: false,
+            colores: true,
+            zonas: true,
+            imagenes: true,
+            atributosExtra: false,
+          },
+          zonas: {
+            General: ["Zona única de impresión"],
+          },
+        },
+      ];
+
+      for (const p of productosBase) {
+        const nombreNormalizado = p.nombre.trim().toLowerCase();
+
+        if (!nombresExistentes.includes(nombreNormalizado)) {
+          await addDoc(ref, p);
+        }
+      }
+
+      localStorage.setItem(`productosBaseCreados_${perfil.clienteId}`, "true");
+    } catch (error) {
+      console.error("Error al crear productos base:", error);
     }
-
-    localStorage.setItem("productosBaseCreados", "true");
   };
 
   useEffect(() => {
     cargarProductos();
-  }, []);
+  }, [perfil]);
 
   // 🔹 Eliminar producto
   const eliminarProducto = async (id) => {
@@ -93,10 +140,18 @@ export default function ConfiguracionProductos() {
   const crearNuevoProducto = async () => {
     const nombre = prompt("Nombre del nuevo producto:");
     if (!nombre) return;
+
+    if (!perfil?.clienteId && perfil?.rol !== "superadmin") {
+      alert("No se encontró el clienteId del usuario.");
+      return;
+    }
+
     const ref = collection(db, "productosBase");
+
     await addDoc(ref, {
       nombre,
       tipo: "personalizado",
+      clienteId: perfil?.clienteId || "",
       switches: {
         talles: false,
         colores: false,
@@ -105,6 +160,7 @@ export default function ConfiguracionProductos() {
         atributosExtra: false,
       },
     });
+
     cargarProductos();
   };
 
@@ -120,9 +176,7 @@ export default function ConfiguracionProductos() {
   };
 
   // 🩵 Mostrar onboarding solo si es la primera vez
-  const mostrarMensajeInicial =
-    mostrarOnboarding &&
-    !localStorage.getItem("productosBaseCreados");
+  const mostrarMensajeInicial = mostrarOnboarding;
 
   return (
     <div className="config-productos">
@@ -148,39 +202,18 @@ export default function ConfiguracionProductos() {
             <thead>
               <tr>
                 <th>Producto</th>
-                <th>Tipo</th>
-                <th>Zonas</th>
-                <th>Talles</th>
-                <th>Acciones</th>
+                <th style={{textAlign:"right"}}>Acciones</th>
               </tr>
             </thead>
             <tbody>
               {productos.map((p) => (
-                <tr
-                  key={p.id}
-                  className="fila-clickable"
-                  onClick={() => abrirConfiguracionProducto(p.id)}
-                >
+                <tr key={p.id}>
                   <td>{p.nombre}</td>
-                  <td>{p.tipo}</td>
-                  <td>{Object.keys(p.zonas || {}).length}</td>
-                  <td>{(p.talles || []).length}</td>
-                  <td className="acciones">
-                    <FaCog
-                      className="icono-accion"
-                      title="Configurar"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        abrirConfiguracionProducto(p.id);
-                      }}
-                    />
-                    <FaTrashAlt
-                      className="icono-accion eliminar"
-                      title="Eliminar"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        eliminarProducto(p.id);
-                      }}
+
+                  <td style={{textAlign:"right"}}>
+                    <ActionMenu
+                      onEditar={() => abrirConfiguracionProducto(p.id)}
+                      onEliminar={() => eliminarProducto(p.id)}
                     />
                   </td>
                 </tr>

@@ -5,7 +5,7 @@ import ProductoFormModal from "./ProductoFormModal";
 import ActionMenu from "../../comunes/componentes/ActionMenu";
 import "./PedidoDetalle.css";
 
-export default function PedidoDetalle({ pedido, onVolver }) {
+export default function PedidoDetalle({ pedido, onVolver, perfil }) {
   const [productos, setProductos] = useState([]);
   const [mostrarModal, setMostrarModal] = useState(false);
   const [productoEditando, setProductoEditando] = useState(null);
@@ -13,12 +13,17 @@ export default function PedidoDetalle({ pedido, onVolver }) {
 
   // 🔹 Cargar productos del pedido
   const cargarProductos = async () => {
-    if (!pedido?.id) return;
-    const snapshot = await getDocs(collection(db, `pedidos/${pedido.id}/productos`));
+    if (!pedido?.firebaseId) return;
+
+    const snapshot = await getDocs(
+      collection(db, `pedidos/${pedido.firebaseId}/productos`)
+    );
+
     const lista = snapshot.docs.map((docu) => ({
       id: docu.id,
       ...docu.data(),
     }));
+
     setProductos(lista);
   };
 
@@ -43,7 +48,7 @@ export default function PedidoDetalle({ pedido, onVolver }) {
   // 🗑️ Eliminar producto
   const manejarEliminarProducto = async (id) => {
     if (window.confirm("¿Seguro que querés eliminar este producto?")) {
-      await deleteDoc(doc(db, `pedidos/${pedido.id}/productos`, id));
+      await deleteDoc(doc(db, `pedidos/${pedido.firebaseId}/productos`, id));
       cargarProductos();
     }
   };
@@ -55,6 +60,7 @@ export default function PedidoDetalle({ pedido, onVolver }) {
     setMostrarModal(true);
   };
 
+  
   
 
   return (
@@ -98,7 +104,7 @@ export default function PedidoDetalle({ pedido, onVolver }) {
           + Agregar Producto
         </button>
         <button className="btn-volver" onClick={onVolver}>
-          ← Volver al listado
+          Volver al listado
         </button>
       </div>
 
@@ -156,7 +162,7 @@ export default function PedidoDetalle({ pedido, onVolver }) {
       {/* 🔹 Modal de productos */}
       {mostrarModal && (
         <ProductoFormModal
-          pedidoId={pedido.id}
+          pedidoId={pedido.firebaseId}
           productoEditando={productoEditando}
           onClose={() => {
             setMostrarModal(false);
@@ -164,6 +170,7 @@ export default function PedidoDetalle({ pedido, onVolver }) {
           }}
           onProductoGuardado={cargarProductos}
           soloVer={soloVer}
+          perfil={perfil}
         />
       )}
     </div>

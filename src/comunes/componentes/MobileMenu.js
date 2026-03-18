@@ -66,7 +66,7 @@ export default function MobileMenu({ vistaActual, onSelect, onCrear }) {
       {menuAbierto && (
         <div className="menu-flotante">
           <button onClick={() => handleCrear("pedido")}>
-            <FilePlus size={18} /> Crear pedido
+            <UserPlus size={18} /> Crear pedido
           </button>
           <button onClick={() => handleCrear("cliente")}>
             <UserPlus size={18} /> Crear cliente
