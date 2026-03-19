@@ -31,6 +31,26 @@ export default function App() {
   const [sidebarExpandido, setSidebarExpandido] = useState(true);
 
 
+  const irAVista = (nuevaVista, extra = {}) => {
+    const nuevoCliente = extra.cliente ?? null;
+    const nuevoPedido = extra.pedido ?? null;
+
+    setVista(nuevaVista);
+    setClienteSeleccionado(nuevoCliente);
+    setPedidoSeleccionado(nuevoPedido);
+
+    window.history.pushState(
+      {
+        vista: nuevaVista,
+        cliente: nuevoCliente,
+        pedido: nuevoPedido,
+      },
+      "",
+      window.location.pathname
+    );
+  };
+
+
   
 
   
@@ -137,31 +157,67 @@ export default function App() {
       return () => unsub();
     }, []);
 
+    useEffect(() => {
+      window.history.replaceState(
+        {
+          vista: "inicio",
+          cliente: null,
+          pedido: null,
+        },
+        "",
+        window.location.pathname
+      );
+
+      const manejarPopState = (event) => {
+        const state = event.state;
+
+        if (state?.vista) {
+          setVista(state.vista);
+          setClienteSeleccionado(state.cliente ?? null);
+          setPedidoSeleccionado(state.pedido ?? null);
+        } else {
+          setVista("inicio");
+          setClienteSeleccionado(null);
+          setPedidoSeleccionado(null);
+        }
+      };
+
+      window.addEventListener("popstate", manejarPopState);
+
+      return () => {
+        window.removeEventListener("popstate", manejarPopState);
+      };
+    }, []);
+
   // 🔹 Navegación desde el sidebar
   const manejarSeleccionSidebar = (modulo) => {
-    setVista(modulo === "clientes" ? "listado" : modulo);
+    irAVista(modulo === "clientes" ? "listado" : modulo);
   };
 
   // 🔹 Navegación desde la pantalla de inicio
   const manejarNavegacionDesdeInicio = (modulo) => {
     switch (modulo) {
       case "inicio":
-        setVista("inicio");
+        irAVista("inicio");
         break;
+
       case "listado":
-        setVista("listado");
+        irAVista("listado");
         break;
+
       case "formulario":
-        setVista("formulario");
+        irAVista("formulario");
         break;
+
       case "pedidos":
-        setVista("pedidos");
+        irAVista("pedidos");
         break;
+
       case "detallePedido":
       case "nuevoPedido":
-        setPedidoSeleccionado(null);
-        setVista("detallePedido");
+        irAVista("detallePedido", { pedido: null });
         break;
+
       default:
         break;
     }
@@ -232,56 +288,51 @@ export default function App() {
           <ClientesList
             perfil={perfil}
             onNuevo={() => {
-              setClienteSeleccionado(null);
-              setVista("formulario");
+              irAVista("formulario", { cliente: null });
             }}
             onEditar={(cliente) => {
-              setClienteSeleccionado(cliente);
-              setVista("formulario");
+              irAVista("formulario", { cliente });
             }}
             onVer={(cliente) => {
-              setClienteSeleccionado(cliente);
-              setVista("detalle");
+              irAVista("detalle", { cliente });
             }}
           />
         )}
 
         {vista === "formulario" && (
           <ClienteForm
-             perfil={perfil}
+            perfil={perfil}
             cliente={clienteSeleccionado}
-            onCancelar={() => setVista("listado")}
-            onGuardar={() => setVista("listado")}
+            onCancelar={() => irAVista("listado")}
+            onGuardar={() => irAVista("listado")}
           />
         )}
 
         {vista === "detalle" && (
           <ClienteDetalle
-           perfil={perfil}
+            perfil={perfil}
             cliente={clienteSeleccionado}
-            onVolver={() => setVista("listado")}
+            onVolver={() => irAVista("listado")}
             onEditar={(cliente) => {
-              setClienteSeleccionado(cliente);
-              setVista("formulario");
+              irAVista("formulario", { cliente });
             }}
           />
         )}
 
         {vista === "pedidos" && (
           <PedidosList
-           perfil={perfil}
+            perfil={perfil}
             onVerDetalle={(pedido) => {
-              setPedidoSeleccionado(pedido);
-              setVista("detallePedido");
+              irAVista("detallePedido", { pedido });
             }}
           />
         )}
 
         {vista === "detallePedido" && (
           <PedidoDetalle
-           perfil={perfil}
+            perfil={perfil}
             pedido={pedidoSeleccionado}
-            onVolver={() => setVista("pedidos")}
+            onVolver={() => irAVista("pedidos")}
           />
         )}
 
@@ -300,11 +351,9 @@ export default function App() {
         onSelect={manejarSeleccionSidebar}
         onCrear={(tipo) => {
           if (tipo === "pedido") {
-            setPedidoSeleccionado(null);
-            setVista("pedidos");
+            irAVista("pedidos", { pedido: null });
           } else if (tipo === "cliente") {
-            setClienteSeleccionado(null);
-            setVista("formulario");
+            irAVista("formulario", { cliente: null });
           }
         }}
       />
