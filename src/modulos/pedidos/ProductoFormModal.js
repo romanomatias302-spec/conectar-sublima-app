@@ -18,6 +18,7 @@ export default function ProductoFormModal({
   onClose,
   onProductoGuardado,
   perfil,
+  soloVer,
 }) {
   const [formData, setFormData] = useState({
     producto: "",
@@ -33,6 +34,7 @@ export default function ProductoFormModal({
   });
 
   const [productosDisponibles, setProductosDisponibles] = useState([]);
+  const [loadingProductos, setLoadingProductos] = useState(true);
   const [switchesActivos, setSwitchesActivos] = useState({});
   const [camposOrden, setCamposOrden] = useState([]);
   const [totalTalles, setTotalTalles] = useState(0);
@@ -117,36 +119,42 @@ export default function ProductoFormModal({
   // =========================
   // 🔹 Cargar productosBase
   // =========================
-  useEffect(() => {
-    const cargarProductos = async () => {
-      try {
-        if (!perfil) return;
+    useEffect(() => {
+      const cargarProductos = async () => {
+        try {
+          if (!perfil || (perfil.rol !== "superadmin" && !perfil.clienteId)) {
+            setProductosDisponibles([]);
+            setLoadingProductos(false);
+            return;
+          }
 
-        const productosRef = collection(db, "productosBase");
+          setLoadingProductos(true);
 
-        const q =
-          perfil.rol === "superadmin"
-            ? query(productosRef)
-            : query(
-                productosRef,
-                where("clienteId", "==", perfil.clienteId)
-              );
+          const productosRef = collection(db, "productosBase");
 
-        const snapshot = await getDocs(q);
+          const q =
+            perfil.rol === "superadmin"
+              ? query(productosRef)
+              : query(productosRef, where("clienteId", "==", perfil.clienteId));
 
-        const lista = snapshot.docs.map((d) => ({
-          id: d.id,
-          ...d.data(),
-        }));
+          const snapshot = await getDocs(q);
 
-        setProductosDisponibles(lista);
-      } catch (err) {
-        console.error("Error al cargar productosBase:", err);
-      }
-    };
+          const lista = snapshot.docs.map((d) => ({
+            id: d.id,
+            ...d.data(),
+          }));
 
-    cargarProductos();
-  }, [perfil]);
+          setProductosDisponibles(lista);
+        } catch (err) {
+          console.error("Error al cargar productosBase:", err);
+          setProductosDisponibles([]);
+        } finally {
+          setLoadingProductos(false);
+        }
+      };
+
+      cargarProductos();
+    }, [perfil?.rol, perfil?.clienteId]);
 
   // =========================
   // 🔹 Si editamos
@@ -491,8 +499,7 @@ const countZonas = (z) => {
 
   return { grupos: 0, subzonas: 0, resumen: [] };
 };
-      case "color":
-      case "colores":
+     
 
         return (
           <div className="pfm-field">
@@ -697,16 +704,26 @@ const countZonas = (z) => {
               <select
                 className="pfm-control"
                 name="producto"
-                value={formData.producto}
+                value={loadingProductos ? "" : formData.producto}
                 onChange={handleChange}
+                disabled={loadingProductos || soloVer}
               >
-                <option value="">Seleccionar producto...</option>
+                <option value="">
+                  {loadingProductos ? "Cargando productos..." : "Seleccionar producto..."}
+                </option>
                 {productosDisponibles.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.nombre}
                   </option>
                 ))}
               </select>
+              {!loadingProductos && productosDisponibles.length === 0 && (
+                <div className="pfm-empty" style={{ marginTop: "8px" }}>
+                  No hay productos configurados disponibles.
+                </div>
+              )}
+
+
             </div>
 
             {/* Detalle general */}

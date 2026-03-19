@@ -23,11 +23,14 @@ export default function App() {
   const [usuario, setUsuario] = useState(null);
   const [perfil, setPerfil] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [mensajeBloqueo, setMensajeBloqueo] = useState("");
 
   const [vista, setVista] = useState("inicio");
   const [clienteSeleccionado, setClienteSeleccionado] = useState(null);
   const [pedidoSeleccionado, setPedidoSeleccionado] = useState(null);
   const [sidebarExpandido, setSidebarExpandido] = useState(true);
+
+
   
 
   
@@ -49,6 +52,7 @@ export default function App() {
           if (!user) {
             setUsuario(null);
             setPerfil(null);
+            setMensajeBloqueo("");
             setAuthLoading(false);
             return;
           }
@@ -58,17 +62,73 @@ export default function App() {
           const ref = doc(db, "usuarios", user.uid);
           const snap = await getDoc(ref);
 
-          if (snap.exists()) {
-            const dataPerfil = snap.data();
-            console.log("PERFIL CARGADO:", dataPerfil);
-            setPerfil(dataPerfil);
-          } else {
-            console.log("NO EXISTE PERFIL PARA ESTE USUARIO");
+          if (!snap.exists()) {
             setPerfil(null);
+            setMensajeBloqueo("");
+            setAuthLoading(false);
+            return;
           }
+
+          const dataPerfil = snap.data();
+          console.log("PERFIL LOGIN:", dataPerfil);
+          setPerfil(dataPerfil);
+
+          setMensajeBloqueo("");
+
+          // 🔒 bloqueo por usuario inactivo
+          if (dataPerfil.activo !== true) {
+            setMensajeBloqueo("Tu usuario está suspendido. Contactá al administrador.");
+            setAuthLoading(false);
+            return;
+          }
+
+          
+
+          // 🔒 bloqueo por cliente SaaS suspendido
+          if (dataPerfil.rol === "admin" && dataPerfil.clienteId) {
+            console.log("clienteId del perfil:", dataPerfil.clienteId);
+
+            const clienteSaasRef = doc(db, "clientes-saas", dataPerfil.clienteId);
+            const clienteSaasSnap = await getDoc(clienteSaasRef);
+
+            console.log("¿Existe clientes-saas?", clienteSaasSnap.exists());
+
+            if (!clienteSaasSnap.exists()) {
+              console.log("NO EXISTE clientes-saas para:", dataPerfil.clienteId);
+              setMensajeBloqueo("No se encontró la empresa asociada a tu cuenta.");
+              setAuthLoading(false);
+              return;
+            }
+
+            const clienteSaasData = clienteSaasSnap.data();
+
+            const estadoRaw = clienteSaasData?.estado;
+            const estadoCliente =
+              typeof estadoRaw === "string"
+                ? estadoRaw.trim().toLowerCase()
+                : "";
+
+            console.log("ESTADO RAW:", JSON.stringify(estadoRaw), typeof estadoRaw);
+            console.log("ESTADO NORMALIZADO:", JSON.stringify(estadoCliente));
+
+            // solo bloquear si el estado dice explícitamente suspendido/bloqueado/inactivo
+            if (["suspendido", "bloqueado", "inactivo"].includes(estadoCliente)) {
+              console.log("BLOQUEADO POR ESTADO");
+              setMensajeBloqueo("Tu cuenta se encuentra suspendida. Contactá al administrador.");
+              setAuthLoading(false);
+              return;
+            }
+
+            console.log("CLIENTE HABILITADO PARA ENTRAR");
+
+            
+          }
+
+          setMensajeBloqueo("");
         } catch (error) {
           console.error("Error al cargar perfil:", error);
           setPerfil(null);
+          setMensajeBloqueo("");
         } finally {
           setAuthLoading(false);
         }
@@ -115,11 +175,26 @@ export default function App() {
       return <Login />;
     }
 
+    if (usuario && !perfil && authLoading) {
+      return <div style={{ padding: 30 }}>Cargando perfil...</div>;
+    }
+
     if (!perfil) {
       return (
         <div style={{ padding: 30 }}>
           <h2>Usuario sin perfil</h2>
           <p>No existe un perfil en Firestore para este usuario.</p>
+          <button onClick={() => signOut(auth)}>Cerrar sesión</button>
+        </div>
+      );
+    }
+
+    if (mensajeBloqueo) {
+      console.log("SE ESTÁ MOSTRANDO BLOQUEO:", mensajeBloqueo);
+      return (
+        <div style={{ padding: 30 }}>
+          <h2>Acceso bloqueado</h2>
+          <p>{mensajeBloqueo}</p>
           <button onClick={() => signOut(auth)}>Cerrar sesión</button>
         </div>
       );

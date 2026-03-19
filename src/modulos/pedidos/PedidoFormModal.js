@@ -183,21 +183,20 @@ export default function PedidoFormModal({ onClose, onPedidoCreado, pedido, perfi
           value={formData.cliente}
           onChange={(e) => {
             const seleccionado = clientes.find(
-              (c) => `${c.nombre} ${c.apellido}` === e.target.value
+              (c) => c.nombre === e.target.value
             );
+
             setFormData({
               ...formData,
-              cliente: seleccionado
-                ? `${seleccionado.nombre} ${seleccionado.apellido}`
-                : "",
+              cliente: seleccionado ? seleccionado.nombre : "",
               clienteDNI: seleccionado ? seleccionado.dni : "",
             });
           }}
         >
           <option value="">Seleccionar cliente...</option>
           {clientes.map((c) => (
-            <option key={c.id} value={`${c.nombre} ${c.apellido}`}>
-              {c.nombre} {c.apellido}
+            <option key={c.id} value={c.nombre}>
+              {c.nombre}
             </option>
           ))}
         </select>

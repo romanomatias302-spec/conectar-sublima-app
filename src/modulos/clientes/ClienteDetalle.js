@@ -9,8 +9,8 @@ export default function ClienteDetalle({ cliente, onVolver, onEditar }) {
       <h2>Detalle del Cliente</h2>
 
       <div className="detalle-info">
-        <p><strong>Nombre:</strong> {cliente.nombre}</p>
-        <p><strong>Apellido:</strong> {cliente.apellido}</p>
+        <p><strong>Nombre y Apellido:</strong> {cliente.nombre}</p>
+        
         <p><strong>DNI:</strong> {cliente.dni}</p>
         <p><strong>Teléfono:</strong> {cliente.telefono}</p>
         <p><strong>Email:</strong> {cliente.email}</p>

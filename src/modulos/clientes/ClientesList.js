@@ -55,7 +55,7 @@ export default function ClientesList({ onNuevo, onEditar, onVer, perfil }) {
     const texto = busqueda.toLowerCase();
     return (
       c.nombre?.toLowerCase().includes(texto) ||
-      c.apellido?.toLowerCase().includes(texto) ||
+      
       c.dni?.toString().includes(texto)
     );
   });
@@ -98,7 +98,7 @@ export default function ClientesList({ onNuevo, onEditar, onVer, perfil }) {
               onClick={() => onVer(cliente)}
             >
               <td>{cliente.dni}</td>
-              <td>{cliente.nombre} {cliente.apellido}</td>
+              <td>{cliente.nombre}</td>
               <td>{cliente.telefono}</td>
               <td>{cliente.direccion}</td>
               <td>{cliente.localidad}</td>

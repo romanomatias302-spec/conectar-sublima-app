@@ -7,7 +7,6 @@ export default function ClienteForm({ cliente, onVolver, onCancelar, onGuardar, 
     cliente || {
       dni: "",
       nombre: "",
-      apellido: "",
       telefono: "",
       direccion: "",
       localidad: "",
@@ -92,14 +91,11 @@ export default function ClienteForm({ cliente, onVolver, onCancelar, onGuardar, 
         </div>
 
         <div className="form-field">
-          <label>Nombre</label>
+          <label>Nombre y Apellido</label>
           <input name="nombre" value={formData.nombre} onChange={handleChange} />
         </div>
 
-        <div className="form-field">
-          <label>Apellido</label>
-          <input name="apellido" value={formData.apellido} onChange={handleChange} />
-        </div>
+      
 
         <div className="form-field">
           <label>Teléfono</label>
