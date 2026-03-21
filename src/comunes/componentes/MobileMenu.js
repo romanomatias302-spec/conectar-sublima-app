@@ -33,7 +33,7 @@ export default function MobileMenu({ vistaActual, onSelect, onCrear }) {
         </button>
 
         <button
-          className={`menu-btn ${vistaActual === "clientes" ? "active" : ""}`}
+          className={`menu-btn ${vistaActual === "listado" ? "active" : ""}`}
           onClick={() => onSelect("listado")}
         >
           <Users size={22} />
@@ -66,7 +66,7 @@ export default function MobileMenu({ vistaActual, onSelect, onCrear }) {
       {menuAbierto && (
         <div className="menu-flotante">
           <button onClick={() => handleCrear("pedido")}>
-            <UserPlus size={18} /> Crear pedido
+            <FilePlus size={18} /> Crear pedido
           </button>
           <button onClick={() => handleCrear("cliente")}>
             <UserPlus size={18} /> Crear cliente
