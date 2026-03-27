@@ -98,6 +98,59 @@ export default function PedidoDetalle({ pedido, onVolver, perfil }) {
 </div>
 
 
+      {/* 🔹 Estado de factura asociada */}
+      <div
+        style={{
+          marginTop: "16px",
+          marginBottom: "16px",
+          display: "flex",
+          gap: "10px",
+          flexWrap: "wrap",
+        }}
+      >
+        {!pedido?.ventaRefId && (
+          <div
+            style={{
+              background: "rgba(220, 53, 69, 0.10)",
+              color: "#b02a37",
+              padding: "10px 14px",
+              borderRadius: "10px",
+              fontWeight: 600,
+            }}
+          >
+            Este pedido no tiene factura asociada
+          </div>
+        )}
+
+        {pedido?.ventaRefId && (pedido?.ventaEstado || "activa") === "activa" && (
+          <div
+            style={{
+              background: "rgba(25, 135, 84, 0.10)",
+              color: "#146c43",
+              padding: "10px 14px",
+              borderRadius: "10px",
+              fontWeight: 600,
+            }}
+          >
+            Factura asociada: #{pedido?.ventaVisibleId || "-"}
+          </div>
+        )}
+
+        {pedido?.ventaRefId && pedido?.ventaEstado === "anulada" && (
+          <div
+            style={{
+              background: "rgba(108, 117, 125, 0.14)",
+              color: "#495057",
+              padding: "10px 14px",
+              borderRadius: "10px",
+              fontWeight: 600,
+            }}
+          >
+            Factura anulada asociada: #{pedido?.ventaVisibleId || "-"}
+          </div>
+        )}
+      </div>
+
       {/* 🔹 Acciones principales */}
       <div className="acciones-detalle">
         <button className="btn-nuevo" onClick={abrirModal}>

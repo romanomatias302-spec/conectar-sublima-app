@@ -3,6 +3,7 @@
 - onboarding
 - mejorar modo oscuro
 - adaptacion mobile
+- evitar que se toque el boton 2 veces mientras se crea: pedido, cliente etc.
 
 ## modulo configuracion
 

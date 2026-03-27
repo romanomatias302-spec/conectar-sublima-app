@@ -7,13 +7,24 @@ import {
   updateDoc,
   query,
   where,
+  orderBy,
+  limit,
+  startAfter,
+  serverTimestamp,
 } from "firebase/firestore";
 import { db } from "../../firebase";
 import PedidoFormModal from "./PedidoFormModal";
-import ActionMenu from "../../comunes/componentes/ActionMenu"; // 👈 mismo componente usado en Clientes
+import ActionMenu from "../../comunes/componentes/ActionMenu";
 import "./PedidosList.css";
+import ProduccionEstadoCell from "../produccion/ProduccionEstadoCell";
+import { obtenerColumnasProduccion } from "../../firebase/produccionColumnas";
+import { calcularProgresoPorColumna } from "../produccion/produccionUtils";
 
-export default function PedidosList({ onVerDetalle = () => {}, perfil }) {
+export default function PedidosList({
+  onVerDetalle = () => {},
+  onIrProduccion = () => {},
+  perfil,
+}) {
   const [pedidos, setPedidos] = useState([]);
   const [busqueda, setBusqueda] = useState("");
   const [estadoFiltro, setEstadoFiltro] = useState("");
@@ -23,19 +34,37 @@ export default function PedidosList({ onVerDetalle = () => {}, perfil }) {
   const [ordenCampo, setOrdenCampo] = useState("id");
   const [ordenDireccion, setOrdenDireccion] = useState("desc");
 
-  // 🔹 Cargar pedidos
+  const [loading, setLoading] = useState(false);
+  const [loadingMas, setLoadingMas] = useState(false);
+  const [ultimoDoc, setUltimoDoc] = useState(null);
+  const [hayMas, setHayMas] = useState(true);
+
+  const [buscando, setBuscando] = useState(false);
+  const [modoBusqueda, setModoBusqueda] = useState(false);
+  const [columnasProduccion, setColumnasProduccion] = useState([]);
+
+  const PAGE_SIZE = 100;
+
   const cargarPedidos = async () => {
     try {
       if (!perfil) return;
+
+      setLoading(true);
 
       const pedidosRef = collection(db, "pedidos");
 
       const q =
         perfil.rol === "superadmin"
-          ? query(pedidosRef)
+          ? query(
+              pedidosRef,
+              orderBy("createdAt", "desc"),
+              limit(PAGE_SIZE)
+            )
           : query(
               pedidosRef,
-              where("clienteId", "==", perfil.clienteId)
+              where("clienteId", "==", perfil.clienteId),
+              orderBy("createdAt", "desc"),
+              limit(PAGE_SIZE)
             );
 
       const snapshot = await getDocs(q);
@@ -46,16 +75,159 @@ export default function PedidosList({ onVerDetalle = () => {}, perfil }) {
       }));
 
       setPedidos(lista);
+      setUltimoDoc(snapshot.docs.length ? snapshot.docs[snapshot.docs.length - 1] : null);
+      setHayMas(snapshot.docs.length === PAGE_SIZE);
     } catch (error) {
       console.error("Error al cargar pedidos:", error);
+    } finally {
+      setLoading(false);
     }
   };
 
-  useEffect(() => {
-    cargarPedidos();
-  }, [perfil]);
+  const cargarMasPedidos = async () => {
+    try {
+      if (!perfil || !ultimoDoc || !hayMas) return;
 
-  // 🔹 Eliminar pedido
+      setLoadingMas(true);
+
+      const pedidosRef = collection(db, "pedidos");
+
+      const q =
+        perfil.rol === "superadmin"
+          ? query(
+              pedidosRef,
+              orderBy("createdAt", "desc"),
+              startAfter(ultimoDoc),
+              limit(PAGE_SIZE)
+            )
+          : query(
+              pedidosRef,
+              where("clienteId", "==", perfil.clienteId),
+              orderBy("createdAt", "desc"),
+              startAfter(ultimoDoc),
+              limit(PAGE_SIZE)
+            );
+
+      const snapshot = await getDocs(q);
+
+      const nuevosPedidos = snapshot.docs.map((docu) => ({
+        firebaseId: docu.id,
+        ...docu.data(),
+      }));
+
+      setPedidos((prev) => [...prev, ...nuevosPedidos]);
+      setUltimoDoc(snapshot.docs.length ? snapshot.docs[snapshot.docs.length - 1] : null);
+      setHayMas(snapshot.docs.length === PAGE_SIZE);
+    } catch (error) {
+      console.error("Error al cargar más pedidos:", error);
+    } finally {
+      setLoadingMas(false);
+    }
+  };
+
+  const buscarPedidosFirestore = async () => {
+    try {
+      if (!perfil) return;
+
+      const texto = normalizarTexto(busqueda);
+
+      if (!texto) {
+        setModoBusqueda(false);
+        cargarPedidos();
+        return;
+      }
+
+      setBuscando(true);
+      setModoBusqueda(true);
+
+      const pedidosRef = collection(db, "pedidos");
+
+      let q;
+
+      // búsqueda por número exacto de pedido
+      if (/^\d+$/.test(texto)) {
+        q =
+          perfil.rol === "superadmin"
+            ? query(
+                pedidosRef,
+                where("id", "==", texto),
+                limit(20)
+              )
+            : query(
+                pedidosRef,
+                where("clienteId", "==", perfil.clienteId),
+                where("id", "==", texto),
+                limit(20)
+              );
+      } else {
+        // búsqueda por cliente (prefijo)
+        q =
+          perfil.rol === "superadmin"
+            ? query(
+                pedidosRef,
+                orderBy("clienteBusqueda"),
+                where("clienteBusqueda", ">=", texto),
+                where("clienteBusqueda", "<=", texto + "\uf8ff"),
+                limit(100)
+              )
+            : query(
+                pedidosRef,
+                where("clienteId", "==", perfil.clienteId),
+                orderBy("clienteBusqueda"),
+                where("clienteBusqueda", ">=", texto),
+                where("clienteBusqueda", "<=", texto + "\uf8ff"),
+                limit(100)
+              );
+      }
+
+      console.log("BUSQUEDA TEXTO:", texto);
+      console.log("MODO BUSQUEDA:", /^\d+$/.test(texto) ? "por id" : "por cliente");
+
+      const snapshot = await getDocs(q);
+
+      console.log("RESULTADOS BUSQUEDA:", snapshot.docs.length);
+
+      const lista = snapshot.docs.map((docu) => ({
+        firebaseId: docu.id,
+        ...docu.data(),
+      }));
+
+      setPedidos(lista);
+      setHayMas(false);
+      setUltimoDoc(null);
+    } catch (error) {
+      console.error("Error al buscar pedidos:", error);
+    } finally {
+      setBuscando(false);
+    }
+  };
+
+  const normalizarTexto = (texto) => (texto || "").trim().toLowerCase();
+
+  const cargarColumnasProduccion = async () => {
+  try {
+    if (!perfil?.clienteId) return;
+
+    const columnas = await obtenerColumnasProduccion(perfil.clienteId);
+    setColumnasProduccion(columnas || []);
+  } catch (error) {
+    console.error("Error al cargar columnas de producción:", error);
+  }
+};
+
+  useEffect(() => {
+  cargarPedidos();
+  cargarColumnasProduccion();
+}, [perfil]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      buscarPedidosFirestore();
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [busqueda]);
+
   const eliminarPedido = async (firebaseId) => {
     if (window.confirm("¿Seguro que querés eliminar este pedido?")) {
       try {
@@ -67,14 +239,86 @@ export default function PedidosList({ onVerDetalle = () => {}, perfil }) {
     }
   };
 
-  // 🔹 Actualizar estado directamente
   const actualizarEstado = async (firebaseId, nuevoEstado) => {
     try {
+      const pedidoActual = pedidos.find((p) => p.firebaseId === firebaseId);
+      if (!pedidoActual) return;
+
+      const columnasOrdenadas = [...columnasProduccion].sort((a, b) => a.orden - b.orden);
+      const columnaInicial = columnasOrdenadas.find((c) => c.esInicial);
+      const columnaFinal = columnasOrdenadas.find((c) => c.esFinal);
+
+      const columnasIntermedias = columnasOrdenadas.filter(
+        (c) => !c.esInicial && !c.esFinal
+      );
+
+      let columnaDestino = null;
+      let nuevosCamposProduccion = {};
+
+      if (nuevoEstado === "Pendiente" && columnaInicial) {
+        columnaDestino = columnaInicial;
+      }
+
+      if (nuevoEstado === "Terminado" && columnaFinal) {
+        columnaDestino = columnaFinal;
+      }
+
+      if (nuevoEstado === "En proceso") {
+        // si hay intermedias, vuelve a la más cercana al final
+        if (columnasIntermedias.length > 0) {
+          columnaDestino = columnasIntermedias[columnasIntermedias.length - 1];
+        } else if (columnaInicial) {
+          columnaDestino = columnaInicial;
+        }
+      }
+
+      if (nuevoEstado === "Cancelado") {
+        nuevosCamposProduccion = {
+          estado: "Cancelado",
+          updatedAt: serverTimestamp(),
+        };
+      } else if (columnaDestino) {
+        const progresoProduccion = calcularProgresoPorColumna(
+          columnasOrdenadas,
+          columnaDestino.id
+        );
+
+        const estadoProduccion = columnaDestino.esFinal
+          ? "finalizado"
+          : columnaDestino.esInicial
+          ? "pendiente"
+          : "en_proceso";
+
+        const produccionFinalizada = !!columnaDestino.esFinal;
+
+        nuevosCamposProduccion = {
+          estado: nuevoEstado,
+          columnaProduccionId: columnaDestino.id,
+          progresoProduccion,
+          estadoProduccion,
+          produccionFinalizada,
+          produccionActualizadoAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        };
+      } else {
+        nuevosCamposProduccion = {
+          estado: nuevoEstado,
+          updatedAt: serverTimestamp(),
+        };
+      }
+
       const ref = doc(db, "pedidos", firebaseId);
-      await updateDoc(ref, { estado: nuevoEstado });
+      await updateDoc(ref, nuevosCamposProduccion);
+
       setPedidos((prev) =>
         prev.map((p) =>
-          p.firebaseId === firebaseId ? { ...p, estado: nuevoEstado } : p
+          p.firebaseId === firebaseId
+            ? {
+                ...p,
+                ...nuevosCamposProduccion,
+                estado: nuevoEstado,
+              }
+            : p
         )
       );
     } catch (error) {
@@ -82,14 +326,9 @@ export default function PedidosList({ onVerDetalle = () => {}, perfil }) {
     }
   };
 
-  // 🔹 Filtrado
   const pedidosFiltrados = pedidos.filter((p) => {
-    const texto = busqueda.toLowerCase();
-    const coincideBusqueda =
-      p.cliente?.toLowerCase().includes(texto) ||
-      p.id?.toString().includes(texto);
     const coincideEstado = estadoFiltro ? p.estado === estadoFiltro : true;
-    return coincideBusqueda && coincideEstado;
+    return coincideEstado;
   });
 
   const manejarOrden = (campo) => {
@@ -103,13 +342,10 @@ export default function PedidosList({ onVerDetalle = () => {}, perfil }) {
 
   const normalizarFecha = (fecha) => {
     if (!fecha) return new Date(0);
-
-    // si viene en formato YYYY-MM-DD
     const partes = fecha.split("-");
     if (partes.length === 3) {
       return new Date(fecha + "T00:00:00");
     }
-
     return new Date(fecha);
   };
 
@@ -146,6 +382,10 @@ export default function PedidosList({ onVerDetalle = () => {}, perfil }) {
             className="buscador"
           />
 
+          {buscando && (
+            <p style={{ marginTop: "10px", color: "#666" }}>Buscando pedidos...</p>
+          )}
+
           <select
             value={estadoFiltro}
             onChange={(e) => setEstadoFiltro(e.target.value)}
@@ -170,6 +410,10 @@ export default function PedidosList({ onVerDetalle = () => {}, perfil }) {
         </div>
       </div>
 
+      {loading && (
+        <p style={{ marginTop: "10px", color: "#666" }}>Cargando pedidos...</p>
+      )}
+
       <table className="tabla-pedidos">
         <thead>
           <tr>
@@ -185,6 +429,7 @@ export default function PedidosList({ onVerDetalle = () => {}, perfil }) {
             <th onClick={() => manejarOrden("fechaEntrega")} style={{ cursor: "pointer" }}>
               Fecha Entrega {ordenCampo === "fechaEntrega" ? (ordenDireccion === "asc" ? "▲" : "▼") : ""}
             </th>
+            <th>Producción</th>
             <th onClick={() => manejarOrden("estado")} style={{ cursor: "pointer" }}>
               Estado {ordenCampo === "estado" ? (ordenDireccion === "asc" ? "▲" : "▼") : ""}
             </th>
@@ -204,13 +449,19 @@ export default function PedidosList({ onVerDetalle = () => {}, perfil }) {
               <td>{p.fechaPedido}</td>
               <td>{p.fechaEntrega}</td>
 
-              {/* Estado editable */}
+              <td style={{ minWidth: "150px", width: "150px" }}>
+                <ProduccionEstadoCell
+                  pedido={p}
+                  onIrProduccion={onIrProduccion}
+                />
+              </td>
+
               <td>
                 <select
                   className={`estado-select ${p.estado?.toLowerCase().replace(" ", "-")}`}
                   value={p.estado || ""}
                   onChange={(e) => actualizarEstado(p.firebaseId, e.target.value)}
-                  onClick={(e) => e.stopPropagation()} // evita que dispare el click de la fila
+                  onClick={(e) => e.stopPropagation()}
                 >
                   <option value="Pendiente">Pendiente</option>
                   <option value="En proceso">En proceso</option>
@@ -219,10 +470,7 @@ export default function PedidosList({ onVerDetalle = () => {}, perfil }) {
                 </select>
               </td>
 
-              {/* Acciones */}
-              <td
-                onClick={(e) => e.stopPropagation()} // no abre el detalle
-              >
+              <td onClick={(e) => e.stopPropagation()}>
                 <ActionMenu
                   onVer={() => onVerDetalle(p)}
                   onEditar={() => {
@@ -241,6 +489,14 @@ export default function PedidosList({ onVerDetalle = () => {}, perfil }) {
         <p style={{ textAlign: "center", marginTop: "20px", color: "#888" }}>
           No se encontraron pedidos.
         </p>
+      )}
+
+      {!loading && !modoBusqueda && hayMas && (
+        <div style={{ textAlign: "center", marginTop: "20px" }}>
+          <button className="btn-secundario" onClick={cargarMasPedidos} disabled={loadingMas}>
+            {loadingMas ? "Cargando..." : "Cargar más"}
+          </button>
+        </div>
       )}
 
       {mostrarModal && (

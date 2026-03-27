@@ -14,7 +14,12 @@ import Configuracion from "./modulos/configuracion/Configuracion";
 import MobileMenu from "./comunes/componentes/MobileMenu";
 import DuenoSaasPanel from "./modulos/superadmin/DuenoSaasPanel";
 import "./App.css";
-
+import VentasList from "./modulos/ventas/VentasList";
+import VentaFormModal from "./modulos/ventas/VentaFormModal";
+import VentasPage from "./modulos/ventas/VentasPage";
+import MovimientosList from "./modulos/movimientos/MovimientosList";
+import VentaDetalle from "./modulos/ventas/VentaDetalle";
+import ProduccionPage from "./modulos/produccion/ProduccionPage";
 
 
 
@@ -29,21 +34,26 @@ export default function App() {
   const [clienteSeleccionado, setClienteSeleccionado] = useState(null);
   const [pedidoSeleccionado, setPedidoSeleccionado] = useState(null);
   const [sidebarExpandido, setSidebarExpandido] = useState(true);
+  const [ventaSeleccionada, setVentaSeleccionada] = useState(null);
+  const [mostrarModalVenta, setMostrarModalVenta] = useState(false);
 
 
   const irAVista = (nuevaVista, extra = {}) => {
     const nuevoCliente = extra.cliente ?? null;
     const nuevoPedido = extra.pedido ?? null;
+    const nuevaVenta = extra.venta ?? null;
 
     setVista(nuevaVista);
     setClienteSeleccionado(nuevoCliente);
     setPedidoSeleccionado(nuevoPedido);
+    setVentaSeleccionada(nuevaVenta);
 
     window.history.pushState(
       {
         vista: nuevaVista,
         cliente: nuevoCliente,
         pedido: nuevoPedido,
+        venta: nuevaVenta,
       },
       "",
       window.location.pathname
@@ -91,7 +101,53 @@ export default function App() {
 
           const dataPerfil = snap.data();
           console.log("PERFIL LOGIN:", dataPerfil);
-          setPerfil(dataPerfil);
+
+          let monedaTenant = "ARS";
+          let localeMonedaTenant = "es-AR";
+
+          if (dataPerfil.rol === "admin" && dataPerfil.clienteId) {
+            const clienteSaasRef = doc(db, "clientes-saas", dataPerfil.clienteId);
+            const clienteSaasSnap = await getDoc(clienteSaasRef);
+
+            console.log("clienteId del perfil:", dataPerfil.clienteId);
+            console.log("¿Existe clientes-saas?", clienteSaasSnap.exists());
+
+            if (!clienteSaasSnap.exists()) {
+              console.log("NO EXISTE clientes-saas para:", dataPerfil.clienteId);
+              setMensajeBloqueo("No se encontró la empresa asociada a tu cuenta.");
+              setAuthLoading(false);
+              return;
+            }
+
+            const clienteSaasData = clienteSaasSnap.data();
+
+            monedaTenant = clienteSaasData?.moneda || "ARS";
+            localeMonedaTenant = clienteSaasData?.localeMoneda || "es-AR";
+
+            const estadoRaw = clienteSaasData?.estado;
+            const estadoCliente =
+              typeof estadoRaw === "string"
+                ? estadoRaw.trim().toLowerCase()
+                : "";
+
+            console.log("ESTADO RAW:", JSON.stringify(estadoRaw), typeof estadoRaw);
+            console.log("ESTADO NORMALIZADO:", JSON.stringify(estadoCliente));
+
+            if (["suspendido", "bloqueado", "inactivo"].includes(estadoCliente)) {
+              console.log("BLOQUEADO POR ESTADO");
+              setMensajeBloqueo("Tu cuenta se encuentra suspendida. Contactá al administrador.");
+              setAuthLoading(false);
+              return;
+            }
+
+            console.log("CLIENTE HABILITADO PARA ENTRAR");
+          }
+
+          setPerfil({
+            ...dataPerfil,
+            moneda: monedaTenant,
+            localeMoneda: localeMonedaTenant,
+          });
 
           setMensajeBloqueo("");
 
@@ -121,6 +177,8 @@ export default function App() {
             }
 
             const clienteSaasData = clienteSaasSnap.data();
+            const monedaTenant = clienteSaasData?.moneda || "ARS";
+            const localeMonedaTenant = clienteSaasData?.localeMoneda || "es-AR";
 
             const estadoRaw = clienteSaasData?.estado;
             const estadoCliente =
@@ -175,10 +233,12 @@ export default function App() {
           setVista(state.vista);
           setClienteSeleccionado(state.cliente ?? null);
           setPedidoSeleccionado(state.pedido ?? null);
+          setVentaSeleccionada(state.venta ?? null);
         } else {
           setVista("inicio");
           setClienteSeleccionado(null);
           setPedidoSeleccionado(null);
+          setVentaSeleccionada(null);
         }
       };
 
@@ -191,37 +251,62 @@ export default function App() {
 
   // 🔹 Navegación desde el sidebar
   const manejarSeleccionSidebar = (modulo) => {
-    irAVista(modulo === "clientes" ? "listado" : modulo);
+    switch (modulo) {
+      case "clientes":
+        irAVista("listado");
+        break;
+      case "ventas":
+        irAVista("ventas");
+        break;
+      case "movimientos":
+        irAVista("movimientos");
+        break;
+      default:
+        irAVista(modulo);
+        break;
+    }
   };
 
   // 🔹 Navegación desde la pantalla de inicio
   const manejarNavegacionDesdeInicio = (modulo) => {
-    switch (modulo) {
-      case "inicio":
-        irAVista("inicio");
-        break;
+  switch (modulo) {
+    case "inicio":
+      irAVista("inicio");
+      break;
 
-      case "listado":
-        irAVista("listado");
-        break;
+    case "listado":
+      irAVista("listado");
+      break;
 
-      case "formulario":
-        irAVista("formulario");
-        break;
+    case "formulario":
+      irAVista("formulario");
+      break;
 
-      case "pedidos":
-        irAVista("pedidos");
-        break;
+    case "pedidos":
+      irAVista("pedidos");
+      break;
 
-      case "detallePedido":
-      case "nuevoPedido":
-        irAVista("detallePedido", { pedido: null });
-        break;
+    case "produccion":
+      irAVista("produccion");
+      break;
 
-      default:
-        break;
-    }
-  };
+    case "detallePedido":
+    case "nuevoPedido":
+      irAVista("detallePedido", { pedido: null });
+      break;
+
+    case "ventas":
+      irAVista("ventas");
+      break;
+
+    case "movimientos":
+      irAVista("movimientos");
+      break;
+
+    default:
+      break;
+  }
+};
 
     if (authLoading) {
       return <div style={{ padding: 30 }}>Cargando...</div>;
@@ -325,6 +410,18 @@ export default function App() {
             onVerDetalle={(pedido) => {
               irAVista("detallePedido", { pedido });
             }}
+            onIrProduccion={(pedido) => {
+              irAVista("produccion", { pedido });
+            }}
+          />
+        )}
+
+        {vista === "produccion" && (
+          <ProduccionPage
+            perfil={perfil}
+            onVerPedido={(pedido) => {
+              irAVista("detallePedido", { pedido });
+            }}
           />
         )}
 
@@ -336,11 +433,42 @@ export default function App() {
           />
         )}
 
+        {vista === "ventas-crear" && (
+          <VentasPage perfil={perfil} />
+        )}
+
+        {vista === "ventas-listado" && (
+          <VentasList
+            perfil={perfil}
+            onVer={(venta) => irAVista("venta-detalle", { venta })}
+            onEditar={(venta) => irAVista("venta-detalle", { venta })}
+          />
+        )}
+
+        {vista === "venta-detalle" && ventaSeleccionada && (
+          <VentaDetalle
+            perfil={perfil}
+            ventaId={ventaSeleccionada.firebaseId}
+            onVolver={() => irAVista("ventas-listado")}
+          />
+        )}
+
+
+        {vista === "movimientos" && (
+          <MovimientosList perfil={perfil} />
+        )}
+
         {vista === "configuracion" && (
           <Configuracion
             perfil={perfil}
             modoOscuro={modoOscuro}
             setModoOscuro={setModoOscuro}
+            onActualizarPerfil={(cambios) =>
+              setPerfil((prev) => ({
+                ...prev,
+                ...cambios,
+              }))
+            }
           />
         )}
       </main>

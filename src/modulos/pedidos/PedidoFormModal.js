@@ -7,9 +7,15 @@ import {
   doc,
   query,
   where,
+  runTransaction,
+  serverTimestamp,
 } from "firebase/firestore";
 import { db } from "../../firebase";
 import "./PedidoFormModal.css";
+import {
+  asegurarColumnasBaseProduccion,
+  obtenerColumnaInicialProduccion,
+} from "../../firebase/produccionColumnas";
 
 export default function PedidoFormModal({ onClose, onPedidoCreado, pedido, perfil }) {
   const [clientes, setClientes] = useState([]);
@@ -76,6 +82,35 @@ export default function PedidoFormModal({ onClose, onPedidoCreado, pedido, perfi
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
+  const obtenerSiguienteNumeroPedido = async () => {
+    if (!perfil?.clienteId) {
+      throw new Error("No se encontró clienteId para generar el número de pedido.");
+    }
+
+    const clienteSaasRef = doc(db, "clientes-saas", perfil.clienteId);
+
+    const nuevoNumero = await runTransaction(db, async (transaction) => {
+      const clienteSnap = await transaction.get(clienteSaasRef);
+
+      if (!clienteSnap.exists()) {
+        throw new Error("No existe el cliente SaaS asociado.");
+      }
+
+      const data = clienteSnap.data();
+      const ultimoNumeroPedido = Number(data.ultimoNumeroPedido || 0);
+      const siguienteNumero = ultimoNumeroPedido + 1;
+
+      transaction.update(clienteSaasRef, {
+        ultimoNumeroPedido: siguienteNumero,
+        updatedAt: serverTimestamp(),
+      });
+
+      return siguienteNumero;
+    });
+
+    return nuevoNumero.toString();
+  };
+
   // 🔹 Guardar (crear o actualizar)
   const guardarPedido = async () => {
     if (!formData.cliente || !formData.fechaPedido) {
@@ -100,7 +135,9 @@ export default function PedidoFormModal({ onClose, onPedidoCreado, pedido, perfi
 
         await updateDoc(ref, {
           ...formData,
+          clienteBusqueda: (formData.cliente || "").trim().toLowerCase(),
           clienteId: pedido.clienteId || perfil?.clienteId || "",
+          updatedAt: serverTimestamp(),
         });
 
         const pedidoActualizado = {
@@ -119,33 +156,49 @@ export default function PedidoFormModal({ onClose, onPedidoCreado, pedido, perfi
         return;
       }
 
+      
       // 🔹 CREAR nuevo pedido
-      const pedidosQuery =
+      const nuevoID =
         perfil?.rol === "superadmin"
-          ? query(pedidosRef)
-          : query(
-              pedidosRef,
-              where("clienteId", "==", perfil.clienteId)
-            );
+          ? Date.now().toString()
+          : await obtenerSiguienteNumeroPedido();
 
-      const snapshot = await getDocs(pedidosQuery);
+      await asegurarColumnasBaseProduccion(perfil?.clienteId || "");
+      const columnaInicial = await obtenerColumnaInicialProduccion(perfil?.clienteId || "");
 
-      const ultimoID =
-        snapshot.docs.length > 0
-          ? Math.max(...snapshot.docs.map((docu) => parseInt(docu.data().id) || 0))
-          : 0;
-
-      const nuevoID = (ultimoID + 1).toString();
+      if (!columnaInicial) {
+        throw new Error("No se encontró la columna inicial de producción.");
+      }
 
       const nuevoPedidoData = {
         id: nuevoID,
         cliente: formData.cliente,
+        clienteBusqueda: (formData.cliente || "").trim().toLowerCase(),
         clienteDNI: formData.clienteDNI,
         fechaPedido: formData.fechaPedido,
         fechaEntrega: formData.fechaEntrega,
         estado: formData.estado,
-        productos: [],
         clienteId: perfil?.clienteId || "",
+
+        // ✅ campos resumen para escalabilidad futura
+        cantidadItems: 0,
+        totalUnidades: 0,
+        montoTotal: 0,
+        estadoPago: "Pendiente",
+
+        // ✅ producción
+        columnaProduccionId: columnaInicial.id,
+        progresoProduccion: 0,
+        estadoProduccion: "pendiente",
+        produccionFinalizada: false,
+        produccionActualizadoAt: serverTimestamp(),
+        ultimaAccionProduccionPor: null,
+        ultimaAccionProduccionPorNombre: null,
+        ultimaAccionProduccionAt: null,
+
+        // ✅ timestamps para orden y paginación
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
       };
 
       const docRef = await addDoc(pedidosRef, nuevoPedidoData);
@@ -216,6 +269,8 @@ export default function PedidoFormModal({ onClose, onPedidoCreado, pedido, perfi
           value={formData.fechaEntrega}
           onChange={handleChange}
         />
+
+
 
         <label>Estado</label>
         <select name="estado" value={formData.estado} onChange={handleChange}>

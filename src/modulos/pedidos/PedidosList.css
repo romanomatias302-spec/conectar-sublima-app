@@ -196,3 +196,41 @@ body.dark-mode .estado-select.pendiente { background-color: #f39c12 !important; 
 body.dark-mode .estado-select.en-proceso { background-color: #3498db !important; }
 body.dark-mode .estado-select.terminado { background-color: #2ecc71 !important; }
 body.dark-mode .estado-select.cancelado { background-color: #e74c3c !important; }
+
+.estado-select {
+  width: 120px;
+  min-width: 120px;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 8px;
+  border: 1px solid #d9dee8;
+  background: #fff;
+  color: #444;
+  outline: none;
+  cursor: pointer;
+}
+
+.estado-select.pendiente {
+  background: #f7f7f8;
+  color: #666;
+  border-color: #d9dee8;
+}
+
+.estado-select.en-proceso {
+  background: #eef4ff;
+  color: #2b5fb8;
+  border-color: #c9d8f3;
+}
+
+.estado-select.terminado {
+  background: #edf8f0;
+  color: #2e7d32;
+  border-color: #cfe7d3;
+}
+
+.estado-select.cancelado {
+  background: #fdeeee;
+  color: #c62828;
+  border-color: #efc7c7;
+}

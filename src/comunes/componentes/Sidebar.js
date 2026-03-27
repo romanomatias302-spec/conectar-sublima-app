@@ -1,12 +1,24 @@
-import React from "react";
-import { FaUsers, FaClipboardList, FaCog, FaBars, FaHome, FaSignOutAlt } from "react-icons/fa";
+import React, { useState } from "react";
+import {
+  FaUsers,
+  FaClipboardList,
+  FaCog,
+  FaBars,
+  FaHome,
+  FaSignOutAlt,
+  FaCashRegister,
+  FaExchangeAlt,
+} from "react-icons/fa";
 import { signOut } from "firebase/auth";
 import { auth } from "../../firebase";
 import "./Sidebar.css";
 
 
 
+
 export default function Sidebar({ onSelect, expandido, onToggle, perfil }) {
+
+  const [ventasOpen, setVentasOpen] = useState(false);
 
   const handleLogout = async () => {
 
@@ -50,6 +62,52 @@ export default function Sidebar({ onSelect, expandido, onToggle, perfil }) {
         <li onClick={() => onSelect("pedidos")}>
         <FaClipboardList className="icon"/>
         {expandido && <span>Pedidos</span>}
+        </li>
+
+        <li onClick={() => onSelect("produccion")}>
+        <FaClipboardList className="icon"/>
+        {expandido && <span>produccion</span>}
+        </li>
+
+        <li className="menu-group">
+          <div
+            className="menu-item-with-arrow"
+            onClick={() => setVentasOpen((prev) => !prev)}
+          >
+            <div className="menu-item-main">
+              <FaCashRegister className="icon" />
+              {expandido && <span>Ventas</span>}
+            </div>
+
+            {expandido && (
+              <span className={`submenu-arrow ${ventasOpen ? "open" : ""}`}>
+                ▾
+              </span>
+            )}
+          </div>
+
+          {expandido && ventasOpen && (
+            <div className="sidebar-submenu">
+              <div
+                className="sidebar-subitem"
+                onClick={() => onSelect("ventas-crear")}
+              >
+                Crear venta
+              </div>
+
+              <div
+                className="sidebar-subitem"
+                onClick={() => onSelect("ventas-listado")}
+              >
+                Listado de ventas
+              </div>
+            </div>
+          )}
+        </li>
+
+        <li onClick={() => onSelect("movimientos")}>
+          <FaExchangeAlt className="icon" />
+          {expandido && <span>Movimientos</span>}
         </li>
 
         <li onClick={() => onSelect("configuracion")}>

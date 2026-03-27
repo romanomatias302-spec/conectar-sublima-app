@@ -11,7 +11,7 @@ import ConfiguracionProductos from "./ConfiguracionProductos";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { db } from "../../firebase";
 
-export default function Configuracion({ modoOscuro, setModoOscuro, perfil }) {
+export default function Configuracion({ modoOscuro, setModoOscuro, perfil, onActualizarPerfil, }) {
   const [pestañaActiva, setPestañaActiva] = useState(
     localStorage.getItem("pestañaActivaConfig") || "general"
   );
@@ -20,6 +20,19 @@ export default function Configuracion({ modoOscuro, setModoOscuro, perfil }) {
   const [nombreVisible, setNombreVisible] = useState("");
   const [guardandoConfig, setGuardandoConfig] = useState(false);
   const [mensajeConfig, setMensajeConfig] = useState("");
+  const [moneda, setMoneda] = useState(perfil?.moneda || "ARS");
+  
+  const [guardandoMoneda, setGuardandoMoneda] = useState(false);
+  const [mensajeMoneda, setMensajeMoneda] = useState("");
+
+  const MONEDAS_CONFIG = {
+    ARS: { moneda: "ARS", localeMoneda: "es-AR", label: "ARS - Peso argentino" },
+    PEN: { moneda: "PEN", localeMoneda: "es-PE", label: "PEN - Sol peruano" },
+    CLP: { moneda: "CLP", localeMoneda: "es-CL", label: "CLP - Peso chileno" },
+    MXN: { moneda: "MXN", localeMoneda: "es-MX", label: "MXN - Peso mexicano" },
+    USD: { moneda: "USD", localeMoneda: "en-US", label: "USD - Dólar estadounidense" },
+  };
+  
 
   useEffect(() => {
     localStorage.setItem("pestañaActivaConfig", pestañaActiva);
@@ -91,6 +104,43 @@ export default function Configuracion({ modoOscuro, setModoOscuro, perfil }) {
     }
   };
 
+  const guardarConfiguracionMoneda = async () => {
+    try {
+      if (!perfil?.clienteId) {
+        setMensajeMoneda("No se encontró clienteId del tenant.");
+        return;
+      }
+
+      setGuardandoMoneda(true);
+      setMensajeMoneda("");
+
+      const configSeleccionada = MONEDAS_CONFIG[moneda] || MONEDAS_CONFIG.ARS;
+
+      const ref = doc(db, "clientes-saas", perfil.clienteId);
+
+      await updateDoc(ref, {
+        moneda: configSeleccionada.moneda,
+        localeMoneda: configSeleccionada.localeMoneda,
+      });
+
+      if (onActualizarPerfil) {
+        onActualizarPerfil({
+          moneda: configSeleccionada.moneda,
+          localeMoneda: configSeleccionada.localeMoneda,
+        });
+      }
+
+      setMensajeMoneda("Configuración de moneda guardada correctamente.");
+    } catch (error) {
+      console.error("Error guardando moneda:", error);
+      setMensajeMoneda("No se pudo guardar la configuración de moneda.");
+    } finally {
+      setGuardandoMoneda(false);
+    }
+  };
+
+
+
   return (
     <div className="config-container">
       <header className="config-header">
@@ -136,6 +186,45 @@ export default function Configuracion({ modoOscuro, setModoOscuro, perfil }) {
                 <span>{modoOscuro ? "Modo claro" : "Modo oscuro"}</span>
               </button>
             </div>
+
+            <div className="container-secundaria" style={{ marginTop: "20px" }}>
+              <h3>Moneda del sistema</h3>
+
+              <div style={{ display: "grid", gap: "14px", maxWidth: "420px" }}>
+                <div>
+                  <label>Moneda</label>
+                  <select
+                    value={moneda}
+                    onChange={(e) => setMoneda(e.target.value)}
+                  >
+                    {Object.values(MONEDAS_CONFIG).map((item) => (
+                      <option key={item.moneda} value={item.moneda}>
+                        {item.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <button
+                  className="btn btn-primary"
+                  onClick={guardarConfiguracionMoneda}
+                  disabled={guardandoMoneda}
+                  style={{ width: "fit-content" }}
+                >
+                  {guardandoMoneda ? "Guardando..." : "Guardar moneda"}
+                </button>
+
+                <p style={{ margin: 0, color: "#666" }}>
+                  El formato regional se ajusta automáticamente según la moneda elegida.
+                </p>
+
+                {mensajeMoneda && (
+                  <p style={{ margin: 0, color: "#666" }}>{mensajeMoneda}</p>
+                )}
+              </div>
+            </div>
+
+
 
             {perfil?.rol !== "superadmin" && (
               <div
@@ -200,6 +289,8 @@ export default function Configuracion({ modoOscuro, setModoOscuro, perfil }) {
             )}
           </section>
         )}
+
+        
 
         {pestañaActiva === "productos" && (
           <section className="config-section">

@@ -1,0 +1,270 @@
+.produccion-page {
+  padding: 16px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-sizing: border-box;
+}
+
+.produccion-page-header h2 {
+  margin: 0;
+  font-size: 22px;
+}
+
+.produccion-board {
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+  align-items: flex-start;
+  padding-bottom: 8px;
+}
+
+.produccion-column {
+  min-width: 280px;
+  max-width: 280px;
+  background: #f6f7f9;
+  border: 2px solid #d9dee8;
+  border-radius: 12px;
+  padding: 12px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  min-height: 300px;
+}
+
+.produccion-column-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.produccion-column-title {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.produccion-column-count {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.produccion-column-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 60px;
+}
+
+.produccion-card {
+  background: #fff;
+  border-radius: 10px;
+  padding: 12px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+}
+
+.produccion-card-numero {
+  font-weight: 700;
+  font-size: 14px;
+  margin-bottom: 6px;
+}
+
+.produccion-card-cliente {
+  font-size: 13px;
+  color: #444;
+}
+
+.produccion-column-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 220px;
+}
+
+.produccion-card {
+  background: #fff;
+  border-radius: 10px;
+  padding: 12px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  user-select: none;
+}
+
+.produccion-page-header {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.produccion-page-header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.btn-produccion-secundario,
+.btn-produccion-primario,
+.btn-produccion-cancelar {
+  border: none;
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.btn-produccion-secundario {
+  background: #eef1f6;
+  color: #333;
+}
+
+.btn-produccion-primario {
+  background: #7c3aed;
+  color: white;
+}
+
+.btn-produccion-cancelar {
+  background: #f2f3f5;
+  color: #555;
+}
+
+.produccion-nueva-columna-box {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.produccion-input-columna {
+  min-width: 260px;
+  max-width: 320px;
+  padding: 10px 12px;
+  border: 1px solid #d9dee8;
+  border-radius: 10px;
+  outline: none;
+}
+
+.produccion-column-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.produccion-column-header-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.produccion-column-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.produccion-column-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.produccion-columna-btn {
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 6px;
+  background: #eef1f6;
+  color: #333;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.produccion-columna-btn.eliminar {
+  background: #fdeeee;
+  color: #c62828;
+}
+
+.produccion-columna-editar-box {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.produccion-columna-editar-input {
+  width: 150px;
+  padding: 6px 8px;
+  border: 1px solid #d9dee8;
+  border-radius: 8px;
+  outline: none;
+  font-size: 13px;
+}
+
+.produccion-columna-btn-guardar {
+  border: none;
+  border-radius: 8px;
+  background: #7c3aed;
+  color: white;
+  padding: 6px 8px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.produccion-card {
+  background: #fff;
+  border-radius: 10px;
+  padding: 10px 12px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  user-select: none;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.produccion-card-drag-handle {
+  cursor: grab;
+  color: #999;
+  font-size: 14px;
+  line-height: 1;
+  padding-top: 2px;
+  border: none;
+  background: transparent;
+  padding: 0;
+  min-width: 18px;
+}
+
+.produccion-card-drag-handle:active {
+  cursor: grabbing;
+}
+
+.produccion-card.dragging {
+  z-index: 20;
+}
+
+.produccion-card-clickable {
+  flex: 1;
+  cursor: pointer;
+}
+
+.produccion-card-numero {
+  font-weight: 700;
+  font-size: 14px;
+  margin-bottom: 6px;
+}
+
+.produccion-card-cliente {
+  font-size: 13px;
+  color: #444;
+  margin-bottom: 6px;
+}
+
+.produccion-card-fecha {
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 8px;
+}
+
+.produccion-card-link {
+  font-size: 12px;
+  color: #7c3aed;
+  font-weight: 600;
+}
