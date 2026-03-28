@@ -20,6 +20,8 @@ export default function ProduccionBoard({
   onGuardarEdicionColumna,
   guardandoEdicionColumna,
   eliminandoColumnaId,
+  columnasContraidas,
+  onToggleColumnaContraida,
 }) {
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -50,7 +52,7 @@ export default function ProduccionBoard({
     >
       <div className="produccion-board">
         {columnas.map((columna) => (
-          <ProduccionColumn
+        <ProduccionColumn
             key={columna.id}
             columna={columna}
             pedidos={pedidosPorColumna[columna.id] || []}
@@ -63,7 +65,9 @@ export default function ProduccionBoard({
             onGuardarEdicionColumna={onGuardarEdicionColumna}
             guardandoEdicionColumna={guardandoEdicionColumna}
             eliminandoColumnaId={eliminandoColumnaId}
-          />
+            estaContraida={columnasContraidas?.includes(columna.id)}
+            onToggleContraer={() => onToggleColumnaContraida?.(columna.id)}
+        />
         ))}
       </div>
     </DndContext>

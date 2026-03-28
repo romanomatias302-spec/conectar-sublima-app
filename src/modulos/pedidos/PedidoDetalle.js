@@ -5,7 +5,7 @@ import ProductoFormModal from "./ProductoFormModal";
 import ActionMenu from "../../comunes/componentes/ActionMenu";
 import "./PedidoDetalle.css";
 
-export default function PedidoDetalle({ pedido, onVolver, perfil }) {
+export default function PedidoDetalle({ pedido, onVolver, perfil, onVerVenta }) {
   const [productos, setProductos] = useState([]);
   const [mostrarModal, setMostrarModal] = useState(false);
   const [productoEditando, setProductoEditando] = useState(null);
@@ -106,6 +106,7 @@ export default function PedidoDetalle({ pedido, onVolver, perfil }) {
           display: "flex",
           gap: "10px",
           flexWrap: "wrap",
+          alignItems: "center",
         }}
       >
         {!pedido?.ventaRefId && (
@@ -123,31 +124,39 @@ export default function PedidoDetalle({ pedido, onVolver, perfil }) {
         )}
 
         {pedido?.ventaRefId && (pedido?.ventaEstado || "activa") === "activa" && (
-          <div
+          <button
+            type="button"
+            onClick={() => onVerVenta && onVerVenta(pedido.ventaRefId)}
             style={{
               background: "rgba(25, 135, 84, 0.10)",
               color: "#146c43",
               padding: "10px 14px",
               borderRadius: "10px",
-              fontWeight: 600,
+              fontWeight: 700,
+              border: "none",
+              cursor: "pointer",
             }}
           >
-            Factura asociada: #{pedido?.ventaVisibleId || "-"}
-          </div>
+            Ver factura #{pedido?.ventaVisibleId || "-"}
+          </button>
         )}
 
         {pedido?.ventaRefId && pedido?.ventaEstado === "anulada" && (
-          <div
+          <button
+            type="button"
+            onClick={() => onVerVenta && onVerVenta(pedido.ventaRefId)}
             style={{
               background: "rgba(108, 117, 125, 0.14)",
               color: "#495057",
               padding: "10px 14px",
               borderRadius: "10px",
-              fontWeight: 600,
+              fontWeight: 700,
+              border: "none",
+              cursor: "pointer",
             }}
           >
-            Factura anulada asociada: #{pedido?.ventaVisibleId || "-"}
-          </div>
+            Ver factura anulada #{pedido?.ventaVisibleId || "-"}
+          </button>
         )}
       </div>
 

@@ -19,6 +19,7 @@ import VentaFormModal from "./modulos/ventas/VentaFormModal";
 import VentasPage from "./modulos/ventas/VentasPage";
 import MovimientosList from "./modulos/movimientos/MovimientosList";
 import VentaDetalle from "./modulos/ventas/VentaDetalle";
+import { obtenerVentaPorId } from "./firebase/ventas";
 import ProduccionPage from "./modulos/produccion/ProduccionPage";
 
 
@@ -267,6 +268,37 @@ export default function App() {
     }
   };
 
+    const abrirVentaDesdePedido = async (ventaId) => {
+      try {
+        const venta = await obtenerVentaPorId(ventaId);
+        irAVista("venta-detalle", { venta });
+      } catch (error) {
+        console.error("Error abriendo venta desde pedido:", error);
+        alert("No se pudo abrir la factura asociada.");
+      }
+    };
+
+    const abrirPedidoDesdeVenta = async (pedidoId) => {
+      try {
+        const pedidoRef = doc(db, "pedidos", pedidoId);
+        const pedidoSnap = await getDoc(pedidoRef);
+
+        if (!pedidoSnap.exists()) {
+          throw new Error("El pedido no existe.");
+        }
+
+        const pedido = {
+          firebaseId: pedidoSnap.id,
+          ...pedidoSnap.data(),
+        };
+
+        irAVista("detallePedido", { pedido });
+      } catch (error) {
+        console.error("Error abriendo pedido desde venta:", error);
+        alert("No se pudo abrir el pedido asociado.");
+      }
+    };
+
   // 🔹 Navegación desde la pantalla de inicio
   const manejarNavegacionDesdeInicio = (modulo) => {
   switch (modulo) {
@@ -430,6 +462,7 @@ export default function App() {
             perfil={perfil}
             pedido={pedidoSeleccionado}
             onVolver={() => irAVista("pedidos")}
+            onVerVenta={abrirVentaDesdePedido}
           />
         )}
 
@@ -450,6 +483,7 @@ export default function App() {
             perfil={perfil}
             ventaId={ventaSeleccionada.firebaseId}
             onVolver={() => irAVista("ventas-listado")}
+            onVerPedido={abrirPedidoDesdeVenta}
           />
         )}
 

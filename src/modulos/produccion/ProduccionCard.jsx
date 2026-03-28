@@ -21,9 +21,9 @@ export default function ProduccionCard({ pedido, onVerPedido = () => {} }) {
 
   return (
     <div
-      ref={setNodeRef}
-      style={style}
-      className={`produccion-card ${isDragging ? "dragging" : ""}`}
+    ref={setNodeRef}
+    style={style}
+    className={`produccion-card ${isDragging ? "dragging" : ""} ${pedido.__animandoSalida ? "finalizando" : ""}`}
     >
       <button
         type="button"

@@ -1,10 +1,11 @@
 .produccion-page {
   padding: 16px;
-  height: 100%;
+  height: calc(100vh - 80px);
   display: flex;
   flex-direction: column;
   gap: 16px;
   box-sizing: border-box;
+  min-height: 0;
 }
 
 .produccion-page-header h2 {
@@ -267,4 +268,102 @@
   font-size: 12px;
   color: #7c3aed;
   font-weight: 600;
+}
+
+
+
+.produccion-card.finalizando {
+  animation: produccionFadeOutFinal 2.5s ease forwards;
+}
+
+@keyframes produccionFadeOutFinal {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  30% {
+    opacity: 1;
+    transform: scale(1.01);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+.produccion-board-wrapper {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  border-radius: 12px;
+}
+
+.produccion-board {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  padding-bottom: 12px;
+  min-width: max-content;
+}
+
+.produccion-column {
+  min-width: 280px;
+  max-width: 280px;
+  border: 2px solid #d9dee8;
+  border-radius: 12px;
+  padding: 12px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  min-height: 300px;
+  transition: width 0.2s ease, min-width 0.2s ease, max-width 0.2s ease;
+}
+
+.produccion-column.contraida {
+  min-width: 56px;
+  max-width: 56px;
+  padding: 10px 8px;
+  overflow: hidden;
+}
+
+.produccion-column.contraida .produccion-column-header {
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.produccion-column.contraida .produccion-column-header-main {
+  width: 100%;
+}
+
+.produccion-column.contraida .produccion-column-title {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  text-align: center;
+  white-space: nowrap;
+  font-size: 11px;
+  max-height: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin: 0 auto;
+}
+
+.produccion-column.contraida .produccion-column-header-right {
+  flex-direction: column;
+  gap: 8px;
+}
+
+.produccion-column.contraida .produccion-column-count {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.produccion-column.contraida .produccion-column-body {
+  min-height: 40px;
+}
+
+.produccion-column-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding-bottom: 8px;
 }

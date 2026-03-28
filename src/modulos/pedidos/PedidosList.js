@@ -11,6 +11,7 @@ import {
   limit,
   startAfter,
   serverTimestamp,
+  onSnapshot,
 } from "firebase/firestore";
 import { db } from "../../firebase";
 import PedidoFormModal from "./PedidoFormModal";
@@ -19,6 +20,7 @@ import "./PedidosList.css";
 import ProduccionEstadoCell from "../produccion/ProduccionEstadoCell";
 import { obtenerColumnasProduccion } from "../../firebase/produccionColumnas";
 import { calcularProgresoPorColumna } from "../produccion/produccionUtils";
+import { sincronizarPedidoDesdeEstadoManual } from "../../firebase/produccionPedidos";
 
 export default function PedidosList({
   onVerDetalle = () => {},
@@ -45,43 +47,47 @@ export default function PedidosList({
 
   const PAGE_SIZE = 100;
 
-  const cargarPedidos = async () => {
-    try {
-      if (!perfil) return;
+  const cargarPedidos = () => {
+    if (!perfil) return () => {};
 
-      setLoading(true);
+    setLoading(true);
 
-      const pedidosRef = collection(db, "pedidos");
+    const pedidosRef = collection(db, "pedidos");
 
-      const q =
-        perfil.rol === "superadmin"
-          ? query(
-              pedidosRef,
-              orderBy("createdAt", "desc"),
-              limit(PAGE_SIZE)
-            )
-          : query(
-              pedidosRef,
-              where("clienteId", "==", perfil.clienteId),
-              orderBy("createdAt", "desc"),
-              limit(PAGE_SIZE)
-            );
+    const q =
+      perfil.rol === "superadmin"
+        ? query(
+            pedidosRef,
+            orderBy("createdAt", "desc"),
+            limit(PAGE_SIZE)
+          )
+        : query(
+            pedidosRef,
+            where("clienteId", "==", perfil.clienteId),
+            orderBy("createdAt", "desc"),
+            limit(PAGE_SIZE)
+          );
 
-      const snapshot = await getDocs(q);
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const lista = snapshot.docs.map((docu) => ({
+          firebaseId: docu.id,
+          ...docu.data(),
+        }));
 
-      const lista = snapshot.docs.map((docu) => ({
-        firebaseId: docu.id,
-        ...docu.data(),
-      }));
+        setPedidos(lista);
+        setUltimoDoc(snapshot.docs.length ? snapshot.docs[snapshot.docs.length - 1] : null);
+        setHayMas(snapshot.docs.length === PAGE_SIZE);
+        setLoading(false);
+      },
+      (error) => {
+        console.error("Error al escuchar pedidos:", error);
+        setLoading(false);
+      }
+    );
 
-      setPedidos(lista);
-      setUltimoDoc(snapshot.docs.length ? snapshot.docs[snapshot.docs.length - 1] : null);
-      setHayMas(snapshot.docs.length === PAGE_SIZE);
-    } catch (error) {
-      console.error("Error al cargar pedidos:", error);
-    } finally {
-      setLoading(false);
-    }
+    return unsubscribe;
   };
 
   const cargarMasPedidos = async () => {
@@ -216,9 +222,14 @@ export default function PedidosList({
 };
 
   useEffect(() => {
-  cargarPedidos();
-  cargarColumnasProduccion();
-}, [perfil]);
+    const unsubscribe = cargarPedidos();
+
+    return () => {
+      if (typeof unsubscribe === "function") {
+        unsubscribe();
+      }
+    };
+  }, [perfil]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -232,7 +243,6 @@ export default function PedidosList({
     if (window.confirm("¿Seguro que querés eliminar este pedido?")) {
       try {
         await deleteDoc(doc(db, "pedidos", firebaseId));
-        await cargarPedidos();
       } catch (error) {
         console.error("Error al eliminar pedido:", error);
       }
@@ -243,84 +253,13 @@ export default function PedidosList({
     try {
       const pedidoActual = pedidos.find((p) => p.firebaseId === firebaseId);
       if (!pedidoActual) return;
+      if (!perfil?.clienteId) return;
 
-      const columnasOrdenadas = [...columnasProduccion].sort((a, b) => a.orden - b.orden);
-      const columnaInicial = columnasOrdenadas.find((c) => c.esInicial);
-      const columnaFinal = columnasOrdenadas.find((c) => c.esFinal);
-
-      const columnasIntermedias = columnasOrdenadas.filter(
-        (c) => !c.esInicial && !c.esFinal
-      );
-
-      let columnaDestino = null;
-      let nuevosCamposProduccion = {};
-
-      if (nuevoEstado === "Pendiente" && columnaInicial) {
-        columnaDestino = columnaInicial;
-      }
-
-      if (nuevoEstado === "Terminado" && columnaFinal) {
-        columnaDestino = columnaFinal;
-      }
-
-      if (nuevoEstado === "En proceso") {
-        // si hay intermedias, vuelve a la más cercana al final
-        if (columnasIntermedias.length > 0) {
-          columnaDestino = columnasIntermedias[columnasIntermedias.length - 1];
-        } else if (columnaInicial) {
-          columnaDestino = columnaInicial;
-        }
-      }
-
-      if (nuevoEstado === "Cancelado") {
-        nuevosCamposProduccion = {
-          estado: "Cancelado",
-          updatedAt: serverTimestamp(),
-        };
-      } else if (columnaDestino) {
-        const progresoProduccion = calcularProgresoPorColumna(
-          columnasOrdenadas,
-          columnaDestino.id
-        );
-
-        const estadoProduccion = columnaDestino.esFinal
-          ? "finalizado"
-          : columnaDestino.esInicial
-          ? "pendiente"
-          : "en_proceso";
-
-        const produccionFinalizada = !!columnaDestino.esFinal;
-
-        nuevosCamposProduccion = {
-          estado: nuevoEstado,
-          columnaProduccionId: columnaDestino.id,
-          progresoProduccion,
-          estadoProduccion,
-          produccionFinalizada,
-          produccionActualizadoAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        };
-      } else {
-        nuevosCamposProduccion = {
-          estado: nuevoEstado,
-          updatedAt: serverTimestamp(),
-        };
-      }
-
-      const ref = doc(db, "pedidos", firebaseId);
-      await updateDoc(ref, nuevosCamposProduccion);
-
-      setPedidos((prev) =>
-        prev.map((p) =>
-          p.firebaseId === firebaseId
-            ? {
-                ...p,
-                ...nuevosCamposProduccion,
-                estado: nuevoEstado,
-              }
-            : p
-        )
-      );
+      await sincronizarPedidoDesdeEstadoManual({
+        pedidoActual,
+        nuevoEstado,
+        clienteId: perfil.clienteId,
+      });
     } catch (error) {
       console.error("Error al actualizar estado:", error);
     }
@@ -506,7 +445,6 @@ export default function PedidosList({
           onClose={() => setMostrarModal(false)}
           onPedidoCreado={(nuevoPedido) => {
             setMostrarModal(false);
-            cargarPedidos();
             onVerDetalle(nuevoPedido);
           }}
         />

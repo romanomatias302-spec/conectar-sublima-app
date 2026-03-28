@@ -23,7 +23,7 @@ import { formatearMoneda, obtenerConfigMonedaDesdePerfil } from "../../utils/mon
 import "./VentasPage.css";
 
 
-export default function VentaDetalle({ perfil, ventaId, onVolver }) {
+export default function VentaDetalle({ perfil, ventaId, onVolver, onVerPedido }) {
   const [venta, setVenta] = useState(null);
   const [items, setItems] = useState([]);
   const [pagos, setPagos] = useState([]);
@@ -357,6 +357,7 @@ export default function VentaDetalle({ perfil, ventaId, onVolver }) {
                 <select
                   value={pedidoRefId}
                   onChange={(e) => setPedidoRefId(e.target.value)}
+                  disabled={ventaAnulada}
                 >
                   <option value="">Sin pedido asociado</option>
                   {pedidos.map((p) => (
@@ -373,6 +374,16 @@ export default function VentaDetalle({ perfil, ventaId, onVolver }) {
                 >
                   {guardandoPedido ? "Guardando..." : "Guardar"}
                 </button>
+
+                {venta?.pedidoRefId && (
+                  <button
+                    className="btn btn-secondary"
+                    type="button"
+                    onClick={() => onVerPedido && onVerPedido(venta.pedidoRefId)}
+                  >
+                    Ver pedido
+                  </button>
+                )}
               </div>
             </div>
           </div>

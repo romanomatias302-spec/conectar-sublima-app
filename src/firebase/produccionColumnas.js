@@ -13,7 +13,34 @@ import {
 } from "firebase/firestore";
 import { db } from "../firebase";
 
+
+
 const PRODUCCION_COLUMNAS_COLLECTION = "produccion_columnas";
+
+const PALETA_COLUMNAS = [
+  { colorFondo: "#F6F8FF", colorBorde: "#D9E2FF" },
+  { colorFondo: "#F4FBF7", colorBorde: "#D7F0E0" },
+  { colorFondo: "#FFF8F3", colorBorde: "#F5DDCB" },
+  { colorFondo: "#FAF5FF", colorBorde: "#E7D9F8" },
+  { colorFondo: "#F4FBFB", colorBorde: "#D6ECEC" },
+  { colorFondo: "#FFF9EF", colorBorde: "#F0E0BA" },
+  { colorFondo: "#F8F6FF", colorBorde: "#DDD7F6" },
+  { colorFondo: "#F7FAF4", colorBorde: "#DCE8D1" },
+];
+
+function obtenerColorSiguiente(columnas) {
+  const usadas = new Set(
+    columnas
+      .filter((c) => !c.esInicial && !c.esFinal)
+      .map((c) => `${c.colorFondo || ""}_${c.colorBorde || ""}`)
+  );
+
+  const libre = PALETA_COLUMNAS.find(
+    (c) => !usadas.has(`${c.colorFondo}_${c.colorBorde}`)
+  );
+
+  return libre || PALETA_COLUMNAS[columnas.length % PALETA_COLUMNAS.length];
+}
 
 export async function obtenerColumnasProduccion(clienteId) {
   const q = query(
@@ -53,30 +80,34 @@ export async function asegurarColumnasBaseProduccion(clienteId) {
   const tieneFinal = columnas.some((col) => col.esFinal);
 
   if (!tieneInicial) {
-    await addDoc(collection(db, PRODUCCION_COLUMNAS_COLLECTION), {
-      clienteId,
-      nombre: "Pendiente",
-      orden: 0,
-      esInicial: true,
-      esFinal: false,
-      activo: true,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
-  }
+  await addDoc(collection(db, PRODUCCION_COLUMNAS_COLLECTION), {
+    clienteId,
+    nombre: "Pendiente",
+    orden: 0,
+    esInicial: true,
+    esFinal: false,
+    activo: true,
+    colorFondo: "#F7F7F8",
+    colorBorde: "#D9DEE8",
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+}
 
-  if (!tieneFinal) {
-    await addDoc(collection(db, PRODUCCION_COLUMNAS_COLLECTION), {
-      clienteId,
-      nombre: "Producción finalizada",
-      orden: 9999,
-      esInicial: false,
-      esFinal: true,
-      activo: true,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
-  }
+if (!tieneFinal) {
+  await addDoc(collection(db, PRODUCCION_COLUMNAS_COLLECTION), {
+    clienteId,
+    nombre: "Producción finalizada",
+    orden: 9999,
+    esInicial: false,
+    esFinal: true,
+    activo: true,
+    colorFondo: "#EEF8F0",
+    colorBorde: "#CFE7D3",
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+}
 
   return await obtenerColumnasProduccion(clienteId);
 }
@@ -125,6 +156,8 @@ export async function crearColumnaIntermediaProduccion({ clienteId, nombre }) {
     nuevoOrden = columnasIntermedias[columnasIntermedias.length - 1].orden + 1;
   }
 
+  const color = obtenerColorSiguiente(columnas);
+
   const ref = await addDoc(collection(db, PRODUCCION_COLUMNAS_COLLECTION), {
     clienteId,
     nombre: nombre?.trim() || "Nueva columna",
@@ -132,6 +165,8 @@ export async function crearColumnaIntermediaProduccion({ clienteId, nombre }) {
     esInicial: false,
     esFinal: false,
     activo: true,
+    colorFondo: color.colorFondo,
+    colorBorde: color.colorBorde,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });

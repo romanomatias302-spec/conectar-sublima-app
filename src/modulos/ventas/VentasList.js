@@ -213,6 +213,7 @@ export default function VentasList({ perfil, onVer = () => {}, onEditar = () => 
                   <th>Fecha</th>
                   <th>Cliente</th>
                   <th>Pedido asociado</th>
+                  <th>Estado</th>
                   <th>Total</th>
                   <th>Pagado</th>
                   <th>Saldo</th>
@@ -221,46 +222,64 @@ export default function VentasList({ perfil, onVer = () => {}, onEditar = () => 
               </thead>
 
               <tbody>
-                {ventasFiltradas.map((v) => (
-                  <tr key={v.firebaseId}>
-                    <td>{v.numeroVenta || "-"}</td>
-                    <td>{v.fechaVenta || "-"}</td>
-                    <td>{v.clienteNombre || "-"}</td>
-                    <td>{v.pedidoVisibleId ? `#${v.pedidoVisibleId}` : "-"}</td>
-                    <td>{formatearMoneda(v.total, configMoneda.moneda, configMoneda.localeMoneda)}</td>
-                    <td>{formatearMoneda(v.totalPagado, configMoneda.moneda, configMoneda.localeMoneda)}</td> 
-                    <td>
-                      {Number(v.saldoAFavor || 0) > 0 ? (
-                        <span className="ventas-saldo-badge ventas-saldo-favor">
-                          A favor: {formatearMoneda(v.saldoAFavor, configMoneda.moneda, configMoneda.localeMoneda)}
-                        </span>
-                      ) : Number(v.saldoPendiente || 0) > 0 ? (
-                        <span className="ventas-saldo-badge ventas-saldo-pendiente">
-                          Pendiente: {formatearMoneda(v.saldoPendiente, configMoneda.moneda, configMoneda.localeMoneda)} 
-                        </span>
-                      ) : (
-                        <span className="ventas-saldo-badge ventas-saldo-ok">
-                          {formatearMoneda(0)}
-                        </span>
-                      )}
-                    </td>
-                    <td>
-                      <div className="ventas-acciones">
-                        <button
-                          type="button"
-                          className="btn btn-secondary btn-xs"
-                          onClick={() => onVer(v)}
+                {ventasFiltradas.map((v) => {
+                  const ventaAnulada = (v.estadoVenta || "activa") === "anulada";
+
+                  return (
+                    <tr
+                      key={v.firebaseId}
+                      className={ventaAnulada ? "ventas-row-anulada" : ""}
+                    >
+                      <td>{v.numeroVenta || "-"}</td>
+                      <td>{v.fechaVenta || "-"}</td>
+                      <td>{v.clienteNombre || "-"}</td>
+                      <td>{v.pedidoVisibleId ? `#${v.pedidoVisibleId}` : "-"}</td>
+                      <td>
+                        <span
+                          className={`ventas-estado-badge ${
+                            ventaAnulada
+                              ? "ventas-estado-anulado"
+                              : "ventas-estado-ok"
+                          }`}
                         >
-                          Ver
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                          {ventaAnulada ? "Anulada" : "Activa"}
+                        </span>
+                      </td>
+                      <td>{formatearMoneda(v.total, configMoneda.moneda, configMoneda.localeMoneda)}</td>
+                      <td>{formatearMoneda(v.totalPagado, configMoneda.moneda, configMoneda.localeMoneda)}</td>
+                      <td>
+                        {Number(v.saldoAFavor || 0) > 0 ? (
+                          <span className="ventas-saldo-badge ventas-saldo-favor">
+                            A favor: {formatearMoneda(v.saldoAFavor, configMoneda.moneda, configMoneda.localeMoneda)}
+                          </span>
+                        ) : Number(v.saldoPendiente || 0) > 0 ? (
+                          <span className="ventas-saldo-badge ventas-saldo-pendiente">
+                            Pendiente: {formatearMoneda(v.saldoPendiente, configMoneda.moneda, configMoneda.localeMoneda)}
+                          </span>
+                        ) : (
+                          <span className="ventas-saldo-badge ventas-saldo-ok">
+                            {formatearMoneda(0, configMoneda.moneda, configMoneda.localeMoneda)}
+                          </span>
+                        )}
+                      </td>
+                      <td>
+                        <div className="ventas-acciones">
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-xs"
+                            onClick={() => onVer(v)}
+                          >
+                            Ver
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
 
                 {ventasFiltradas.length === 0 && (
                   <tr>
-                    <td colSpan="8" style={{ textAlign: "center", padding: "18px" }}>
+                    <td colSpan="9" style={{ textAlign: "center", padding: "18px" }}>
                       No se encontraron ventas.
                     </td>
                   </tr>
