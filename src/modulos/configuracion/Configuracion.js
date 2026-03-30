@@ -10,6 +10,7 @@ import {
 import ConfiguracionProductos from "./ConfiguracionProductos";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { db } from "../../firebase";
+import ConfiguracionUsuarios from "./ConfiguracionUsuarios";
 
 export default function Configuracion({ modoOscuro, setModoOscuro, perfil, onActualizarPerfil, }) {
   const [pestañaActiva, setPestañaActiva] = useState(
@@ -164,6 +165,13 @@ export default function Configuracion({ modoOscuro, setModoOscuro, perfil, onAct
         </button>
 
         <button
+          className={`tab-btn ${pestañaActiva === "usuarios" ? "activo" : ""}`}
+          onClick={() => setPestañaActiva("usuarios")}
+        >
+          <FaUserCog /> Usuarios
+        </button>
+
+        <button
           className={`tab-btn ${pestañaActiva === "cuenta" ? "activo" : ""}`}
           onClick={() => setPestañaActiva("cuenta")}
         >
@@ -301,6 +309,16 @@ export default function Configuracion({ modoOscuro, setModoOscuro, perfil, onAct
             <ConfiguracionProductos perfil={perfil} />
           </section>
         )}
+
+        {pestañaActiva === "usuarios" && (
+        <section className="config-section">
+          <h2>Usuarios</h2>
+          <p className="config-note">
+            Invitá y administrá los accesos del equipo.
+          </p>
+          <ConfiguracionUsuarios perfil={perfil} />
+        </section>
+      )}
 
         {pestañaActiva === "cuenta" && (
           <section className="config-section">

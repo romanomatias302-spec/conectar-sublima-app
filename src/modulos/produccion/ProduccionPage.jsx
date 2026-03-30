@@ -5,6 +5,7 @@ import {
   actualizarColumnaProduccion,
   desactivarColumnaProduccion,
   escucharColumnasProduccion,
+  moverColumnaProduccion,
 } from "../../firebase/produccionColumnas";
 import {
   moverPedidoProduccion,
@@ -12,6 +13,7 @@ import {
   escucharPedidosProduccionFinalizadosRecientes,
   moverPedidosDeColumnaEliminadaAAnterior,
   recalcularPedidosPorCambioDeColumnas,
+  actualizarDetalleManualProduccion,
 } from "../../firebase/produccionPedidos";
 import { agruparPedidosPorColumna } from "./produccionUtils";
 import ProduccionBoard from "./ProduccionBoard";
@@ -67,6 +69,15 @@ export default function ProduccionPage({ perfil, onVerPedido = () => {} }) {
   const [guardandoEdicionColumna, setGuardandoEdicionColumna] = useState(false);
   const [eliminandoColumnaId, setEliminandoColumnaId] = useState(null);
   const [columnasContraidas, setColumnasContraidas] = useState([]);
+
+  const [ordenTarjetas, setOrdenTarjetas] = useState("normal");
+
+ const [pedidoEditandoDetalle, setPedidoEditandoDetalle] = useState(null);
+ const [notaManual, setNotaManual] = useState("");
+ const [metrosManual, setMetrosManual] = useState("");
+ const [colorManual, setColorManual] = useState("");
+ const [guardandoDetalleManual, setGuardandoDetalleManual] = useState(false);
+ const [ahoraTick, setAhoraTick] = useState(Date.now());
 
   async function cargar() {
     if (!perfil?.clienteId) return;
@@ -132,38 +143,96 @@ export default function ProduccionPage({ perfil, onVerPedido = () => {} }) {
         setColumnasContraidas(cargarColumnasContraidas(perfil));
         }, [perfil?.clienteId, perfil?.uid, perfil?.firebaseUid, perfil?.email]);
 
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setAhoraTick(Date.now());
+        }, 60000);
+
+        return () => clearInterval(interval);
+        }, []);    
+
+
+  function normalizarFechaOrden(fecha) {
+  if (!fecha) return null;
+  const d = new Date(fecha);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function ordenarTarjetas(lista, modoOrden) {
+  const copia = [...lista];
+
+  if (modoOrden === "entrega-asc") {
+    return copia.sort((a, b) => {
+      const fa = normalizarFechaOrden(a.fechaEntrega);
+      const fb = normalizarFechaOrden(b.fechaEntrega);
+
+      if (!fa && !fb) return 0;
+      if (!fa) return 1;
+      if (!fb) return -1;
+
+      return fa - fb;
+    });
+  }
+
+  if (modoOrden === "entrega-desc") {
+    return copia.sort((a, b) => {
+      const fa = normalizarFechaOrden(a.fechaEntrega);
+      const fb = normalizarFechaOrden(b.fechaEntrega);
+
+      if (!fa && !fb) return 0;
+      if (!fa) return 1;
+      if (!fb) return -1;
+
+      return fb - fa;
+    });
+  }
+
+  return copia;
+}
+
   const pedidosPorColumna = useMemo(() => {
-    const agrupado = agruparPedidosPorColumna(columnas, pedidos);
+  const agrupadoBase = agruparPedidosPorColumna(columnas, pedidos);
 
-    const columnaFinal = columnas.find((c) => c.esFinal);
-    if (!columnaFinal) return agrupado;
+  const columnaFinal = columnas.find((c) => c.esFinal);
+  if (!columnaFinal) {
+    const agrupadoOrdenado = {};
+    Object.keys(agrupadoBase).forEach((colId) => {
+      agrupadoOrdenado[colId] = ordenarTarjetas(agrupadoBase[colId] || [], ordenTarjetas);
+    });
+    return agrupadoOrdenado;
+  }
 
-    if (!agrupado[columnaFinal.id]) {
-        agrupado[columnaFinal.id] = [];
+  if (!agrupadoBase[columnaFinal.id]) {
+    agrupadoBase[columnaFinal.id] = [];
+  }
+
+  pedidosFinalizadosRecientes.forEach((pedidoFinalizado) => {
+    const yaExiste = agrupadoBase[columnaFinal.id].some(
+      (p) => (p.firebaseId || p.id) === (pedidoFinalizado.firebaseId || pedidoFinalizado.id)
+    );
+
+    if (!yaExiste) {
+      agrupadoBase[columnaFinal.id].push(pedidoFinalizado);
     }
+  });
 
-    pedidosFinalizadosRecientes.forEach((pedidoFinalizado) => {
-        const yaExiste = agrupado[columnaFinal.id].some(
-        (p) => (p.firebaseId || p.id) === (pedidoFinalizado.firebaseId || pedidoFinalizado.id)
-        );
+  animandoFinalizados.forEach((pedidoAnimado) => {
+    const yaExiste = agrupadoBase[columnaFinal.id].some(
+      (p) => (p.firebaseId || p.id) === (pedidoAnimado.firebaseId || pedidoAnimado.id)
+    );
 
-        if (!yaExiste) {
-        agrupado[columnaFinal.id].push(pedidoFinalizado);
-        }
-    });
+    if (!yaExiste) {
+      agrupadoBase[columnaFinal.id].push(pedidoAnimado);
+    }
+  });
 
-    animandoFinalizados.forEach((pedidoAnimado) => {
-        const yaExiste = agrupado[columnaFinal.id].some(
-        (p) => (p.firebaseId || p.id) === (pedidoAnimado.firebaseId || pedidoAnimado.id)
-        );
+  const agrupadoOrdenado = {};
+  Object.keys(agrupadoBase).forEach((colId) => {
+    agrupadoOrdenado[colId] = ordenarTarjetas(agrupadoBase[colId] || [], ordenTarjetas);
+  });
 
-        if (!yaExiste) {
-        agrupado[columnaFinal.id].push(pedidoAnimado);
-        }
-    });
-
-    return agrupado;
-    }, [columnas, pedidos, pedidosFinalizadosRecientes, animandoFinalizados]);
+  return agrupadoOrdenado;
+}, [columnas, pedidos, pedidosFinalizadosRecientes, animandoFinalizados, ordenTarjetas]);
 
   async function manejarMoverPedido(pedidoId, columnaDestinoId) {
     if (moviendo) return;
@@ -366,20 +435,92 @@ function toggleColumnaContraida(columnaId) {
   });
 }
 
+  function abrirDetalleManual(pedido) {
+  setPedidoEditandoDetalle(pedido);
+  setNotaManual(pedido?.produccionNotaCorta || "");
+  setMetrosManual(
+    pedido?.produccionMetros === "" || pedido?.produccionMetros == null
+      ? ""
+      : String(pedido.produccionMetros)
+  );
+  setColorManual(pedido?.produccionColorMarca || "");
+}
+
+function cerrarDetalleManual() {
+  setPedidoEditandoDetalle(null);
+  setNotaManual("");
+  setMetrosManual("");
+  setColorManual("");
+}
+
+async function guardarDetalleManual() {
+  try {
+    if (!pedidoEditandoDetalle?.firebaseId) return;
+
+    setGuardandoDetalleManual(true);
+
+    await actualizarDetalleManualProduccion({
+      pedidoId: pedidoEditandoDetalle.firebaseId,
+      produccionNotaCorta: notaManual,
+      produccionColorMarca: colorManual,
+      produccionMetros: metrosManual,
+    });
+
+    cerrarDetalleManual();
+  } catch (error) {
+    console.error("Error guardando detalle manual de producción:", error);
+  } finally {
+    setGuardandoDetalleManual(false);
+  }
+}
+
+  const puedeGestionarColumnas = perfil?.rol === "admin";
+
+  async function manejarMoverColumna(columna, direccion) {
+    try {
+        if (!perfil?.clienteId) return;
+        if (!columna || columna.esInicial || columna.esFinal) return;
+        if (!puedeGestionarColumnas) return;
+
+        await moverColumnaProduccion({
+        clienteId: perfil.clienteId,
+        columnaId: columna.id,
+        direccion,
+        });
+
+        await recalcularPedidosPorCambioDeColumnas(perfil.clienteId);
+    } catch (error) {
+        console.error("Error moviendo columna:", error);
+    }
+    }
 
   return (
     <div className="produccion-page">
       <div className="produccion-page-header">
-  <div className="produccion-page-header-top">
-    <h2>Producción</h2>
+        <div className="produccion-page-header-top">
+            <h2>Producción</h2>
 
-    <button
-      className="btn-produccion-secundario"
-      onClick={() => setMostrarNuevaColumna((prev) => !prev)}
-    >
-      + Columna
-    </button>
-  </div>
+            <div className="produccion-page-header-actions">
+                <select
+                value={ordenTarjetas}
+                onChange={(e) => setOrdenTarjetas(e.target.value)}
+                className="produccion-select-orden"
+                >
+                <option value="normal">Orden normal</option>
+                <option value="entrega-asc">Entrega más próxima</option>
+                <option value="entrega-desc">Entrega más lejana</option>
+                </select>
+
+                {puedeGestionarColumnas && (
+                    <button
+                        className="btn-produccion-secundario"
+                        onClick={() => setMostrarNuevaColumna((prev) => !prev)}
+                    >
+                        + Columna
+                    </button>
+                    )}
+            </div>
+        </div>
 
   {mostrarNuevaColumna && (
     <div className="produccion-nueva-columna-box">
@@ -414,22 +555,85 @@ function toggleColumnaContraida(columnaId) {
 
 <div className="produccion-board-wrapper">
   <ProduccionBoard
-    columnas={columnas}
-    pedidosPorColumna={pedidosPorColumna}
-    onMoverPedido={manejarMoverPedido}
-    onVerPedido={onVerPedido}
-    onEditarColumna={manejarEditarColumna}
-    onEliminarColumna={manejarEliminarColumna}
-    columnaEditandoId={columnaEditandoId}
-    nombreEditarColumna={nombreEditarColumna}
-    setNombreEditarColumna={setNombreEditarColumna}
-    onGuardarEdicionColumna={guardarEdicionColumna}
-    guardandoEdicionColumna={guardandoEdicionColumna}
-    eliminandoColumnaId={eliminandoColumnaId}
-    columnasContraidas={columnasContraidas}
-    onToggleColumnaContraida={toggleColumnaContraida}
-  />
+  columnas={columnas}
+  pedidosPorColumna={pedidosPorColumna}
+  onMoverPedido={manejarMoverPedido}
+  onVerPedido={onVerPedido}
+  onEditarColumna={manejarEditarColumna}
+  onEliminarColumna={manejarEliminarColumna}
+  columnaEditandoId={columnaEditandoId}
+  nombreEditarColumna={nombreEditarColumna}
+  setNombreEditarColumna={setNombreEditarColumna}
+  onGuardarEdicionColumna={guardarEdicionColumna}
+  guardandoEdicionColumna={guardandoEdicionColumna}
+  eliminandoColumnaId={eliminandoColumnaId}
+  columnasContraidas={columnasContraidas}
+  onToggleColumnaContraida={toggleColumnaContraida}
+  onEditarDetalleManual={abrirDetalleManual}
+  puedeGestionarColumnas={puedeGestionarColumnas}
+  onMoverColumna={manejarMoverColumna}
+  ahoraTick={ahoraTick}
+/>
 </div>
+
+{pedidoEditandoDetalle && (
+  <div className="produccion-modal-overlay" onClick={cerrarDetalleManual}>
+    <div
+      className="produccion-modal"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <h3>Detalle manual de producción</h3>
+
+      <label>Metros</label>
+      <input
+        type="number"
+        step="0.01"
+        value={metrosManual}
+        onChange={(e) => setMetrosManual(e.target.value)}
+        className="produccion-modal-input"
+        placeholder="Ej: 42"
+      />
+
+      <label>Nota corta</label>
+      <input
+        type="text"
+        maxLength={60}
+        value={notaManual}
+        onChange={(e) => setNotaManual(e.target.value)}
+        className="produccion-modal-input"
+        placeholder="Ej: Mandar hoy / Esperar 200 mts"
+      />
+
+      <label>Marca de color</label>
+      <div className="produccion-colores-box">
+        {["", "amarillo", "verde", "azul", "rojo", "violeta"].map((color) => (
+          <button
+            key={color || "sin-color"}
+            type="button"
+            className={`produccion-color-btn ${colorManual === color ? "activo" : ""}`}
+            onClick={() => setColorManual(color)}
+          >
+            {color === "" ? "Sin color" : color}
+          </button>
+        ))}
+      </div>
+
+      <div className="produccion-modal-actions">
+        <button className="btn-produccion-cancelar" onClick={cerrarDetalleManual}>
+          Cancelar
+        </button>
+
+        <button
+          className="btn-produccion-primario"
+          onClick={guardarDetalleManual}
+          disabled={guardandoDetalleManual}
+        >
+          {guardandoDetalleManual ? "Guardando..." : "Guardar"}
+        </button>
+      </div>
+    </div>
+  </div>
+)}
     </div>
   );
 }

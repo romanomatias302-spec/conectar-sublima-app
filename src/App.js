@@ -3,6 +3,7 @@ import { onAuthStateChanged, signOut } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "./firebase";
 import Login from "./modulos/auth/Login";
+import ActivarCuenta from "./modulos/auth/ActivarCuenta";
 import Sidebar from "./comunes/componentes/Sidebar";
 import ClientesList from "./modulos/clientes/ClientesList";
 import ClienteForm from "./modulos/clientes/ClienteForm";
@@ -39,27 +40,38 @@ export default function App() {
   const [mostrarModalVenta, setMostrarModalVenta] = useState(false);
 
 
-  const irAVista = (nuevaVista, extra = {}) => {
-    const nuevoCliente = extra.cliente ?? null;
-    const nuevoPedido = extra.pedido ?? null;
-    const nuevaVenta = extra.venta ?? null;
+  const [origenVista, setOrigenVista] = useState(null);
 
-    setVista(nuevaVista);
-    setClienteSeleccionado(nuevoCliente);
-    setPedidoSeleccionado(nuevoPedido);
-    setVentaSeleccionada(nuevaVenta);
+  const esRutaActivacion = window.location.pathname === "/activar-cuenta";
 
-    window.history.pushState(
-      {
-        vista: nuevaVista,
-        cliente: nuevoCliente,
-        pedido: nuevoPedido,
-        venta: nuevaVenta,
-      },
-      "",
-      window.location.pathname
-    );
-  };
+const irAVista = (nuevaVista, extra = {}) => {
+  const nuevoCliente = extra.cliente ?? null;
+  const nuevoPedido = extra.pedido ?? null;
+  const nuevaVenta = extra.venta ?? null;
+  const nuevoOrigen = extra.origen ?? null;
+
+
+
+  setVista(nuevaVista);
+  setClienteSeleccionado(nuevoCliente);
+  setPedidoSeleccionado(nuevoPedido);
+  setVentaSeleccionada(nuevaVenta);
+  setOrigenVista(nuevoOrigen);
+
+  if (esRutaActivacion) return;
+
+  window.history.pushState(
+    {
+      vista: nuevaVista,
+      cliente: nuevoCliente,
+      pedido: nuevoPedido,
+      venta: nuevaVenta,
+      origen: nuevoOrigen,
+    },
+    "",
+    window.location.pathname
+  );
+};
 
 
   
@@ -217,6 +229,8 @@ export default function App() {
     }, []);
 
     useEffect(() => {
+      if (esRutaActivacion) return;
+
       window.history.replaceState(
         {
           vista: "inicio",
@@ -235,11 +249,13 @@ export default function App() {
           setClienteSeleccionado(state.cliente ?? null);
           setPedidoSeleccionado(state.pedido ?? null);
           setVentaSeleccionada(state.venta ?? null);
+          setOrigenVista(state.origen ?? null);
         } else {
           setVista("inicio");
           setClienteSeleccionado(null);
           setPedidoSeleccionado(null);
           setVentaSeleccionada(null);
+          setOrigenVista(null);
         }
       };
 
@@ -248,7 +264,7 @@ export default function App() {
       return () => {
         window.removeEventListener("popstate", manejarPopState);
       };
-    }, []);
+    }, [esRutaActivacion]);
 
   // 🔹 Navegación desde el sidebar
   const manejarSeleccionSidebar = (modulo) => {
@@ -339,6 +355,10 @@ export default function App() {
       break;
   }
 };
+
+    if (esRutaActivacion) {
+      return <ActivarCuenta />;
+    }
 
     if (authLoading) {
       return <div style={{ padding: 30 }}>Cargando...</div>;
@@ -440,7 +460,7 @@ export default function App() {
           <PedidosList
             perfil={perfil}
             onVerDetalle={(pedido) => {
-              irAVista("detallePedido", { pedido });
+              irAVista("detallePedido", { pedido, origen: "pedidos" });
             }}
             onIrProduccion={(pedido) => {
               irAVista("produccion", { pedido });
@@ -452,7 +472,7 @@ export default function App() {
           <ProduccionPage
             perfil={perfil}
             onVerPedido={(pedido) => {
-              irAVista("detallePedido", { pedido });
+              irAVista("detallePedido", { pedido, origen: "produccion" });
             }}
           />
         )}
@@ -461,8 +481,25 @@ export default function App() {
           <PedidoDetalle
             perfil={perfil}
             pedido={pedidoSeleccionado}
-            onVolver={() => irAVista("pedidos")}
-            onVerVenta={abrirVentaDesdePedido}
+            origenVista={origenVista}
+            onVolver={() => {
+              if (origenVista === "produccion") {
+                irAVista("produccion");
+                return;
+              }
+
+              if (origenVista === "pedidos") {
+                irAVista("pedidos");
+                return;
+              }
+
+              if (origenVista === "ventas") {
+                irAVista("ventas-listado");
+                return;
+              }
+
+              window.history.back();
+            }}
           />
         )}
 
@@ -484,6 +521,7 @@ export default function App() {
             ventaId={ventaSeleccionada.firebaseId}
             onVolver={() => irAVista("ventas-listado")}
             onVerPedido={abrirPedidoDesdeVenta}
+            
           />
         )}
 

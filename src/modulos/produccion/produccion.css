@@ -367,3 +367,247 @@
   z-index: 2;
   padding-bottom: 8px;
 }
+
+.produccion-column {
+  position: relative;
+}
+
+.produccion-column-body {
+  min-height: 220px;
+  padding-bottom: 30px;
+}
+
+.produccion-page-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.produccion-select-orden {
+  border: 1px solid #d9dee8;
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 13px;
+  background: #fff;
+  color: #333;
+  outline: none;
+}
+
+.produccion-card-top-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.produccion-card-mini-btn {
+  border: none;
+  background: #eef1f6;
+  color: #333;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.produccion-card-layout {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.produccion-card-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.produccion-card-side {
+  width: 84px;
+  min-width: 84px;
+  border-left: 1px solid rgba(0,0,0,0.08);
+  padding-left: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: stretch;
+}
+
+.produccion-card-metros {
+  font-size: 11px;
+  font-weight: 700;
+  color: #444;
+  padding: 4px 6px;
+  background: rgba(0,0,0,0.04);
+  border-radius: 8px;
+  text-align: center;
+}
+
+.produccion-card-nota {
+  font-size: 11px;
+  color: #555;
+  padding: 6px 7px;
+  background: rgba(255,255,255,0.6);
+  border-radius: 8px;
+  line-height: 1.2;
+  word-break: break-word;
+}
+
+.produccion-card-marca {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 4px 6px;
+  border-radius: 999px;
+  text-align: center;
+  text-transform: capitalize;
+}
+
+.produccion-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.produccion-modal {
+  background: #fff;
+  border-radius: 14px;
+  width: 100%;
+  max-width: 420px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.18);
+}
+
+.produccion-modal h3 {
+  margin: 0 0 6px 0;
+  font-size: 18px;
+}
+
+.produccion-modal label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #444;
+}
+
+.produccion-modal-input {
+  width: 100%;
+  border: 1px solid #d9dee8;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.produccion-colores-box {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.produccion-color-btn {
+  border: 1px solid #d9dee8;
+  background: #fff;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  text-transform: capitalize;
+}
+
+.produccion-color-btn.activo {
+  border-color: #7c3aed;
+  color: #7c3aed;
+  font-weight: 700;
+}
+
+.produccion-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.produccion-card-tiempo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #2d2d2d;
+  padding: 4px 6px;
+  background: rgba(0, 0, 0, 0.04);
+  border-radius: 8px;
+  justify-content: center;
+}
+
+.produccion-card-tiempo-icono {
+  color: #39ff14;
+  text-shadow: 0 0 6px rgba(57, 255, 20, 0.65);
+  font-size: 12px;
+  line-height: 1;
+}
+
+.produccion-card-usuario {
+  font-size: 11px;
+  color: #555;
+  padding: 5px 6px;
+  background: rgba(255,255,255,0.55);
+  border-radius: 8px;
+  text-align: center;
+  word-break: break-word;
+}
+
+.produccion-column-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding-bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.produccion-column-header-main {
+  width: 100%;
+  min-width: 0;
+}
+
+.produccion-column-title {
+  font-weight: 700;
+  font-size: 13px;
+  line-height: 1.2;
+  color: #2f2f2f;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.produccion-column-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.produccion-column-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.produccion-column-count {
+  font-size: 12px;
+  font-weight: 700;
+  color: #666;
+  flex-shrink: 0;
+}

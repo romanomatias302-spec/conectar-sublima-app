@@ -3,9 +3,10 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
-  closestCorners,
+  pointerWithin,
 } from "@dnd-kit/core";
 import ProduccionColumn from "./ProduccionColumn";
+import { restrictToFirstScrollableAncestor } from "@dnd-kit/modifiers";
 
 export default function ProduccionBoard({
   columnas,
@@ -22,6 +23,10 @@ export default function ProduccionBoard({
   eliminandoColumnaId,
   columnasContraidas,
   onToggleColumnaContraida,
+  onEditarDetalleManual,
+  puedeGestionarColumnas,
+  onMoverColumna,
+  ahoraTick,
 }) {
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -46,29 +51,58 @@ export default function ProduccionBoard({
 
   return (
     <DndContext
-      sensors={sensors}
-      collisionDetection={closestCorners}
-      onDragEnd={manejarDragEnd}
+        sensors={sensors}
+        collisionDetection={pointerWithin}
+        modifiers={[restrictToFirstScrollableAncestor]}
+        autoScroll={true}
+        measuring={{
+            droppable: {
+            strategy: "always"
+            }
+        }}
+        onDragEnd={manejarDragEnd}
     >
       <div className="produccion-board">
-        {columnas.map((columna) => (
-        <ProduccionColumn
-            key={columna.id}
-            columna={columna}
-            pedidos={pedidosPorColumna[columna.id] || []}
-            onVerPedido={onVerPedido}
-            onEditarColumna={onEditarColumna}
-            onEliminarColumna={onEliminarColumna}
-            columnaEditandoId={columnaEditandoId}
-            nombreEditarColumna={nombreEditarColumna}
-            setNombreEditarColumna={setNombreEditarColumna}
-            onGuardarEdicionColumna={onGuardarEdicionColumna}
-            guardandoEdicionColumna={guardandoEdicionColumna}
-            eliminandoColumnaId={eliminandoColumnaId}
-            estaContraida={columnasContraidas?.includes(columna.id)}
-            onToggleContraer={() => onToggleColumnaContraida?.(columna.id)}
-        />
-        ))}
+       {columnas.map((columna, index) => {
+            const intermedias = columnas.filter((c) => !c.esInicial && !c.esFinal);
+            const indexIntermedia = intermedias.findIndex((c) => c.id === columna.id);
+
+            const puedeMoverIzquierda =
+                !columna.esInicial &&
+                !columna.esFinal &&
+                indexIntermedia > 0;
+
+            const puedeMoverDerecha =
+                !columna.esInicial &&
+                !columna.esFinal &&
+                indexIntermedia !== -1 &&
+                indexIntermedia < intermedias.length - 1;
+
+            return (
+                <ProduccionColumn
+                key={columna.id}
+                columna={columna}
+                pedidos={pedidosPorColumna[columna.id] || []}
+                onVerPedido={onVerPedido}
+                onEditarColumna={onEditarColumna}
+                onEliminarColumna={onEliminarColumna}
+                columnaEditandoId={columnaEditandoId}
+                nombreEditarColumna={nombreEditarColumna}
+                setNombreEditarColumna={setNombreEditarColumna}
+                onGuardarEdicionColumna={onGuardarEdicionColumna}
+                guardandoEdicionColumna={guardandoEdicionColumna}
+                eliminandoColumnaId={eliminandoColumnaId}
+                estaContraida={columnasContraidas?.includes(columna.id)}
+                onToggleContraer={() => onToggleColumnaContraida?.(columna.id)}
+                onEditarDetalleManual={onEditarDetalleManual}
+                puedeGestionarColumnas={puedeGestionarColumnas}
+                onMoverColumna={onMoverColumna}
+                puedeMoverIzquierda={puedeMoverIzquierda}
+                puedeMoverDerecha={puedeMoverDerecha}
+                ahoraTick={ahoraTick}
+                />
+            );
+            })}
       </div>
     </DndContext>
   );

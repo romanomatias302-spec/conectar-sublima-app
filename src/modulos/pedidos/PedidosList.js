@@ -18,8 +18,7 @@ import PedidoFormModal from "./PedidoFormModal";
 import ActionMenu from "../../comunes/componentes/ActionMenu";
 import "./PedidosList.css";
 import ProduccionEstadoCell from "../produccion/ProduccionEstadoCell";
-import { obtenerColumnasProduccion } from "../../firebase/produccionColumnas";
-import { calcularProgresoPorColumna } from "../produccion/produccionUtils";
+import { escucharColumnasProduccion } from "../../firebase/produccionColumnas";
 import { sincronizarPedidoDesdeEstadoManual } from "../../firebase/produccionPedidos";
 
 export default function PedidosList({
@@ -210,23 +209,43 @@ export default function PedidosList({
 
   const normalizarTexto = (texto) => (texto || "").trim().toLowerCase();
 
-  const cargarColumnasProduccion = async () => {
-  try {
-    if (!perfil?.clienteId) return;
+  const obtenerNombreEtapaPedido = (pedido) => {
+    if (pedido.estado === "Cancelado") return "Cancelado";
 
-    const columnas = await obtenerColumnasProduccion(perfil.clienteId);
-    setColumnasProduccion(columnas || []);
-  } catch (error) {
-    console.error("Error al cargar columnas de producción:", error);
-  }
-};
+    const columna = columnasProduccion.find(
+      (c) => c.id === pedido.columnaProduccionId
+    );
+
+    if (columna?.nombre) return columna.nombre;
+
+    if (pedido.estado === "Terminado") return "Producción finalizada";
+    if (pedido.estado === "En proceso") return "En proceso";
+    return "Pendiente";
+  };
+
+  const cargarColumnasProduccion = () => {
+    if (!perfil?.clienteId) return () => {};
+
+    const unsubscribe = escucharColumnasProduccion(
+      perfil.clienteId,
+      (columnas) => {
+        setColumnasProduccion(columnas || []);
+      }
+    );
+
+    return unsubscribe;
+  };
 
   useEffect(() => {
-    const unsubscribe = cargarPedidos();
+    const unsubscribePedidos = cargarPedidos();
+    const unsubscribeColumnas = cargarColumnasProduccion();
 
     return () => {
-      if (typeof unsubscribe === "function") {
-        unsubscribe();
+      if (typeof unsubscribePedidos === "function") {
+        unsubscribePedidos();
+      }
+      if (typeof unsubscribeColumnas === "function") {
+        unsubscribeColumnas();
       }
     };
   }, [perfil]);
@@ -249,25 +268,52 @@ export default function PedidosList({
     }
   };
 
-  const actualizarEstado = async (firebaseId, nuevoEstado) => {
+  const actualizarEstado = async (firebaseId, nuevaEtapaONuevoEstado) => {
     try {
       const pedidoActual = pedidos.find((p) => p.firebaseId === firebaseId);
       if (!pedidoActual) return;
       if (!perfil?.clienteId) return;
 
+      if (nuevaEtapaONuevoEstado === "Cancelado") {
+        await sincronizarPedidoDesdeEstadoManual({
+          pedidoActual,
+          nuevoEstado: "Cancelado",
+          clienteId: perfil.clienteId,
+        });
+        return;
+      }
+
+      const columnaDestino = columnasProduccion.find(
+        (c) => c.nombre === nuevaEtapaONuevoEstado
+      );
+
+      if (!columnaDestino) return;
+
+      const nuevoEstadoGeneral = columnaDestino.esFinal
+        ? "Terminado"
+        : columnaDestino.esInicial
+        ? "Pendiente"
+        : "En proceso";
+
       await sincronizarPedidoDesdeEstadoManual({
-        pedidoActual,
-        nuevoEstado,
+        pedidoActual: {
+          ...pedidoActual,
+          columnaProduccionId: columnaDestino.id,
+        },
+        nuevoEstado: nuevoEstadoGeneral,
         clienteId: perfil.clienteId,
+        columnaDestinoManualId: columnaDestino.id,
       });
     } catch (error) {
-      console.error("Error al actualizar estado:", error);
+      console.error("Error al actualizar etapa/estado:", error);
     }
   };
 
   const pedidosFiltrados = pedidos.filter((p) => {
-    const coincideEstado = estadoFiltro ? p.estado === estadoFiltro : true;
-    return coincideEstado;
+    if (!estadoFiltro) return true;
+
+    const etapaActual = obtenerNombreEtapaPedido(p);
+    return etapaActual === estadoFiltro;
   });
 
   const manejarOrden = (campo) => {
@@ -330,10 +376,14 @@ export default function PedidosList({
             onChange={(e) => setEstadoFiltro(e.target.value)}
             className="filtro"
           >
-            <option value="">Todos los estados</option>
-            <option value="Pendiente">Pendiente</option>
-            <option value="En proceso">En proceso</option>
-            <option value="Terminado">Terminado</option>
+            <option value="">Todas las etapas</option>
+
+            {columnasProduccion.map((col) => (
+              <option key={col.id} value={col.nombre}>
+                {col.nombre}
+              </option>
+            ))}
+
             <option value="Cancelado">Cancelado</option>
           </select>
 
@@ -388,9 +438,10 @@ export default function PedidosList({
               <td>{p.fechaPedido}</td>
               <td>{p.fechaEntrega}</td>
 
-              <td style={{ minWidth: "150px", width: "150px" }}>
+              <td style={{ minWidth: "170px", width: "170px" }}>
                 <ProduccionEstadoCell
                   pedido={p}
+                  columnasProduccion={columnasProduccion}
                   onIrProduccion={onIrProduccion}
                 />
               </td>
@@ -398,13 +449,16 @@ export default function PedidosList({
               <td>
                 <select
                   className={`estado-select ${p.estado?.toLowerCase().replace(" ", "-")}`}
-                  value={p.estado || ""}
+                  value={obtenerNombreEtapaPedido(p)}
                   onChange={(e) => actualizarEstado(p.firebaseId, e.target.value)}
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <option value="Pendiente">Pendiente</option>
-                  <option value="En proceso">En proceso</option>
-                  <option value="Terminado">Terminado</option>
+                  {columnasProduccion.map((col) => (
+                    <option key={col.id} value={col.nombre}>
+                      {col.nombre}
+                    </option>
+                  ))}
+
                   <option value="Cancelado">Cancelado</option>
                 </select>
               </td>

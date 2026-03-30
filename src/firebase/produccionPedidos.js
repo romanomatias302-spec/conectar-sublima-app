@@ -117,6 +117,7 @@ export async function sincronizarPedidoDesdeEstadoManual({
   pedidoActual,
   nuevoEstado,
   clienteId,
+  columnaDestinoManualId = null,
 }) {
   if (!pedidoActual?.firebaseId) return;
 
@@ -148,11 +149,18 @@ export async function sincronizarPedidoDesdeEstadoManual({
     progresoProduccion = calcularProgresoPorColumna(columnasOrdenadas, columnaDestino.id);
   }
 
-  if (nuevoEstado === "En proceso") {
-    if (columnasIntermedias.length > 0) {
-      columnaDestino = columnasIntermedias[columnasIntermedias.length - 1];
-    } else if (columnaInicial) {
-      columnaDestino = columnaInicial;
+ if (nuevoEstado === "En proceso") {
+    if (columnaDestinoManualId) {
+      columnaDestino =
+        columnasOrdenadas.find((c) => c.id === columnaDestinoManualId) || null;
+    }
+
+    if (!columnaDestino) {
+      if (columnasIntermedias.length > 0) {
+        columnaDestino = columnasIntermedias[columnasIntermedias.length - 1];
+      } else if (columnaInicial) {
+        columnaDestino = columnaInicial;
+      }
     }
 
     if (columnaDestino) {
@@ -318,4 +326,23 @@ export function escucharPedidosProduccionFinalizadosRecientes(clienteId, callbac
       console.error("Error escuchando pedidos finalizados recientes:", error);
     }
   );
+}
+
+export async function actualizarDetalleManualProduccion({
+  pedidoId,
+  produccionNotaCorta = "",
+  produccionColorMarca = "",
+  produccionMetros = "",
+}) {
+  const ref = doc(db, PEDIDOS_COLLECTION, pedidoId);
+
+  await updateDoc(ref, {
+    produccionNotaCorta: produccionNotaCorta || "",
+    produccionColorMarca: produccionColorMarca || "",
+    produccionMetros:
+      produccionMetros === "" || produccionMetros === null
+        ? ""
+        : Number(produccionMetros),
+    updatedAt: serverTimestamp(),
+  });
 }

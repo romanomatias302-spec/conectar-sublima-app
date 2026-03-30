@@ -1,4 +1,4 @@
-import { initializeApp } from "firebase/app";
+import { initializeApp, getApps, getApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 
@@ -11,7 +11,15 @@ const firebaseConfig = {
   appId: "1:581268637988:web:e341af5e071daa736d4bb1"
 };
 
-const app = initializeApp(firebaseConfig);
+const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
 export const db = getFirestore(app);
 export const auth = getAuth(app);
+
+// app secundaria
+const secondaryApp =
+  getApps().find((a) => a.name === "secondary") ||
+  initializeApp(firebaseConfig, "secondary");
+
+export const secondaryAuth = getAuth(secondaryApp);
+export const secondaryDb = getFirestore(secondaryApp);

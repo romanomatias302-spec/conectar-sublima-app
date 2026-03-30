@@ -1,12 +1,23 @@
-export default function ProduccionEstadoCell({ pedido, onIrProduccion = () => {} }) {
+export default function ProduccionEstadoCell({
+  pedido,
+  columnasProduccion = [],
+  onIrProduccion = () => {},
+}) {
   const progreso = pedido?.progresoProduccion || 0;
-  const estadoGeneral = pedido?.estado || "Pendiente";
-  const etapaProduccion = pedido?.estadoProduccion || "Pendiente";
+
+  const columnaActual =
+    pedido?.estado === "Cancelado"
+      ? null
+      : columnasProduccion.find((c) => c.id === pedido.columnaProduccionId);
+
+  const etiqueta = pedido?.estado === "Cancelado"
+    ? "Cancelado"
+    : columnaActual?.nombre || "Pendiente";
 
   function colorEstado() {
-    if (estadoGeneral === "Cancelado") return "#d32f2f";
-    if (estadoGeneral === "En proceso") return "#1976d2";
-    if (estadoGeneral === "Terminado") return "#2e7d32";
+    if (pedido?.estado === "Cancelado") return "#d32f2f";
+    if (pedido?.estado === "Terminado") return "#2e7d32";
+    if (pedido?.estado === "En proceso") return "#1976d2";
     return "#666";
   }
 
@@ -16,14 +27,14 @@ export default function ProduccionEstadoCell({ pedido, onIrProduccion = () => {}
         width: "100%",
         display: "flex",
         flexDirection: "column",
-        gap: "3px",
+        gap: "4px",
         justifyContent: "center",
       }}
     >
       <div
         style={{
           fontSize: "11px",
-          lineHeight: "8px",
+          lineHeight: "11px",
           color: colorEstado(),
           fontWeight: 600,
           whiteSpace: "nowrap",
@@ -31,7 +42,7 @@ export default function ProduccionEstadoCell({ pedido, onIrProduccion = () => {}
           textOverflow: "ellipsis",
         }}
       >
-        {estadoGeneral}
+        {etiqueta}
       </div>
 
       <div
@@ -39,11 +50,11 @@ export default function ProduccionEstadoCell({ pedido, onIrProduccion = () => {}
           e.stopPropagation();
           onIrProduccion(pedido);
         }}
-        title={`${etapaProduccion} · ${progreso}%`}
+        title={`${etiqueta} · ${progreso}%`}
         style={{
           width: "100%",
           height: "13px",
-          background: "#e3e6ea",
+          background: pedido?.estado === "Cancelado" ? "#ececec" : "#e3e6ea",
           borderRadius: "6px",
           cursor: "pointer",
           overflow: "hidden",
@@ -51,9 +62,9 @@ export default function ProduccionEstadoCell({ pedido, onIrProduccion = () => {}
       >
         <div
           style={{
-            width: `${progreso}%`,
+            width: pedido?.estado === "Cancelado" ? "0%" : `${progreso}%`,
             height: "100%",
-            background: "#7c3aed",
+            background: pedido?.estado === "Cancelado" ? "#bdbdbd" : "#7c3aed",
             transition: "0.3s",
           }}
         />

@@ -166,7 +166,7 @@ export default function PedidoDetalle({ pedido, onVolver, perfil, onVerVenta }) 
           + Agregar Producto
         </button>
         <button className="btn-volver" onClick={onVolver}>
-          Volver al listado
+          Volver
         </button>
       </div>
 

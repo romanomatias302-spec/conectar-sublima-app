@@ -198,3 +198,36 @@ export function escucharColumnasProduccion(clienteId, callback) {
     }
   );
 }
+
+export async function moverColumnaProduccion({
+  clienteId,
+  columnaId,
+  direccion,
+}) {
+  const columnas = await obtenerColumnasProduccion(clienteId);
+
+  const intermedias = columnas.filter((c) => !c.esInicial && !c.esFinal);
+  const index = intermedias.findIndex((c) => c.id === columnaId);
+
+  if (index === -1) return;
+  if (direccion === "izquierda" && index === 0) return;
+  if (direccion === "derecha" && index === intermedias.length - 1) return;
+
+  const columnaActual = intermedias[index];
+  const columnaVecina =
+    direccion === "izquierda"
+      ? intermedias[index - 1]
+      : intermedias[index + 1];
+
+  if (!columnaActual || !columnaVecina) return;
+
+  await updateDoc(doc(db, PRODUCCION_COLUMNAS_COLLECTION, columnaActual.id), {
+    orden: columnaVecina.orden,
+    updatedAt: serverTimestamp(),
+  });
+
+  await updateDoc(doc(db, PRODUCCION_COLUMNAS_COLLECTION, columnaVecina.id), {
+    orden: columnaActual.orden,
+    updatedAt: serverTimestamp(),
+  });
+}
