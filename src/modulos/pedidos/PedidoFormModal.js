@@ -16,6 +16,7 @@ import {
   asegurarColumnasBaseProduccion,
   obtenerColumnaInicialProduccion,
 } from "../../firebase/produccionColumnas";
+import { puedeHacer } from "../../utils/permisos";
 
 export default function PedidoFormModal({ onClose, onPedidoCreado, pedido, perfil }) {
   const [clientes, setClientes] = useState([]);
@@ -30,6 +31,12 @@ export default function PedidoFormModal({ onClose, onPedidoCreado, pedido, perfi
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [exito, setExito] = useState(false); // ✅ nuevo estado para el mensaje de éxito
+
+  const puedeCrearPedidos = puedeHacer(perfil, "pedidos", "crear");
+  const puedeEditarPedidos = puedeHacer(perfil, "pedidos", "editar");
+
+  const soloLectura =
+    (pedido && !puedeEditarPedidos) || (!pedido && !puedeCrearPedidos);
 
   // 🔹 Cargar lista de clientes
   useEffect(() => {
@@ -113,6 +120,17 @@ export default function PedidoFormModal({ onClose, onPedidoCreado, pedido, perfi
 
   // 🔹 Guardar (crear o actualizar)
   const guardarPedido = async () => {
+
+    if (!pedido && !puedeCrearPedidos) {
+      setError("No tenés permisos para crear pedidos.");
+      return;
+    }
+
+    if (pedido && !puedeEditarPedidos) {
+      setError("No tenés permisos para editar pedidos.");
+      return;
+    }
+
     if (!formData.cliente || !formData.fechaPedido) {
       setError("El cliente y la fecha de pedido son obligatorios.");
       return;
@@ -232,6 +250,7 @@ export default function PedidoFormModal({ onClose, onPedidoCreado, pedido, perfi
 
         <label>Cliente</label>
         <select
+          
           name="cliente"
           value={formData.cliente}
           onChange={(e) => {
@@ -245,6 +264,7 @@ export default function PedidoFormModal({ onClose, onPedidoCreado, pedido, perfi
               clienteDNI: seleccionado ? seleccionado.dni : "",
             });
           }}
+          disabled={soloLectura}
         >
           <option value="">Seleccionar cliente...</option>
           {clientes.map((c) => (
@@ -260,6 +280,7 @@ export default function PedidoFormModal({ onClose, onPedidoCreado, pedido, perfi
           name="fechaPedido"
           value={formData.fechaPedido}
           onChange={handleChange}
+          disabled={soloLectura}
         />
 
         <label>Fecha de entrega</label>
@@ -268,23 +289,25 @@ export default function PedidoFormModal({ onClose, onPedidoCreado, pedido, perfi
           name="fechaEntrega"
           value={formData.fechaEntrega}
           onChange={handleChange}
+          disabled={soloLectura}
         />
 
 
 
         <label>Estado</label>
-        <select name="estado" value={formData.estado} onChange={handleChange}>
+        <select name="estado" value={formData.estado} onChange={handleChange} disabled={soloLectura}> 
           <option value="Pendiente">Pendiente</option>
           <option value="En proceso">En proceso</option>
           <option value="Terminado">Terminado</option>
           <option value="Cancelado">Cancelado</option>
+          
         </select>
 
         <div className="modal-buttons">
           <button className="cancelar" onClick={onClose}>
             Cancelar
           </button>
-          <button onClick={guardarPedido} disabled={loading}>
+          <button onClick={guardarPedido} disabled={loading || soloLectura}>
             {loading
               ? "Guardando..."
               : pedido

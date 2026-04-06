@@ -1,8 +1,10 @@
 import React from "react";
 import "./ClienteDetalle.css";
+import { puedeHacer } from "../../utils/permisos";
 
-export default function ClienteDetalle({ cliente, onVolver, onEditar }) {
+export default function ClienteDetalle({ cliente, onVolver, onEditar, perfil }) {
   if (!cliente) return <p>No se encontró información del cliente.</p>;
+  const puedeEditarClientes = puedeHacer(perfil, "clientes", "editar");
 
   return (
     <div className="cliente-detalle">
@@ -21,11 +23,13 @@ export default function ClienteDetalle({ cliente, onVolver, onEditar }) {
 
       <div className="detalle-botones">
         <button className="btn volver" onClick={onVolver}>
-          ← Volver al listado
+          Volver al listado
         </button>
-        <button className="btn editar" onClick={() => onEditar(cliente)}>
-          ✏️ Editar cliente
-        </button>
+        {puedeEditarClientes && (
+          <button className="btn editar" onClick={() => onEditar(cliente)}>
+            Editar cliente
+          </button>
+        )}
       </div>
     </div>
   );

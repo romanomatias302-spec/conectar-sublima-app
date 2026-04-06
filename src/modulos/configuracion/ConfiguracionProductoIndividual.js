@@ -228,23 +228,26 @@ if (!producto) return <p>Cargando producto...</p>;
   <>
     
 
-    <ZonasConfigEditor
+<ZonasConfigEditor
   zonasIniciales={producto.zonas}
   productoNombre={producto.nombre}
-  onGuardar={async ({ zonas, tipoArea }) => {
+  imagenReferenciaPersonalizadaInicial={producto.imagenReferenciaPersonalizada || ""}
+  onGuardar={async ({ zonas, tipoArea, imagenReferenciaPersonalizada }) => {
     try {
       await updateDoc(doc(db, "productosBase", productoId), {
         zonas,
-        tipoArea, // ✅ clave
+        tipoArea,
+        imagenReferenciaPersonalizada: imagenReferenciaPersonalizada || "",
       });
 
       setProducto((prev) => ({
         ...prev,
         zonas,
         tipoArea,
+        imagenReferenciaPersonalizada: imagenReferenciaPersonalizada || "",
       }));
 
-      setTipoArea(tipoArea); // opcional (tu state local)
+      setTipoArea(tipoArea);
     } catch (error) {
       console.error("Error al guardar zonas:", error);
     }

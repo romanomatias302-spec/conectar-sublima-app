@@ -1,14 +1,21 @@
 import React, { useState, useEffect } from "react";
+import { storage } from "../../firebase";
+import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import "./ConfiguracionProductos.css";
+
 
 export default function ZonasConfigEditor({
   zonasIniciales = null, // ahora puede ser array u objeto
   productoNombre = "",
+  imagenReferenciaPersonalizadaInicial = "",
   onGuardar,
   onCerrar,
 }) {
-  const [zonas, setZonas] = useState([]);
-  const [tipoArea, setTipoArea] = useState("multiple"); // multiple | unica | personalizada
+const [zonas, setZonas] = useState([]);
+const [tipoArea, setTipoArea] = useState("multiple"); // multiple | unica | personalizada
+const [imagenReferenciaPersonalizada, setImagenReferenciaPersonalizada] = useState("");
+const [subiendoImagen, setSubiendoImagen] = useState(false);
+const [errorImagen, setErrorImagen] = useState("");
 
   // ✅ Helpers: convertir formatos
   const objectToArray = (obj) => {
@@ -38,7 +45,9 @@ export default function ZonasConfigEditor({
 
   // 🟢 Inicialización inmediata (acepta zonasIniciales objeto o array)
   useEffect(() => {
+      setImagenReferenciaPersonalizada(imagenReferenciaPersonalizadaInicial || "");
     // 1) Si zonasIniciales viene como OBJETO {Frente:[...]}
+      
     if (zonasIniciales && !Array.isArray(zonasIniciales) && typeof zonasIniciales === "object") {
       const arr = objectToArray(zonasIniciales);
       setZonas(arr);
@@ -69,7 +78,7 @@ export default function ZonasConfigEditor({
       setTipoArea("personalizada");
       setZonas([]);
     }
-  }, [zonasIniciales, productoNombre]);
+  }, [zonasIniciales, productoNombre, imagenReferenciaPersonalizadaInicial]);
 
   // 🟢 Cambiar tipo de área → recarga zonas por defecto
   useEffect(() => {
@@ -121,14 +130,78 @@ export default function ZonasConfigEditor({
     );
   };
 
+    const safeFileName = (name = "") =>
+    String(name)
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-zA-Z0-9._-]/g, "_");
+
+    const handleUploadImagenReferencia = async (file) => {
+    if (!file) return;
+
+    const tiposPermitidos = [
+      "image/png",
+      "image/jpeg",
+      "image/jpg",
+      "image/webp",
+    ];
+
+    if (!tiposPermitidos.includes(file.type)) {
+      setErrorImagen("Solo se permiten imágenes PNG, JPG, JPEG o WEBP.");
+      return;
+    }
+
+    try {
+      setSubiendoImagen(true);
+      setErrorImagen("");
+
+      const extension = file.name.split(".").pop() || "png";
+      const nombreProducto = safeFileName(productoNombre || "producto");
+      const fileName = `${nombreProducto}_${Date.now()}.${extension}`;
+
+      const storageRef = ref(
+        storage,
+        `productosBase/referencias_personalizadas/${fileName}`
+      );
+
+      await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(storageRef);
+
+      setImagenReferenciaPersonalizada(url);
+    } catch (error) {
+      console.error("Error al subir imagen de referencia:", error);
+      setErrorImagen("No se pudo subir la imagen. Intentá nuevamente.");
+    } finally {
+      setSubiendoImagen(false);
+    }
+  };
+
+  const eliminarImagenReferencia = async () => {
+  if (!imagenReferenciaPersonalizada) return;
+
+  try {
+    // intentamos borrar del storage si es posible
+    const storageRef = ref(storage, imagenReferenciaPersonalizada);
+    await deleteObject(storageRef).catch(() => {
+      // si falla el borrado físico no frenamos UX
+    });
+  } catch (error) {
+    console.warn("No se pudo eliminar físicamente la imagen:", error);
+  }
+
+  setImagenReferenciaPersonalizada("");
+  setErrorImagen("");
+};
+
   // ✅ Guardar: mandamos OBJETO al padre (formato único en Firestore)
-  const guardarCambios = () => {
+const guardarCambios = () => {
   const zonasObjeto = arrayToObject(zonas);
 
-  // ✅ ahora también mandamos tipoArea
   onGuardar({
     zonas: zonasObjeto,
     tipoArea,
+    imagenReferenciaPersonalizada:
+      tipoArea === "personalizada" ? imagenReferenciaPersonalizada.trim() : "",
   });
 
   onCerrar();
@@ -140,7 +213,7 @@ export default function ZonasConfigEditor({
       <h2>Zonas de impresión</h2>
       <p className="descripcion">
         Configurá las áreas donde se imprimen tus productos.
-        Podés elegir entre múltiples zonas, un área única o crear tus propias zonas.
+    
       </p>
 
       <div className="tipo-area">
@@ -175,14 +248,71 @@ export default function ZonasConfigEditor({
         </div>
       )}
 
-      {tipoArea === "personalizada" && (
-        <div className="referencia-img personalizada">
-          <p className="img-subtexto">
-            Creá tus propias zonas de impresión según el producto que necesites.
-            Podés agregar zonas y subzonas libremente.
-          </p>
-        </div>
+{tipoArea === "personalizada" && (
+  <div className="referencia-img personalizada">
+    <p className="img-subtexto">
+      Creá tus propias zonas de impresión.
+    </p>
+
+    <div className="referencia-personalizada-box">
+      <label className="referencia-personalizada-label">
+        
+      </label>
+
+{!imagenReferenciaPersonalizada ? (
+  <div className="referencia-upload-wrap">
+    <input
+      id="upload-referencia-personalizada"
+      type="file"
+      accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"
+      className="referencia-upload-input-hidden"
+      disabled={subiendoImagen}
+      onChange={(e) => handleUploadImagenReferencia(e.target.files?.[0])}
+    />
+
+    <label
+      htmlFor="upload-referencia-personalizada"
+      className="referencia-upload-btn"
+    >
+      {subiendoImagen ? "Subiendo imagen..." : "Seleccionar imagen"}
+    </label>
+
+    <div className="referencia-upload-help">
+       Subi tu imagen de referencia
+    </div>
+  </div>
+) : (
+        <>
+          <div className="referencia-personalizada-preview">
+            <img
+              src={imagenReferenciaPersonalizada}
+              alt="Referencia personalizada"
+              className="remera-zonas"
+            />
+          </div>
+
+          <div className="referencia-upload-actions">
+            <button
+              type="button"
+              className="btn-mini-eliminar"
+              onClick={eliminarImagenReferencia}
+            >
+              Quitar imagen
+            </button>
+          </div>
+        </>
       )}
+
+      {errorImagen ? (
+        <p className="referencia-upload-error">{errorImagen}</p>
+      ) : null}
+
+      <p className="img-subtexto" style={{ marginTop: 8 }}>
+        
+      </p>
+    </div>
+  </div>
+)}
 
       {/* 🧱 Listado editable */}
       {zonas.length > 0 &&

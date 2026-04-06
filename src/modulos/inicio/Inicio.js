@@ -16,6 +16,7 @@ import {
   where,
 } from "firebase/firestore";
 import { db } from "../../firebase";
+import { puedeHacer } from "../../utils/permisos";
 
 export default function Inicio({ onNavigate, perfil }) {
   const [stats, setStats] = useState({
@@ -36,12 +37,15 @@ export default function Inicio({ onNavigate, perfil }) {
     return `${yyyy}-${mm}-${dd}`;
   }, []);
 
+  const puedeVerClientes = puedeHacer(perfil, "clientes", "ver");
+  const puedeVerPedidos = puedeHacer(perfil, "pedidos", "ver");
+  const puedeVerConfiguracion = puedeHacer(perfil, "configuracion", "ver");
+
   useEffect(() => {
     const cargarDashboard = async () => {
       try {
         if (!perfil) return;
 
-        // superadmin: si querés después armamos un dashboard distinto
         if (perfil.rol === "superadmin") {
           setNombreEmpresa("Panel Dueño SaaS");
           setLogoUrl("");
@@ -51,7 +55,6 @@ export default function Inicio({ onNavigate, perfil }) {
         const clienteId = perfil.clienteId;
         if (!clienteId) return;
 
-        // Datos del tenant
         const clienteSaasRef = doc(db, "clientes-saas", clienteId);
         const clienteSaasSnap = await getDoc(clienteSaasRef);
 
@@ -61,7 +64,6 @@ export default function Inicio({ onNavigate, perfil }) {
           setLogoUrl(data.logoUrl || "");
         }
 
-        // Pedidos
         const pedidosQ = query(
           collection(db, "pedidos"),
           where("clienteId", "==", clienteId)
@@ -69,7 +71,6 @@ export default function Inicio({ onNavigate, perfil }) {
         const pedidosSnap = await getDocs(pedidosQ);
         const pedidos = pedidosSnap.docs.map((d) => d.data());
 
-        // Clientes
         const clientesQ = query(
           collection(db, "clientes"),
           where("clienteId", "==", clienteId)
@@ -111,11 +112,8 @@ export default function Inicio({ onNavigate, perfil }) {
 
           <div>
             <h1>{nombreEmpresa}</h1>
-            
           </div>
         </div>
-
-        
       </header>
 
       <section className="resumen-cards">
@@ -141,17 +139,29 @@ export default function Inicio({ onNavigate, perfil }) {
       </section>
 
       <section className="accesos-rapidos">
-        <div onClick={() => onNavigate("pedidos")} className="modulo">
-          <FaClipboardList className="icon" />
-          <span>Pedidos</span>
-        </div>
+        {puedeVerPedidos && (
+          <div onClick={() => onNavigate("pedidos")} className="modulo">
+            <FaClipboardList className="icon" />
+            <span>Pedidos</span>
+          </div>
+        )}
 
-        <div onClick={() => onNavigate("listado")} className="modulo">
-          <FaUsers className="icon" />
-          <span>Clientes</span>
-        </div>
+        {puedeVerClientes && (
+          <div onClick={() => onNavigate("listado")} className="modulo">
+            <FaUsers className="icon" />
+            <span>Clientes</span>
+          </div>
+        )}
 
-        <div className="modulo">
+        {puedeVerConfiguracion && (
+          <div onClick={() => onNavigate("configuracion")} className="modulo">
+            <FaCog className="icon" />
+            <span>Configuración</span>
+          </div>
+        )}
+
+        {/* Dejamos ocultos por ahora hasta tener módulo/permisos reales */}
+        {/* <div className="modulo">
           <FaBox className="icon" />
           <span>Productos</span>
         </div>
@@ -159,12 +169,7 @@ export default function Inicio({ onNavigate, perfil }) {
         <div className="modulo">
           <FaChartBar className="icon" />
           <span>Estadísticas</span>
-        </div>
-
-        <div onClick={() => onNavigate("configuracion")} className="modulo">
-          <FaCog className="icon" />
-          <span>Configuración</span>
-        </div>
+        </div> */}
       </section>
     </div>
   );

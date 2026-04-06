@@ -13,6 +13,7 @@ import { db } from "../../firebase";
 import { crearVenta } from "../../firebase/ventas";
 import { formatearMoneda, obtenerConfigMonedaDesdePerfil } from "../../utils/moneda";
 import "./VentasPage.css";
+import { puedeHacer } from "../../utils/permisos";
 
 const itemVacio = () => ({
   descripcion: "",
@@ -51,6 +52,10 @@ export default function VentasPage({ perfil }) {
   const [exito, setExito] = useState("");
 
   const configMoneda = obtenerConfigMonedaDesdePerfil(perfil);
+
+  const puedeCrearVentas = puedeHacer(perfil, "ventas", "crear");
+  const puedeEditarVentas = puedeHacer(perfil, "ventas", "editar");
+  const puedeCrearClientes = puedeHacer(perfil, "clientes", "crear");
 
   const cargarDatosBase = async () => {
     try {
@@ -196,6 +201,10 @@ export default function VentasPage({ perfil }) {
 
   const guardarClienteRapido = async () => {
     try {
+      if (!puedeCrearClientes) {
+        setError("No tenés permisos para crear clientes.");
+        return;
+      }
       if (!clienteRapido.nombre.trim()) {
         setError("El nombre del cliente rápido es obligatorio.");
         return;
@@ -259,6 +268,10 @@ export default function VentasPage({ perfil }) {
 
   const guardarVenta = async () => {
     try {
+      if (!puedeCrearVentas) {
+        setError("No tenés permisos para crear ventas.");
+        return;
+      }
       setGuardando(true);
       setError("");
       setExito("");
@@ -357,6 +370,7 @@ export default function VentasPage({ perfil }) {
                       setClienteRefId(clienteEncontrado.firebaseId);
                     }
                   }}
+                  disabled={!puedeCrearVentas}
                 />
 
                 <datalist id="clientes-sugeridos">
@@ -368,18 +382,21 @@ export default function VentasPage({ perfil }) {
                   ))}
                 </datalist>
 
-                <button
-                  type="button"
-                  className="btn btn-secondary ventas-btn-inline"
-                  onClick={() => setMostrarClienteRapido((prev) => !prev)}
-                >
-                  {mostrarClienteRapido ? "Cerrar" : "Cliente rápido"}
-                </button>
+                  {puedeCrearClientes && (
+                    <button
+                      type="button"
+                      className="btn btn-secondary ventas-btn-inline"
+                      onClick={() => setMostrarClienteRapido((prev) => !prev)}
+                      disabled={!puedeCrearVentas}
+                    >
+                      {mostrarClienteRapido ? "Cerrar" : "Cliente rápido"}
+                    </button>
+                  )}
               </div>
             </div>
           </div>
 
-          {mostrarClienteRapido && (
+          {mostrarClienteRapido && puedeCrearClientes && (
             <div className="ventas-subpanel">
               <h3>Cliente rápido</h3>
               <div className="ventas-grid ventas-grid-3">
@@ -390,6 +407,7 @@ export default function VentasPage({ perfil }) {
                     onChange={(e) =>
                       setClienteRapido((prev) => ({ ...prev, nombre: e.target.value }))
                     }
+                    disabled={!puedeCrearClientes}
                   />
                 </div>
 
@@ -400,6 +418,7 @@ export default function VentasPage({ perfil }) {
                     onChange={(e) =>
                       setClienteRapido((prev) => ({ ...prev, dni: e.target.value }))
                     }
+                    disabled={!puedeCrearClientes}
                   />
                 </div>
 
@@ -410,6 +429,7 @@ export default function VentasPage({ perfil }) {
                     onChange={(e) =>
                       setClienteRapido((prev) => ({ ...prev, telefono: e.target.value }))
                     }
+                    disabled={!puedeCrearClientes}
                   />
                 </div>
               </div>
@@ -428,6 +448,7 @@ export default function VentasPage({ perfil }) {
               <select
                 value={pedidoRefId}
                 onChange={(e) => setPedidoRefId(e.target.value)}
+                disabled={!puedeCrearVentas}
               >
                 <option value="">Sin pedido asociado</option>
                 {pedidos.map((p) => (
@@ -444,6 +465,7 @@ export default function VentasPage({ perfil }) {
                 value={observaciones}
                 onChange={(e) => setObservaciones(e.target.value)}
                 placeholder="Detalle extra de la venta..."
+                disabled={!puedeCrearVentas}
               />
             </div>
           </div>
@@ -451,7 +473,7 @@ export default function VentasPage({ perfil }) {
           
 
           <div className="ventas-items-actions">
-            <button className="btn btn-primary" onClick={agregarItem}>
+            <button className="btn btn-primary" onClick={agregarItem} disabled={!puedeCrearVentas}>
               + Agregar ítem
             </button>
           </div>
@@ -477,6 +499,7 @@ export default function VentasPage({ perfil }) {
                           actualizarItem(index, "descripcion", e.target.value)
                         }
                         placeholder="Ej: Remera personalizada"
+                        disabled={!puedeCrearVentas}
                       />
                     </td>
                     <td>
@@ -487,6 +510,7 @@ export default function VentasPage({ perfil }) {
                         onChange={(e) =>
                           actualizarItem(index, "cantidad", e.target.value)
                         }
+                        disabled={!puedeCrearVentas}
                       />
                     </td>
                     <td>
@@ -497,6 +521,7 @@ export default function VentasPage({ perfil }) {
                         onChange={(e) =>
                           actualizarItem(index, "precioUnitario", e.target.value)
                         }
+                        disabled={!puedeCrearVentas}
                       />
                     </td>
                      <td>{formatearMoneda(item.subtotal, configMoneda.moneda, configMoneda.localeMoneda)}</td>
@@ -504,7 +529,7 @@ export default function VentasPage({ perfil }) {
                       <button
                         className="btn btn-danger"
                         onClick={() => eliminarItem(index)}
-                        disabled={items.length === 1}
+                        disabled={items.length === 1 || !puedeCrearVentas}
                       >
                         Eliminar
                       </button>
@@ -545,6 +570,7 @@ export default function VentasPage({ perfil }) {
                   min="0"
                   value={descuento}
                   onChange={(e) => setDescuento(e.target.value)}
+                  disabled={!puedeCrearVentas}
                 />
               </div>
 
@@ -568,6 +594,7 @@ export default function VentasPage({ perfil }) {
                       onChange={(e) =>
                         actualizarPagoInicial(index, "monto", e.target.value)
                       }
+                      disabled={!puedeCrearVentas}
                     />
 
                     <select
@@ -588,7 +615,7 @@ export default function VentasPage({ perfil }) {
                       type="button"
                       className="ventas-pago-remove"
                       onClick={() => eliminarPagoInicial(index)}
-                      disabled={pagosIniciales.length === 1}
+                      disabled={pagosIniciales.length === 1 || !puedeCrearVentas}
                     >
                       ×
                     </button>
@@ -600,6 +627,7 @@ export default function VentasPage({ perfil }) {
                 type="button"
                 className="ventas-add-pago-btn"
                 onClick={agregarPagoInicial}
+                disabled={!puedeCrearVentas}
               >
                 + Agregar otro pago
               </button>
@@ -617,7 +645,7 @@ export default function VentasPage({ perfil }) {
               <button
                 className="btn btn-primary btn-full"
                 onClick={guardarVenta}
-                disabled={guardando}
+                disabled={guardando || !puedeCrearVentas}
               >
                 {guardando ? "Guardando..." : "Guardar venta"}
               </button>

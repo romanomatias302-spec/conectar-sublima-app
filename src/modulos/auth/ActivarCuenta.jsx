@@ -5,7 +5,7 @@ import {
   updateProfile,
 } from "firebase/auth";
 import { doc, serverTimestamp, setDoc } from "firebase/firestore";
-import { db, secondaryAuth, secondaryDb } from "../../firebase";
+import { auth, db } from "../../firebase";
 import {
   invitacionEstaVencida,
   marcarInvitacionComoUsada,
@@ -119,7 +119,7 @@ export default function ActivarCuenta() {
       console.log("Paso 1: creando usuario en Auth...");
 
       const userCredential = await createUserWithEmailAndPassword(
-        secondaryAuth,
+        auth,
         invitacion.email,
         password
       );
@@ -134,7 +134,7 @@ export default function ActivarCuenta() {
 
       console.log("Paso 3: guardando usuario en Firestore...");
 
-      await setDoc(doc(secondaryDb, "usuarios", nuevoUsuario.uid), {
+      await setDoc(doc(db, "usuarios", nuevoUsuario.uid), {
         nombre: nombre.trim(),
         email: invitacion.email,
         rol: invitacion.rol || "usuario",
@@ -142,6 +142,20 @@ export default function ActivarCuenta() {
         clienteId: invitacion.clienteId,
         createdAt: serverTimestamp(),
         invitacionId: invitacion.id,
+        permisos: {
+          inicio: { ver: true },
+          clientes: { ver: false, crear: false, editar: false, eliminar: false },
+          pedidos: { ver: true, crear: false, editar: false, eliminar: false },
+          produccion: {
+            ver: true,
+            mover: true,
+            editarDetalle: true,
+            asignarUsuario: false,
+          },
+          ventas: { ver: false, crear: false, editar: false, eliminar: false },
+          movimientos: { ver: false },
+          configuracion: { ver: false },
+        },
       });
 
       console.log("Paso 4: marcando invitación como usada...");
@@ -149,12 +163,12 @@ export default function ActivarCuenta() {
       await marcarInvitacionComoUsada({
         invitacionId: invitacion.id,
         usuarioCreadoUid: nuevoUsuario.uid,
-        dbInstance: secondaryDb,
+        dbInstance: db,
       });
 
       console.log("Paso 5: cerrando sesión secundaria...");
 
-      await signOut(secondaryAuth);
+      await signOut(auth);
 
       setMensaje("Cuenta activada correctamente. Ya podés iniciar sesión.");
     } catch (err) {

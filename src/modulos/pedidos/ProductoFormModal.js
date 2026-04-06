@@ -11,6 +11,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../../firebase";
 import "./ProductoFormModal.css";
+import { puedeHacer } from "../../utils/permisos";
 
 export default function ProductoFormModal({
   pedidoId,
@@ -43,6 +44,8 @@ export default function ProductoFormModal({
   const [tipoAreaConfig, setTipoAreaConfig] = useState(""); // multiple | unica | personalizada
 
 
+
+
   // ✅ colores configurados
   const [coloresDisponibles, setColoresDisponibles] = useState([]);
 
@@ -54,6 +57,14 @@ export default function ProductoFormModal({
 
   // ✅ NUEVO: tipo de área para mostrar referencia (multiple | unica | personalizada)
   const [tipoArea, setTipoArea] = useState("");
+  const [modoEdicionLocal, setModoEdicionLocal] = useState(!soloVer);
+
+
+
+  const puedeEditarPedidos = puedeHacer(perfil, "pedidos", "editar");
+
+const modoVistaEstatica = !!productoEditando && soloVer && !modoEdicionLocal;
+const modoSoloLecturaReal = !modoEdicionLocal && soloVer;
 
   // =========================
   // Helpers
@@ -174,7 +185,10 @@ export default function ProductoFormModal({
         imagenes: productoEditando.imagenes || [""],
       });
     }
-  }, [productoEditando]);
+
+    // si entro a ver un producto ya cargado, arranco en modo vista
+    setModoEdicionLocal(!soloVer);
+  }, [productoEditando, soloVer]);
 
   // =========================
   // 🔹 Al seleccionar producto: cargar config
@@ -353,6 +367,10 @@ export default function ProductoFormModal({
   // 🔹 Guardar
   // =========================
   const guardarProducto = async () => {
+    if (!puedeEditarPedidos || modoSoloLecturaReal) {
+      setError("No tenés permisos para editar productos del pedido.");
+      return;
+    }
     if (!formData.producto) {
       setError("Debe seleccionar un producto configurado.");
       return;
@@ -456,6 +474,248 @@ export default function ProductoFormModal({
     }
 
     return null;
+  };
+
+  
+
+  const imagenesConContenido = (formData.imagenes || []).filter(
+    (img) => String(img || "").trim() !== ""
+  );
+
+  const tallesUsados = Object.entries(formData.talles || {}).filter(([talle, cantidad]) => {
+    const qty = Number(cantidad) || 0;
+    const detalle = String(formData.detallePorTalle?.[talle] || "").trim();
+    return qty > 0 || detalle !== "";
+  });
+
+  const zonasUsadas = Object.entries(formData.zonas || {}).filter(([zona, valor]) => {
+    return String(valor || "").trim() !== "";
+  });
+
+    const buildZonasAgrupadas = () => {
+    const usadasMap = Object.entries(formData.zonas || {}).reduce((acc, [zona, valor]) => {
+      if (String(valor || "").trim() !== "") {
+        acc[zona] = valor;
+      }
+      return acc;
+    }, {});
+
+    const grupos = [];
+
+    if (zonasConfig && typeof zonasConfig === "object" && !Array.isArray(zonasConfig)) {
+      Object.entries(zonasConfig).forEach(([grupo, codigos]) => {
+        const items = (codigos || [])
+          .filter((codigo) => usadasMap[codigo] !== undefined)
+          .map((codigo) => ({
+            codigo,
+            valor: usadasMap[codigo],
+          }));
+
+        if (items.length > 0) {
+          grupos.push({ grupo, items });
+        }
+      });
+
+      return grupos;
+    }
+
+    // fallback si no hay config clara
+    const frente = [];
+    const espalda = [];
+    const mangas = [];
+    const otros = [];
+
+    Object.entries(usadasMap).forEach(([codigo, valor]) => {
+      if (codigo.startsWith("F")) frente.push({ codigo, valor });
+      else if (codigo.startsWith("E")) espalda.push({ codigo, valor });
+      else if (codigo.startsWith("M")) mangas.push({ codigo, valor });
+      else otros.push({ codigo, valor });
+    });
+
+    const sortByCodigo = (a, b) =>
+      a.codigo.localeCompare(b.codigo, undefined, { numeric: true, sensitivity: "base" });
+
+    frente.sort(sortByCodigo);
+    espalda.sort(sortByCodigo);
+    mangas.sort(sortByCodigo);
+    otros.sort(sortByCodigo);
+
+    if (frente.length) grupos.push({ grupo: "Frente", items: frente });
+    if (espalda.length) grupos.push({ grupo: "Espalda", items: espalda });
+    if (mangas.length) grupos.push({ grupo: "Mangas", items: mangas });
+    if (otros.length) grupos.push({ grupo: "Otras", items: otros });
+
+    return grupos;
+  };
+
+  const zonasAgrupadas = buildZonasAgrupadas();
+
+  const atributosUsados = Object.entries(formData.atributosExtra || {}).filter(([k, valor]) => {
+    return String(valor || "").trim() !== "";
+  });
+
+    const renderCampoEstatico = (campo) => {
+    switch (campo) {
+      case "color":
+      case "colores":
+        return formData.color ? (
+          <div className="pfm-static-card" key="color">
+            <div className="pfm-static-card-title">Color</div>
+            <div className="pfm-static-badge">
+              <span className="pfm-static-badge-dot" />
+              {formData.color}
+            </div>
+          </div>
+        ) : null;
+
+      case "zonas":
+        return zonasAgrupadas.length > 0 ? (
+          <div className="pfm-static-card" key="zonas">
+            <div className="pfm-static-card-title">Zonas de impresión</div>
+
+            <div className="pfm-static-zonas-layout">
+              <div className="pfm-static-zonas-ref">
+                {renderReferencia()}
+              </div>
+
+              <div className="pfm-static-zonas-data">
+                {zonasAgrupadas.map(({ grupo, items }) => (
+                  <div key={grupo} className="pfm-static-zona-group">
+                    <div className="pfm-static-zona-group-title">{grupo}</div>
+
+                    <div className="pfm-static-zonas-grid">
+                      {items.map(({ codigo, valor }) => (
+                        <div key={codigo} className="pfm-static-zona-item">
+                          <div className="pfm-static-zona-top">
+                            <div className="pfm-static-zona-code">{codigo}</div>
+                          </div>
+                          <div className="pfm-static-zona-text">{valor}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : null;
+
+      case "talles":
+        return tallesUsados.length > 0 ? (
+          <div className="pfm-static-card" key="talles">
+            <div className="pfm-static-card-head">
+              <div className="pfm-static-card-title">Talles cargados</div>
+              <div className="pfm-static-total-badge">
+                Total: <strong>{totalTalles}</strong>
+              </div>
+            </div>
+
+            <div className="pfm-static-talles-grid">
+              {tallesUsados.map(([talle, cantidad]) => (
+                <div key={talle} className="pfm-static-talle-chip">
+                  <div className="pfm-static-talle-top">
+                    <span className="pfm-static-talle-name">{talle}</span>
+                    <span className="pfm-static-talle-qty">
+                      {Number(cantidad) || 0}
+                      <span className="pfm-static-talle-qty-unit"> uni.</span>
+                    </span>
+                  </div>
+
+                  {formData.detallePorTalle?.[talle] ? (
+                    <div className="pfm-static-talle-detail">
+                      {formData.detallePorTalle[talle]}
+                    </div>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null;
+
+      case "atributosExtra":
+        return atributosUsados.length > 0 ? (
+          <div className="pfm-static-card" key="atributosExtra">
+            <div className="pfm-static-card-title">Atributos adicionales</div>
+
+            <div className="pfm-static-table">
+              {atributosUsados.map(([nombre, valor]) => (
+                <div key={nombre} className="pfm-static-table-row">
+                  <div className="pfm-static-table-key">{nombre}</div>
+                  <div className="pfm-static-table-value">{valor}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null;
+
+      case "imagenes":
+        return imagenesConContenido.length > 0 ? (
+          <div className="pfm-static-card" key="imagenes">
+            <div className="pfm-static-card-title">Imágenes / enlaces</div>
+
+            <div className="pfm-static-links-grid">
+              {imagenesConContenido.map((img, index) => (
+                <a
+                  key={`${img}-${index}`}
+                  href={img}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="pfm-static-link-card"
+                >
+                  <div className="pfm-static-link-icon-wrap">
+                    <span className="pfm-static-link-icon">🔗</span>
+                  </div>
+
+                  <div className="pfm-static-link-body">
+                    <div className="pfm-static-link-title">Enlace {index + 1}</div>
+                    <div className="pfm-static-link-url">{img}</div>
+                  </div>
+                </a>
+              ))}
+            </div>
+          </div>
+        ) : null;
+
+      default:
+        return null;
+    }
+  };
+
+  const renderVistaEstatica = () => {
+    const productoTitulo =
+      formData.productoNombre || getProductoNombreById(formData.producto) || "Producto";
+
+    const bloquesDinamicos = (camposOrden || [])
+      .map((campo) => renderCampoEstatico(campo))
+      .filter(Boolean);
+
+    return (
+      <div className="pfm-static">
+        <div className="pfm-static-hero">
+          <div>
+            <div className="pfm-static-eyebrow pfm-static-eyebrow-strong">
+              Detalle del producto
+            </div>
+            <div className="pfm-static-producto pfm-static-producto-soft">
+              {productoTitulo}
+            </div>
+          </div>
+        </div>
+
+        {formData.detalle ? (
+          <div className="pfm-static-card">
+            <div className="pfm-static-card-title">Detalle general</div>
+            <div className="pfm-static-card-text">{formData.detalle}</div>
+          </div>
+        ) : null}
+
+        {bloquesDinamicos}
+
+        {!formData.detalle && bloquesDinamicos.length === 0 ? (
+          <div className="pfm-empty">Este producto no tiene datos cargados.</div>
+        ) : null}
+      </div>
+    );
   };
 
   const renderCampo = (campo) => {
@@ -686,7 +946,11 @@ const countZonas = (z) => {
       >
         <div className="pfm-header">
           <h2 className="pfm-title">
-            {productoEditando ? "Editar Producto" : "Agregar Producto"}
+            {productoEditando
+              ? modoVistaEstatica
+                ? "Detalle del Producto"
+                : "Editar Producto"
+              : "Agregar Producto"}
           </h2>
           <button className="pfm-close" onClick={onClose} type="button" title="Cerrar">
             ✕
@@ -696,121 +960,142 @@ const countZonas = (z) => {
         {error && <div className="pfm-error">{error}</div>}
 
         {/* ✅ TOP GRID: izq campos base + der referencia */}
-        <div className="pfm-top-grid">
-          <div className="pfm-top-left">
-            {/* Producto */}
-            <div className="pfm-field">
-              <div className="pfm-label">Producto</div>
-              <select
-                className="pfm-control"
-                name="producto"
-                value={loadingProductos ? "" : formData.producto}
-                onChange={handleChange}
-                disabled={loadingProductos || soloVer}
-              >
-                <option value="">
-                  {loadingProductos ? "Cargando productos..." : "Seleccionar producto..."}
-                </option>
-                {productosDisponibles.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.nombre}
-                  </option>
-                ))}
-              </select>
-              {!loadingProductos && productosDisponibles.length === 0 && (
-                <div className="pfm-empty" style={{ marginTop: "8px" }}>
-                  No hay productos configurados disponibles.
-                </div>
-              )}
-
-
-            </div>
-
-            {/* Detalle general */}
-            <div className="pfm-field">
-              <div className="pfm-label">Detalle general</div>
-              <textarea
-                className="pfm-control pfm-textarea"
-                name="detalle"
-                placeholder="Ej: diseño personalizado, logo en frente..."
-                value={formData.detalle}
-                onChange={handleChange}
-              />
-            </div>
-
-            {/* Links */}
-            <div className="pfm-field">
-              <div className="pfm-label">Imágenes / Enlaces</div>
-              <div className="pfm-links">
-                {(formData.imagenes || []).map((img, index) => (
-                  <div key={index} className="pfm-link-row">
-                    <input
-                      className="pfm-control"
-                      type="text"
-                      placeholder="https://drive.google.com/..."
-                      value={img}
-                      onChange={(e) => handleImagenChange(index, e.target.value)}
-                    />
-                    <button
-                      type="button"
-                      className="pfm-link-remove"
-                      onClick={() => eliminarCampoImagen(index)}
-                      title="Eliminar"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                ))}
-
-                {(formData.imagenes || []).length < 10 && (
-                  <button
-                    type="button"
-                    className="pfm-link-add"
-                    onClick={agregarCampoImagen}
+        {modoVistaEstatica ? (
+          renderVistaEstatica()
+        ) : (
+          <>
+            {/* ✅ TOP GRID: izq campos base + der referencia */}
+            <div className="pfm-top-grid">
+              <div className="pfm-top-left">
+                {/* Producto */}
+                <div className="pfm-field">
+                  <div className="pfm-label">Producto</div>
+                  <select
+                    className="pfm-control"
+                    name="producto"
+                    value={loadingProductos ? "" : formData.producto}
+                    onChange={handleChange}
+                    disabled={loadingProductos || soloVer}
                   >
-                    + Agregar enlace
-                  </button>
-                )}
+                    <option value="">
+                      {loadingProductos ? "Cargando productos..." : "Seleccionar producto..."}
+                    </option>
+                    {productosDisponibles.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.nombre}
+                      </option>
+                    ))}
+                  </select>
+                  {!loadingProductos && productosDisponibles.length === 0 && (
+                    <div className="pfm-empty" style={{ marginTop: "8px" }}>
+                      No hay productos configurados disponibles.
+                    </div>
+                  )}
+                </div>
+
+                {/* Detalle general */}
+                <div className="pfm-field">
+                  <div className="pfm-label">Detalle general</div>
+                  <textarea
+                    className="pfm-control pfm-textarea"
+                    name="detalle"
+                    placeholder="Ej: diseño personalizado, logo en frente..."
+                    value={formData.detalle}
+                    onChange={handleChange}
+                  />
+                </div>
+
+                {/* Links */}
+                <div className="pfm-field">
+                  <div className="pfm-label">Imágenes / Enlaces</div>
+                  <div className="pfm-links">
+                    {(formData.imagenes || []).map((img, index) => (
+                      <div key={index} className="pfm-link-row">
+                        <input
+                          className="pfm-control"
+                          type="text"
+                          placeholder="https://drive.google.com/..."
+                          value={img}
+                          onChange={(e) => handleImagenChange(index, e.target.value)}
+                        />
+                        <button
+                          type="button"
+                          className="pfm-link-remove"
+                          onClick={() => eliminarCampoImagen(index)}
+                          title="Eliminar"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+
+                    {(formData.imagenes || []).length < 10 && (
+                      <button
+                        type="button"
+                        className="pfm-link-add"
+                        onClick={agregarCampoImagen}
+                      >
+                        + Agregar enlace
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="pfm-top-right">
+                {renderReferencia()}
               </div>
             </div>
-          </div>
 
-          <div className="pfm-top-right">
-            {renderReferencia()}
-          </div>
-        </div>
-
-        {/* Campos dinámicos */}
-        {Object.values(switchesActivos).some((v) => v) ? (
-          <div className="pfm-dynamic">
-            {camposOrden.map((campo) => (
-              <React.Fragment key={campo}>
-                {/* evitamos duplicar “imagenes” porque ya está arriba */}
-                {campo === "imagenes" ? null : renderCampo(campo)}
-              </React.Fragment>
-            ))}
-          </div>
-        ) : (
-          <div className="pfm-empty">
-            ⚙️ Este producto no tiene campos configurados.
-            <br />
-            Editalo desde <strong>Configuración de Productos</strong>.
-          </div>
+            {/* Campos dinámicos */}
+            {Object.values(switchesActivos).some((v) => v) ? (
+              <div className="pfm-dynamic">
+                {camposOrden.map((campo) => (
+                  <React.Fragment key={campo}>
+                    {campo === "imagenes" ? null : renderCampo(campo)}
+                  </React.Fragment>
+                ))}
+              </div>
+            ) : (
+              <div className="pfm-empty">
+                ⚙️ Este producto no tiene campos configurados.
+                <br />
+                Editalo desde <strong>Configuración de Productos</strong>.
+              </div>
+            )}
+          </>
         )}
 
         {/* Botones */}
         <div className="pfm-actions">
           <button className="pfm-btn pfm-btn-secondary" onClick={onClose} type="button">
-            Cancelar
+            {modoVistaEstatica ? "Cerrar" : "Cancelar"}
           </button>
-          <button
-            className="pfm-btn pfm-btn-primary"
-            onClick={guardarProducto}
-            disabled={loading}
-            type="button"
-          >
-            {loading ? "Guardando..." : productoEditando ? "Guardar Cambios" : "Guardar Producto"}
-          </button>
+
+          {modoVistaEstatica ? (
+            puedeEditarPedidos ? (
+              <button
+                className="pfm-btn pfm-btn-primary"
+                type="button"
+                onClick={() => setModoEdicionLocal(true)}
+              >
+                Editar
+              </button>
+            ) : null
+          ) : (
+            <button
+              className="pfm-btn pfm-btn-primary"
+              onClick={guardarProducto}
+              disabled={loading || !modoEdicionLocal || !puedeEditarPedidos}
+              type="button"
+            >
+              {loading
+                ? "Guardando..."
+                : productoEditando
+                ? "Guardar Cambios"
+                : "Guardar Producto"}
+            </button>
+          )}
         </div>
       </div>
     </div>

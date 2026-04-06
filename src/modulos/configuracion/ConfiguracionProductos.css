@@ -1850,3 +1850,133 @@ body.dark-mode .cancelar {
   border-radius: 5px;
   border: 1px solid #ccc;
 }
+
+.referencia-personalizada-box {
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid #dbe3ec;
+  border-radius: 10px;
+  background: #ffffff;
+  text-align: left;
+}
+
+.referencia-personalizada-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1f2937;
+  margin-bottom: 8px;
+}
+
+.referencia-personalizada-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #cfd8e3;
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.referencia-personalizada-input:focus {
+  border-color: #0096d1;
+  box-shadow: 0 0 0 3px rgba(0, 150, 209, 0.12);
+}
+
+.referencia-personalizada-preview {
+  margin-top: 14px;
+}
+
+.referencia-upload-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.referencia-upload-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: #0096d1;
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.referencia-upload-btn:hover {
+  opacity: 0.92;
+}
+
+.referencia-upload-help {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.referencia-upload-actions {
+  margin-top: 10px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.referencia-upload-error {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #dc2626;
+  font-weight: 600;
+}
+
+.referencia-upload-input-hidden {
+  display: none;
+}
+
+.referencia-upload-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.referencia-upload-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  min-width: 180px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: #0096d1;
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 2px 8px rgba(0, 150, 209, 0.18);
+  transition: 0.2s ease;
+}
+
+.referencia-upload-btn:hover {
+  opacity: 0.93;
+  transform: translateY(-1px);
+}
+
+.referencia-upload-help {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.referencia-upload-actions {
+  margin-top: 10px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.referencia-upload-error {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #dc2626;
+  font-weight: 600;
+}

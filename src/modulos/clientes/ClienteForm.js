@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { collection, doc, addDoc, updateDoc } from "firebase/firestore";
 import { db } from "../../firebase";
+import { puedeHacer } from "../../utils/permisos";
 
 export default function ClienteForm({ cliente, onVolver, onCancelar, onGuardar, perfil }) {
   const [formData, setFormData] = useState(
@@ -17,11 +18,26 @@ export default function ClienteForm({ cliente, onVolver, onCancelar, onGuardar, 
   const [error, setError] = useState("");
   const volver = onVolver || onCancelar || (() => {}); // compatibilidad
 
+  const puedeCrearClientes = puedeHacer(perfil, "clientes", "crear");
+  const puedeEditarClientes = puedeHacer(perfil, "clientes", "editar");
+
+  const soloLectura =
+    (cliente && !puedeEditarClientes) || (!cliente && !puedeCrearClientes);
+
   const handleChange = (e) => {
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
   const guardarCliente = async () => {
+     if (!cliente && !puedeCrearClientes) {
+      setError("No tenés permisos para crear clientes.");
+      return;
+    }
+
+    if (cliente && !puedeEditarClientes) {
+      setError("No tenés permisos para editar clientes.");
+      return;
+    }
     if (!formData.dni) {
       setError("El DNI es obligatorio.");
       return;
@@ -86,46 +102,77 @@ export default function ClienteForm({ cliente, onVolver, onCancelar, onGuardar, 
             value={formData.dni}
             onChange={handleChange}
             type="text"
-            disabled={!!cliente}
+            disabled={!!cliente || soloLectura}
           />
         </div>
 
         <div className="form-field">
           <label>Nombre y Apellido</label>
-          <input name="nombre" value={formData.nombre} onChange={handleChange} />
+          <input
+            name="nombre"
+            value={formData.nombre}
+            onChange={handleChange}
+            disabled={soloLectura}
+          />
         </div>
 
       
 
         <div className="form-field">
           <label>Teléfono</label>
-          <input name="telefono" value={formData.telefono} onChange={handleChange} />
+          <input
+            name="telefono"
+            value={formData.telefono}
+            onChange={handleChange}
+            disabled={soloLectura}
+          />
         </div>
 
         <div className="form-field wide">
           <label>Dirección</label>
-          <input name="direccion" value={formData.direccion} onChange={handleChange} />
+          <input
+            name="direccion"
+            value={formData.direccion}
+            onChange={handleChange}
+            disabled={soloLectura}
+          />
         </div>
 
         <div className="form-field">
           <label>Localidad</label>
-          <input name="localidad" value={formData.localidad} onChange={handleChange} />
+          <input
+            name="localidad"
+            value={formData.localidad}
+            onChange={handleChange}
+            disabled={soloLectura}
+          />
         </div>
 
         <div className="form-field">
           <label>Provincia</label>
-          <input name="provincia" value={formData.provincia} onChange={handleChange} />
+          <input
+            name="provincia"
+            value={formData.provincia}
+            onChange={handleChange}
+            disabled={soloLectura}
+          />
         </div>
 
         <div className="form-field wide">
           <label>Email</label>
-          <input name="email" type="email" value={formData.email} onChange={handleChange} />
+            <input
+              name="email"
+              type="email"
+              value={formData.email}
+              onChange={handleChange}
+              disabled={soloLectura}
+            />
         </div>
       </div>
 
       <div className="form-actions">
         <button className="btn btn-ghost" onClick={volver}>Cancelar</button>
-        <button className="btn btn-primary" onClick={guardarCliente}>
+        <button className="btn btn-primary" onClick={guardarCliente} disabled={soloLectura}>
           {cliente ? "Guardar cambios" : "Guardar cliente"}
         </button>
       </div>

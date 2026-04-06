@@ -21,6 +21,7 @@ import {
 } from "../../firebase/ventas";
 import { formatearMoneda, obtenerConfigMonedaDesdePerfil } from "../../utils/moneda";
 import "./VentasPage.css";
+import { puedeHacer } from "../../utils/permisos";
 
 
 export default function VentaDetalle({ perfil, ventaId, onVolver, onVerPedido }) {
@@ -52,6 +53,9 @@ export default function VentaDetalle({ perfil, ventaId, onVolver, onVerPedido })
 
   const [error, setError] = useState("");
   const [exito, setExito] = useState("");
+
+  const puedeVerVentas = puedeHacer(perfil, "ventas", "ver");
+  const puedeEditarVentas = puedeHacer(perfil, "ventas", "editar");
 
 
 
@@ -121,6 +125,7 @@ export default function VentaDetalle({ perfil, ventaId, onVolver, onVerPedido })
 
     const anularItem = async (item) => {
     try {
+      if (!puedeEditarVentas) return;
       const motivo = window.prompt("Motivo de anulación del ítem:", "");
       if (motivo === null) return;
 
@@ -144,6 +149,7 @@ export default function VentaDetalle({ perfil, ventaId, onVolver, onVerPedido })
 
   const anularPago = async (pago) => {
     try {
+      if (!puedeEditarVentas) return;
       const motivo = window.prompt("Motivo de anulación del pago:", "");
       if (motivo === null) return;
 
@@ -167,6 +173,7 @@ export default function VentaDetalle({ perfil, ventaId, onVolver, onVerPedido })
 
     const handleAnularVenta = async () => {
       try {
+        if (!puedeEditarVentas) return;
         if (!venta) return;
 
         const motivo = window.prompt("Motivo de anulación de la venta:", "");
@@ -202,6 +209,7 @@ export default function VentaDetalle({ perfil, ventaId, onVolver, onVerPedido })
 
   const guardarPedidoAsociado = async () => {
     try {
+      if (!puedeEditarVentas) return;
       if (!venta) return;
       setGuardandoPedido(true);
       setError("");
@@ -224,6 +232,7 @@ export default function VentaDetalle({ perfil, ventaId, onVolver, onVerPedido })
 
   const guardarNuevoItem = async () => {
     try {
+      if (!puedeEditarVentas) return;
       if (!venta) return;
       setGuardandoItem(true);
       setError("");
@@ -255,6 +264,7 @@ export default function VentaDetalle({ perfil, ventaId, onVolver, onVerPedido })
 
   const guardarNuevoPago = async () => {
     try {
+      if (!puedeEditarVentas) return;
       if (!venta) return;
       setGuardandoPago(true);
       setError("");
@@ -288,6 +298,16 @@ export default function VentaDetalle({ perfil, ventaId, onVolver, onVerPedido })
     }
   };
 
+    if (!puedeVerVentas) {
+    return (
+      <div className="ventas-page">
+        <div className="ventas-card">
+          <p>No tenés permisos para ver ventas.</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!venta) {
     return (
       <div className="ventas-page">
@@ -316,7 +336,7 @@ export default function VentaDetalle({ perfil, ventaId, onVolver, onVerPedido })
               <button
                 className="btn btn-secondary btn-xs"
                 onClick={handleAnularVenta}
-                disabled={anulandoVenta}
+                disabled={anulandoVenta || !puedeEditarVentas}
               >
                 {anulandoVenta ? "Anulando..." : "Anular venta"}
               </button>
@@ -357,7 +377,7 @@ export default function VentaDetalle({ perfil, ventaId, onVolver, onVerPedido })
                 <select
                   value={pedidoRefId}
                   onChange={(e) => setPedidoRefId(e.target.value)}
-                  disabled={ventaAnulada}
+                  disabled={ventaAnulada || !puedeEditarVentas}
                 >
                   <option value="">Sin pedido asociado</option>
                   {pedidos.map((p) => (
@@ -370,7 +390,7 @@ export default function VentaDetalle({ perfil, ventaId, onVolver, onVerPedido })
                 <button
                   className="btn btn-primary"
                   onClick={guardarPedidoAsociado}
-                  disabled={guardandoPedido || ventaAnulada}
+                  disabled={guardandoPedido || ventaAnulada || !puedeEditarVentas}
                 >
                   {guardandoPedido ? "Guardando..." : "Guardar"}
                 </button>
@@ -424,7 +444,7 @@ export default function VentaDetalle({ perfil, ventaId, onVolver, onVerPedido })
                           </span>
                         </td>
                         <td>
-                           {activo && !ventaAnulada ? (
+                          {activo && !ventaAnulada && puedeEditarVentas ? (
                             <button
                               className="btn btn-secondary btn-xs"
                               onClick={() => anularItem(item)}
@@ -455,6 +475,7 @@ export default function VentaDetalle({ perfil, ventaId, onVolver, onVerPedido })
                     onChange={(e) =>
                       setNuevoItem((prev) => ({ ...prev, descripcion: e.target.value }))
                     }
+                    disabled={!puedeEditarVentas || ventaAnulada}
                   />
                 </div>
 
@@ -467,6 +488,7 @@ export default function VentaDetalle({ perfil, ventaId, onVolver, onVerPedido })
                     onChange={(e) =>
                       setNuevoItem((prev) => ({ ...prev, cantidad: e.target.value }))
                     }
+                    disabled={!puedeEditarVentas || ventaAnulada}
                   />
                 </div>
 
@@ -479,6 +501,7 @@ export default function VentaDetalle({ perfil, ventaId, onVolver, onVerPedido })
                     onChange={(e) =>
                       setNuevoItem((prev) => ({ ...prev, precioUnitario: e.target.value }))
                     }
+                    disabled={!puedeEditarVentas || ventaAnulada}
                   />
                 </div>
               </div>
@@ -487,7 +510,7 @@ export default function VentaDetalle({ perfil, ventaId, onVolver, onVerPedido })
                 <button
                   className="btn btn-primary"
                   onClick={guardarNuevoItem}
-                  disabled={guardandoItem || ventaAnulada}
+                  disabled={guardandoItem || ventaAnulada || !puedeEditarVentas}
                 >
                   {guardandoItem ? "Agregando..." : "Agregar ítem"}
                 </button>
@@ -533,7 +556,7 @@ export default function VentaDetalle({ perfil, ventaId, onVolver, onVerPedido })
                           </span>
                         </td>
                         <td>
-                           {activo && !ventaAnulada ? (
+                          {activo && !ventaAnulada && puedeEditarVentas ? (
                             <button
                               className="btn btn-secondary btn-xs"
                               onClick={() => anularPago(pago)}
@@ -566,6 +589,7 @@ export default function VentaDetalle({ perfil, ventaId, onVolver, onVerPedido })
                     onChange={(e) =>
                       setNuevoPago((prev) => ({ ...prev, monto: e.target.value }))
                     }
+                    disabled={!puedeEditarVentas || ventaAnulada}
                   />
                 </div>
 
@@ -576,6 +600,7 @@ export default function VentaDetalle({ perfil, ventaId, onVolver, onVerPedido })
                     onChange={(e) =>
                       setNuevoPago((prev) => ({ ...prev, medioPago: e.target.value }))
                     }
+                    disabled={!puedeEditarVentas || ventaAnulada}
                   >
                     <option value="efectivo">Efectivo</option>
                     <option value="transferencia">Transferencia</option>
@@ -603,6 +628,7 @@ export default function VentaDetalle({ perfil, ventaId, onVolver, onVerPedido })
                   onChange={(e) =>
                     setNuevoPago((prev) => ({ ...prev, observacion: e.target.value }))
                   }
+                  disabled={!puedeEditarVentas || ventaAnulada}
                 />
               </div>
 
@@ -617,6 +643,7 @@ export default function VentaDetalle({ perfil, ventaId, onVolver, onVerPedido })
                       fechaComprobanteReal: e.target.value,
                     }))
                   }
+                  disabled={!puedeEditarVentas || ventaAnulada}
                 />
               </div>
 
@@ -624,7 +651,7 @@ export default function VentaDetalle({ perfil, ventaId, onVolver, onVerPedido })
                 <button
                   className="btn btn-primary"
                   onClick={guardarNuevoPago}
-                  disabled={guardandoPago || ventaAnulada}
+                  disabled={guardandoPago || ventaAnulada || !puedeEditarVentas}
                 >
                   {guardandoPago ? "Agregando..." : "Agregar pago"}
                 </button>

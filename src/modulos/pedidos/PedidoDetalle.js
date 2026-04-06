@@ -4,12 +4,15 @@ import { db } from "../../firebase";
 import ProductoFormModal from "./ProductoFormModal";
 import ActionMenu from "../../comunes/componentes/ActionMenu";
 import "./PedidoDetalle.css";
+import { puedeHacer } from "../../utils/permisos";
 
 export default function PedidoDetalle({ pedido, onVolver, perfil, onVerVenta }) {
   const [productos, setProductos] = useState([]);
   const [mostrarModal, setMostrarModal] = useState(false);
   const [productoEditando, setProductoEditando] = useState(null);
   const [soloVer, setSoloVer] = useState(false);
+
+  const puedeEditarPedidos = puedeHacer(perfil, "pedidos", "editar");
 
   // 🔹 Cargar productos del pedido
   const cargarProductos = async () => {
@@ -40,6 +43,8 @@ export default function PedidoDetalle({ pedido, onVolver, perfil, onVerVenta }) 
 
   // ✏️ Editar producto
   const manejarEditarProducto = (producto) => {
+    if (!puedeEditarPedidos) return;
+
     setProductoEditando(producto);
     setSoloVer(false);
     setMostrarModal(true);
@@ -47,6 +52,8 @@ export default function PedidoDetalle({ pedido, onVolver, perfil, onVerVenta }) 
 
   // 🗑️ Eliminar producto
   const manejarEliminarProducto = async (id) => {
+    if (!puedeEditarPedidos) return;
+
     if (window.confirm("¿Seguro que querés eliminar este producto?")) {
       await deleteDoc(doc(db, `pedidos/${pedido.firebaseId}/productos`, id));
       cargarProductos();
@@ -55,6 +62,8 @@ export default function PedidoDetalle({ pedido, onVolver, perfil, onVerVenta }) 
 
   // ➕ Nuevo producto
   const abrirModal = () => {
+    if (!puedeEditarPedidos) return;
+
     setProductoEditando(null);
     setSoloVer(false);
     setMostrarModal(true);
@@ -162,9 +171,11 @@ export default function PedidoDetalle({ pedido, onVolver, perfil, onVerVenta }) 
 
       {/* 🔹 Acciones principales */}
       <div className="acciones-detalle">
-        <button className="btn-nuevo" onClick={abrirModal}>
-          + Agregar Producto
-        </button>
+        {puedeEditarPedidos && (
+          <button className="btn-nuevo" onClick={abrirModal}>
+            + Agregar Producto
+          </button>
+        )}
         <button className="btn-volver" onClick={onVolver}>
           Volver
         </button>
@@ -205,8 +216,8 @@ export default function PedidoDetalle({ pedido, onVolver, perfil, onVerVenta }) 
     <td onClick={(e) => e.stopPropagation()}>
       <ActionMenu
         onVer={() => manejarVerProducto(p)}
-        onEditar={() => manejarEditarProducto(p)}
-        onEliminar={() => manejarEliminarProducto(p.id)}
+        onEditar={puedeEditarPedidos ? () => manejarEditarProducto(p) : undefined}
+        onEliminar={puedeEditarPedidos ? () => manejarEliminarProducto(p.id) : undefined}
       />
     </td>
   </tr>

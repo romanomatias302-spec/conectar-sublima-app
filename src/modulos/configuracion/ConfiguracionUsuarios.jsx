@@ -1,6 +1,13 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { cancelarInvitacion, crearInvitacionUsuario, escucharInvitacionesPorCliente } from "../../firebase/invitacionesUsuarios";
-import { escucharUsuariosActivosPorCliente } from "../../firebase/usuariosProduccion";
+import {
+  cancelarInvitacion,
+  crearInvitacionUsuario,
+  escucharInvitacionesPorCliente,
+} from "../../firebase/invitacionesUsuarios";
+import {
+  obtenerUsuariosPorCliente,
+  actualizarPermisosUsuario,
+} from "../../firebase/usuariosConfig";
 
 function formatearFecha(fecha) {
   if (!fecha) return "-";
@@ -14,6 +21,79 @@ function formatearFecha(fecha) {
 
   return d.toLocaleString("es-AR");
 }
+
+const PERMISOS_DEFAULT_USUARIO = {
+  inicio: { ver: true },
+  clientes: { ver: false, crear: false, editar: false, eliminar: false },
+  pedidos: { ver: true, crear: false, editar: false, eliminar: false },
+  produccion: {
+    ver: true,
+    mover: true,
+    editarDetalle: true,
+    asignarUsuario: false,
+  },
+  ventas: { ver: false, crear: false, editar: false, eliminar: false },
+  movimientos: { ver: false },
+  configuracion: { ver: false },
+};
+
+const MODULOS_PERMISOS = [
+  {
+    key: "inicio",
+    label: "Inicio",
+    acciones: [{ key: "ver", label: "Ver módulo" }],
+  },
+  {
+    key: "clientes",
+    label: "Clientes",
+    acciones: [
+      { key: "ver", label: "Ver" },
+      { key: "crear", label: "Crear" },
+      { key: "editar", label: "Editar" },
+      { key: "eliminar", label: "Eliminar" },
+    ],
+  },
+  {
+    key: "pedidos",
+    label: "Pedidos",
+    acciones: [
+      { key: "ver", label: "Ver" },
+      { key: "crear", label: "Crear" },
+      { key: "editar", label: "Editar" },
+      { key: "eliminar", label: "Eliminar" },
+    ],
+  },
+  {
+    key: "produccion",
+    label: "Producción",
+    acciones: [
+      { key: "ver", label: "Ver" },
+      { key: "mover", label: "Mover tarjetas" },
+      { key: "editarDetalle", label: "Editar detalle" },
+      { key: "asignarUsuario", label: "Asignar usuario" },
+    ],
+  },
+  {
+    key: "ventas",
+    label: "Ventas",
+    acciones: [
+      { key: "ver", label: "Ver" },
+      { key: "crear", label: "Crear" },
+      { key: "editar", label: "Editar" },
+      { key: "eliminar", label: "Eliminar" },
+    ],
+  },
+  {
+    key: "movimientos",
+    label: "Movimientos",
+    acciones: [{ key: "ver", label: "Ver" }],
+  },
+  {
+    key: "configuracion",
+    label: "Configuración",
+    acciones: [{ key: "ver", label: "Ver" }],
+  },
+];
 
 export default function ConfiguracionUsuarios({ perfil }) {
   const [usuarios, setUsuarios] = useState([]);
@@ -29,6 +109,10 @@ export default function ConfiguracionUsuarios({ perfil }) {
   const [mensaje, setMensaje] = useState("");
   const [cancelandoId, setCancelandoId] = useState(null);
 
+  const [usuarioEditandoPermisos, setUsuarioEditandoPermisos] = useState(null);
+  const [permisosEditando, setPermisosEditando] = useState(PERMISOS_DEFAULT_USUARIO);
+  const [guardandoPermisos, setGuardandoPermisos] = useState(false);
+
   const puedeInvitar = perfil?.rol === "admin";
 
   async function cargarTodo() {
@@ -37,39 +121,23 @@ export default function ConfiguracionUsuarios({ perfil }) {
 
       setLoading(true);
 
-      const [invitacionesData] = await Promise.all([
+      const [usuariosData, invitacionesData] = await Promise.all([
+        obtenerUsuariosPorCliente(perfil.clienteId),
         escucharInvitacionesPorCliente(perfil.clienteId),
       ]);
 
+      setUsuarios(usuariosData);
       setInvitaciones(invitacionesData);
     } catch (error) {
       console.error("Error cargando usuarios/configuración:", error);
+      setMensaje("No se pudieron cargar los usuarios.");
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(() => {
-    let unsubscribeUsuarios = null;
-
-    async function iniciar() {
-      await cargarTodo();
-
-      if (!perfil?.clienteId) return;
-
-      unsubscribeUsuarios = escucharUsuariosActivosPorCliente(
-        perfil.clienteId,
-        (data) => {
-          setUsuarios(data);
-        }
-      );
-    }
-
-    iniciar();
-
-    return () => {
-      if (unsubscribeUsuarios) unsubscribeUsuarios();
-    };
+    cargarTodo();
   }, [perfil?.clienteId]);
 
   const invitacionesPendientes = useMemo(
@@ -132,6 +200,52 @@ export default function ConfiguracionUsuarios({ perfil }) {
     }
   }
 
+  function abrirEditorPermisos(usuario) {
+    setUsuarioEditandoPermisos(usuario);
+    setPermisosEditando({
+      ...PERMISOS_DEFAULT_USUARIO,
+      ...(usuario?.permisos || {}),
+    });
+  }
+
+  function cerrarEditorPermisos() {
+    setUsuarioEditandoPermisos(null);
+    setPermisosEditando(PERMISOS_DEFAULT_USUARIO);
+  }
+
+  function togglePermiso(modulo, accion) {
+    setPermisosEditando((prev) => ({
+      ...prev,
+      [modulo]: {
+        ...(prev[modulo] || {}),
+        [accion]: !prev?.[modulo]?.[accion],
+      },
+    }));
+  }
+
+  async function guardarPermisosUsuario() {
+    try {
+      if (!usuarioEditandoPermisos?.uid) return;
+
+      setGuardandoPermisos(true);
+      setMensaje("");
+
+      await actualizarPermisosUsuario(
+        usuarioEditandoPermisos.uid,
+        permisosEditando
+      );
+
+      setMensaje("Permisos actualizados correctamente.");
+      cerrarEditorPermisos();
+      await cargarTodo();
+    } catch (error) {
+      console.error("Error guardando permisos:", error);
+      setMensaje("No se pudieron actualizar los permisos.");
+    } finally {
+      setGuardandoPermisos(false);
+    }
+  }
+
   if (loading) {
     return <div>Cargando usuarios...</div>;
   }
@@ -139,7 +253,15 @@ export default function ConfiguracionUsuarios({ perfil }) {
   return (
     <div style={{ display: "grid", gap: "24px" }}>
       <div className="container-secundaria">
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: "12px",
+            flexWrap: "wrap",
+          }}
+        >
           <div>
             <h3 style={{ margin: 0 }}>Usuarios activos</h3>
             <p style={{ margin: "6px 0 0", color: "#666" }}>
@@ -159,7 +281,9 @@ export default function ConfiguracionUsuarios({ perfil }) {
 
         <div style={{ marginTop: "18px", display: "grid", gap: "10px" }}>
           {usuarios.length === 0 ? (
-            <p style={{ margin: 0, color: "#666" }}>Todavía no hay usuarios activos.</p>
+            <p style={{ margin: 0, color: "#666" }}>
+              Todavía no hay usuarios activos.
+            </p>
           ) : (
             usuarios.map((usuario) => (
               <div
@@ -178,6 +302,17 @@ export default function ConfiguracionUsuarios({ perfil }) {
                 <div style={{ color: "#666", fontSize: "14px" }}>
                   Rol: {usuario.rol || "usuario"}
                 </div>
+
+                {usuario.rol !== "admin" && usuario.rol !== "superadmin" && (
+                  <div style={{ marginTop: "6px" }}>
+                    <button
+                      className="btn"
+                      onClick={() => abrirEditorPermisos(usuario)}
+                    >
+                      Editar permisos
+                    </button>
+                  </div>
+                )}
               </div>
             ))
           )}
@@ -245,9 +380,7 @@ export default function ConfiguracionUsuarios({ perfil }) {
         <h3 style={{ marginTop: 0 }}>Invitaciones pendientes</h3>
 
         {mensaje && (
-          <p style={{ color: "#64748b", marginTop: 0 }}>
-            {mensaje}
-          </p>
+          <p style={{ color: "#64748b", marginTop: 0 }}>{mensaje}</p>
         )}
 
         <div style={{ display: "grid", gap: "10px" }}>
@@ -285,20 +418,27 @@ export default function ConfiguracionUsuarios({ perfil }) {
 
                   <div
                     style={{
-                        marginTop: "8px",
-                        padding: "8px 10px",
-                        background: "#f8fafc",
-                        border: "1px solid #e5e7eb",
-                        borderRadius: "8px",
-                        fontSize: "12px",
-                        color: "#334155",
-                        wordBreak: "break-all",
+                      marginTop: "8px",
+                      padding: "8px 10px",
+                      background: "#f8fafc",
+                      border: "1px solid #e5e7eb",
+                      borderRadius: "8px",
+                      fontSize: "12px",
+                      color: "#334155",
+                      wordBreak: "break-all",
                     }}
-                    >
+                  >
                     {link}
-                    </div>
+                  </div>
 
-                    <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "8px" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: "8px",
+                      flexWrap: "wrap",
+                      marginTop: "8px",
+                    }}
+                  >
                     <button
                       className="btn"
                       onClick={async () => {
@@ -318,7 +458,9 @@ export default function ConfiguracionUsuarios({ perfil }) {
                       onClick={() => manejarCancelarInvitacion(inv.id)}
                       disabled={cancelandoId === inv.id}
                     >
-                      {cancelandoId === inv.id ? "Cancelando..." : "Cancelar invitación"}
+                      {cancelandoId === inv.id
+                        ? "Cancelando..."
+                        : "Cancelar invitación"}
                     </button>
                   </div>
                 </div>
@@ -327,6 +469,99 @@ export default function ConfiguracionUsuarios({ perfil }) {
           )}
         </div>
       </div>
+
+      {usuarioEditandoPermisos && (
+        <div className="produccion-modal-overlay" onClick={cerrarEditorPermisos}>
+          <div
+            className="produccion-modal"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "min(920px, 92vw)",
+              maxHeight: "85vh",
+              overflowY: "auto",
+              padding: "24px",
+              borderRadius: "18px",
+            }}
+          >
+            <div style={{ marginBottom: "18px" }}>
+              <h3 style={{ margin: 0 }}>
+                Permisos de{" "}
+                {usuarioEditandoPermisos.nombre || usuarioEditandoPermisos.email}
+              </h3>
+              <p style={{ margin: "6px 0 0", color: "#64748b" }}>
+                Definí qué módulos puede ver y qué acciones puede realizar.
+              </p>
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
+                gap: "14px",
+              }}
+            >
+              {MODULOS_PERMISOS.map((modulo) => (
+                <div
+                  key={modulo.key}
+                  style={{
+                    border: "1px solid #e5e7eb",
+                    borderRadius: "16px",
+                    padding: "16px",
+                    background: "#fff",
+                    boxShadow: "0 4px 14px rgba(0,0,0,0.04)",
+                  }}
+                >
+                  <h4 style={{ margin: "0 0 12px", fontSize: "15px" }}>
+                    {modulo.label}
+                  </h4>
+
+                  <div style={{ display: "grid", gap: "10px" }}>
+                    {modulo.acciones.map((accion) => (
+                      <label
+                        key={accion.key}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "10px",
+                          cursor: "pointer",
+                          fontSize: "14px",
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={!!permisosEditando?.[modulo.key]?.[accion.key]}
+                          onChange={() => togglePermiso(modulo.key, accion.key)}
+                        />
+                        <span>{accion.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div
+              className="produccion-modal-actions"
+              style={{ marginTop: "22px" }}
+            >
+              <button
+                className="btn-produccion-cancelar"
+                onClick={cerrarEditorPermisos}
+              >
+                Cancelar
+              </button>
+
+              <button
+                className="btn-produccion-primario"
+                onClick={guardarPermisosUsuario}
+                disabled={guardandoPermisos}
+              >
+                {guardandoPermisos ? "Guardando..." : "Guardar permisos"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

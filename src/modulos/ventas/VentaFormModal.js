@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "../../firebase";
 import { crearVenta } from "../../firebase/ventas";
+import { puedeHacer } from "../../utils/permisos";
 
 export default function VentaFormModal({ perfil, onClose, onVentaCreada }) {
   const [clientes, setClientes] = useState([]);
@@ -17,6 +18,9 @@ export default function VentaFormModal({ perfil, onClose, onVentaCreada }) {
   });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const puedeCrearVentas = puedeHacer(perfil, "ventas", "crear");
+  const soloLectura = !puedeCrearVentas;
 
   useEffect(() => {
     const fetchClientes = async () => {
@@ -43,6 +47,10 @@ export default function VentaFormModal({ perfil, onClose, onVentaCreada }) {
 
   const guardar = async () => {
     try {
+      if (!puedeCrearVentas) {
+        setError("No tenés permisos para crear ventas.");
+        return;
+      }
       setLoading(true);
       setError("");
 
@@ -90,10 +98,21 @@ export default function VentaFormModal({ perfil, onClose, onVentaCreada }) {
         {error && <div className="error">{error}</div>}
 
         <label>Fecha</label>
-        <input type="date" name="fechaVenta" value={formData.fechaVenta} onChange={handleChange} />
+        <input
+          type="date"
+          name="fechaVenta"
+          value={formData.fechaVenta}
+          onChange={handleChange}
+          disabled={soloLectura}
+        />
 
         <label>Cliente</label>
-        <select name="clienteRefId" value={formData.clienteRefId} onChange={handleChange}>
+        <select
+          name="clienteRefId"
+          value={formData.clienteRefId}
+          onChange={handleChange}
+          disabled={soloLectura}
+        >
           <option value="">Seleccionar cliente...</option>
           {clientes.map((c) => (
             <option key={c.firebaseId} value={c.firebaseId}>
@@ -103,10 +122,21 @@ export default function VentaFormModal({ perfil, onClose, onVentaCreada }) {
         </select>
 
         <label>Descripción</label>
-        <input name="descripcion" value={formData.descripcion} onChange={handleChange} />
+        <input
+          name="descripcion"
+          value={formData.descripcion}
+          onChange={handleChange}
+          disabled={soloLectura}
+        />
 
         <label>Cantidad</label>
-        <input name="cantidad" type="number" value={formData.cantidad} onChange={handleChange} />
+        <input
+          name="cantidad"
+          type="number"
+          value={formData.cantidad}
+          onChange={handleChange}
+          disabled={soloLectura}
+        />
 
         <label>Precio unitario</label>
         <input
@@ -114,10 +144,17 @@ export default function VentaFormModal({ perfil, onClose, onVentaCreada }) {
           type="number"
           value={formData.precioUnitario}
           onChange={handleChange}
+          disabled={soloLectura}
         />
 
         <label>Descuento</label>
-        <input name="descuento" type="number" value={formData.descuento} onChange={handleChange} />
+        <input
+          name="descuento"
+          type="number"
+          value={formData.descuento}
+          onChange={handleChange}
+          disabled={soloLectura}
+        />
 
         <label>Pago recibido</label>
         <input
@@ -125,10 +162,16 @@ export default function VentaFormModal({ perfil, onClose, onVentaCreada }) {
           type="number"
           value={formData.pagoInicial}
           onChange={handleChange}
+          disabled={soloLectura}
         />
 
         <label>Medio de pago</label>
-        <select name="medioPago" value={formData.medioPago} onChange={handleChange}>
+        <select
+          name="medioPago"
+          value={formData.medioPago}
+          onChange={handleChange}
+          disabled={soloLectura}
+        >
           <option value="efectivo">Efectivo</option>
           <option value="transferencia">Transferencia</option>
           <option value="debito">Débito</option>
@@ -145,7 +188,7 @@ export default function VentaFormModal({ perfil, onClose, onVentaCreada }) {
 
         <div className="modal-buttons">
           <button className="cancelar" onClick={onClose}>Cancelar</button>
-          <button onClick={guardar} disabled={loading}>
+          <button onClick={guardar} disabled={loading || soloLectura}>
             {loading ? "Guardando..." : "Guardar Venta"}
           </button>
         </div>

@@ -3,10 +3,15 @@ import { collection, getDocs, deleteDoc, doc, query, where } from "firebase/fire
 import { db } from "../../firebase";
 import "./ClientesList.css";
 import ActionMenu from "../../comunes/componentes/ActionMenu";
+import { puedeHacer } from "../../utils/permisos";
 
 export default function ClientesList({ onNuevo, onEditar, onVer, perfil }) {
   const [clientes, setClientes] = useState([]);
   const [busqueda, setBusqueda] = useState("");
+
+  const puedeCrearClientes = puedeHacer(perfil, "clientes", "crear");
+  const puedeEditarClientes = puedeHacer(perfil, "clientes", "editar");
+  const puedeEliminarClientes = puedeHacer(perfil, "clientes", "eliminar");
 
   const cargarClientes = async () => {
     try {
@@ -40,6 +45,7 @@ export default function ClientesList({ onNuevo, onEditar, onVer, perfil }) {
   }, [perfil]);
 
   const eliminarCliente = async (id) => {
+    if (!puedeEliminarClientes) return;
     if (window.confirm("¿Seguro que querés eliminar este cliente?")) {
       try {
         await deleteDoc(doc(db, "clientes", id));
@@ -72,9 +78,11 @@ export default function ClientesList({ onNuevo, onEditar, onVer, perfil }) {
             onChange={(e) => setBusqueda(e.target.value)}
             className="buscador"
           />
-          <button onClick={onNuevo} className="btn-nuevo">
-            + Nuevo Cliente
-          </button>
+          {puedeCrearClientes && (
+            <button onClick={onNuevo} className="btn-nuevo">
+              + Nuevo Cliente
+            </button>
+          )}
         </div>
       </div>
 
@@ -109,8 +117,14 @@ export default function ClientesList({ onNuevo, onEditar, onVer, perfil }) {
               >
                 <ActionMenu
                   onVer={() => onVer(cliente)}
-                  onEditar={() => onEditar(cliente)}
-                  onEliminar={() => eliminarCliente(cliente.firebaseId)}
+                  onEditar={
+                    puedeEditarClientes ? () => onEditar(cliente) : undefined
+                  }
+                  onEliminar={
+                    puedeEliminarClientes
+                      ? () => eliminarCliente(cliente.firebaseId)
+                      : undefined
+                  }
                 />
               </td>
             </tr>

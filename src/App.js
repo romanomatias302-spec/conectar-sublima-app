@@ -44,6 +44,35 @@ export default function App() {
 
   const esRutaActivacion = window.location.pathname === "/activar-cuenta";
 
+  const PERMISOS_DEFAULT_USUARIO = {
+    inicio: { ver: true },
+    clientes: { ver: false, crear: false, editar: false, eliminar: false },
+    pedidos: { ver: true, crear: false, editar: false, eliminar: false },
+    produccion: {
+      ver: true,
+      mover: true,
+      editarDetalle: true,
+      asignarUsuario: false,
+    },
+    ventas: { ver: false, crear: false, editar: false, eliminar: false },
+    movimientos: { ver: false },
+    configuracion: { ver: false },
+  };
+
+  const puedeHacer = (modulo, accion = "ver") => {
+    if (!perfil) return false;
+
+    if (perfil.rol === "superadmin" || perfil.rol === "admin") {
+      return true;
+    }
+
+    const permisos = perfil.permisos || PERMISOS_DEFAULT_USUARIO;
+
+    return permisos?.[modulo]?.[accion] === true;
+  };
+
+  const puedeVerModulo = (modulo) => puedeHacer(modulo, "ver");
+
 const irAVista = (nuevaVista, extra = {}) => {
   const nuevoCliente = extra.cliente ?? null;
   const nuevoPedido = extra.pedido ?? null;
@@ -266,6 +295,38 @@ const irAVista = (nuevaVista, extra = {}) => {
       };
     }, [esRutaActivacion]);
 
+    useEffect(() => {
+      if (!perfil) return;
+      if (perfil.rol === "admin" || perfil.rol === "superadmin") return;
+
+      const mapaVistaModulo = {
+        inicio: "inicio",
+        listado: "clientes",
+        formulario: "clientes",
+        detalle: "clientes",
+        pedidos: "pedidos",
+        detallePedido: "pedidos",
+        produccion: "produccion",
+        "ventas-crear": "ventas",
+        "ventas-listado": "ventas",
+        "venta-detalle": "ventas",
+        movimientos: "movimientos",
+        configuracion: "configuracion",
+      };
+
+      const moduloActual = mapaVistaModulo[vista];
+
+      if (!moduloActual) return;
+
+      if (!puedeVerModulo(moduloActual)) {
+        setVista("inicio");
+        setClienteSeleccionado(null);
+        setPedidoSeleccionado(null);
+        setVentaSeleccionada(null);
+        setOrigenVista(null);
+      }
+    }, [perfil, vista]);
+
   // 🔹 Navegación desde el sidebar
   const manejarSeleccionSidebar = (modulo) => {
     switch (modulo) {
@@ -410,6 +471,7 @@ const irAVista = (nuevaVista, extra = {}) => {
         expandido={sidebarExpandido}
         perfil={perfil}
         onToggle={() => setSidebarExpandido(!sidebarExpandido)}
+        puedeVerModulo={puedeVerModulo}
       />
 
 
@@ -549,6 +611,7 @@ const irAVista = (nuevaVista, extra = {}) => {
       <MobileMenu
         vistaActual={vista}
         onSelect={manejarSeleccionSidebar}
+        perfil={perfil}
         onCrear={(tipo) => {
           if (tipo === "pedido") {
             irAVista("pedidos", { pedido: null });

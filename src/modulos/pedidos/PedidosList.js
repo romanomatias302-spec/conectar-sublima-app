@@ -20,6 +20,7 @@ import "./PedidosList.css";
 import ProduccionEstadoCell from "../produccion/ProduccionEstadoCell";
 import { escucharColumnasProduccion } from "../../firebase/produccionColumnas";
 import { sincronizarPedidoDesdeEstadoManual } from "../../firebase/produccionPedidos";
+import { puedeHacer } from "../../utils/permisos";
 
 export default function PedidosList({
   onVerDetalle = () => {},
@@ -45,6 +46,10 @@ export default function PedidosList({
   const [columnasProduccion, setColumnasProduccion] = useState([]);
 
   const PAGE_SIZE = 100;
+
+  const puedeCrearPedidos = puedeHacer(perfil, "pedidos", "crear");
+  const puedeEditarPedidos = puedeHacer(perfil, "pedidos", "editar");
+  const puedeEliminarPedidos = puedeHacer(perfil, "pedidos", "eliminar");
 
   const cargarPedidos = () => {
     if (!perfil) return () => {};
@@ -259,6 +264,7 @@ export default function PedidosList({
   }, [busqueda]);
 
   const eliminarPedido = async (firebaseId) => {
+    if (!puedeEliminarPedidos) return;
     if (window.confirm("¿Seguro que querés eliminar este pedido?")) {
       try {
         await deleteDoc(doc(db, "pedidos", firebaseId));
@@ -270,6 +276,7 @@ export default function PedidosList({
 
   const actualizarEstado = async (firebaseId, nuevaEtapaONuevoEstado) => {
     try {
+      if (!puedeEditarPedidos) return; 
       const pedidoActual = pedidos.find((p) => p.firebaseId === firebaseId);
       if (!pedidoActual) return;
       if (!perfil?.clienteId) return;
@@ -387,15 +394,17 @@ export default function PedidosList({
             <option value="Cancelado">Cancelado</option>
           </select>
 
-          <button
-            className="btn-nuevo"
-            onClick={() => {
-              setPedidoEditar(null);
-              setMostrarModal(true);
-            }}
-          >
-            + Nuevo Pedido
-          </button>
+          {puedeCrearPedidos && (
+            <button
+              className="btn-nuevo"
+              onClick={() => {
+                setPedidoEditar(null);
+                setMostrarModal(true);
+              }}
+            >
+              + Nuevo Pedido
+            </button>
+          )}
         </div>
       </div>
 
@@ -452,6 +461,7 @@ export default function PedidosList({
                   value={obtenerNombreEtapaPedido(p)}
                   onChange={(e) => actualizarEstado(p.firebaseId, e.target.value)}
                   onClick={(e) => e.stopPropagation()}
+                  disabled={!puedeEditarPedidos}
                 >
                   {columnasProduccion.map((col) => (
                     <option key={col.id} value={col.nombre}>
@@ -466,11 +476,19 @@ export default function PedidosList({
               <td onClick={(e) => e.stopPropagation()}>
                 <ActionMenu
                   onVer={() => onVerDetalle(p)}
-                  onEditar={() => {
-                    setPedidoEditar(p);
-                    setMostrarModal(true);
-                  }}
-                  onEliminar={() => eliminarPedido(p.firebaseId)}
+                  onEditar={
+                    puedeEditarPedidos
+                      ? () => {
+                          setPedidoEditar(p);
+                          setMostrarModal(true);
+                        }
+                      : undefined
+                  }
+                  onEliminar={
+                    puedeEliminarPedidos
+                      ? () => eliminarPedido(p.firebaseId)
+                      : undefined
+                  }
                 />
               </td>
             </tr>

@@ -39,6 +39,8 @@ export default function ProduccionCard({
   onVerPedido = () => {},
   onEditarDetalleManual = () => {},
   ahoraTick = Date.now(),
+  puedeMoverPedidos = true,
+  puedeEditarDetalleManual = true,
 }) {
   const id = pedido.firebaseId || pedido.id;
 
@@ -50,7 +52,7 @@ export default function ProduccionCard({
     isDragging,
   } = useDraggable({
     id,
-    disabled: pedido.produccionFinalizada === true,
+    disabled: pedido.produccionFinalizada === true || !puedeMoverPedidos,
   });
 
   const style = {
@@ -65,8 +67,7 @@ export default function ProduccionCard({
     ahoraTick
   );
 
-  const ultimoUsuario =
-    pedido.ultimaAccionProduccionPorNombre || "";
+  const ultimoUsuario = pedido.ultimaAccionProduccionPorNombre || "";
 
   const tieneDetalleManual =
     marcaStyle ||
@@ -86,9 +87,15 @@ export default function ProduccionCard({
       <button
         type="button"
         className="produccion-card-drag-handle"
-        {...(pedido.produccionFinalizada === true ? {} : listeners)}
-        {...(pedido.produccionFinalizada === true ? {} : attributes)}
-        title={pedido.produccionFinalizada === true ? "Pedido finalizado" : "Mover tarjeta"}
+        {...(pedido.produccionFinalizada === true || !puedeMoverPedidos ? {} : listeners)}
+        {...(pedido.produccionFinalizada === true || !puedeMoverPedidos ? {} : attributes)}
+        title={
+          pedido.produccionFinalizada === true
+            ? "Pedido finalizado"
+            : !puedeMoverPedidos
+            ? "Sin permiso para mover"
+            : "Mover tarjeta"
+        }
         onClick={(e) => e.stopPropagation()}
       >
         ⋮⋮
@@ -103,17 +110,19 @@ export default function ProduccionCard({
             {pedido.id || pedido.numeroPedido || pedido.numero || "Sin número"}
           </div>
 
-          <button
-            type="button"
-            className="produccion-card-mini-btn"
-            onClick={(e) => {
-              e.stopPropagation();
-              onEditarDetalleManual(pedido);
-            }}
-            title="Editar detalle manual"
-          >
-            ✎
-          </button>
+          {puedeEditarDetalleManual && (
+            <button
+              type="button"
+              className="produccion-card-mini-btn"
+              onClick={(e) => {
+                e.stopPropagation();
+                onEditarDetalleManual(pedido);
+              }}
+              title="Editar detalle manual"
+            >
+              ✎
+            </button>
+          )}
         </div>
 
         <div className="produccion-card-layout">

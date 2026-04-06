@@ -79,6 +79,33 @@ export default function ProduccionPage({ perfil, onVerPedido = () => {} }) {
  const [guardandoDetalleManual, setGuardandoDetalleManual] = useState(false);
  const [ahoraTick, setAhoraTick] = useState(Date.now());
 
+   const PERMISOS_DEFAULT_USUARIO = {
+    inicio: { ver: true },
+    clientes: { ver: false, crear: false, editar: false, eliminar: false },
+    pedidos: { ver: true, crear: false, editar: false, eliminar: false },
+    produccion: {
+      ver: true,
+      mover: true,
+      editarDetalle: true,
+      asignarUsuario: false,
+    },
+    ventas: { ver: false, crear: false, editar: false, eliminar: false },
+    movimientos: { ver: false },
+    configuracion: { ver: false },
+  };
+
+  const puedeHacerEnProduccion = (accion = "ver") => {
+    if (!perfil) return false;
+
+    if (perfil.rol === "admin" || perfil.rol === "superadmin") {
+      return true;
+    }
+
+    const permisos = perfil.permisos || PERMISOS_DEFAULT_USUARIO;
+    return permisos?.produccion?.[accion] === true;
+  };
+
+
   async function cargar() {
     if (!perfil?.clienteId) return;
 
@@ -235,6 +262,7 @@ function ordenarTarjetas(lista, modoOrden) {
 }, [columnas, pedidos, pedidosFinalizadosRecientes, animandoFinalizados, ordenTarjetas]);
 
   async function manejarMoverPedido(pedidoId, columnaDestinoId) {
+    if (!puedeHacerEnProduccion("mover")) return;
     if (moviendo) return;
 
     const pedidoActual = pedidos.find(
@@ -436,15 +464,17 @@ function toggleColumnaContraida(columnaId) {
 }
 
   function abrirDetalleManual(pedido) {
-  setPedidoEditandoDetalle(pedido);
-  setNotaManual(pedido?.produccionNotaCorta || "");
-  setMetrosManual(
-    pedido?.produccionMetros === "" || pedido?.produccionMetros == null
-      ? ""
-      : String(pedido.produccionMetros)
-  );
-  setColorManual(pedido?.produccionColorMarca || "");
-}
+    if (!puedeHacerEnProduccion("editarDetalle")) return;
+
+    setPedidoEditandoDetalle(pedido);
+    setNotaManual(pedido?.produccionNotaCorta || "");
+    setMetrosManual(
+      pedido?.produccionMetros === "" || pedido?.produccionMetros == null
+        ? ""
+        : String(pedido.produccionMetros)
+    );
+    setColorManual(pedido?.produccionColorMarca || "");
+  }
 
 function cerrarDetalleManual() {
   setPedidoEditandoDetalle(null);
@@ -455,6 +485,7 @@ function cerrarDetalleManual() {
 
 async function guardarDetalleManual() {
   try {
+    if (!puedeHacerEnProduccion("editarDetalle")) return;
     if (!pedidoEditandoDetalle?.firebaseId) return;
 
     setGuardandoDetalleManual(true);
@@ -573,10 +604,12 @@ async function guardarDetalleManual() {
   puedeGestionarColumnas={puedeGestionarColumnas}
   onMoverColumna={manejarMoverColumna}
   ahoraTick={ahoraTick}
+  puedeMoverPedidos={puedeHacerEnProduccion("mover")}
+  puedeEditarDetalleManual={puedeHacerEnProduccion("editarDetalle")}
 />
 </div>
 
-{pedidoEditandoDetalle && (
+{pedidoEditandoDetalle && puedeHacerEnProduccion("editarDetalle") && (
   <div className="produccion-modal-overlay" onClick={cerrarDetalleManual}>
     <div
       className="produccion-modal"

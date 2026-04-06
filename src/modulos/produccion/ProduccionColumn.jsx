@@ -21,12 +21,15 @@ export default function ProduccionColumn({
   puedeMoverIzquierda = false,
   puedeMoverDerecha = false,
   ahoraTick,
+  puedeMoverPedidos = true,
+  puedeEditarDetalleManual = true,
 }) {
   const { setNodeRef } = useDroppable({
     id: columna.id,
     data: {
       columnaId: columna.id,
     },
+    disabled: !puedeMoverPedidos,
   });
 
   const esEditando = columnaEditandoId === columna.id;
@@ -43,95 +46,92 @@ export default function ProduccionColumn({
     >
       <div className="produccion-column-header">
         <div className="produccion-column-header-main">
-            {esEditando && !estaContraida ? (
+          {esEditando && !estaContraida ? (
             <div className="produccion-columna-editar-box">
-                <input
+              <input
                 type="text"
                 value={nombreEditarColumna}
                 onChange={(e) => setNombreEditarColumna(e.target.value)}
                 className="produccion-columna-editar-input"
-                />
-                <button
+              />
+              <button
                 className="produccion-columna-btn-guardar"
                 onClick={onGuardarEdicionColumna}
                 disabled={guardandoEdicionColumna}
-                >
+              >
                 {guardandoEdicionColumna ? "..." : "OK"}
-                </button>
+              </button>
             </div>
-            ) : (
-            <div
-                className="produccion-column-title"
-                title={columna.nombre}
-            >
-                {columna.nombre}
+          ) : (
+            <div className="produccion-column-title" title={columna.nombre}>
+              {columna.nombre}
             </div>
-            )}
+          )}
         </div>
 
         <div className="produccion-column-toolbar">
-            <div className="produccion-column-count">{pedidos.length}</div>
+          <div className="produccion-column-count">{pedidos.length}</div>
 
-            {!esEditando && (
+          {!esEditando && (
             <div className="produccion-column-actions">
-                <button
+              <button
                 className="produccion-columna-btn"
                 onClick={onToggleContraer}
                 title={estaContraida ? "Expandir columna" : "Contraer columna"}
-                >
+              >
                 {estaContraida ? "⟫" : "⟪"}
-                </button>
+              </button>
 
-                {!estaContraida && puedeGestionarColumnas && (
+              {!estaContraida && puedeGestionarColumnas && (
                 <>
-                    {!columna.esInicial && !columna.esFinal && (
+                  {!columna.esInicial && !columna.esFinal && (
                     <>
-                        <button
+                      <button
                         className="produccion-columna-btn"
                         onClick={() => onMoverColumna?.(columna, "izquierda")}
                         disabled={!puedeMoverIzquierda}
                         title="Mover columna a la izquierda"
-                        >
+                      >
                         ←
-                        </button>
+                      </button>
 
-                        <button
+                      <button
                         className="produccion-columna-btn"
                         onClick={() => onMoverColumna?.(columna, "derecha")}
                         disabled={!puedeMoverDerecha}
                         title="Mover columna a la derecha"
-                        >
+                      >
                         →
-                        </button>
+                      </button>
                     </>
-                    )}
+                  )}
 
-                    <button
+                  <button
                     className="produccion-columna-btn"
                     onClick={() => onEditarColumna?.(columna)}
                     title="Editar nombre"
-                    >
+                  >
                     ✎
-                    </button>
+                  </button>
 
-                    {sePuedeEliminar && (
+                  {sePuedeEliminar && (
                     <button
-                        className="produccion-columna-btn eliminar"
-                        onClick={() => onEliminarColumna?.(columna)}
-                        disabled={eliminandoColumnaId === columna.id}
-                        title="Eliminar columna"
+                      className="produccion-columna-btn eliminar"
+                      onClick={() => onEliminarColumna?.(columna)}
+                      disabled={eliminandoColumnaId === columna.id}
+                      title="Eliminar columna"
                     >
-                        {eliminandoColumnaId === columna.id ? "..." : "×"}
+                      {eliminandoColumnaId === columna.id ? "..." : "×"}
                     </button>
-                    )}
+                  )}
                 </>
-                )}
+              )}
             </div>
-            )}
+          )}
         </div>
-        </div>
+      </div>
 
-        <div className="produccion-column-body">
+      <div className="produccion-column-body">
         {!estaContraida &&
           pedidos.map((pedido) => (
             <ProduccionCard
@@ -140,6 +140,8 @@ export default function ProduccionColumn({
               onVerPedido={onVerPedido}
               onEditarDetalleManual={onEditarDetalleManual}
               ahoraTick={ahoraTick}
+              puedeMoverPedidos={puedeMoverPedidos}
+              puedeEditarDetalleManual={puedeEditarDetalleManual}
             />
           ))}
       </div>

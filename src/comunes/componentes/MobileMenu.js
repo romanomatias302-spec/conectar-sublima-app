@@ -9,8 +9,9 @@ import {
   UserPlus,
 } from "lucide-react";
 import "./MobileMenu.css";
+import { puedeHacer } from "../../utils/permisos";
 
-export default function MobileMenu({ vistaActual, onSelect, onCrear }) {
+export default function MobileMenu({ vistaActual, onSelect, onCrear, perfil }) {
   const [menuAbierto, setMenuAbierto] = useState(false);
 
   const toggleMenu = () => setMenuAbierto(!menuAbierto);
@@ -20,57 +21,79 @@ export default function MobileMenu({ vistaActual, onSelect, onCrear }) {
     onCrear(tipo);
   };
 
+  const puedeVerInicio = puedeHacer(perfil, "inicio", "ver");
+  const puedeVerClientes = puedeHacer(perfil, "clientes", "ver");
+  const puedeVerPedidos = puedeHacer(perfil, "pedidos", "ver");
+  const puedeVerConfiguracion = puedeHacer(perfil, "configuracion", "ver");
+
+  const puedeCrearPedidos = puedeHacer(perfil, "pedidos", "crear");
+  const puedeCrearClientes = puedeHacer(perfil, "clientes", "crear");
+
+  const mostrarBotonCentral = puedeCrearPedidos || puedeCrearClientes;
+
   return (
     <>
-      {/* 🔹 Menú inferior fijo */}
       <nav className="mobile-menu">
-        <button
-          className={`menu-btn ${vistaActual === "inicio" ? "active" : ""}`}
-          onClick={() => onSelect("inicio")}
-        >
-          <Home size={22} />
-          <span>Inicio</span>
-        </button>
+        {puedeVerInicio && (
+          <button
+            className={`menu-btn ${vistaActual === "inicio" ? "active" : ""}`}
+            onClick={() => onSelect("inicio")}
+          >
+            <Home size={22} />
+            <span>Inicio</span>
+          </button>
+        )}
 
-        <button
-          className={`menu-btn ${vistaActual === "listado" ? "active" : ""}`}
-          onClick={() => onSelect("listado")}
-        >
-          <Users size={22} />
-          <span>Clientes</span>
-        </button>
+        {puedeVerClientes && (
+          <button
+            className={`menu-btn ${vistaActual === "listado" ? "active" : ""}`}
+            onClick={() => onSelect("listado")}
+          >
+            <Users size={22} />
+            <span>Clientes</span>
+          </button>
+        )}
 
-        {/* 🔹 Botón central flotante */}
-        <button className="btn-central" onClick={toggleMenu}>
-          <PlusCircle size={34} />
-        </button>
+        {mostrarBotonCentral && (
+          <button className="btn-central" onClick={toggleMenu}>
+            <PlusCircle size={34} />
+          </button>
+        )}
 
-        <button
-          className={`menu-btn ${vistaActual === "pedidos" ? "active" : ""}`}
-          onClick={() => onSelect("pedidos")}
-        >
-          <ClipboardList size={22} />
-          <span>Pedidos</span>
-        </button>
+        {puedeVerPedidos && (
+          <button
+            className={`menu-btn ${vistaActual === "pedidos" ? "active" : ""}`}
+            onClick={() => onSelect("pedidos")}
+          >
+            <ClipboardList size={22} />
+            <span>Pedidos</span>
+          </button>
+        )}
 
-        <button
-          className={`menu-btn ${vistaActual === "configuracion" ? "active" : ""}`}
-          onClick={() => onSelect("configuracion")}
-        >
-          <Settings size={22} />
-          <span>Config</span>
-        </button>
+        {puedeVerConfiguracion && (
+          <button
+            className={`menu-btn ${vistaActual === "configuracion" ? "active" : ""}`}
+            onClick={() => onSelect("configuracion")}
+          >
+            <Settings size={22} />
+            <span>Config</span>
+          </button>
+        )}
       </nav>
 
-      {/* 🔹 Menú emergente (crear pedido / cliente) */}
-      {menuAbierto && (
+      {menuAbierto && mostrarBotonCentral && (
         <div className="menu-flotante">
-          <button onClick={() => handleCrear("pedido")}>
-            <FilePlus size={18} /> Crear pedido
-          </button>
-          <button onClick={() => handleCrear("cliente")}>
-            <UserPlus size={18} /> Crear cliente
-          </button>
+          {puedeCrearPedidos && (
+            <button onClick={() => handleCrear("pedido")}>
+              <FilePlus size={18} /> Crear pedido
+            </button>
+          )}
+
+          {puedeCrearClientes && (
+            <button onClick={() => handleCrear("cliente")}>
+              <UserPlus size={18} /> Crear cliente
+            </button>
+          )}
         </div>
       )}
     </>
