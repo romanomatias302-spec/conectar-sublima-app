@@ -18,6 +18,15 @@ function colorMarcaStyles(color) {
   }
 }
 
+function obtenerTextoMarca(pedido) {
+  return (
+    pedido?.produccionColorMarcaTexto ||
+    pedido?.produccionColorMarcaNombre ||
+    pedido?.produccionColorMarca ||
+    ""
+  );
+}
+
 function formatearTiempoEnEtapa(timestamp, ahoraTick) {
   if (!timestamp?.seconds) return "Sin tiempo";
 
@@ -61,6 +70,7 @@ export default function ProduccionCard({
   };
 
   const marcaStyle = colorMarcaStyles(pedido.produccionColorMarca);
+  const marcaTexto = obtenerTextoMarca(pedido);
 
   const tiempoEtapa = formatearTiempoEnEtapa(
     pedido.produccionActualizadoAt || pedido.ultimaAccionProduccionAt,
@@ -68,15 +78,20 @@ export default function ProduccionCard({
   );
 
   const ultimoUsuario = pedido.ultimaAccionProduccionPorNombre || "";
+  const usuarioAsignado =
+    pedido.produccionAsignadoNombre ||
+    pedido.produccionAsignadoEmail ||
+    "";
 
   const tieneDetalleManual =
-    marcaStyle ||
+    !!marcaStyle ||
+    !!usuarioAsignado ||
     (pedido.produccionMetros !== "" &&
       pedido.produccionMetros !== null &&
       pedido.produccionMetros !== undefined) ||
-    pedido.produccionNotaCorta ||
-    tiempoEtapa ||
-    ultimoUsuario;
+    !!pedido.produccionNotaCorta ||
+    !!tiempoEtapa ||
+    !!ultimoUsuario;
 
   return (
     <div
@@ -142,23 +157,27 @@ export default function ProduccionCard({
 
           {tieneDetalleManual && (
             <div className="produccion-card-side">
-              <div className="produccion-card-tiempo">
-                <span className="produccion-card-tiempo-icono">⏱</span>
-                <span>{tiempoEtapa}</span>
+              <div className="produccion-card-meta-top">
+                <div className="produccion-card-tiempo">
+                  <span className="produccion-card-tiempo-icono">⏱</span>
+                  <span>{tiempoEtapa}</span>
+                </div>
+
+                {marcaStyle && (
+                  <div
+                    className="produccion-card-marca"
+                    style={marcaStyle}
+                    title={marcaTexto}
+                  >
+                    {marcaTexto}
+                  </div>
+                )}
               </div>
 
-              {ultimoUsuario && (
-                <div className="produccion-card-usuario">
-                  {ultimoUsuario}
-                </div>
-              )}
-
-              {marcaStyle && (
-                <div
-                  className="produccion-card-marca"
-                  style={marcaStyle}
-                >
-                  {pedido.produccionColorMarca}
+              {usuarioAsignado && (
+                <div className="produccion-card-asignado" title={usuarioAsignado}>
+                  <span className="produccion-card-asignado-icono">👤</span>
+                  <span className="produccion-card-asignado-texto">{usuarioAsignado}</span>
                 </div>
               )}
 
@@ -171,8 +190,14 @@ export default function ProduccionCard({
               )}
 
               {pedido.produccionNotaCorta && (
-                <div className="produccion-card-nota">
+                <div className="produccion-card-nota" title={pedido.produccionNotaCorta}>
                   {pedido.produccionNotaCorta}
+                </div>
+              )}
+
+              {ultimoUsuario && (
+                <div className="produccion-card-usuario" title={ultimoUsuario}>
+                  Último mov.: {ultimoUsuario}
                 </div>
               )}
             </div>

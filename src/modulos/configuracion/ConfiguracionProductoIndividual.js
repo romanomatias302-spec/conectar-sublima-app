@@ -1,7 +1,8 @@
 // 🧩 ConfiguracionProductoIndividual.js
 import React, { useState, useEffect } from "react";
-import { db } from "../../firebase";
+import { db, storage } from "../../firebase";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { FaCog, FaArrowLeft } from "react-icons/fa";
 import "./ConfiguracionProductos.css";
 import ZonasConfigEditor from "./ZonasConfigEditor";
@@ -9,6 +10,8 @@ import TallesConfigEditor from "./TallesConfigEditor";
 import ColoresConfigEditor from "./ColoresConfigEditor";
 import AtributosExtraConfigEditor from "./AtributosExtraConfigEditor";
 import DetallesPorTalleConfigEditor from "./DetallesPorTalleConfigEditor";
+import DetallesCosturaConfigEditor from "./DetallesCosturaConfigEditor";
+
 
 
 
@@ -74,18 +77,27 @@ if (zonasVacias) {
           ];
         }
 
-        // ✅ Precarga de switches
-        if (!data.switches) {
-          data.switches = {
-            talles: true,
-            colores: true,
-            zonas: true,
-            imagenes: true,
-            atributosExtra: false,
-          };
-        }
+       
+        // ✅ Precarga / merge de switches
+        data.switches = {
+          talles: true,
+          colores: true,
+          zonas: true,
+          imagenes: true,
+          atributosExtra: false,
+          detallesCostura: false,
+          ...(data.switches || {}),
+        };
 
         if (!data.imagenes) data.imagenes = [];
+
+          // 🔹 Normalizar formato viejo → nuevo
+          data.imagenes = data.imagenes.map((img) => {
+            if (typeof img === "string") {
+              return { url: img, tipo: "link" };
+            }
+            return img;
+          });
         if (!data.detallesPorTalle) data.detallesPorTalle = [];
 
         // 🔹 NUEVO: definir orden_campos si no existe
@@ -95,17 +107,32 @@ if (zonasVacias) {
           "zonas",
           "talles",
           "detallesTalle",
+          "detallesCostura",
           "atributosExtra",
         ];
 
-        if (!data.orden_campos || data.orden_campos.length === 0) {
+        if (!data.detallesCostura) data.detallesCostura = [];
+
+        const ordenActual = Array.isArray(data.orden_campos) ? data.orden_campos : [];
+        const ordenCompleto = [
+          ...ordenActual,
+          ...ordenBase.filter((campo) => !ordenActual.includes(campo)),
+        ];
+
+        if (
+          !data.orden_campos ||
+          data.orden_campos.length === 0 ||
+          ordenCompleto.length !== ordenActual.length
+        ) {
           try {
-            await updateDoc(ref, { orden_campos: ordenBase });
-            console.log("✅ orden_campos inicial guardado:", ordenBase);
-            data.orden_campos = ordenBase;
+            await updateDoc(ref, { orden_campos: ordenCompleto });
+            console.log("✅ orden_campos actualizado:", ordenCompleto);
+            data.orden_campos = ordenCompleto;
           } catch (err) {
             console.error("Error guardando orden_campos:", err);
           }
+        } else {
+          data.orden_campos = ordenActual;
         }
 
         // 🔹 Seteamos el estado del producto
@@ -146,26 +173,11 @@ if (!producto) return <p>Cargando producto...</p>;
     setMostrarModal(true);
   };
 
-  // 🔹 Guardar imágenes
-  const guardarImagenes = async () => {
-    try {
-      await updateDoc(doc(db, "productosBase", productoId), { imagenes });
-      setProducto({ ...producto, imagenes });
-      setMostrarModal(false);
-    } catch (error) {
-      console.error("Error al guardar imágenes:", error);
-    }
-  };
+ 
 
-  // 🔹 Manejo de enlaces de imágenes
-  const handleAddImage = () => setImagenes([...imagenes, ""]);
-  const handleRemoveImage = (index) =>
-    setImagenes(imagenes.filter((_, i) => i !== index));
-  const handleChangeImage = (index, value) => {
-    const nuevas = [...imagenes];
-    nuevas[index] = value;
-    setImagenes(nuevas);
-  };
+
+
+
 
   // ===================================================
   //   🧠 RENDER
@@ -194,6 +206,7 @@ if (!producto) return <p>Cargando producto...</p>;
           colores: "Colores del producto",
           zonas: "Zonas de impresión",
           imagenes: "Imágenes / Enlaces",
+          detallesCostura: "Detalles de costura",
           atributosExtra: "Atributos adicionales",
         }).map(([key, label]) => (
           <div key={key} className="switch-fila">
@@ -231,6 +244,7 @@ if (!producto) return <p>Cargando producto...</p>;
 <ZonasConfigEditor
   zonasIniciales={producto.zonas}
   productoNombre={producto.nombre}
+  tipoAreaInicial={producto.tipoArea || ""}
   imagenReferenciaPersonalizadaInicial={producto.imagenReferenciaPersonalizada || ""}
   onGuardar={async ({ zonas, tipoArea, imagenReferenciaPersonalizada }) => {
     try {
@@ -303,61 +317,49 @@ if (!producto) return <p>Cargando producto...</p>;
                 }}
                 onCerrar={() => setMostrarModal(false)}
               />
-            ) : campoSeleccionado === "imagenes" ? (
+) : campoSeleccionado === "imagenes" ? (
   <>
-    <h2>Editar imágenes / enlaces</h2>
+    <h2>Imágenes del producto</h2>
     <p className="descripcion">
-      Agregá los campos de enlaces de tus imágenes o recursos (Drive, URL directa, etc.).  
-      Estas imágenes aparecerán en el formulario del pedido. Serian todas esas imagenes que tu cliente te envia y que estan relacionadas al producto.
+      Este switch habilita la carga de imágenes desde el formulario del producto dentro del pedido.
+      No se configuran imágenes acá.
     </p>
 
-    {imagenes.map((img, i) => (
-      <div key={i} className="imagen-item">
-        <input
-          type="text"
-          value={img}
-          placeholder="https://..."
-          onChange={(e) => handleChangeImage(i, e.target.value)}
-        />
-        <button
-          className="btn-mini-eliminar"
-          onClick={() => handleRemoveImage(i)}
-        >
-          ✕
-        </button>
-      </div>
-    ))}
+    <div className="preview-box">
+      <h4>Cómo funciona</h4>
+      <p className="texto-secundario" style={{ marginBottom: "10px" }}>
+        Cuando este campo esté habilitado, al cargar o editar un producto dentro del pedido
+        se mostrará la sección para adjuntar imágenes.
+      </p>
 
-    <button className="btn-mini-agregar" onClick={handleAddImage}>
-      + Agregar imagen
-    </button>
+      <p className="texto-secundario" style={{ marginBottom: 0 }}>
+        Más adelante se puede usar esta misma base para diferenciar:
+        versión estándar = enlaces manuales / versión premium = subida real a Storage.
+      </p>
+    </div>
 
-    {/* 💾 Acciones */}
     <div className="form-actions">
       <button className="cancelar" onClick={() => setMostrarModal(false)}>
         Cerrar
       </button>
-      <button className="btn-guardar" onClick={guardarImagenes}>
-        Guardar
-      </button>
-    </div>
-
-    {/* 👁️ Vista previa */}
-    <div className="preview-box">
-      <h4>Vista previa (como se verá en el formulario)</h4>
-      <div className="preview-imagenes">
-        {imagenes.length === 0 ? (
-          <p className="texto-secundario">No hay imágenes cargadas.</p>
-        ) : (
-          imagenes.map((img, i) => (
-            <div key={i} className="preview-imagen-item">
-              <img src={img} alt={`imagen-${i}`} className="preview-img" />
-            </div>
-          ))
-        )}
-      </div>
     </div>
   </>
+
+  ) : campoSeleccionado === "detallesCostura" ? (
+  <DetallesCosturaConfigEditor
+    detallesIniciales={producto.detallesCostura || []}
+    onGuardar={async (nuevosDetalles) => {
+      try {
+        await updateDoc(doc(db, "productosBase", productoId), {
+          detallesCostura: nuevosDetalles,
+        });
+        setProducto({ ...producto, detallesCostura: nuevosDetalles });
+      } catch (error) {
+        console.error("Error al guardar detalles de costura:", error);
+      }
+    }}
+    onCerrar={() => setMostrarModal(false)}
+  />
 
    ): campoSeleccionado === "atributosExtra" ? (
   <AtributosExtraConfigEditor

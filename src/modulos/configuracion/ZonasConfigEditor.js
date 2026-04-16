@@ -5,8 +5,9 @@ import "./ConfiguracionProductos.css";
 
 
 export default function ZonasConfigEditor({
-  zonasIniciales = null, // ahora puede ser array u objeto
+  zonasIniciales = null,
   productoNombre = "",
+  tipoAreaInicial = "",
   imagenReferenciaPersonalizadaInicial = "",
   onGuardar,
   onCerrar,
@@ -43,57 +44,72 @@ const [errorImagen, setErrorImagen] = useState("");
     return "multiple";
   };
 
+    const getZonasDefaultPorTipo = (tipo, nombre = "") => {
+    const nombreLower = (nombre || "").toLowerCase();
+
+    if (tipo === "multiple") {
+      return [
+        { grupo: "Frente", subzonas: ["F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8"] },
+        { grupo: "Espalda", subzonas: ["E1", "E2", "E3", "E4"] },
+        { grupo: "Mangas", subzonas: ["M1", "M2"] },
+      ];
+    }
+
+    if (tipo === "unica") {
+      return [{ grupo: "General", subzonas: ["Zona única de impresión"] }];
+    }
+
+    if (tipo === "personalizada") {
+      return [];
+    }
+
+    if (nombreLower.includes("remera") || nombreLower.includes("camiseta")) {
+      return [
+        { grupo: "Frente", subzonas: ["F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8"] },
+        { grupo: "Espalda", subzonas: ["E1", "E2", "E3", "E4"] },
+        { grupo: "Mangas", subzonas: ["M1", "M2"] },
+      ];
+    }
+
+    if (nombreLower.includes("taza") || nombreLower.includes("gorra")) {
+      return [{ grupo: "General", subzonas: ["Zona única de impresión"] }];
+    }
+
+    return [];
+  };
+
   // 🟢 Inicialización inmediata (acepta zonasIniciales objeto o array)
-  useEffect(() => {
+    useEffect(() => {
       setImagenReferenciaPersonalizada(imagenReferenciaPersonalizadaInicial || "");
-    // 1) Si zonasIniciales viene como OBJETO {Frente:[...]}
-      
-    if (zonasIniciales && !Array.isArray(zonasIniciales) && typeof zonasIniciales === "object") {
-      const arr = objectToArray(zonasIniciales);
-      setZonas(arr);
-      setTipoArea(detectarTipoArea(arr));
-      return;
-    }
 
-    // 2) Si zonasIniciales viene como ARRAY [{grupo, subzonas}]
-    if (Array.isArray(zonasIniciales) && zonasIniciales.length > 0) {
-      setZonas(zonasIniciales);
-      setTipoArea(detectarTipoArea(zonasIniciales));
-      return;
-    }
+      let arr = [];
 
-    // 3) Si no hay zonas cargadas: precarga por nombre
-    const nombre = (productoNombre || "").toLowerCase();
-    if (nombre.includes("remera") || nombre.includes("camiseta")) {
-      setTipoArea("multiple");
-      setZonas([
-        { grupo: "Frente", subzonas: ["F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8"] },
-        { grupo: "Espalda", subzonas: ["E1", "E2", "E3", "E4"] },
-        { grupo: "Mangas", subzonas: ["M1", "M2"] },
-      ]);
-    } else if (nombre.includes("taza") || nombre.includes("gorra")) {
-      setTipoArea("unica");
-      setZonas([{ grupo: "General", subzonas: ["Zona única de impresión"] }]);
-    } else {
-      setTipoArea("personalizada");
-      setZonas([]);
-    }
-  }, [zonasIniciales, productoNombre, imagenReferenciaPersonalizadaInicial]);
+      if (zonasIniciales && !Array.isArray(zonasIniciales) && typeof zonasIniciales === "object") {
+        arr = objectToArray(zonasIniciales);
+      } else if (Array.isArray(zonasIniciales) && zonasIniciales.length > 0) {
+        arr = zonasIniciales;
+      }
 
-  // 🟢 Cambiar tipo de área → recarga zonas por defecto
-  useEffect(() => {
-    if (tipoArea === "multiple") {
-      setZonas([
-        { grupo: "Frente", subzonas: ["F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8"] },
-        { grupo: "Espalda", subzonas: ["E1", "E2", "E3", "E4"] },
-        { grupo: "Mangas", subzonas: ["M1", "M2"] },
-      ]);
-    } else if (tipoArea === "unica") {
-      setZonas([{ grupo: "General", subzonas: ["Zona única de impresión"] }]);
-    } else if (tipoArea === "personalizada") {
-      setZonas([]);
-    }
-  }, [tipoArea]);
+      const tipoFinal =
+        tipoAreaInicial ||
+        (arr.length > 0 ? detectarTipoArea(arr) : "") ||
+        "personalizada";
+
+      setTipoArea(tipoFinal);
+
+      if (arr.length > 0) {
+        setZonas(arr);
+      } else {
+        setZonas(getZonasDefaultPorTipo(tipoFinal, productoNombre));
+      }
+    }, [
+      zonasIniciales,
+      productoNombre,
+      tipoAreaInicial,
+      imagenReferenciaPersonalizadaInicial,
+    ]);
+
+
 
   // ➕ Agregar zona (solo personalizada)
   const agregarZona = () => {
@@ -207,6 +223,17 @@ const guardarCambios = () => {
   onCerrar();
 };
 
+  const handleTipoAreaChange = (nuevoTipo) => {
+    if (nuevoTipo === tipoArea) return;
+
+    setTipoArea(nuevoTipo);
+    setZonas(getZonasDefaultPorTipo(nuevoTipo, productoNombre));
+
+    if (nuevoTipo !== "personalizada") {
+      setImagenReferenciaPersonalizada("");
+    }
+  };
+
 
   return (
     <div className="zonas-editor">
@@ -218,7 +245,7 @@ const guardarCambios = () => {
 
       <div className="tipo-area">
         <label><strong>Tipo de área de impresión:</strong></label>
-        <select value={tipoArea} onChange={(e) => setTipoArea(e.target.value)}>
+        <select value={tipoArea} onChange={(e) => handleTipoAreaChange(e.target.value)}>
           <option value="multiple">Múltiples áreas (recomendado para remeras)</option>
           <option value="unica">Área única (recomendado para tazas o gorras)</option>
           <option value="personalizada">Personalizada (crear manualmente)</option>

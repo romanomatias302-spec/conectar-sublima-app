@@ -346,3 +346,23 @@ export async function actualizarDetalleManualProduccion({
     updatedAt: serverTimestamp(),
   });
 }
+
+export async function asignarUsuarioProduccion({
+  pedidoId,
+  usuarioAsignado,
+  usuarioActor,
+}) {
+  if (!pedidoId) return;
+
+  const ref = doc(db, PEDIDOS_COLLECTION, pedidoId);
+
+  await updateDoc(ref, {
+    produccionAsignadoUid: usuarioAsignado?.uid || "",
+    produccionAsignadoNombre: usuarioAsignado?.nombre || "",
+    produccionAsignadoEmail: usuarioAsignado?.email || "",
+    produccionAsignadoAt: serverTimestamp(),
+    produccionAsignadoPorUid: usuarioActor?.uid || "",
+    produccionAsignadoPorNombre: usuarioActor?.nombre || "",
+    updatedAt: serverTimestamp(),
+  });
+}

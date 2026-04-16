@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { collection, getDocs, query, where } from "firebase/firestore";
+import { db } from "../../firebase";
 import {
   asegurarColumnasBaseProduccion,
   crearColumnaIntermediaProduccion,
@@ -14,6 +16,7 @@ import {
   moverPedidosDeColumnaEliminadaAAnterior,
   recalcularPedidosPorCambioDeColumnas,
   actualizarDetalleManualProduccion,
+  asignarUsuarioProduccion,
 } from "../../firebase/produccionPedidos";
 import { agruparPedidosPorColumna } from "./produccionUtils";
 import ProduccionBoard from "./ProduccionBoard";
@@ -78,6 +81,10 @@ export default function ProduccionPage({ perfil, onVerPedido = () => {} }) {
  const [colorManual, setColorManual] = useState("");
  const [guardandoDetalleManual, setGuardandoDetalleManual] = useState(false);
  const [ahoraTick, setAhoraTick] = useState(Date.now());
+
+ const [usuariosProduccion, setUsuariosProduccion] = useState([]);
+ const [usuarioAsignadoUid, setUsuarioAsignadoUid] = useState("");
+ const [guardandoAsignacion, setGuardandoAsignacion] = useState(false);
 
    const PERMISOS_DEFAULT_USUARIO = {
     inicio: { ver: true },
@@ -164,6 +171,51 @@ export default function ProduccionPage({ perfil, onVerPedido = () => {} }) {
         if (unsubscribeFinalizados) unsubscribeFinalizados();
     };
     }, [perfil?.clienteId]);
+
+    useEffect(() => {
+  let cancelado = false;
+
+  async function cargarUsuariosProduccion() {
+    try {
+      if (!perfil?.clienteId) return;
+
+      const q = query(
+        collection(db, "usuarios"),
+        where("clienteId", "==", perfil.clienteId)
+      );
+
+      const snapshot = await getDocs(q);
+
+      const lista = snapshot.docs
+        .map((d) => ({
+          uid: d.id,
+          ...d.data(),
+        }))
+        .filter((u) => {
+          if (!u?.activo) return false;
+          if (u?.rol === "admin" || u?.rol === "superadmin") return true;
+          return u?.permisos?.produccion?.ver === true;
+        })
+        .sort((a, b) =>
+          String(a?.nombre || a?.email || "").localeCompare(
+            String(b?.nombre || b?.email || "")
+          )
+        );
+
+      if (!cancelado) {
+        setUsuariosProduccion(lista);
+      }
+    } catch (error) {
+      console.error("Error cargando usuarios de producción:", error);
+    }
+  }
+
+  cargarUsuariosProduccion();
+
+  return () => {
+    cancelado = true;
+  };
+}, [perfil?.clienteId]);
 
     useEffect(() => {
         if (!perfil) return;
@@ -474,6 +526,7 @@ function toggleColumnaContraida(columnaId) {
         : String(pedido.produccionMetros)
     );
     setColorManual(pedido?.produccionColorMarca || "");
+    setUsuarioAsignadoUid(pedido?.produccionAsignadoUid || "");
   }
 
 function cerrarDetalleManual() {
@@ -481,6 +534,7 @@ function cerrarDetalleManual() {
   setNotaManual("");
   setMetrosManual("");
   setColorManual("");
+  setUsuarioAsignadoUid("");
 }
 
 async function guardarDetalleManual() {
@@ -502,6 +556,42 @@ async function guardarDetalleManual() {
     console.error("Error guardando detalle manual de producción:", error);
   } finally {
     setGuardandoDetalleManual(false);
+  }
+}
+
+async function guardarAsignacionProduccion() {
+  try {
+    if (perfil?.rol !== "admin" && perfil?.rol !== "superadmin") return;
+    if (!pedidoEditandoDetalle?.firebaseId) return;
+
+    const usuarioSeleccionado =
+      usuariosProduccion.find((u) => u.uid === usuarioAsignadoUid) || null;
+
+    setGuardandoAsignacion(true);
+
+    await asignarUsuarioProduccion({
+      pedidoId: pedidoEditandoDetalle.firebaseId,
+      usuarioAsignado: usuarioSeleccionado,
+      usuarioActor: {
+        uid: perfil?.uid || perfil?.firebaseUid || null,
+        nombre: perfil?.nombre || perfil?.email || "Usuario",
+      },
+    });
+
+    setPedidoEditandoDetalle((prev) =>
+      prev
+        ? {
+            ...prev,
+            produccionAsignadoUid: usuarioSeleccionado?.uid || "",
+            produccionAsignadoNombre: usuarioSeleccionado?.nombre || "",
+            produccionAsignadoEmail: usuarioSeleccionado?.email || "",
+          }
+        : prev
+    );
+  } catch (error) {
+    console.error("Error asignando usuario en producción:", error);
+  } finally {
+    setGuardandoAsignacion(false);
   }
 }
 
@@ -637,6 +727,34 @@ async function guardarDetalleManual() {
         placeholder="Ej: Mandar hoy / Esperar 200 mts"
       />
 
+            {(perfil?.rol === "admin" || perfil?.rol === "superadmin") && (
+        <>
+          <label>Asignado a</label>
+          <div className="produccion-asignacion-box">
+            <select
+              value={usuarioAsignadoUid}
+              onChange={(e) => setUsuarioAsignadoUid(e.target.value)}
+              className="produccion-modal-input"
+            >
+              <option value="">Sin asignar</option>
+              {usuariosProduccion.map((usuario) => (
+                <option key={usuario.uid} value={usuario.uid}>
+                  {usuario.nombre || usuario.email || usuario.uid}
+                </option>
+              ))}
+            </select>
+
+            <button
+              type="button"
+              className="btn-produccion-secundario"
+              onClick={guardarAsignacionProduccion}
+              disabled={guardandoAsignacion}
+            >
+              {guardandoAsignacion ? "Asignando..." : "Asignar"}
+            </button>
+          </div>
+        </>
+      )}
       <label>Marca de color</label>
       <div className="produccion-colores-box">
         {["", "amarillo", "verde", "azul", "rojo", "violeta"].map((color) => (

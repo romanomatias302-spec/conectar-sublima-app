@@ -9,7 +9,8 @@ import {
   query,
   where,
 } from "firebase/firestore";
-import { db } from "../../firebase";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { db, storage } from "../../firebase";
 import "./ProductoFormModal.css";
 import { puedeHacer } from "../../utils/permisos";
 
@@ -21,18 +22,19 @@ export default function ProductoFormModal({
   perfil,
   soloVer,
 }) {
-  const [formData, setFormData] = useState({
-    producto: "",
-    productoNombre: "",
-    color: "",
-    detalle: "",
-    cantidad: 1,
-    zonas: {},
-    talles: {},
-    detallePorTalle: {},
-    atributosExtra: {},
-    imagenes: [""],
-  });
+const [formData, setFormData] = useState({
+  producto: "",
+  productoNombre: "",
+  color: "",
+  detalle: "",
+  cantidad: 1,
+  zonas: {},
+  talles: {},
+  detallePorTalle: {},
+  atributosExtra: {},
+  detallesCostura: {},
+  imagenes: [{ url: "", tipo: "link", portada: false }],
+});
 
   const [productosDisponibles, setProductosDisponibles] = useState([]);
   const [loadingProductos, setLoadingProductos] = useState(true);
@@ -55,13 +57,20 @@ export default function ProductoFormModal({
 
   const [atributosExtraConfig, setAtributosExtraConfig] = useState([]);
 
+  const [detallesCosturaConfig, setDetallesCosturaConfig] = useState([]);
+
   // ✅ NUEVO: tipo de área para mostrar referencia (multiple | unica | personalizada)
   const [tipoArea, setTipoArea] = useState("");
-  const [modoEdicionLocal, setModoEdicionLocal] = useState(!soloVer);
 
+  const [imagenReferenciaPersonalizada, setImagenReferenciaPersonalizada] = useState("");
+
+  const [modoEdicionLocal, setModoEdicionLocal] = useState(!soloVer);
+  const [mostrarReferenciaZonas, setMostrarReferenciaZonas] = useState(false);
 
 
   const puedeEditarPedidos = puedeHacer(perfil, "pedidos", "editar");
+  const habilitarUploadImagenes = true; // después esto puede venir del plan
+
 
 const modoVistaEstatica = !!productoEditando && soloVer && !modoEdicionLocal;
 const modoSoloLecturaReal = !modoEdicionLocal && soloVer;
@@ -182,7 +191,27 @@ const modoSoloLecturaReal = !modoEdicionLocal && soloVer;
         talles: productoEditando.talles || {},
         detallePorTalle: productoEditando.detallePorTalle || {},
         atributosExtra: productoEditando.atributosExtra || {},
-        imagenes: productoEditando.imagenes || [""],
+        detallesCostura: productoEditando.detallesCostura || {},
+        imagenes:
+          (productoEditando.imagenes || []).map((img) => {
+            if (typeof img === "string") {
+              return { url: img, tipo: "link", portada: false };
+            }
+            return {
+              ...img,
+              portada: img?.tipo === "storage" ? !!img?.portada : false,
+            };
+          }).length > 0
+            ? (productoEditando.imagenes || []).map((img) => {
+                if (typeof img === "string") {
+                  return { url: img, tipo: "link", portada: false };
+                }
+                return {
+                  ...img,
+                  portada: img?.tipo === "storage" ? !!img?.portada : false,
+                };
+              })
+            : [{ url: "", tipo: "link", portada: false }],
       });
     }
 
@@ -216,6 +245,8 @@ const modoSoloLecturaReal = !modoEdicionLocal && soloVer;
         setTallesConfig(data.talles ?? null);
         setAtributosExtraConfig(Array.isArray(data.atributosExtra) ? data.atributosExtra : []);
 
+        setDetallesCosturaConfig(Array.isArray(data.detallesCostura) ? data.detallesCostura : []);
+
         // ✅ colores
         setColoresDisponibles(Array.isArray(data.colores) ? data.colores : []);
 
@@ -231,6 +262,8 @@ const modoSoloLecturaReal = !modoEdicionLocal && soloVer;
             : "";
 
         setTipoArea(tipoNormalizado);
+
+        setImagenReferenciaPersonalizada(data.imagenReferenciaPersonalizada || "");
 
         // ✅ productoNombre
         setFormData((prev) => ({
@@ -265,9 +298,23 @@ const modoSoloLecturaReal = !modoEdicionLocal && soloVer;
             atributosExtra: mergeKeepExisting(atributosKeys, prev.atributosExtra, ""),
           }));
         }
+
+        if (Array.isArray(data.detallesCostura)) {
+          const costuraKeys = data.detallesCostura
+            .map((a) => a?.nombre)
+            .filter(Boolean);
+
+          setFormData((prev) => ({
+            ...prev,
+            detallesCostura: mergeKeepExisting(costuraKeys, prev.detallesCostura, ""),
+          }));
+        }
+
       } catch (err) {
         console.error("Error al cargar configuración del producto:", err);
       }
+
+  
 
 
     };
@@ -297,20 +344,22 @@ const modoSoloLecturaReal = !modoEdicionLocal && soloVer;
       setError("");
       const nombre = getProductoNombreById(value);
 
-      setFormData((prev) => ({
-        ...prev,
-        producto: value,
-        productoNombre: nombre || prev.productoNombre || "",
-        color: "",
-        zonas: {},
-        talles: {},
-        detallePorTalle: {},
-        atributosExtra: {},
-        imagenes: [""],
-      }));
+    setFormData((prev) => ({
+      ...prev,
+      producto: value,
+      productoNombre: nombre || prev.productoNombre || "",
+      color: "",
+      zonas: {},
+      talles: {},
+      detallePorTalle: {},
+      atributosExtra: {},
+      detallesCostura: {},
+      imagenes: [{ url: "", tipo: "link", portada: false }],
+    }));
 
       // importante: reseteamos referencia hasta cargar el doc nuevo
       setTipoArea("");
+      setImagenReferenciaPersonalizada("");
       return;
     }
 
@@ -345,23 +394,146 @@ const modoSoloLecturaReal = !modoEdicionLocal && soloVer;
     }));
   };
 
-  const handleImagenChange = (index, value) => {
-    const nuevas = [...(formData.imagenes || [""])];
-    nuevas[index] = value;
-    setFormData((prev) => ({ ...prev, imagenes: nuevas }));
+  const handleDetalleCosturaChange = (nombre, value) => {
+  setFormData((prev) => ({
+    ...prev,
+    detallesCostura: {
+      ...prev.detallesCostura,
+      [nombre]: value,
+    },
+  }));
+};
+
+const subirImagenProducto = async (file) => {
+  try {
+    if (!file) return;
+
+    const path = `pedidos/${pedidoId}/productos/${Date.now()}_${file.name}`;
+    const storageRef = ref(storage, path);
+
+    await uploadBytes(storageRef, file);
+    const url = await getDownloadURL(storageRef);
+
+    setFormData((prev) => {
+      const imagenesPrevias = (prev.imagenes || []).filter((img) => {
+        if (typeof img === "string") return String(img).trim() !== "";
+        return String(img?.url || "").trim() !== "";
+      });
+
+      const yaHayPortadaStorage = imagenesPrevias.some((img) => {
+        if (typeof img === "string") return false;
+        return img?.tipo === "storage" && img?.portada === true;
+      });
+
+      return {
+        ...prev,
+        imagenes: [
+          ...imagenesPrevias,
+          {
+            url,
+            tipo: "storage",
+            nombre: file.name,
+            portada: !yaHayPortadaStorage,
+          },
+        ],
+      };
+    });
+  } catch (error) {
+    console.error("Error subiendo imagen del producto:", error);
+    setError("No se pudo subir la imagen.");
+  }
+};
+
+const handleImagenChange = (index, value) => {
+  const nuevas = [...(formData.imagenes || [{ url: "", tipo: "link", portada: false }])];
+  nuevas[index] = {
+    ...nuevas[index],
+    url: value,
+    tipo: "link",
+    portada: nuevas[index]?.portada || false,
   };
 
-  const agregarCampoImagen = () => {
-    const nuevas = [...(formData.imagenes || [""])];
-    if (nuevas.length < 10) nuevas.push("");
-    setFormData((prev) => ({ ...prev, imagenes: nuevas }));
-  };
+  setFormData((prev) => ({ ...prev, imagenes: nuevas }));
+};
 
-  const eliminarCampoImagen = (index) => {
-    const nuevas = [...(formData.imagenes || [])];
-    nuevas.splice(index, 1);
-    setFormData((prev) => ({ ...prev, imagenes: nuevas.length ? nuevas : [""] }));
-  };
+const agregarCampoImagen = () => {
+  const nuevas = [...(formData.imagenes || [{ url: "", tipo: "link", portada: false }])];
+  if (nuevas.length < 10) nuevas.push({ url: "", tipo: "link", portada: false });
+  setFormData((prev) => ({ ...prev, imagenes: nuevas }));
+};
+
+const eliminarCampoImagen = (index) => {
+  const nuevas = [...(formData.imagenes || [])];
+  nuevas.splice(index, 1);
+
+  const nuevasConContenido = nuevas.filter((img) => {
+    if (typeof img === "string") return String(img).trim() !== "";
+    return String(img?.url || "").trim() !== "";
+  });
+
+  const hayPortadaStorage = nuevasConContenido.some((img) => {
+    if (typeof img === "string") return false;
+    return img?.tipo === "storage" && img?.portada === true;
+  });
+
+  let primeraStorageAsignada = false;
+
+  const normalizadas = nuevasConContenido.map((img) => {
+    const normalizada =
+      typeof img === "string" ? { url: img, tipo: "link", portada: false } : img;
+
+    if (normalizada.tipo !== "storage") {
+      return {
+        ...normalizada,
+        portada: false,
+      };
+    }
+
+    if (hayPortadaStorage) {
+      return {
+        ...normalizada,
+        portada: !!normalizada.portada,
+      };
+    }
+
+    if (!primeraStorageAsignada) {
+      primeraStorageAsignada = true;
+      return {
+        ...normalizada,
+        portada: true,
+      };
+    }
+
+    return {
+      ...normalizada,
+      portada: false,
+    };
+  });
+
+  setFormData((prev) => ({
+    ...prev,
+    imagenes: normalizadas.length
+      ? normalizadas
+      : [{ url: "", tipo: "link", portada: false }],
+  }));
+};
+
+const marcarImagenComoPortada = (index) => {
+  const nuevas = (formData.imagenes || []).map((img, i) => {
+    const normalizada =
+      typeof img === "string" ? { url: img, tipo: "link", portada: false } : img;
+
+    return {
+      ...normalizada,
+      portada: normalizada.tipo === "storage" ? i === index : false,
+    };
+  });
+
+  setFormData((prev) => ({
+    ...prev,
+    imagenes: nuevas,
+  }));
+};
 
   // =========================
   // 🔹 Guardar
@@ -462,25 +634,44 @@ const modoSoloLecturaReal = !modoEdicionLocal && soloVer;
       );
     }
 
-    if (tipoArea === "personalizada") {
-      return (
-        <div className="pfm-ref-card">
-          <div className="pfm-ref-title">Referencia personalizada</div>
+if (tipoArea === "personalizada") {
+  return (
+    <div className="pfm-ref-card">
+      <div className="pfm-ref-title">Referencia personalizada</div>
+
+      {imagenReferenciaPersonalizada ? (
+        <>
+          <img
+            src={imagenReferenciaPersonalizada}
+            alt="Referencia personalizada"
+            className="pfm-ref-img"
+          />
           <div className="pfm-ref-sub">
-            Las zonas son personalizadas para este producto.
+            Guía visual personalizada para este producto.
           </div>
+        </>
+      ) : (
+        <div className="pfm-ref-sub">
+          Las zonas son personalizadas para este producto.
         </div>
-      );
-    }
+      )}
+    </div>
+  );
+}
 
     return null;
   };
 
   
 
-  const imagenesConContenido = (formData.imagenes || []).filter(
-    (img) => String(img || "").trim() !== ""
-  );
+const imagenesConContenido = (formData.imagenes || []).filter((img) => {
+  if (typeof img === "string") return String(img).trim() !== "";
+  return String(img?.url || "").trim() !== "";
+});
+
+const imagenPortada = imagenesConContenido.find((img) =>
+  typeof img === "string" ? false : img?.tipo === "storage" && img?.portada === true
+);
 
   const tallesUsados = Object.entries(formData.talles || {}).filter(([talle, cantidad]) => {
     const qty = Number(cantidad) || 0;
@@ -553,6 +744,10 @@ const modoSoloLecturaReal = !modoEdicionLocal && soloVer;
   const atributosUsados = Object.entries(formData.atributosExtra || {}).filter(([k, valor]) => {
     return String(valor || "").trim() !== "";
   });
+
+  const detallesCosturaUsados = Object.entries(formData.detallesCostura || {}).filter(
+  ([k, valor]) => String(valor || "").trim() !== ""
+);
 
     const renderCampoEstatico = (campo) => {
     switch (campo) {
@@ -648,30 +843,61 @@ const modoSoloLecturaReal = !modoEdicionLocal && soloVer;
           </div>
         ) : null;
 
+      case "detallesCostura":
+        return detallesCosturaUsados.length > 0 ? (
+          <div className="pfm-static-card" key="detallesCostura">
+            <div className="pfm-static-card-title">Detalles de costura</div>
+
+            <div className="pfm-static-table">
+              {detallesCosturaUsados.map(([nombre, valor]) => (
+                <div key={nombre} className="pfm-static-table-row">
+                  <div className="pfm-static-table-key">{nombre}</div>
+                  <div className="pfm-static-table-value">{valor}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null;
+
       case "imagenes":
         return imagenesConContenido.length > 0 ? (
           <div className="pfm-static-card" key="imagenes">
-            <div className="pfm-static-card-title">Imágenes / enlaces</div>
+            <div className="pfm-static-card-title">Imágenes</div>
 
-            <div className="pfm-static-links-grid">
-              {imagenesConContenido.map((img, index) => (
-                <a
-                  key={`${img}-${index}`}
-                  href={img}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="pfm-static-link-card"
-                >
-                  <div className="pfm-static-link-icon-wrap">
-                    <span className="pfm-static-link-icon">🔗</span>
-                  </div>
+            <div className="pfm-static-imagenes-grid">
+              {imagenesConContenido.map((img, index) => {
+                const normalizada =
+                  typeof img === "string"
+                    ? { url: img, tipo: "link", portada: false }
+                    : img;
 
-                  <div className="pfm-static-link-body">
-                    <div className="pfm-static-link-title">Enlace {index + 1}</div>
-                    <div className="pfm-static-link-url">{img}</div>
+                const url = normalizada?.url || "";
+                const portada = !!normalizada?.portada;
+                const tipo = normalizada?.tipo || "link";
+
+                return (
+                  <div
+                    key={`${url}-${index}`}
+                    className={`pfm-static-imagen-card ${portada ? "is-portada" : ""}`}
+                  >
+                    <img
+                      src={url}
+                      alt={`imagen-${index}`}
+                      className="pfm-static-imagen-preview"
+                    />
+
+                    <div className="pfm-static-imagen-meta">
+                      {portada ? (
+                        <span className="pfm-static-imagen-badge">Portada</span>
+                      ) : tipo === "storage" ? (
+                        <span className="pfm-static-imagen-badge soft">Imagen</span>
+                      ) : (
+                        <span className="pfm-static-imagen-badge soft">Link</span>
+                      )}
+                    </div>
                   </div>
-                </a>
-              ))}
+                );
+              })}
             </div>
           </div>
         ) : null;
@@ -800,10 +1026,48 @@ const countZonas = (z) => {
       case "zonas": {
         const zonas = resolveZonasToRender();
         return (
-          <div className="pfm-field">
-            <div className="pfm-label">Zonas de impresión</div>
+          <div
+            className="pfm-field pfm-field-zonas"
+            onMouseEnter={() => setMostrarReferenciaZonas(true)}
+            onMouseLeave={() => setMostrarReferenciaZonas(false)}
+          >
+            <div className="pfm-label-row">
+              <div className="pfm-label">Zonas de impresión</div>
 
-            <div className="pfm-zonas">
+              <div
+                className="pfm-zonas-ref-trigger"
+                onMouseEnter={() => setMostrarReferenciaZonas(true)}
+                onMouseLeave={() => setMostrarReferenciaZonas(false)}
+              >
+                <div className="pfm-zonas-ref-trigger-box">
+                  <span className="pfm-zonas-ref-trigger-text">Ver</span>
+
+                  {tipoArea === "multiple" ? (
+                    <img
+                      src="/imagenes/remera_vectorial.png"
+                      alt="Referencia"
+                      className="pfm-zonas-ref-trigger-thumb"
+                    />
+                  ) : imagenReferenciaPersonalizada ? (
+                    <img
+                      src={imagenReferenciaPersonalizada}
+                      alt="Referencia"
+                      className="pfm-zonas-ref-trigger-thumb"
+                    />
+                  ) : (
+                    <div className="pfm-zonas-ref-trigger-thumb pfm-zonas-ref-trigger-thumb-empty">
+                      Ref
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div
+              className="pfm-zonas pfm-zonas-with-ref"
+              onMouseEnter={() => setMostrarReferenciaZonas(true)}
+              onMouseLeave={() => setMostrarReferenciaZonas(false)}
+            >
               {Object.entries(zonas).map(([titulo, items]) => (
                 <div key={titulo} className="pfm-zona-card">
                   <div className="pfm-zona-title">{titulo}</div>
@@ -894,6 +1158,34 @@ const countZonas = (z) => {
           </div>
         );
 
+      case "detallesCostura":
+        return (
+          <div className="pfm-field">
+            <div className="pfm-label">Detalles de costura</div>
+
+            <div className="pfm-costura-grid">
+              {(detallesCosturaConfig || []).map((attr, i) => {
+                const nombreAttr = attr?.nombre || `Campo ${i + 1}`;
+
+                return (
+                  <div key={`${nombreAttr}-${i}`} className="pfm-costura-item">
+                    <div className="pfm-costura-name">{nombreAttr}</div>
+                    <input
+                      className="pfm-control"
+                      type="text"
+                      placeholder={`Ingresar ${nombreAttr.toLowerCase()}...`}
+                      value={formData.detallesCostura?.[nombreAttr] || ""}
+                      onChange={(e) =>
+                        handleDetalleCosturaChange(nombreAttr, e.target.value)
+                      }
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+
       case "imagenes":
         return (
           <div className="pfm-field">
@@ -906,7 +1198,7 @@ const countZonas = (z) => {
                     className="pfm-control"
                     type="text"
                     placeholder="https://drive.google.com/..."
-                    value={img}
+                    value={typeof img === "string" ? img : img?.url || ""}
                     onChange={(e) => handleImagenChange(index, e.target.value)}
                   />
                   <button
@@ -1007,27 +1299,23 @@ const countZonas = (z) => {
 
                 {/* Links */}
                 <div className="pfm-field">
-                  <div className="pfm-label">Imágenes / Enlaces</div>
-                  <div className="pfm-links">
-                    {(formData.imagenes || []).map((img, index) => (
-                      <div key={index} className="pfm-link-row">
+                  <div className="pfm-label">Imágenes</div>
+
+                  <div className="pfm-imagenes-toolbar">
+                    {habilitarUploadImagenes && (
+                      <label className="pfm-link-add" style={{ display: "inline-block", cursor: "pointer" }}>
+                        + Subir imagen
                         <input
-                          className="pfm-control"
-                          type="text"
-                          placeholder="https://drive.google.com/..."
-                          value={img}
-                          onChange={(e) => handleImagenChange(index, e.target.value)}
+                          type="file"
+                          accept="image/*"
+                          style={{ display: "none" }}
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) subirImagenProducto(file);
+                          }}
                         />
-                        <button
-                          type="button"
-                          className="pfm-link-remove"
-                          onClick={() => eliminarCampoImagen(index)}
-                          title="Eliminar"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    ))}
+                      </label>
+                    )}
 
                     {(formData.imagenes || []).length < 10 && (
                       <button
@@ -1035,27 +1323,106 @@ const countZonas = (z) => {
                         className="pfm-link-add"
                         onClick={agregarCampoImagen}
                       >
-                        + Agregar enlace
+                        + Agregar enlace manual
                       </button>
                     )}
                   </div>
+
+                  {imagenesConContenido.length > 0 ? (
+                    <div className="pfm-imagenes-grid">
+                      {(formData.imagenes || []).map((img, index) => {
+                        const normalizada =
+                          typeof img === "string"
+                            ? { url: img, tipo: "link", portada: false }
+                            : img;
+
+                        const url = normalizada?.url || "";
+                        const tipo = normalizada?.tipo || "link";
+                        const portada = !!normalizada?.portada;
+                        const tieneContenido = String(url).trim() !== "";
+
+                        return (
+                          <div key={index} className={`pfm-imagen-card ${portada ? "is-portada" : ""}`}>
+                            <button
+                              type="button"
+                              className="pfm-imagen-delete"
+                              onClick={() => eliminarCampoImagen(index)}
+                              title="Eliminar imagen"
+                            >
+                              ✕
+                            </button>
+
+                            <div className="pfm-imagen-preview-wrap">
+                              {tieneContenido ? (
+                                <img
+                                  src={url}
+                                  alt={`imagen-${index}`}
+                                  className="pfm-imagen-preview"
+                                />
+                              ) : (
+                                <div className="pfm-imagen-empty">Sin imagen</div>
+                              )}
+                            </div>
+
+                            <div className="pfm-imagen-footer">
+                              {tipo === "storage" ? (
+                                <button
+                                  type="button"
+                                  className={`pfm-portada-btn ${portada ? "is-active" : ""}`}
+                                  onClick={() => marcarImagenComoPortada(index)}
+                                  title="Usar como portada"
+                                >
+                                  {portada ? "Portada" : "Elegir portada"}
+                                </button>
+                              ) : (
+                                <div className="pfm-portada-placeholder">Link manual</div>
+                              )}
+                            </div>
+
+                            {tipo === "link" && (
+                              <div className="pfm-imagen-link-edit">
+                                <input
+                                  className="pfm-control"
+                                  type="text"
+                                  placeholder="https://..."
+                                  value={url}
+                                  onChange={(e) => handleImagenChange(index, e.target.value)}
+                                />
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="pfm-empty">No hay imágenes cargadas.</div>
+                  )}
+
+
                 </div>
               </div>
 
-              <div className="pfm-top-right">
-                {renderReferencia()}
-              </div>
+              <div className="pfm-top-right" />
             </div>
 
+            
             {/* Campos dinámicos */}
             {Object.values(switchesActivos).some((v) => v) ? (
-              <div className="pfm-dynamic">
-                {camposOrden.map((campo) => (
-                  <React.Fragment key={campo}>
-                    {campo === "imagenes" ? null : renderCampo(campo)}
-                  </React.Fragment>
-                ))}
-              </div>
+              <>
+                <div className="pfm-dynamic">
+                  {camposOrden.map((campo) => (
+                    <React.Fragment key={campo}>
+                      {campo === "imagenes" ? null : renderCampo(campo)}
+                    </React.Fragment>
+                  ))}
+                </div>
+
+                {switchesActivos.zonas && mostrarReferenciaZonas ? (
+                  <div className="pfm-zonas-ref-floating">
+                    {renderReferencia()}
+                  </div>
+                ) : null}
+              </>
             ) : (
               <div className="pfm-empty">
                 ⚙️ Este producto no tiene campos configurados.
