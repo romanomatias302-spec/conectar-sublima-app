@@ -19,12 +19,7 @@ function colorMarcaStyles(color) {
 }
 
 function obtenerTextoMarca(pedido) {
-  return (
-    pedido?.produccionColorMarcaTexto ||
-    pedido?.produccionColorMarcaNombre ||
-    pedido?.produccionColorMarca ||
-    ""
-  );
+  return pedido?.produccionEtiquetaNombre || "";
 }
 
 function formatearTiempoEnEtapa(timestamp, ahoraTick) {
@@ -69,7 +64,7 @@ export default function ProduccionCard({
     opacity: isDragging ? 0.6 : 1,
   };
 
-  const marcaStyle = colorMarcaStyles(pedido.produccionColorMarca);
+  const marcaStyle = colorMarcaStyles(pedido.produccionEtiquetaColor);
   const marcaTexto = obtenerTextoMarca(pedido);
 
   const tiempoEtapa = formatearTiempoEnEtapa(
@@ -118,7 +113,7 @@ export default function ProduccionCard({
 
       <div
         className="produccion-card-clickable"
-        onClick={() => onVerPedido(pedido)}
+        onClick={() => onEditarDetalleManual(pedido)}
       >
         <div className="produccion-card-top-row">
           <div className="produccion-card-numero">
@@ -150,48 +145,55 @@ export default function ProduccionCard({
               Entrega: {pedido.fechaEntrega || "-"}
             </div>
 
-            <div className="produccion-card-link">
+            {pedido.produccionNotaCorta && (
+              <div className="produccion-card-nota" title={pedido.produccionNotaCorta}>
+                {pedido.produccionNotaCorta}
+              </div>
+            )}
+
+            <button
+              type="button"
+              className="produccion-card-link"
+              onClick={(e) => {
+                e.stopPropagation();
+                onVerPedido(pedido);
+              }}
+            >
               Ver pedido
-            </div>
+            </button>
           </div>
 
           {tieneDetalleManual && (
             <div className="produccion-card-side">
-              <div className="produccion-card-meta-top">
+              <div className="produccion-card-meta-row">
                 <div className="produccion-card-tiempo">
                   <span className="produccion-card-tiempo-icono">⏱</span>
                   <span>{tiempoEtapa}</span>
                 </div>
 
-                {marcaStyle && (
-                  <div
-                    className="produccion-card-marca"
-                    style={marcaStyle}
-                    title={marcaTexto}
-                  >
-                    {marcaTexto}
+                {(pedido.produccionMetros !== "" &&
+                  pedido.produccionMetros !== null &&
+                  pedido.produccionMetros !== undefined) && (
+                  <div className="produccion-card-metros">
+                    {pedido.produccionMetros} mts
                   </div>
                 )}
               </div>
+
+              {marcaStyle && (
+                <div
+                  className="produccion-card-marca"
+                  style={marcaStyle}
+                  title={marcaTexto}
+                >
+                  {marcaTexto}
+                </div>
+              )}
 
               {usuarioAsignado && (
                 <div className="produccion-card-asignado" title={usuarioAsignado}>
                   <span className="produccion-card-asignado-icono">👤</span>
                   <span className="produccion-card-asignado-texto">{usuarioAsignado}</span>
-                </div>
-              )}
-
-              {(pedido.produccionMetros !== "" &&
-                pedido.produccionMetros !== null &&
-                pedido.produccionMetros !== undefined) && (
-                <div className="produccion-card-metros">
-                  {pedido.produccionMetros} mts
-                </div>
-              )}
-
-              {pedido.produccionNotaCorta && (
-                <div className="produccion-card-nota" title={pedido.produccionNotaCorta}>
-                  {pedido.produccionNotaCorta}
                 </div>
               )}
 

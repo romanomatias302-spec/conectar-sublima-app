@@ -7,6 +7,7 @@ import {
   updateDoc,
   doc,
   onSnapshot,
+  addDoc,
 } from "firebase/firestore";
 import { db } from "../firebase";
 import {
@@ -85,6 +86,69 @@ function calcularEstadoGeneralPedido(columnaDestino, estadoActualPedido) {
   return "En proceso";
 }
 
+async function registrarMovimientoProduccion({
+  pedidoId,
+  pedidoActual,
+  columnaOrigen,
+  columnaDestino,
+  usuarioActor,
+}) {
+  if (!pedidoId || !columnaDestino) return;
+
+  const historialRef = collection(db, `${PEDIDOS_COLLECTION}/${pedidoId}/historial_produccion`);
+
+  let duracionEnOrigenMinutos = 0;
+
+  const ultimaFechaMovimiento =
+    pedidoActual?.produccionActualizadoAt?.toDate
+      ? pedidoActual.produccionActualizadoAt.toDate()
+      : pedidoActual?.produccionActualizadoAt
+      ? new Date(pedidoActual.produccionActualizadoAt)
+      : null;
+
+  if (ultimaFechaMovimiento) {
+    duracionEnOrigenMinutos = Math.round(
+      (Date.now() - ultimaFechaMovimiento.getTime()) / 60000
+    );
+  }
+
+  await addDoc(historialRef, {
+    clienteId: pedidoActual?.clienteId || "",
+
+    pedidoId,
+    pedidoVisibleId:
+      pedidoActual?.id ||
+      pedidoActual?.numeroPedido ||
+      pedidoActual?.numero ||
+      "",
+
+    clienteNombre:
+      pedidoActual?.clienteNombre ||
+      pedidoActual?.cliente ||
+      "",
+
+    columnaOrigenId: columnaOrigen?.id || "",
+    columnaOrigenNombre: columnaOrigen?.nombre || "",
+
+    columnaDestinoId: columnaDestino?.id || "",
+    columnaDestinoNombre: columnaDestino?.nombre || "",
+
+    usuarioActorUid: usuarioActor?.uid || "",
+    usuarioActorNombre: usuarioActor?.nombre || "",
+
+    usuarioAsignadoUid: pedidoActual?.produccionAsignadoUid || "",
+    usuarioAsignadoNombre:
+      pedidoActual?.produccionAsignadoNombre ||
+      pedidoActual?.produccionAsignadoEmail ||
+      "",
+
+    duracionEnOrigenMinutos,
+    pedidoFinalizado: columnaDestino?.esFinal === true,
+
+    createdAt: serverTimestamp(),
+  });
+}
+
 export async function moverPedidoProduccion({
   pedidoId,
   pedidoActual,
@@ -99,6 +163,9 @@ export async function moverPedidoProduccion({
 
   const ref = doc(db, PEDIDOS_COLLECTION, pedidoId);
 
+    const columnaOrigen =
+    columnasOrdenadas.find((c) => c.id === pedidoActual?.columnaProduccionId) || null;
+
   await updateDoc(ref, {
     columnaProduccionId: columnaDestino.id,
     progresoProduccion,
@@ -110,6 +177,14 @@ export async function moverPedidoProduccion({
     ultimaAccionProduccionPor: usuarioActor?.uid || null,
     ultimaAccionProduccionPorNombre: usuarioActor?.nombre || null,
     ultimaAccionProduccionAt: serverTimestamp(),
+  });
+
+  await registrarMovimientoProduccion({
+    pedidoId,
+    pedidoActual,
+    columnaOrigen,
+    columnaDestino,
+    usuarioActor,
   });
 }
 
@@ -331,18 +406,24 @@ export function escucharPedidosProduccionFinalizadosRecientes(clienteId, callbac
 export async function actualizarDetalleManualProduccion({
   pedidoId,
   produccionNotaCorta = "",
-  produccionColorMarca = "",
   produccionMetros = "",
+  produccionEtiquetaId = "",
+  produccionEtiquetaNombre = "",
+  produccionEtiquetaColor = "",
 }) {
   const ref = doc(db, PEDIDOS_COLLECTION, pedidoId);
 
   await updateDoc(ref, {
     produccionNotaCorta: produccionNotaCorta || "",
-    produccionColorMarca: produccionColorMarca || "",
     produccionMetros:
       produccionMetros === "" || produccionMetros === null
         ? ""
         : Number(produccionMetros),
+
+    produccionEtiquetaId: produccionEtiquetaId || "",
+    produccionEtiquetaNombre: produccionEtiquetaNombre || "",
+    produccionEtiquetaColor: produccionEtiquetaColor || "",
+
     updatedAt: serverTimestamp(),
   });
 }
@@ -365,4 +446,24 @@ export async function asignarUsuarioProduccion({
     produccionAsignadoPorNombre: usuarioActor?.nombre || "",
     updatedAt: serverTimestamp(),
   });
+}
+
+export async function obtenerHistorialProduccionPedido(pedidoId) {
+  if (!pedidoId) return [];
+
+  const historialRef = collection(db, `${PEDIDOS_COLLECTION}/${pedidoId}/historial_produccion`);
+  const q = query(historialRef);
+
+  const snapshot = await getDocs(q);
+
+  return snapshot.docs
+    .map((d) => ({
+      firebaseId: d.id,
+      ...d.data(),
+    }))
+    .sort((a, b) => {
+      const aTime = a.createdAt?.seconds || 0;
+      const bTime = b.createdAt?.seconds || 0;
+      return bTime - aTime;
+    });
 }

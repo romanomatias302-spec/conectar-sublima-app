@@ -17,9 +17,14 @@ import {
   recalcularPedidosPorCambioDeColumnas,
   actualizarDetalleManualProduccion,
   asignarUsuarioProduccion,
+  obtenerHistorialProduccionPedido,
 } from "../../firebase/produccionPedidos";
 import { agruparPedidosPorColumna } from "./produccionUtils";
 import ProduccionBoard from "./ProduccionBoard";
+import {
+  escucharEtiquetasProduccion,
+  crearEtiquetaProduccion,
+} from "../../firebase/produccionEtiquetas";
 import "./produccion.css";
 
 function getProduccionUIStorageKey(perfil) {
@@ -74,17 +79,30 @@ export default function ProduccionPage({ perfil, onVerPedido = () => {} }) {
   const [columnasContraidas, setColumnasContraidas] = useState([]);
 
   const [ordenTarjetas, setOrdenTarjetas] = useState("normal");
+  const [filtroAsignado, setFiltroAsignado] = useState("todos");
+  
 
  const [pedidoEditandoDetalle, setPedidoEditandoDetalle] = useState(null);
  const [notaManual, setNotaManual] = useState("");
  const [metrosManual, setMetrosManual] = useState("");
+ const [etiquetasProduccion, setEtiquetasProduccion] = useState([]);
+ const [etiquetaSeleccionadaId, setEtiquetaSeleccionadaId] = useState("");
  const [colorManual, setColorManual] = useState("");
+const [colorManualTexto, setColorManualTexto] = useState("");
+
+ const [mostrarNuevaEtiqueta, setMostrarNuevaEtiqueta] = useState(false);
+ const [nuevaEtiquetaNombre, setNuevaEtiquetaNombre] = useState("");
+ const [nuevaEtiquetaColor, setNuevaEtiquetaColor] = useState("rojo");
+ const [guardandoEtiqueta, setGuardandoEtiqueta] = useState(false);
  const [guardandoDetalleManual, setGuardandoDetalleManual] = useState(false);
  const [ahoraTick, setAhoraTick] = useState(Date.now());
+ const [historialProduccion, setHistorialProduccion] = useState([]);
+ const [loadingHistorialProduccion, setLoadingHistorialProduccion] = useState(false);
+
 
  const [usuariosProduccion, setUsuariosProduccion] = useState([]);
  const [usuarioAsignadoUid, setUsuarioAsignadoUid] = useState("");
- const [guardandoAsignacion, setGuardandoAsignacion] = useState(false);
+
 
    const PERMISOS_DEFAULT_USUARIO = {
     inicio: { ver: true },
@@ -122,6 +140,20 @@ export default function ProduccionPage({ perfil, onVerPedido = () => {} }) {
         console.error("Error asegurando columnas base:", error);
     }
   }
+
+  useEffect(() => {
+  let unsubscribe = null;
+
+  if (!perfil?.clienteId) return;
+
+  unsubscribe = escucharEtiquetasProduccion(perfil.clienteId, (lista) => {
+    setEtiquetasProduccion(lista || []);
+  });
+
+  return () => {
+    if (unsubscribe) unsubscribe();
+  };
+}, [perfil?.clienteId]);
 
   useEffect(() => {
     let unsubscribeColumnas = null;
@@ -269,8 +301,40 @@ function ordenarTarjetas(lista, modoOrden) {
   return copia;
 }
 
+function filtrarPedidosPorAsignado(lista, filtro, perfil) {
+  if (!Array.isArray(lista)) return [];
+
+  if (filtro === "todos") return lista;
+
+  if (filtro === "sin_asignar") {
+    return lista.filter((p) => !p.produccionAsignadoUid);
+  }
+
+  if (filtro === "mios") {
+    const uidActual = perfil?.uid || perfil?.firebaseUid || "";
+    if (!uidActual) return lista;
+    return lista.filter((p) => p.produccionAsignadoUid === uidActual);
+  }
+
+  return lista.filter((p) => p.produccionAsignadoUid === filtro);
+}
+
+
+
   const pedidosPorColumna = useMemo(() => {
-  const agrupadoBase = agruparPedidosPorColumna(columnas, pedidos);
+  const pedidosFiltrados = filtrarPedidosPorAsignado(pedidos, filtroAsignado, perfil);
+  const finalizadosFiltrados = filtrarPedidosPorAsignado(
+    pedidosFinalizadosRecientes,
+    filtroAsignado,
+    perfil
+  );
+  const animadosFiltrados = filtrarPedidosPorAsignado(
+    animandoFinalizados,
+    filtroAsignado,
+    perfil
+  );
+
+  const agrupadoBase = agruparPedidosPorColumna(columnas, pedidosFiltrados);
 
   const columnaFinal = columnas.find((c) => c.esFinal);
   if (!columnaFinal) {
@@ -285,7 +349,7 @@ function ordenarTarjetas(lista, modoOrden) {
     agrupadoBase[columnaFinal.id] = [];
   }
 
-  pedidosFinalizadosRecientes.forEach((pedidoFinalizado) => {
+    finalizadosFiltrados.forEach((pedidoFinalizado) => {
     const yaExiste = agrupadoBase[columnaFinal.id].some(
       (p) => (p.firebaseId || p.id) === (pedidoFinalizado.firebaseId || pedidoFinalizado.id)
     );
@@ -295,7 +359,7 @@ function ordenarTarjetas(lista, modoOrden) {
     }
   });
 
-  animandoFinalizados.forEach((pedidoAnimado) => {
+    animadosFiltrados.forEach((pedidoAnimado) => {
     const yaExiste = agrupadoBase[columnaFinal.id].some(
       (p) => (p.firebaseId || p.id) === (pedidoAnimado.firebaseId || pedidoAnimado.id)
     );
@@ -311,13 +375,27 @@ function ordenarTarjetas(lista, modoOrden) {
   });
 
   return agrupadoOrdenado;
-}, [columnas, pedidos, pedidosFinalizadosRecientes, animandoFinalizados, ordenTarjetas]);
+}, [
+  columnas,
+  pedidos,
+  pedidosFinalizadosRecientes,
+  animandoFinalizados,
+  ordenTarjetas,
+  filtroAsignado,
+  perfil,
+]);
 
   async function manejarMoverPedido(pedidoId, columnaDestinoId) {
     if (!puedeHacerEnProduccion("mover")) return;
     if (moviendo) return;
 
-    const pedidoActual = pedidos.find(
+    const todosLosPedidos = [
+      ...pedidos,
+      ...pedidosFinalizadosRecientes,
+      ...animandoFinalizados,
+    ];
+
+    const pedidoActual = todosLosPedidos.find(
       (p) => (p.firebaseId || p.id) === pedidoId
     );
     if (!pedidoActual) return;
@@ -351,7 +429,7 @@ function ordenarTarjetas(lista, modoOrden) {
     const produccionFinalizadaNueva = !!columnaDestino.esFinal;
     const vaAFinalizados = !!columnaDestino.esFinal;
 
-    const pedidosPrevios = pedidos;
+      const pedidosPrevios = [...pedidos];
 
     setPedidos((prev) =>
       prev.map((p) =>
@@ -515,7 +593,7 @@ function toggleColumnaContraida(columnaId) {
   });
 }
 
-  function abrirDetalleManual(pedido) {
+  async function abrirDetalleManual(pedido) {
     if (!puedeHacerEnProduccion("editarDetalle")) return;
 
     setPedidoEditandoDetalle(pedido);
@@ -525,17 +603,32 @@ function toggleColumnaContraida(columnaId) {
         ? ""
         : String(pedido.produccionMetros)
     );
-    setColorManual(pedido?.produccionColorMarca || "");
+setEtiquetaSeleccionadaId(pedido?.produccionEtiquetaId || "");
     setUsuarioAsignadoUid(pedido?.produccionAsignadoUid || "");
+
+    try {
+      setLoadingHistorialProduccion(true);
+      const historial = await obtenerHistorialProduccionPedido(pedido?.firebaseId);
+      setHistorialProduccion(historial);
+    } catch (error) {
+      console.error("Error cargando historial de producción:", error);
+      setHistorialProduccion([]);
+    } finally {
+      setLoadingHistorialProduccion(false);
+    }
   }
 
 function cerrarDetalleManual() {
   setPedidoEditandoDetalle(null);
   setNotaManual("");
   setMetrosManual("");
-  setColorManual("");
+  setEtiquetaSeleccionadaId("");
   setUsuarioAsignadoUid("");
+  setHistorialProduccion([]);
+  setLoadingHistorialProduccion(false);
 }
+
+
 
 async function guardarDetalleManual() {
   try {
@@ -544,30 +637,11 @@ async function guardarDetalleManual() {
 
     setGuardandoDetalleManual(true);
 
-    await actualizarDetalleManualProduccion({
-      pedidoId: pedidoEditandoDetalle.firebaseId,
-      produccionNotaCorta: notaManual,
-      produccionColorMarca: colorManual,
-      produccionMetros: metrosManual,
-    });
-
-    cerrarDetalleManual();
-  } catch (error) {
-    console.error("Error guardando detalle manual de producción:", error);
-  } finally {
-    setGuardandoDetalleManual(false);
-  }
-}
-
-async function guardarAsignacionProduccion() {
-  try {
-    if (perfil?.rol !== "admin" && perfil?.rol !== "superadmin") return;
-    if (!pedidoEditandoDetalle?.firebaseId) return;
+    const etiquetaSeleccionada =
+      etiquetasProduccion.find((e) => e.id === etiquetaSeleccionadaId) || null;
 
     const usuarioSeleccionado =
       usuariosProduccion.find((u) => u.uid === usuarioAsignadoUid) || null;
-
-    setGuardandoAsignacion(true);
 
     await asignarUsuarioProduccion({
       pedidoId: pedidoEditandoDetalle.firebaseId,
@@ -578,20 +652,48 @@ async function guardarAsignacionProduccion() {
       },
     });
 
-    setPedidoEditandoDetalle((prev) =>
-      prev
-        ? {
-            ...prev,
-            produccionAsignadoUid: usuarioSeleccionado?.uid || "",
-            produccionAsignadoNombre: usuarioSeleccionado?.nombre || "",
-            produccionAsignadoEmail: usuarioSeleccionado?.email || "",
-          }
-        : prev
-    );
+    await actualizarDetalleManualProduccion({
+      pedidoId: pedidoEditandoDetalle.firebaseId,
+      produccionNotaCorta: notaManual,
+      produccionMetros: metrosManual,
+      produccionEtiquetaId: etiquetaSeleccionada?.id || "",
+      produccionEtiquetaNombre: etiquetaSeleccionada?.nombre || "",
+      produccionEtiquetaColor: etiquetaSeleccionada?.color || "",
+    });
+
+    cerrarDetalleManual();
   } catch (error) {
-    console.error("Error asignando usuario en producción:", error);
+    console.error("Error guardando detalle manual de producción:", error);
   } finally {
-    setGuardandoAsignacion(false);
+    setGuardandoDetalleManual(false);
+  }
+}
+
+
+
+async function guardarNuevaEtiquetaProduccion() {
+  try {
+    if (perfil?.rol !== "admin" && perfil?.rol !== "superadmin") return;
+    if (!perfil?.clienteId) return;
+
+    const nombre = (nuevaEtiquetaNombre || "").trim();
+    if (!nombre) return;
+
+    setGuardandoEtiqueta(true);
+
+    await crearEtiquetaProduccion({
+      clienteId: perfil.clienteId,
+      nombre,
+      color: nuevaEtiquetaColor,
+    });
+
+    setNuevaEtiquetaNombre("");
+    setNuevaEtiquetaColor("rojo");
+    setMostrarNuevaEtiqueta(false);
+  } catch (error) {
+    console.error("Error creando etiqueta de producción:", error);
+  } finally {
+    setGuardandoEtiqueta(false);
   }
 }
 
@@ -615,6 +717,20 @@ async function guardarAsignacionProduccion() {
     }
     }
 
+  function formatearFechaHistorial(timestamp) {
+  if (!timestamp?.seconds) return "-";
+
+  const fecha = new Date(timestamp.seconds * 1000);
+
+  return fecha.toLocaleString("es-AR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
   return (
     <div className="produccion-page">
       <div className="produccion-page-header">
@@ -623,13 +739,29 @@ async function guardarAsignacionProduccion() {
 
             <div className="produccion-page-header-actions">
                 <select
-                value={ordenTarjetas}
-                onChange={(e) => setOrdenTarjetas(e.target.value)}
-                className="produccion-select-orden"
+                  value={ordenTarjetas}
+                  onChange={(e) => setOrdenTarjetas(e.target.value)}
+                  className="produccion-select-orden"
                 >
-                <option value="normal">Orden normal</option>
-                <option value="entrega-asc">Entrega más próxima</option>
-                <option value="entrega-desc">Entrega más lejana</option>
+                  <option value="normal">Orden normal</option>
+                  <option value="entrega-asc">Entrega más próxima</option>
+                  <option value="entrega-desc">Entrega más lejana</option>
+                </select>
+
+                <select
+                  value={filtroAsignado}
+                  onChange={(e) => setFiltroAsignado(e.target.value)}
+                  className="produccion-select-orden"
+                >
+                  <option value="todos">Todos los asignados</option>
+                  <option value="sin_asignar">Sin asignar</option>
+                  <option value="mios">Solo mis pedidos</option>
+
+                  {usuariosProduccion.map((usuario) => (
+                    <option key={usuario.uid} value={usuario.uid}>
+                      {usuario.nombre || usuario.email || usuario.uid}
+                    </option>
+                  ))}
                 </select>
 
                 {puedeGestionarColumnas && (
@@ -727,7 +859,7 @@ async function guardarAsignacionProduccion() {
         placeholder="Ej: Mandar hoy / Esperar 200 mts"
       />
 
-            {(perfil?.rol === "admin" || perfil?.rol === "superadmin") && (
+      {(perfil?.rol === "admin" || perfil?.rol === "superadmin") && (
         <>
           <label>Asignado a</label>
           <div className="produccion-asignacion-box">
@@ -743,31 +875,123 @@ async function guardarAsignacionProduccion() {
                 </option>
               ))}
             </select>
-
-            <button
-              type="button"
-              className="btn-produccion-secundario"
-              onClick={guardarAsignacionProduccion}
-              disabled={guardandoAsignacion}
-            >
-              {guardandoAsignacion ? "Asignando..." : "Asignar"}
-            </button>
           </div>
         </>
       )}
-      <label>Marca de color</label>
-      <div className="produccion-colores-box">
-        {["", "amarillo", "verde", "azul", "rojo", "violeta"].map((color) => (
+      <label>Etiqueta</label>
+      <div className="produccion-asignacion-box">
+        <select
+          value={etiquetaSeleccionadaId}
+          onChange={(e) => setEtiquetaSeleccionadaId(e.target.value)}
+          className="produccion-modal-input"
+        >
+          <option value="">Sin etiqueta</option>
+          {etiquetasProduccion.map((etiqueta) => (
+            <option key={etiqueta.id} value={etiqueta.id}>
+              {etiqueta.nombre}
+            </option>
+          ))}
+        </select>
+
+        {(perfil?.rol === "admin" || perfil?.rol === "superadmin") && (
           <button
-            key={color || "sin-color"}
             type="button"
-            className={`produccion-color-btn ${colorManual === color ? "activo" : ""}`}
-            onClick={() => setColorManual(color)}
+            className="btn-produccion-secundario"
+            onClick={() => setMostrarNuevaEtiqueta((prev) => !prev)}
           >
-            {color === "" ? "Sin color" : color}
+            + Etiqueta
           </button>
-        ))}
+        )}
       </div>
+
+      {mostrarNuevaEtiqueta && (perfil?.rol === "admin" || perfil?.rol === "superadmin") && (
+        <div className="produccion-etiqueta-nueva-box">
+          <input
+            type="text"
+            maxLength={22}
+            value={nuevaEtiquetaNombre}
+            onChange={(e) => setNuevaEtiquetaNombre(e.target.value)}
+            className="produccion-modal-input"
+            placeholder="Nombre de la etiqueta"
+          />
+
+          <div className="produccion-colores-box">
+            {["amarillo", "verde", "azul", "rojo", "violeta"].map((color) => (
+              <button
+                key={color}
+                type="button"
+                className={`produccion-color-btn ${nuevaEtiquetaColor === color ? "activo" : ""}`}
+                onClick={() => setNuevaEtiquetaColor(color)}
+              >
+                {color}
+              </button>
+            ))}
+          </div>
+
+                <div className="produccion-historial-box">
+        <h4 className="produccion-historial-title">Historial de movimientos</h4>
+
+        {loadingHistorialProduccion ? (
+          <p className="produccion-historial-empty">Cargando historial...</p>
+        ) : historialProduccion.length === 0 ? (
+          <p className="produccion-historial-empty">Todavía no hay movimientos registrados.</p>
+        ) : (
+          <div className="produccion-historial-lista">
+            {historialProduccion.map((item) => (
+              <div key={item.firebaseId} className="produccion-historial-item">
+                <div className="produccion-historial-top">
+                  <span className="produccion-historial-fecha">
+                    {formatearFechaHistorial(item.createdAt)}
+                  </span>
+                </div>
+
+                <div className="produccion-historial-linea">
+                  <strong>{item.columnaOrigenNombre || "Sin origen"}</strong>
+                  <span className="produccion-historial-flecha">→</span>
+                  <strong>{item.columnaDestinoNombre || "Sin destino"}</strong>
+                </div>
+
+                <div className="produccion-historial-meta">
+                  <span>
+                    Movió: {item.usuarioActorNombre || "-"}
+                  </span>
+                </div>
+
+                <div className="produccion-historial-meta">
+                  <span>
+                    Asignado: {item.usuarioAsignadoNombre || "Sin asignar"}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+          <div className="produccion-modal-actions">
+            <button
+              type="button"
+              className="btn-produccion-cancelar"
+              onClick={() => {
+                setMostrarNuevaEtiqueta(false);
+                setNuevaEtiquetaNombre("");
+                setNuevaEtiquetaColor("rojo");
+              }}
+            >
+              Cancelar
+            </button>
+
+            <button
+              type="button"
+              className="btn-produccion-primario"
+              onClick={guardarNuevaEtiquetaProduccion}
+              disabled={guardandoEtiqueta}
+            >
+              {guardandoEtiqueta ? "Guardando..." : "Guardar etiqueta"}
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="produccion-modal-actions">
         <button className="btn-produccion-cancelar" onClick={cerrarDetalleManual}>
