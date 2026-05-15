@@ -8,6 +8,7 @@ import {
   updateDoc,
   deleteDoc,
   doc,
+  getDoc,
   query,
   where,
 } from "firebase/firestore";
@@ -21,23 +22,61 @@ export default function ConfiguracionProductos({ perfil }) {
   const [mostrarOnboarding, setMostrarOnboarding] = useState(false);
   const [productoSeleccionado, setProductoSeleccionado] = useState(null);
 
+  const limpiarProductosDuplicados = async () => {
+  if (!perfil?.clienteId) return;
+
+  const ref = collection(db, "productosBase");
+  const snap = await getDocs(
+    query(ref, where("clienteId", "==", perfil.clienteId))
+  );
+
+  const vistos = new Set();
+
+  for (const docu of snap.docs) {
+    const data = docu.data();
+    const nombre = (data.nombre || "").trim().toLowerCase();
+
+    if (!nombre) continue;
+
+    if (vistos.has(nombre)) {
+      await deleteDoc(doc(db, "productosBase", docu.id));
+    } else {
+      vistos.add(nombre);
+    }
+  }
+};
+
   // 🔹 Cargar productos y crear base si no existen
-  const cargarProductos = async () => {
-    try {
-      if (!perfil) return;
+const cargarProductos = async () => {
+  try {
+    if (!perfil) return;
+    if (perfil.rol !== "superadmin") {
+      await limpiarProductosDuplicados();
+    }
 
-      const ref = collection(db, "productosBase");
+    const ref = collection(db, "productosBase");
 
-      const q =
-        perfil.rol === "superadmin"
-          ? query(ref)
-          : query(ref, where("clienteId", "==", perfil.clienteId));
+    const q =
+      perfil.rol === "superadmin"
+        ? query(ref)
+        : query(ref, where("clienteId", "==", perfil.clienteId));
 
-      const snapshot = await getDocs(q);
-      let lista = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const snapshot = await getDocs(q);
+    let lista = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
 
-      if (perfil.rol !== "superadmin" && lista.length === 0) {
+    if (perfil.rol !== "superadmin" && lista.length === 0) {
+      const clienteSaasRef = doc(db, "clientes-saas", perfil.clienteId);
+      const clienteSaasSnap = await getDoc(clienteSaasRef);
+      const clienteSaasData = clienteSaasSnap.exists()
+        ? clienteSaasSnap.data()
+        : {};
+
+      if (clienteSaasData.productosBaseInicializados !== true) {
         await crearProductosBase();
+
+        await updateDoc(clienteSaasRef, {
+          productosBaseInicializados: true,
+        });
 
         const snapshotRecargado = await getDocs(
           query(ref, where("clienteId", "==", perfil.clienteId))
@@ -52,12 +91,15 @@ export default function ConfiguracionProductos({ perfil }) {
           setMostrarOnboarding(true);
         }
       }
-
-      setProductos(lista);
-    } catch (error) {
-      console.error("Error al cargar productos:", error);
     }
-  };
+
+    setProductos(lista);
+  } catch (error) {
+    console.error("Error al cargar productos:", error);
+  }
+};
+
+  
 
   // 🧩 Crear productos por defecto (Remera y Taza)
   const crearProductosBase = async () => {

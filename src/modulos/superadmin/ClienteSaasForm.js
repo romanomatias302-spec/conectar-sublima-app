@@ -12,7 +12,9 @@ export default function ClienteSaasForm({
         estado: "activo",
         plan: "instalacion",
         costoInstalacion: 300000,
-        mantenimientoMensual: 20000,
+        mantenimientoMensual: "",
+        fechaProximoCargo: "",
+        estadoCuenta: "al_dia",
         ultimoPago: "",
         fechaAlta: "",
         proximoVencimiento: "",
@@ -33,6 +35,8 @@ export default function ClienteSaasForm({
         fechaAlta: clienteEditando.fechaAlta || "",
         proximoVencimiento: clienteEditando.proximoVencimiento || "",
         observaciones: clienteEditando.observaciones || "",
+        fechaProximoCargo: clienteEditando.fechaProximoCargo || "",
+        estadoCuenta: clienteEditando.estadoCuenta || "al_dia",
       });
     }
   }, [clienteEditando]);
@@ -73,7 +77,7 @@ export default function ClienteSaasForm({
 
         // Si cambia el último pago, recalculamos el próximo vencimiento
         if (name === "ultimoPago") {
-            nuevoForm.proximoVencimiento = sumarUnMes(value);
+          nuevoForm.fechaProximoCargo = sumarUnMes(value);
         }
 
         return nuevoForm;
@@ -172,9 +176,9 @@ export default function ClienteSaasForm({
           />
 
           <input
-            name="proximoVencimiento"
+            name="fechaProximoCargo"
             type="date"
-            value={formData.proximoVencimiento}
+            value={formData.fechaProximoCargo}
             onChange={handleChange}
             style={input}
           />

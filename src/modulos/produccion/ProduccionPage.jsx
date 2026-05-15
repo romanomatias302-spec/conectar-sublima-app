@@ -3,6 +3,7 @@ import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "../../firebase";
 import {
   asegurarColumnasBaseProduccion,
+limpiarColumnasBaseDuplicadasProduccion,
   crearColumnaIntermediaProduccion,
   actualizarColumnaProduccion,
   desactivarColumnaProduccion,
@@ -131,15 +132,7 @@ const [colorManualTexto, setColorManualTexto] = useState("");
   };
 
 
-  async function cargar() {
-    if (!perfil?.clienteId) return;
 
-    try {
-        await asegurarColumnasBaseProduccion(perfil.clienteId);
-    } catch (error) {
-        console.error("Error asegurando columnas base:", error);
-    }
-  }
 
   useEffect(() => {
   let unsubscribe = null;
@@ -167,6 +160,7 @@ const [colorManualTexto, setColorManualTexto] = useState("");
 
         try {
         await asegurarColumnasBaseProduccion(perfil.clienteId);
+        await limpiarColumnasBaseDuplicadasProduccion(perfil.clienteId);
 
         unsubscribeColumnas = escucharColumnasProduccion(
             perfil.clienteId,

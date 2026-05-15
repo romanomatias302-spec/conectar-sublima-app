@@ -74,44 +74,59 @@ export async function obtenerColumnaFinalProduccion(clienteId) {
 }
 
 export async function asegurarColumnasBaseProduccion(clienteId) {
-  const columnas = await obtenerColumnasProduccion(clienteId);
+  if (!clienteId) return [];
 
-  const tieneInicial = columnas.some((col) => col.esInicial);
-  const tieneFinal = columnas.some((col) => col.esFinal);
+  const ref = collection(db, PRODUCCION_COLUMNAS_COLLECTION);
 
-  if (!tieneInicial) {
-  await addDoc(collection(db, PRODUCCION_COLUMNAS_COLLECTION), {
-    clienteId,
-    nombre: "Pendiente",
-    orden: 0,
-    esInicial: true,
-    esFinal: false,
-    activo: true,
-    colorFondo: "#F7F7F8",
-    colorBorde: "#D9DEE8",
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  });
-}
+  const q = query(
+    ref,
+    where("clienteId", "==", clienteId)
+  );
 
-if (!tieneFinal) {
-  await addDoc(collection(db, PRODUCCION_COLUMNAS_COLLECTION), {
-    clienteId,
-    nombre: "Producción finalizada",
-    orden: 9999,
-    esInicial: false,
-    esFinal: true,
-    activo: true,
-    colorFondo: "#EEF8F0",
-    colorBorde: "#CFE7D3",
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  });
-}
+  const snapshot = await getDocs(q);
+
+  const columnas = snapshot.docs.map((d) => ({
+    id: d.id,
+    ...d.data(),
+  }));
+
+  const columnasActivas = columnas.filter((col) => col.activo !== false);
+
+  const inicialActiva = columnasActivas.find((col) => col.esInicial);
+  const finalActiva = columnasActivas.find((col) => col.esFinal);
+
+  if (!inicialActiva) {
+    await addDoc(ref, {
+      clienteId,
+      nombre: "Pendiente",
+      orden: 0,
+      esInicial: true,
+      esFinal: false,
+      activo: true,
+      colorFondo: "#F7F7F8",
+      colorBorde: "#D9DEE8",
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+  }
+
+  if (!finalActiva) {
+    await addDoc(ref, {
+      clienteId,
+      nombre: "Producción finalizada",
+      orden: 9999,
+      esInicial: false,
+      esFinal: true,
+      activo: true,
+      colorFondo: "#EEF8F0",
+      colorBorde: "#CFE7D3",
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+  }
 
   return await obtenerColumnasProduccion(clienteId);
 }
-
 export async function crearColumnaProduccion({ clienteId, nombre, orden }) {
   const ref = await addDoc(collection(db, PRODUCCION_COLUMNAS_COLLECTION), {
     clienteId,
@@ -230,4 +245,23 @@ export async function moverColumnaProduccion({
     orden: columnaActual.orden,
     updatedAt: serverTimestamp(),
   });
+}
+
+export async function limpiarColumnasBaseDuplicadasProduccion(clienteId) {
+  if (!clienteId) return;
+
+  const columnas = await obtenerColumnasProduccion(clienteId);
+
+  const iniciales = columnas.filter((c) => c.esInicial);
+  const finales = columnas.filter((c) => c.esFinal);
+
+  const duplicadasIniciales = iniciales.slice(1);
+  const duplicadasFinales = finales.slice(1);
+
+  for (const col of [...duplicadasIniciales, ...duplicadasFinales]) {
+    await updateDoc(doc(db, PRODUCCION_COLUMNAS_COLLECTION, col.id), {
+      activo: false,
+      updatedAt: serverTimestamp(),
+    });
+  }
 }

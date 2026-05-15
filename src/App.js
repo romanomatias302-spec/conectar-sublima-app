@@ -22,6 +22,7 @@ import MovimientosList from "./modulos/movimientos/MovimientosList";
 import VentaDetalle from "./modulos/ventas/VentaDetalle";
 import { obtenerVentaPorId } from "./firebase/ventas";
 import ProduccionPage from "./modulos/produccion/ProduccionPage";
+import CajaPage from "./modulos/caja/CajaPage";
 
 
 
@@ -56,6 +57,7 @@ export default function App() {
     },
     ventas: { ver: false, crear: false, editar: false, eliminar: false },
     movimientos: { ver: false },
+    caja: { ver: false, crear: false, editar: false },
     configuracion: { ver: false },
   };
 
@@ -311,6 +313,7 @@ const irAVista = (nuevaVista, extra = {}) => {
         "ventas-listado": "ventas",
         "venta-detalle": "ventas",
         movimientos: "movimientos",
+        caja: "caja",
         configuracion: "configuracion",
       };
 
@@ -339,6 +342,9 @@ const irAVista = (nuevaVista, extra = {}) => {
       case "movimientos":
         irAVista("movimientos");
         break;
+      case "caja":
+      irAVista("caja");
+      break;  
       default:
         irAVista(modulo);
         break;
@@ -590,6 +596,10 @@ const irAVista = (nuevaVista, extra = {}) => {
 
         {vista === "movimientos" && (
           <MovimientosList perfil={perfil} />
+        )}
+
+        {vista === "caja" && (
+          <CajaPage perfil={perfil} />
         )}
 
         {vista === "configuracion" && (

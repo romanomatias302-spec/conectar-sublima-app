@@ -9,6 +9,9 @@
   transition: width 0.3s ease;
   display: flex;
   flex-direction: column;
+
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .sidebar.colapsado {
@@ -43,6 +46,8 @@
   list-style: none;
   padding: 0;
   margin-top: 10px;
+
+  flex: 1;
 }
 
 .menu li {
@@ -142,6 +147,7 @@
 .bottom-menu {
   margin-top: 0;
   padding-bottom: 14px;
+  flex-shrink: 0;
 }
 
 

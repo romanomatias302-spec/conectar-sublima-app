@@ -116,6 +116,13 @@ export default function Sidebar({
           </li>
         )}
 
+        {puede("caja") && (
+          <li onClick={() => onSelect("caja")}>
+            <FaCashRegister className="icon" />
+            {expandido && <span>Caja</span>}
+          </li>
+        )}
+
         {puede("movimientos") && (
           <li onClick={() => onSelect("movimientos")}>
             <FaExchangeAlt className="icon" />
