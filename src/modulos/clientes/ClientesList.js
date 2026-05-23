@@ -8,6 +8,7 @@ import { puedeHacer } from "../../utils/permisos";
 export default function ClientesList({ onNuevo, onEditar, onVer, perfil }) {
   const [clientes, setClientes] = useState([]);
   const [busqueda, setBusqueda] = useState("");
+  const [clienteAbiertoId, setClienteAbiertoId] = useState(null);
 
   const puedeCrearClientes = puedeHacer(perfil, "clientes", "crear");
   const puedeEditarClientes = puedeHacer(perfil, "clientes", "editar");
@@ -86,7 +87,58 @@ export default function ClientesList({ onNuevo, onEditar, onVer, perfil }) {
         </div>
       </div>
 
-      <table>
+<div className="clientes-mobile-list">
+  {clientesFiltrados.map((cliente) => {
+    const abierto = clienteAbiertoId === cliente.firebaseId;
+
+    return (
+      <div key={cliente.firebaseId} className="cliente-mobile-card">
+        <div
+          className="cliente-mobile-header"
+          onClick={() =>
+            setClienteAbiertoId((prev) =>
+              prev === cliente.firebaseId ? null : cliente.firebaseId
+            )
+          }
+        >
+          <div>
+            <strong>{cliente.nombre || "Sin nombre"}</strong>
+            <span>DNI {cliente.dni || "-"}</span>
+          </div>
+
+          <span className="cliente-mobile-arrow">
+            {abierto ? "⌃" : "⌄"}
+          </span>
+        </div>
+
+        {abierto && (
+          <>
+            <div className="cliente-mobile-info">
+              <p><b>Tel:</b> {cliente.telefono || "-"}</p>
+              <p><b>Email:</b> {cliente.email || "-"}</p>
+              <p><b>Dirección:</b> {cliente.direccion || "-"}</p>
+              <p><b>Localidad:</b> {cliente.localidad || "-"}</p>
+              <p><b>Provincia:</b> {cliente.provincia || "-"}</p>
+            </div>
+
+            <div
+              className="cliente-mobile-actions"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button onClick={() => onVer(cliente)}>Ver detalle</button>
+
+              {puedeEditarClientes && (
+                <button onClick={() => onEditar(cliente)}>Editar</button>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    );
+  })}
+</div>
+
+<table className="clientes-table-desktop">
         <thead>
           <tr>
             <th>DNI</th>

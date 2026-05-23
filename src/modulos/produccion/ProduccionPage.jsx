@@ -637,14 +637,16 @@ async function guardarDetalleManual() {
     const usuarioSeleccionado =
       usuariosProduccion.find((u) => u.uid === usuarioAsignadoUid) || null;
 
-    await asignarUsuarioProduccion({
-      pedidoId: pedidoEditandoDetalle.firebaseId,
-      usuarioAsignado: usuarioSeleccionado,
-      usuarioActor: {
-        uid: perfil?.uid || perfil?.firebaseUid || null,
-        nombre: perfil?.nombre || perfil?.email || "Usuario",
-      },
-    });
+if (puedeHacerEnProduccion("asignarUsuario")) {
+  await asignarUsuarioProduccion({
+    pedidoId: pedidoEditandoDetalle.firebaseId,
+    usuarioAsignado: usuarioSeleccionado,
+    usuarioActor: {
+      uid: perfil?.uid || perfil?.firebaseUid || null,
+      nombre: perfil?.nombre || perfil?.email || "Usuario",
+    },
+  });
+}
 
     await actualizarDetalleManualProduccion({
       pedidoId: pedidoEditandoDetalle.firebaseId,
@@ -667,7 +669,7 @@ async function guardarDetalleManual() {
 
 async function guardarNuevaEtiquetaProduccion() {
   try {
-    if (perfil?.rol !== "admin" && perfil?.rol !== "superadmin") return;
+    if (!puedeHacerEnProduccion("editarDetalle")) return;
     if (!perfil?.clienteId) return;
 
     const nombre = (nuevaEtiquetaNombre || "").trim();
@@ -853,7 +855,7 @@ async function guardarNuevaEtiquetaProduccion() {
         placeholder="Ej: Mandar hoy / Esperar 200 mts"
       />
 
-      {(perfil?.rol === "admin" || perfil?.rol === "superadmin") && (
+      {puedeHacerEnProduccion("asignarUsuario") && (
         <>
           <label>Asignado a</label>
           <div className="produccion-asignacion-box">
@@ -887,7 +889,7 @@ async function guardarNuevaEtiquetaProduccion() {
           ))}
         </select>
 
-        {(perfil?.rol === "admin" || perfil?.rol === "superadmin") && (
+        {puedeHacerEnProduccion("editarDetalle") && (
           <button
             type="button"
             className="btn-produccion-secundario"
@@ -898,7 +900,7 @@ async function guardarNuevaEtiquetaProduccion() {
         )}
       </div>
 
-      {mostrarNuevaEtiqueta && (perfil?.rol === "admin" || perfil?.rol === "superadmin") && (
+      {mostrarNuevaEtiqueta && puedeHacerEnProduccion("editarDetalle") && (
         <div className="produccion-etiqueta-nueva-box">
           <input
             type="text"

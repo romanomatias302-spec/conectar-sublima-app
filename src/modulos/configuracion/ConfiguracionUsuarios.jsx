@@ -24,17 +24,57 @@ function formatearFecha(fecha) {
 
 const PERMISOS_DEFAULT_USUARIO = {
   inicio: { ver: true },
-  clientes: { ver: false, crear: false, editar: false, eliminar: false },
-  pedidos: { ver: true, crear: false, editar: false, eliminar: false },
+
+  clientes: {
+    ver: false,
+    crear: false,
+    editar: false,
+    eliminar: false,
+  },
+
+  pedidos: {
+    ver: true,
+    crear: false,
+    editar: false,
+    eliminar: false,
+  },
+
   produccion: {
     ver: true,
     mover: true,
     editarDetalle: true,
     asignarUsuario: false,
+    verHistorial: true,
   },
-  ventas: { ver: false, crear: false, editar: false, eliminar: false },
-  movimientos: { ver: false },
-  configuracion: { ver: false },
+
+  ventas: {
+    ver: false,
+    crear: false,
+    editar: false,
+    eliminar: false,
+    cobrar: false,
+    anularPagos: false,
+  },
+
+  caja: {
+    ver: false,
+    abrir: false,
+    cerrar: false,
+    movimientosManual: false,
+  },
+
+informes: {
+  ver: false,
+  exportar: false,
+},
+
+  configuracion: {
+    ver: false,
+    productos: false,
+    usuarios: false,
+    cuenta: false,
+    produccion: false,
+  },
 };
 
 const MODULOS_PERMISOS = [
@@ -83,11 +123,25 @@ const MODULOS_PERMISOS = [
       { key: "eliminar", label: "Eliminar" },
     ],
   },
+
   {
-    key: "movimientos",
-    label: "Movimientos",
-    acciones: [{ key: "ver", label: "Ver" }],
-  },
+  key: "caja",
+  label: "Caja",
+  acciones: [
+    { key: "ver", label: "Ver" },
+    { key: "abrir", label: "Abrir caja" },
+    { key: "cerrar", label: "Cerrar caja" },
+    { key: "movimientosManual", label: "Movimientos manuales" },
+  ],
+},
+{
+  key: "informes",
+  label: "Informes",
+  acciones: [
+    { key: "ver", label: "Ver" },
+    { key: "exportar", label: "Exportar" },
+  ],
+},
   {
     key: "configuracion",
     label: "Configuración",

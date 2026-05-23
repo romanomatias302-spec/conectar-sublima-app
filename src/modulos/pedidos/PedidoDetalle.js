@@ -26,6 +26,8 @@ export default function PedidoDetalle({ pedido, onVolver, perfil, onVerVenta }) 
   const [soloVer, setSoloVer] = useState(false);
   const [columnasDetalle, setColumnasDetalle] = useState(getColumnasDetallePedidoDefault());
   const [mostrarConfigColumnas, setMostrarConfigColumnas] = useState(false);
+  const [esMobile, setEsMobile] = useState(window.innerWidth <= 768);
+  const [productosAbiertos, setProductosAbiertos] = useState({});
 
   const esAdmin = perfil?.rol === "admin" || perfil?.rol === "superadmin";
   const puedeEditarPedidos = puedeHacer(perfil, "pedidos", "editar");
@@ -53,6 +55,19 @@ useEffect(() => {
 useEffect(() => {
   cargarConfiguracionColumnas();
 }, [perfil?.clienteId]);
+
+useEffect(() => {
+  const controlarMobile = () => {
+    setEsMobile(window.innerWidth <= 768);
+  };
+
+  controlarMobile();
+  window.addEventListener("resize", controlarMobile);
+
+  return () => {
+    window.removeEventListener("resize", controlarMobile);
+  };
+}, []);
 
   // 👁️ Ver producto
   const manejarVerProducto = (producto) => {
@@ -133,6 +148,13 @@ return usados.length ? usados : [];
 
     return portada?.url || "";
   };
+
+  const toggleProducto = (id) => {
+  setProductosAbiertos((prev) => ({
+    ...prev,
+    [id]: !prev[id],
+  }));
+};
 
   const obtenerObservaciones = (producto) => {
     const atributos = producto?.atributosExtra || {};
@@ -415,9 +437,113 @@ case "tallesResumen": {
         </button>
       </div>
 
+        {esMobile && (
+        <div className="productos-mobile-list">
+          {productos.map((p) => {
+
+            const abierto = productosAbiertos[p.id];
+            const talles = resumirTalles(p);
+            const portadaUrl = obtenerImagenPortada(p);
+            const observaciones = obtenerObservaciones(p);
+
+            return (
+              <div
+                key={p.id}
+                className="producto-mobile-card"
+              >
+
+                <div
+                  className="producto-mobile-header"
+                  onClick={() => toggleProducto(p.id)}
+                >
+
+                  <div className="producto-mobile-header-left">
+                    <strong>
+                      {p.productoNombre || p.producto}
+                    </strong>
+
+                    <span>
+                      {p.totalTalles || p.cantidad || 0} uni.
+                    </span>
+                  </div>
+
+                  <div className="producto-mobile-arrow">
+                    {abierto ? "⌃" : "⌄"}
+                  </div>
+
+                </div>
+
+                {abierto && (
+
+        <>
+        {portadaUrl && (
+        <img
+        src={portadaUrl}
+        alt=""
+        className="producto-mobile-img"
+        />
+        )}
+
+        {!!p.detalle && (
+        <div className="producto-mobile-line">
+        <small>Detalle:</small>
+        <p>{p.detalle}</p>
+        </div>
+        )}
+
+        {!!observaciones && observaciones !== "-" && (
+        <div className="producto-mobile-line">
+        <small>Obs:</small>
+        <p>{observaciones}</p>
+        </div>
+        )}
+
+        {!!talles.length && (
+        <div className="producto-mobile-talles">
+
+        {talles.map((t,index)=>(
+        <span key={index}>
+        {t.talle} · {t.qty}
+        </span>
+        ))}
+
+        </div>
+        )}
+
+        <div
+        className="producto-mobile-actions"
+        onClick={(e)=>e.stopPropagation()}
+        >
+
+        <button onClick={()=>manejarVerProducto(p)}>
+        Ver
+        </button>
+
+        {puedeEditarPedidos && (
+        <button
+        onClick={()=>manejarEditarProducto(p)}
+        >
+        Editar
+        </button>
+        )}
+
+        </div>
+
+        </>
+
+        )}
+
+              </div>
+            );
+          })}
+        </div>
+        )}
+
       
-      {/* 🔹 Tabla de productos */}
-      <table className="tabla-productos">
+{!esMobile && (
+  <>
+    {/* 🔹 Tabla de productos */}
+    <table className="tabla-productos tabla-productos-desktop">
         <thead>
           <tr>
             {columnasVisibles.map((col) => (
@@ -459,6 +585,8 @@ case "tallesResumen": {
           ))}
         </tbody>
       </table>
+        </>
+)}
 
       {productos.length === 0 && (
         <p style={{ textAlign: "center", marginTop: "20px", color: "#888" }}>

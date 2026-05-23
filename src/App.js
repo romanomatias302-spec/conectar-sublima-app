@@ -36,7 +36,9 @@ export default function App() {
   const [vista, setVista] = useState("inicio");
   const [clienteSeleccionado, setClienteSeleccionado] = useState(null);
   const [pedidoSeleccionado, setPedidoSeleccionado] = useState(null);
-  const [sidebarExpandido, setSidebarExpandido] = useState(true);
+  const [sidebarExpandido, setSidebarExpandido] = useState(() => {
+  return window.innerWidth > 768;
+});
   const [ventaSeleccionada, setVentaSeleccionada] = useState(null);
   const [mostrarModalVenta, setMostrarModalVenta] = useState(false);
 
@@ -56,7 +58,7 @@ export default function App() {
       asignarUsuario: false,
     },
     ventas: { ver: false, crear: false, editar: false, eliminar: false },
-    movimientos: { ver: false },
+    informes: { ver: false },
     caja: { ver: false, crear: false, editar: false },
     configuracion: { ver: false },
   };
@@ -312,7 +314,7 @@ const irAVista = (nuevaVista, extra = {}) => {
         "ventas-crear": "ventas",
         "ventas-listado": "ventas",
         "venta-detalle": "ventas",
-        movimientos: "movimientos",
+        movimientos: "informes",
         caja: "caja",
         configuracion: "configuracion",
       };

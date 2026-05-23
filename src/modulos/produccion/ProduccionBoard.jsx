@@ -1,6 +1,7 @@
 import {
   DndContext,
   PointerSensor,
+  TouchSensor,
   useSensor,
   useSensors,
   pointerWithin,
@@ -30,13 +31,19 @@ export default function ProduccionBoard({
   puedeMoverPedidos = true,
   puedeEditarDetalleManual = true,
 }) {
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8,
-      },
-    })
-  );
+const sensors = useSensors(
+  useSensor(PointerSensor, {
+    activationConstraint: {
+      distance: 8,
+    },
+  }),
+  useSensor(TouchSensor, {
+    activationConstraint: {
+      delay: 250,
+      tolerance: 8,
+    },
+  })
+);
 
   function manejarDragEnd(event) {
     if (!puedeMoverPedidos) return;

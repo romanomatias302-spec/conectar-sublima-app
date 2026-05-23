@@ -137,19 +137,21 @@ export default function ProduccionCard({
 
         <div className="produccion-card-layout">
           <div className="produccion-card-main">
-            <div className="produccion-card-cliente">
-              {pedido.cliente || pedido.clienteNombre || pedido.nombreCliente || "Cliente sin nombre"}
+            <div className="produccion-card-mobile-mainline">
+              <span className="produccion-card-pedido-numero">
+                #{pedido.id || pedido.numeroPedido || pedido.numero || "S/N"}
+              </span>
+
+              <span className="produccion-card-cliente">
+                {pedido.cliente || pedido.clienteNombre || pedido.nombreCliente || "Cliente sin nombre"}
+              </span>
+
+              <span className="produccion-card-fecha">
+                Entrega: {pedido.fechaEntrega || "-"}
+              </span>
             </div>
 
-            <div className="produccion-card-fecha">
-              Entrega: {pedido.fechaEntrega || "-"}
-            </div>
 
-            {pedido.produccionNotaCorta && (
-              <div className="produccion-card-nota" title={pedido.produccionNotaCorta}>
-                {pedido.produccionNotaCorta}
-              </div>
-            )}
 
             <button
               type="button"
@@ -171,13 +173,7 @@ export default function ProduccionCard({
                   <span>{tiempoEtapa}</span>
                 </div>
 
-                {(pedido.produccionMetros !== "" &&
-                  pedido.produccionMetros !== null &&
-                  pedido.produccionMetros !== undefined) && (
-                  <div className="produccion-card-metros">
-                    {pedido.produccionMetros} mts
-                  </div>
-                )}
+
               </div>
 
               {marcaStyle && (
@@ -190,18 +186,9 @@ export default function ProduccionCard({
                 </div>
               )}
 
-              {usuarioAsignado && (
-                <div className="produccion-card-asignado" title={usuarioAsignado}>
-                  <span className="produccion-card-asignado-icono">👤</span>
-                  <span className="produccion-card-asignado-texto">{usuarioAsignado}</span>
-                </div>
-              )}
 
-              {ultimoUsuario && (
-                <div className="produccion-card-usuario" title={ultimoUsuario}>
-                  Último mov.: {ultimoUsuario}
-                </div>
-              )}
+
+
             </div>
           )}
         </div>

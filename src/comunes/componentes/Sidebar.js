@@ -123,7 +123,7 @@ export default function Sidebar({
           </li>
         )}
 
-        {puede("movimientos") && (
+        {puede("informes") && (
           <li onClick={() => onSelect("movimientos")}>
             <FaExchangeAlt className="icon" />
             {expandido && <span>Informes</span>}

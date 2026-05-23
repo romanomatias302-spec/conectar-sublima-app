@@ -88,10 +88,14 @@
 
 /* Menú flotante */
 .menu-flotante {
-  position: absolute;
-  bottom: 95px;
+  position: fixed;
+  bottom: 78px;
   left: 50%;
   transform: translateX(-50%);
+
+  width: min(92vw, 340px);
+  max-height: 55vh;
+  overflow-y: auto;
 
   border-radius: 12px;
   padding: 10px;
@@ -207,4 +211,91 @@ body.dark-mode .menu-flotante button {
 
 body.dark-mode .menu-flotante button:hover {
   color: #2da1ff;
+}
+
+.menu-flotante-modulos {
+  width: min(92vw, 340px);
+  max-height: 55vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.menu-flotante-separador {
+  height: 1px;
+  background: rgba(120, 120, 120, 0.25);
+  margin: 4px 0;
+}
+
+.menu-flotante-modulos button {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  justify-content: flex-start;
+}
+
+.menu-flotante-modulos button svg {
+  color: #0096d1;
+  stroke: #0096d1;
+  flex-shrink: 0;
+}
+
+body.dark-mode .menu-flotante-modulos button svg {
+  color: #2da1ff;
+  stroke: #2da1ff;
+}
+
+/* =========================
+   FIX SCROLL HORIZONTAL MENÚ MOBILE
+   ========================= */
+
+.menu-flotante,
+.menu-flotante-modulos {
+  overflow-x: hidden !important;
+  box-sizing: border-box;
+}
+
+.menu-flotante-modulos {
+  max-width: calc(100vw - 24px) !important;
+}
+
+.menu-flotante-modulos button {
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.menu-flotante-modulos button span,
+.menu-flotante-modulos button {
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.menu-flotante-modulos button svg {
+  min-width: 18px;
+}
+
+/* =========================
+   MENÚ MOBILE - ESPACIADO Y SCROLL VERTICAL
+   ========================= */
+
+.menu-flotante,
+.menu-flotante-modulos {
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+}
+
+.menu-flotante-modulos {
+  gap: 10px !important;
+  padding: 12px !important;
+}
+
+.menu-flotante-modulos button {
+  min-height: 42px;
+  padding: 11px 14px !important;
+  gap: 10px !important;
+  flex-shrink: 0;
+}
+
+.menu-flotante-separador {
+  margin: 6px 0 !important;
 }

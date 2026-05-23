@@ -204,8 +204,126 @@ export default function VentasList({ perfil, onVer = () => {}, onEditar = () => 
 
         {loading && <p style={{ marginTop: "16px" }}>Cargando ventas...</p>}
 
-        {!loading && (
-          <div className="ventas-table-wrap">
+{!loading && (
+  <>
+    <div className="ventas-mobile-list">
+      {ventasFiltradas.map((v) => {
+        const ventaAnulada =
+          (v.estadoVenta || "activa") === "anulada";
+
+        return (
+          <div
+            key={v.firebaseId}
+            className={`venta-mobile-card ${
+              ventaAnulada ? "is-anulada" : ""
+            }`}
+            onClick={() => onVer(v)}
+          >
+            <div className="venta-mobile-top">
+              <div>
+                <strong>
+                  Venta #{v.numeroVenta || "-"}
+                </strong>
+
+                <span>
+                  {v.clienteNombre || "Sin cliente"}
+                </span>
+              </div>
+
+              <span
+                className={`ventas-estado-badge ${
+                  ventaAnulada
+                    ? "ventas-estado-anulado"
+                    : "ventas-estado-ok"
+                }`}
+              >
+                {ventaAnulada
+                  ? "Anulada"
+                  : "Activa"}
+              </span>
+            </div>
+
+            <div className="venta-mobile-info">
+              <div>
+                <small>Fecha</small>
+                <p>{v.fechaVenta || "-"}</p>
+              </div>
+
+              <div>
+                <small>Pedido</small>
+                <p>
+                  {v.pedidoVisibleId
+                    ? `#${v.pedidoVisibleId}`
+                    : "-"}
+                </p>
+              </div>
+            </div>
+
+          <div className="venta-mobile-money">
+            <div>
+              <small>Total</small>
+
+              <strong>
+                {formatearMoneda(
+                  v.total,
+                  configMoneda.moneda,
+                  configMoneda.localeMoneda
+                )}
+              </strong>
+            </div>
+
+            <div>
+              <small>Pagado</small>
+
+              <strong>
+                {formatearMoneda(
+                  v.totalPagado,
+                  configMoneda.moneda,
+                  configMoneda.localeMoneda
+                )}
+              </strong>
+            </div>
+
+            <div>
+              <small>Saldo</small>
+
+              <strong
+                className={
+                  Number(v.saldoPendiente || 0) > 0
+                    ? "venta-money-warning"
+                    : "venta-money-ok"
+                }
+              >
+                {formatearMoneda(
+                  v.saldoPendiente || 0,
+                  configMoneda.moneda,
+                  configMoneda.localeMoneda
+                )}
+              </strong>
+            </div>
+          </div>
+
+            <button
+              className="btn btn-primary venta-mobile-btn"
+              onClick={(e) => {
+                e.stopPropagation();
+                onVer(v);
+              }}
+            >
+              Ver
+            </button>
+          </div>
+        );
+      })}
+
+      {ventasFiltradas.length === 0 && (
+        <p className="ventas-mobile-empty">
+          No se encontraron ventas
+        </p>
+      )}
+    </div>
+
+    <div className="ventas-table-wrap ventas-table-desktop">
             <table className="ventas-table">
               <thead>
                 <tr>
@@ -285,9 +403,10 @@ export default function VentasList({ perfil, onVer = () => {}, onEditar = () => 
                   </tr>
                 )}
               </tbody>
-            </table>
+           </table>
           </div>
-        )}
+          </>
+          )}
 
         {!loading && !busqueda && hayMas && (
           <div style={{ textAlign: "center", marginTop: "18px" }}>

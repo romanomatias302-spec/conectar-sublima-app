@@ -70,9 +70,12 @@
 }
 
 .ventas-grid-top {
-  grid-template-columns: 220px 1fr;
-  gap: 12px;
-  align-items: end;
+  grid-template-columns: 1fr !important;
+  gap: 8px;
+}
+
+.ventas-grid-top .ventas-field:first-child {
+  max-width: 120px;
 }
 
 .ventas-field-cliente {
@@ -566,4 +569,305 @@
 
 .ventas-row-anulada .ventas-acciones .btn {
   opacity: 0.95;
+}
+
+/* =========================
+   CREAR VENTA MOBILE COMPACTO
+   ========================= */
+
+@media (max-width: 768px) {
+  .ventas-page {
+    gap: 10px;
+    padding-bottom: 88px;
+  }
+
+  .ventas-topbar h1 {
+    font-size: 22px;
+    margin: 0;
+  }
+
+  .ventas-layout {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .ventas-card,
+  .ventas-card-sticky,
+  .ventas-card-sticky-wrap {
+    padding: 12px;
+    border-radius: 14px;
+  }
+
+  .ventas-card-header {
+    margin-bottom: 8px;
+  }
+
+  .ventas-card-header h2 {
+    font-size: 16px;
+  }
+
+  .ventas-grid-top {
+    grid-template-columns: 90px 1fr !important;
+    gap: 8px;
+    align-items: end;
+  }
+
+  .ventas-grid-pedido {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px;
+  }
+
+  .ventas-field label {
+    font-size: 11px;
+    margin-bottom: 2px;
+  }
+
+  .ventas-field input,
+  .ventas-field select {
+    height: 34px;
+    border-radius: 8px;
+    font-size: 12px;
+    padding: 0 8px;
+  }
+
+  .ventas-cliente-inline {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .ventas-btn-inline {
+    height: 34px;
+    font-size: 12px;
+  }
+
+  .ventas-mt {
+    margin-top: 8px;
+  }
+
+  .ventas-items-actions .btn {
+    width: 100%;
+    height: 36px;
+    padding: 8px;
+  }
+
+  .ventas-table-wrap {
+    overflow-x: hidden;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+  }
+
+  .ventas-table {
+    width: 100%;
+    table-layout: fixed;
+    font-size: 11px;
+  }
+
+  .ventas-table th,
+  .ventas-table td {
+    padding: 5px 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .ventas-table th:nth-child(1),
+  .ventas-table td:nth-child(1) {
+    width: 38%;
+  }
+
+  .ventas-table th:nth-child(2),
+  .ventas-table td:nth-child(2) {
+    width: 13%;
+  }
+
+  .ventas-table th:nth-child(3),
+  .ventas-table td:nth-child(3) {
+    width: 20%;
+  }
+
+  .ventas-table th:nth-child(4),
+  .ventas-table td:nth-child(4) {
+    width: 20%;
+  }
+
+  .ventas-table th:nth-child(5),
+  .ventas-table td:nth-child(5) {
+    width: 9%;
+  }
+
+  .ventas-table td input {
+    height: 28px;
+    font-size: 11px;
+    padding: 0 5px;
+    border-radius: 6px;
+  }
+
+  .ventas-table .btn-danger {
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    font-size: 0;
+    border-radius: 6px;
+  }
+
+  .ventas-table .btn-danger::after {
+    content: "×";
+    font-size: 15px;
+  }
+
+  .ventas-pago-item {
+    grid-template-columns: 1fr 1fr 30px;
+    gap: 6px;
+  }
+}
+
+@media (max-width: 768px) {
+  .ventas-grid-top {
+    align-items: end;
+  }
+
+  .ventas-cliente-inline {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 5px;
+  }
+
+  .ventas-btn-inline {
+    margin-top: 0;
+    height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .ventas-grid-top .ventas-field:first-child {
+    align-self: end;
+  }
+}
+
+/* =========================
+   LISTADO VENTAS MOBILE
+   ========================= */
+
+.ventas-mobile-list {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .ventas-table-desktop {
+    display: none !important;
+  }
+
+  .ventas-mobile-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 12px;
+  }
+
+  .venta-mobile-card {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+    padding: 12px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+  }
+
+  .venta-mobile-card.is-anulada {
+    opacity: 0.7;
+    background: #f8fafc;
+  }
+
+  .venta-mobile-top {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+
+  .venta-mobile-top div {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .venta-mobile-top strong {
+    font-size: 15px;
+    color: #0096d1;
+  }
+
+  .venta-mobile-top span {
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .venta-mobile-info,
+  .venta-mobile-money {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .venta-mobile-info small,
+  .venta-mobile-money small {
+    font-size: 11px;
+    color: #64748b;
+    font-weight: 700;
+  }
+
+  .venta-mobile-info p,
+  .venta-mobile-money strong {
+    margin: 2px 0 0;
+    font-size: 13px;
+  }
+
+  .venta-mobile-btn {
+    width: 100%;
+    height: 36px;
+    font-size: 13px;
+    margin-top: 6px;
+  }
+
+  .ventas-mobile-empty {
+    text-align: center;
+    color: #888;
+    margin-top: 12px;
+  }
+}
+
+.venta-money-warning{
+  color:#ef4444;
+}
+
+.venta-money-ok{
+  color:#22c55e;
+}
+
+@media (max-width: 768px) {
+  .ventas-bloque .ventas-table-wrap {
+    overflow-x: auto;
+  }
+
+  .ventas-bloque .ventas-table {
+    min-width: 620px;
+  }
+
+  .ventas-bloque .ventas-table th:last-child,
+  .ventas-bloque .ventas-table td:last-child {
+    width: 76px;
+    min-width: 76px;
+    text-align: center;
+  }
+
+  .ventas-bloque .ventas-table td:last-child .btn-xs {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 64px;
+    height: 28px;
+    padding: 4px 8px;
+    font-size: 11px;
+    white-space: nowrap;
+  }
 }

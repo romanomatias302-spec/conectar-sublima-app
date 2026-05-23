@@ -35,6 +35,8 @@ export default function PedidoFormModal({ onClose, onPedidoCreado, pedido, perfi
   const puedeCrearPedidos = puedeHacer(perfil, "pedidos", "crear");
   const puedeEditarPedidos = puedeHacer(perfil, "pedidos", "editar");
 
+
+
   const soloLectura =
     (pedido && !puedeEditarPedidos) || (!pedido && !puedeCrearPedidos);
 

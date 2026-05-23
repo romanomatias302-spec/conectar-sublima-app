@@ -273,7 +273,7 @@ useEffect(() => {
 }, [vistaActiva, perfil]);
 
   return (
-    <div className="clientes-lista">
+    <div className="clientes-lista informes-page">
       <div className="encabezado-lista" style={{ marginBottom: 16 }}>
         <div>
           <h1>Informes</h1>
@@ -283,7 +283,7 @@ useEffect(() => {
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: 10, marginBottom: 18, flexWrap: "wrap" }}>
+      <div className="informes-tabs" style={{ display: "flex", gap: 10, marginBottom: 18, flexWrap: "wrap" }}>
         <button
           onClick={() => setVistaActiva("resumen")}
           style={{
@@ -690,10 +690,18 @@ return (
         borderRadius: 12,
         padding: 16,
         marginBottom: 18,
-        display: "flex",
-        gap: 12,
+        display:
+          window.innerWidth <= 768
+            ? "grid"
+            : "flex",
+
+        gridTemplateColumns:
+          window.innerWidth <= 768
+            ? "1fr 1fr"
+            : undefined,
+
+        gap: 8,
         alignItems: "end",
-        flexWrap: "wrap",
       }}
     >
       <div>
@@ -753,6 +761,8 @@ return (
       </button>
     </div>
 
+  
+
     <div
       style={{
         display: "grid",
@@ -764,7 +774,11 @@ return (
       <div style={{ background:"#fff", border:"1px solid #e5e7eb", borderRadius:12, padding:16 }}>
         <h3 style={{ marginTop: 0 }}>Pedidos más demorados</h3>
 
-        <table>
+        
+
+        <div style={{ overflowX: "auto" }}>
+          
+        <table style={{ minWidth: 650 }}>
           <thead>
             <tr>
               <th>Pedido</th>
@@ -786,6 +800,7 @@ return (
             ))}
           </tbody>
         </table>
+        </div>
 
         {pedidosMasDemorados.length === 0 && (
           <p style={{ color: "#666" }}>No hay pedidos activos para mostrar.</p>
@@ -798,7 +813,8 @@ return (
           Cantidad de pedidos activos que tiene asignados cada usuario.
         </p>
 
-        <table>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ minWidth: 650 }}>
           <thead>
             <tr>
               <th>Usuario</th>
@@ -816,7 +832,7 @@ return (
             ))}
           </tbody>
         </table>
-
+      </div>
         {cargaPorUsuario.length === 0 && (
           <p style={{ color: "#666" }}>No hay usuarios con pedidos asignados.</p>
         )}
@@ -970,7 +986,8 @@ const productividadKpi = Object.values(productividadPorUsuarioEtapa)
                     Mide cuánto tarda cada usuario en sacar una tarjeta de cada etapa donde intervino.
                   </p>
 
-                  <table>
+                  <div style={{ overflowX: "auto" }}>
+                  <table style={{ minWidth: 650 }}>
                     <thead>
                       <tr>
                         <th>Usuario</th>
@@ -992,6 +1009,7 @@ const productividadKpi = Object.values(productividadPorUsuarioEtapa)
                       ))}
                     </tbody>
                   </table>
+                  </div>
 
                   {productividadKpi.length === 0 && (
                     <p style={{ color: "#666" }}>
@@ -1005,8 +1023,8 @@ const productividadKpi = Object.values(productividadPorUsuarioEtapa)
                   <p style={{ marginTop: -6, color: "#666", fontSize: 13 }}>
                     Etapas donde las tarjetas tardaron más tiempo antes de avanzar.
                   </p>
-
-                  <table>
+                  <div style={{ overflowX: "auto" }}>
+                  <table style={{ minWidth: 650 }}>
                     <thead>
                       <tr>
                         <th>Etapa</th>
@@ -1024,6 +1042,7 @@ const productividadKpi = Object.values(productividadPorUsuarioEtapa)
                       ))}
                     </tbody>
                   </table>
+                  </div>
                 </div>
               </div>
 
@@ -1070,7 +1089,8 @@ const productividadKpi = Object.values(productividadPorUsuarioEtapa)
                       </button>
                     </div>
 
-                    <table>
+                    <div style={{ overflowX: "auto" }}>
+                    <table style={{ minWidth: 650 }}>
                       <thead>
                         <tr>
                           <th>Fecha</th>
@@ -1098,6 +1118,7 @@ const productividadKpi = Object.values(productividadPorUsuarioEtapa)
                         ))}
                       </tbody>
                     </table>
+                    </div>
                   </div>
                 </div>
               )}

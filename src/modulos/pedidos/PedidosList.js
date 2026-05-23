@@ -412,7 +412,63 @@ export default function PedidosList({
         <p style={{ marginTop: "10px", color: "#666" }}>Cargando pedidos...</p>
       )}
 
-      <table className="tabla-pedidos">
+            <div className="pedidos-mobile-list">
+        {pedidosOrdenados.map((p) => (
+          <div
+            key={p.firebaseId}
+            className="pedido-mobile-card"
+            onClick={() => onVerDetalle(p)}
+          >
+            <div className="pedido-mobile-top">
+              <div>
+                <strong>#{p.id}</strong>
+                <span>{p.cliente || "Sin cliente"}</span>
+              </div>
+
+              <span className={`pedido-mobile-estado ${p.estado?.toLowerCase().replace(" ", "-")}`}>
+                {p.estado || "Sin estado"}
+              </span>
+            </div>
+
+          <div className="pedido-mobile-info">
+            <div className="pedido-mobile-info-row">
+              <small>Pedido:</small>
+              <p>{p.fechaPedido || "-"}</p>
+            </div>
+
+            <div className="pedido-mobile-info-row">
+              <small>Entrega:</small>
+              <p>{p.fechaEntrega || "-"}</p>
+            </div>
+          </div>
+
+            <div className="pedido-mobile-produccion">
+              <ProduccionEstadoCell
+                pedido={p}
+                columnasProduccion={columnasProduccion}
+                onIrProduccion={onIrProduccion}
+              />
+            </div>
+
+            <div className="pedido-mobile-actions" onClick={(e) => e.stopPropagation()}>
+              <button onClick={() => onVerDetalle(p)}>Ver detalle</button>
+
+              {puedeEditarPedidos && (
+                <button
+                  onClick={() => {
+                    setPedidoEditar(p);
+                    setMostrarModal(true);
+                  }}
+                >
+                  Editar
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <table className="tabla-pedidos tabla-pedidos-desktop">
         <thead>
           <tr>
             <th onClick={() => manejarOrden("id")} style={{ cursor: "pointer" }}>

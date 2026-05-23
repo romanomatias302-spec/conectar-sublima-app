@@ -1074,3 +1074,520 @@ body.dark-mode .produccion-historial-meta,
 body.dark-mode .produccion-historial-empty {
   color: #cbd5e1;
 }
+
+/* =========================
+   PRODUCCIÓN MOBILE FIX
+   ========================= */
+
+@media (max-width: 768px) {
+  .produccion-page {
+    padding: 12px;
+    padding-bottom: 92px;
+    height: calc(100vh - 70px);
+  }
+
+  .produccion-page-header-top {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .produccion-page-header-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr auto;
+    gap: 8px;
+  }
+
+  .produccion-select-orden {
+    width: 100%;
+    min-width: 0;
+    font-size: 12px;
+    padding: 7px 8px;
+  }
+
+  .btn-produccion-secundario {
+    white-space: nowrap;
+    padding: 7px 9px;
+    font-size: 12px;
+  }
+
+.produccion-board-wrapper {
+  overflow-x: auto;
+  overflow-y: auto;
+}
+
+  .produccion-board {
+    gap: 12px;
+    padding-bottom: 14px;
+  }
+
+  .produccion-column {
+    min-width: calc(100vw - 48px);
+    max-width: calc(100vw - 48px);
+    padding: 10px;
+  }
+
+  .produccion-column.contraida {
+    min-width: 52px;
+    max-width: 52px;
+  }
+
+  .produccion-card {
+    padding: 9px;
+    gap: 6px;
+  }
+
+  .produccion-card-drag-handle {
+    min-width: 14px;
+    font-size: 12px;
+  }
+
+  .produccion-card-layout {
+    grid-template-columns: 1fr !important;
+  }
+
+  .produccion-card-layout > .produccion-card-side {
+    grid-column: 1 !important;
+    grid-row: auto !important;
+    width: 100% !important;
+    border-left: none !important;
+    border-top: 1px solid rgba(0,0,0,0.08) !important;
+    padding-left: 0 !important;
+    padding-top: 6px !important;
+    margin-top: 6px;
+  }
+
+  .produccion-card-side .produccion-card-meta-row {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .produccion-card-side .produccion-card-tiempo,
+  .produccion-card-side .produccion-card-metros,
+  .produccion-card-side .produccion-card-marca,
+  .produccion-card-side .produccion-card-asignado,
+  .produccion-card-side .produccion-card-usuario {
+    width: auto;
+    max-width: 100%;
+  }
+
+  .produccion-card-cliente {
+    font-size: 13px;
+  }
+
+  .produccion-card-fecha,
+  .produccion-card-link,
+  .produccion-card-nota {
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 768px) {
+  .produccion-card-layout {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .produccion-card-layout > .produccion-card-side {
+    grid-column: 1 !important;
+    width: auto !important;
+    max-width: 100% !important;
+    border-left: none !important;
+    border-top: 1px solid rgba(0,0,0,0.08) !important;
+    padding-left: 0 !important;
+    padding-top: 6px !important;
+    margin-top: 6px;
+  }
+
+  .produccion-card-side .produccion-card-meta-row {
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+  }
+
+  .produccion-card-side .produccion-card-tiempo,
+  .produccion-card-side .produccion-card-metros,
+  .produccion-card-side .produccion-card-marca,
+  .produccion-card-side .produccion-card-asignado,
+  .produccion-card-side .produccion-card-usuario {
+    width: auto !important;
+    max-width: 100% !important;
+  }
+
+  .produccion-column-body {
+    max-height: calc(100vh - 250px);
+    overflow-y: auto;
+  }
+}
+
+/* =========================
+   PRODUCCIÓN MOBILE RESET FINAL
+   ========================= */
+
+@media (max-width: 768px) {
+  .produccion-board-wrapper {
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+  }
+
+  .produccion-board {
+    display: flex !important;
+    align-items: flex-start !important;
+  }
+
+  .produccion-column {
+    min-width: calc(100vw - 48px) !important;
+    max-width: calc(100vw - 48px) !important;
+    overflow: hidden !important;
+  }
+
+  .produccion-column-body {
+    max-height: calc(100vh - 260px) !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+  }
+
+  .produccion-card {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+  }
+
+  .produccion-card-drag-handle {
+    float: left;
+    margin-right: 6px;
+  }
+
+  .produccion-card-clickable {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .produccion-card-layout {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .produccion-card-main,
+  .produccion-card-side {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  .produccion-card-side {
+    border-left: none !important;
+    border-top: 1px solid rgba(0,0,0,0.08) !important;
+    padding-left: 0 !important;
+    padding-top: 6px !important;
+    margin-top: 6px !important;
+  }
+
+  .produccion-card-side .produccion-card-meta-row {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+    gap: 5px !important;
+  }
+
+  .produccion-card-tiempo,
+  .produccion-card-metros,
+  .produccion-card-marca,
+  .produccion-card-asignado,
+  .produccion-card-usuario,
+  .produccion-card-nota {
+    max-width: 100% !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .produccion-page {
+    height: calc(100vh - 70px) !important;
+    overflow: hidden !important;
+  }
+
+  .produccion-board-wrapper {
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    height: 100% !important;
+    min-height: 0 !important;
+  }
+
+  .produccion-column {
+    max-height: calc(100vh - 190px) !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .produccion-column-header {
+    flex-shrink: 0 !important;
+  }
+
+  .produccion-column-body {
+    flex: 1 !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    padding-right: 3px;
+  }
+
+  .produccion-card-main {
+    gap: 5px !important;
+  }
+
+  .produccion-card-link {
+    display: block !important;
+    width: 100% !important;
+    text-align: center !important;
+    padding: 5px 0 !important;
+    margin-top: 3px !important;
+    border-top: 1px solid rgba(0,0,0,0.06) !important;
+  }
+
+  .produccion-card-side {
+    gap: 4px !important;
+  }
+
+  .produccion-card-side .produccion-card-meta-row {
+    gap: 4px !important;
+  }
+}
+
+/* =========================
+   PRODUCCIÓN MOBILE FIX SCROLL + VER PEDIDO
+   ========================= */
+
+@media (max-width: 768px) {
+  .produccion-board-wrapper {
+    height: calc(100vh - 190px) !important;
+    max-height: calc(100vh - 190px) !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+  }
+
+  .produccion-board {
+    height: 100% !important;
+  }
+
+  .produccion-column {
+    height: 100% !important;
+    max-height: 100% !important;
+    overflow: hidden !important;
+  }
+
+  .produccion-column-body {
+    height: calc(100% - 58px) !important;
+    max-height: none !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    padding-bottom: 24px !important;
+  }
+
+  .produccion-card {
+    min-height: auto !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  .produccion-card-clickable {
+    overflow: visible !important;
+  }
+
+  .produccion-card-layout {
+    overflow: visible !important;
+  }
+
+  .produccion-card-main {
+    overflow: visible !important;
+  }
+
+  .produccion-card-link {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    width: 100% !important;
+    margin-top: 6px !important;
+    padding: 6px 0 !important;
+    text-align: center !important;
+    background: rgba(0, 150, 209, 0.08) !important;
+    border-radius: 8px !important;
+    text-decoration: none !important;
+  }
+}
+
+/* =========================
+   PRODUCCIÓN MOBILE COMPACT FINAL
+   ========================= */
+
+@media (max-width: 768px) {
+  .produccion-column {
+    min-width: calc(95vw - 48px) !important;
+    max-width: calc(95vw - 48px) !important;
+  }
+
+  .produccion-board {
+    gap: 10px !important;
+    padding-right: 18px !important;
+  }
+
+  .produccion-card {
+    padding: 10px !important;
+    border-radius: 12px !important;
+  }
+
+  .produccion-card-top-row {
+    margin-bottom: 4px !important;
+  }
+
+  .produccion-card-numero {
+    font-size: 13px !important;
+  }
+
+  .produccion-card-cliente {
+    font-size: 13px !important;
+    line-height: 1.2 !important;
+  }
+
+  .produccion-card-fecha {
+    font-size: 11px !important;
+    margin-bottom: 4px !important;
+  }
+
+  .produccion-card-link {
+    font-size: 11px !important;
+    text-decoration: none !important;
+    background: rgba(0, 150, 209, 0.08) !important;
+    color: #007bb2 !important;
+    border-radius: 7px !important;
+    padding: 4px 8px !important;
+    width: auto !important;
+    align-self: flex-start !important;
+  }
+
+  .produccion-card-layout {
+    display: block !important;
+  }
+
+  .produccion-card-side {
+    border: none !important;
+    padding: 0 !important;
+    margin-top: 6px !important;
+    width: 100% !important;
+  }
+
+  .produccion-card-side .produccion-card-meta-row {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+  }
+
+  .produccion-card-tiempo {
+    width: auto !important;
+    font-size: 11px !important;
+    padding: 4px 7px !important;
+  }
+
+  .produccion-card-marca {
+    width: auto !important;
+    max-width: 100% !important;
+    font-size: 10px !important;
+    padding: 4px 7px !important;
+  }
+}
+
+/* ===== Mostrar mejor N° pedido en mobile ===== */
+
+@media (max-width: 768px) {
+
+  .produccion-card-top-row {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    margin-bottom: 8px !important;
+  }
+
+  .produccion-card-numero {
+    display: inline-flex !important;
+
+    background: #eef6ff !important;
+    color: #0077b6 !important;
+
+    font-size: 12px !important;
+    font-weight: 700 !important;
+
+    padding: 4px 8px !important;
+
+    border-radius: 999px !important;
+
+    line-height: 1 !important;
+
+    margin: 0 !important;
+  }
+
+  body.dark-mode .produccion-card-numero {
+    background: rgba(0,174,239,.15) !important;
+    color: #66d0ff !important;
+  }
+
+}
+@media (max-width: 768px) {
+  .produccion-card-mobile-mainline {
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .produccion-card-pedido-numero {
+    background: #eef6ff;
+    color: #0077b6;
+    font-size: 11px;
+    font-weight: 800;
+    padding: 4px 7px;
+    border-radius: 999px;
+    flex-shrink: 0;
+  }
+
+  .produccion-card-cliente {
+    flex: 1;
+    min-width: 0;
+    font-size: 13px !important;
+    font-weight: 800;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin: 0 !important;
+  }
+
+.produccion-card-fecha {
+  flex-shrink: 0;
+
+  font-size: 10px !important;
+  font-weight: 600;
+
+  color: #64748b;
+
+  white-space: nowrap;
+
+  margin: 0 !important;
+}
+
+  .produccion-card-link {
+    width: 100% !important;
+    text-align: center !important;
+    padding: 7px 10px !important;
+    margin-top: 6px !important;
+    font-size: 12px !important;
+  }
+}

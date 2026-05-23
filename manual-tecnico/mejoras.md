@@ -5,6 +5,10 @@
 - adaptacion mobile
 - mejorar sistema de usuarios es decir los nombres de los privilegios, tenemos a un usuario con nombre de rol "usuario"
 
+## clientes
+
+ver como solucionar dni, corremos riesgo de cargar clientes duplicados porque el sistema deja cargar con el mismo dni.
+
 ## modulo configuracion
 
 - revisar que no se cargue doble. cuando eliminamos vuelven a aparecer.
@@ -29,14 +33,16 @@
 - historial
 - Tandas (hacer dinamicas las columnas de produccion para crear tandas)
 - incidencias (ver como se puede resolver cuando tenemos faltantes)
-- caja
 
 ## ventas
 
 - ver de integrar factura electronica / presupuestos
 - mejorar estetica
+- asociar factura desde la vista de pedidos
 
 ## informes
+
+listo
 
 ## produccion
 
