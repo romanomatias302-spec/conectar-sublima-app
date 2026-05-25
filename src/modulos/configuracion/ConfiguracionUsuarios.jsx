@@ -23,7 +23,9 @@ function formatearFecha(fecha) {
 }
 
 const PERMISOS_DEFAULT_USUARIO = {
-  inicio: { ver: true },
+  inicio: {
+    ver: true,
+  },
 
   clientes: {
     ver: false,
@@ -44,36 +46,32 @@ const PERMISOS_DEFAULT_USUARIO = {
     mover: true,
     editarDetalle: true,
     asignarUsuario: false,
-    verHistorial: true,
+    verSoloAsignados: false,
   },
 
   ventas: {
     ver: false,
     crear: false,
     editar: false,
-    eliminar: false,
-    cobrar: false,
-    anularPagos: false,
+    anular: false,
+    listado: false,
   },
 
   caja: {
     ver: false,
-    abrir: false,
-    cerrar: false,
-    movimientosManual: false,
+    abrirCerrar: false,
+    crearMovimiento: false,
+    anularMovimiento: false,
+    corregirApertura: false,
+    historial: false,
   },
 
-informes: {
-  ver: false,
-  exportar: false,
-},
+  informes: {
+    ver: false,
+  },
 
   configuracion: {
     ver: false,
-    productos: false,
-    usuarios: false,
-    cuenta: false,
-    produccion: false,
   },
 };
 
@@ -103,35 +101,57 @@ const MODULOS_PERMISOS = [
       { key: "eliminar", label: "Eliminar" },
     ],
   },
-  {
-    key: "produccion",
-    label: "Producción",
-    acciones: [
-      { key: "ver", label: "Ver" },
-      { key: "mover", label: "Mover tarjetas" },
-      { key: "editarDetalle", label: "Editar detalle" },
-      { key: "asignarUsuario", label: "Asignar usuario" },
-    ],
-  },
-  {
-    key: "ventas",
-    label: "Ventas",
-    acciones: [
-      { key: "ver", label: "Ver" },
-      { key: "crear", label: "Crear" },
-      { key: "editar", label: "Editar" },
-      { key: "eliminar", label: "Eliminar" },
-    ],
-  },
+{
+  key: "produccion",
+  label: "Producción",
+  acciones: [
+    { key: "ver", label: "Ver módulo" },
+    { key: "mover", label: "Mover tarjetas" },
+    { key: "editarDetalle", label: "Editar detalle" },
+    { key: "asignarUsuario", label: "Asignar usuario" },
+    {
+      key: "verSoloAsignados",
+      label: "Ver solo pedidos asignados",
+    },
+  ],
+},
+{
+  key: "ventas",
+  label: "Ventas",
+  acciones: [
+    { key: "ver", label: "Ver módulo" },
+    { key: "crear", label: "Crear venta" },
+    { key: "listado", label: "Ver listado" },
+    { key: "editar", label: "Editar" },
+    { key: "anular", label: "Anular venta" },
+  ],
+},
 
-  {
+{
   key: "caja",
   label: "Caja",
   acciones: [
-    { key: "ver", label: "Ver" },
-    { key: "abrir", label: "Abrir caja" },
-    { key: "cerrar", label: "Cerrar caja" },
-    { key: "movimientosManual", label: "Movimientos manuales" },
+    { key: "ver", label: "Ver módulo" },
+    {
+      key: "abrirCerrar",
+      label: "Abrir / cerrar caja",
+    },
+    {
+      key: "crearMovimiento",
+      label: "Crear movimientos",
+    },
+    {
+      key: "anularMovimiento",
+      label: "Anular movimientos",
+    },
+    {
+      key: "corregirApertura",
+      label: "Corregir apertura",
+    },
+    {
+      key: "historial",
+      label: "Ver historial",
+    },
   ],
 },
 {

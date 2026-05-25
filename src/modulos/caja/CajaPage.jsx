@@ -8,8 +8,11 @@ import {
   obtenerMovimientosCajaDia,
   obtenerUltimaCajaCerradaAnterior,
   reabrirCaja,
+  obtenerHistorialCajas,
+  corregirAperturaCaja,
 } from "../../firebase/cajas";
 import { formatearMoneda, obtenerConfigMonedaDesdePerfil } from "../../utils/moneda";
+import { puedeHacer } from "../../utils/permisos";
 
 function formatearFechaCaja(fechaISO) {
   if (!fechaISO) return "-";
@@ -17,7 +20,7 @@ function formatearFechaCaja(fechaISO) {
   return `${dd}-${mm}-${yyyy}`;
 }
 
-export default function CajaPage({ perfil }) {
+export default function CajaPage({ perfil, onVerVenta }) {
   const fechaCaja = fechaHoyInput();
 
   const [caja, setCaja] = useState(null);
@@ -28,6 +31,7 @@ export default function CajaPage({ perfil }) {
   const [exito, setExito] = useState("");
 
   const [saldoApertura, setSaldoApertura] = useState(0);
+  const [corrigiendoApertura, setCorrigiendoApertura] = useState(false);
   const [saldoCierreReal, setSaldoCierreReal] = useState("");
 
   const [modalMovimiento, setModalMovimiento] = useState(false);
@@ -36,9 +40,36 @@ export default function CajaPage({ perfil }) {
   const [montoManual, setMontoManual] = useState("");
   const [descripcionManual, setDescripcionManual] = useState("");
   const [mostrarResumen, setMostrarResumen] = useState(false);
+  const [mostrarHistorial, setMostrarHistorial] = useState(false);
+
+const [historialCajas, setHistorialCajas] = useState([]);
+
+const [loadingHistorial, setLoadingHistorial] = useState(false);
+const [historialDesde, setHistorialDesde] = useState("");
+const [historialHasta, setHistorialHasta] = useState("");
+const [cajaHistorialAbiertaId, setCajaHistorialAbiertaId] = useState(null);
+const [movimientosHistorial, setMovimientosHistorial] = useState({});
+  const [filtroTipoMovimiento, setFiltroTipoMovimiento] = useState("");
 
   const configMoneda = obtenerConfigMonedaDesdePerfil(perfil);
+  const puedeAbrirCerrarCaja =
+  puedeHacer(perfil, "caja", "abrirCerrar");
 
+const puedeCrearMovimientoCaja =
+  puedeHacer(perfil, "caja", "crearMovimiento");
+
+const puedeCorregirAperturaCaja =
+  puedeHacer(perfil, "caja", "corregirApertura");
+
+const puedeVerHistorialCaja =
+  puedeHacer(perfil, "caja", "historial");
+  
+ 
+const movimientosFiltrados = useMemo(() => {
+  if (!filtroTipoMovimiento) return movimientos;
+
+  return movimientos.filter((m) => m.tipo === filtroTipoMovimiento);
+}, [movimientos, filtroTipoMovimiento]);
 
   const cargarCaja = async () => {
     try {
@@ -136,6 +167,21 @@ export default function CajaPage({ perfil }) {
       setError("");
       setExito("");
 
+      if (saldoApertura === "" || saldoApertura === null || isNaN(Number(saldoApertura))) {
+        setError("Antes de abrir la caja tenés que ingresar el saldo inicial en efectivo.");
+        return;
+      }
+
+      const ok = window.confirm(
+        `Vas a abrir la caja con ${formatearMoneda(
+          Number(saldoApertura || 0),
+          configMoneda.moneda,
+          configMoneda.localeMoneda
+        )}. ¿Confirmás que el monto es correcto?`
+      );
+
+      if (!ok) return;
+
       await abrirCaja({
         perfil,
         fechaCaja,
@@ -150,6 +196,43 @@ export default function CajaPage({ perfil }) {
       setError(err.message || "No se pudo abrir la caja.");
     }
   };
+
+  const handleCorregirApertura = async () => {
+  try {
+    const nuevoValor = window.prompt(
+      "Ingresá el nuevo saldo de apertura:",
+      caja?.saldoAperturaEfectivo || 0
+    );
+
+    if (nuevoValor === null) return;
+
+    const ok = window.confirm(
+      `¿Corregir apertura a ${formatearMoneda(
+        Number(nuevoValor),
+        configMoneda.moneda,
+        configMoneda.localeMoneda
+      )}?`
+    );
+
+    if (!ok) return;
+
+    setCorrigiendoApertura(true);
+
+    await corregirAperturaCaja({
+      perfil,
+      caja,
+      nuevoSaldoAperturaEfectivo: Number(nuevoValor),
+    });
+
+    await cargarCaja();
+
+    setExito("Apertura corregida.");
+  } catch (err) {
+    setError(err.message);
+  } finally {
+    setCorrigiendoApertura(false);
+  }
+};
 
   const handleCrearMovimientoManual = async () => {
     try {
@@ -179,11 +262,24 @@ export default function CajaPage({ perfil }) {
 
   const handleCerrarCaja = async () => {
     try {
-      const ok = window.confirm("¿Seguro que querés cerrar la caja?");
+
+      if (saldoCierreReal === "" || saldoCierreReal === null || isNaN(Number(saldoCierreReal))) {
+        setError("Antes de cerrar la caja tenés que ingresar el efectivo real contado.");
+        return;
+      }
+      const ok = window.confirm(
+        `Vas a cerrar la caja con efectivo real de ${formatearMoneda(
+          Number(saldoCierreReal || 0),
+          configMoneda.moneda,
+          configMoneda.localeMoneda
+        )}. ¿Confirmás el cierre?`
+      );
+
       if (!ok) return;
 
       setError("");
       setExito("");
+
 
       await cerrarCaja({
         perfil,
@@ -224,6 +320,51 @@ export default function CajaPage({ perfil }) {
       setError(err.message || "No se pudo reabrir la caja.");
     }
   };
+
+  const abrirHistorialCaja = async () => {
+  try {
+    setLoadingHistorial(true);
+
+    const cajas = await obtenerHistorialCajas({
+      perfil,
+      fechaDesde: historialDesde,
+      fechaHasta: historialHasta,
+    });
+
+    setHistorialCajas(cajas);
+
+    setMostrarHistorial(true);
+
+  } catch (err) {
+    setError(err.message);
+
+  } finally {
+    setLoadingHistorial(false);
+  }
+};
+
+const toggleDetalleCajaHistorial = async (cajaHist) => {
+  const abierta = cajaHistorialAbiertaId === cajaHist.firebaseId;
+
+  if (abierta) {
+    setCajaHistorialAbiertaId(null);
+    return;
+  }
+
+  setCajaHistorialAbiertaId(cajaHist.firebaseId);
+
+  
+
+  const movs = await obtenerMovimientosCajaDia({
+    perfil,
+    fechaCaja: cajaHist.fechaCaja,
+  });
+
+  setMovimientosHistorial((prev) => ({
+    ...prev,
+    [cajaHist.fechaCaja]: movs,
+  }));
+};
 
   const opcionesSubtipoManual =
   tipoManual === "ingreso"
@@ -304,11 +445,13 @@ export default function CajaPage({ perfil }) {
         <div style={kpiGrid}>
           <Kpi label="Cierre anterior" value={formatearMoneda(aperturaReferencia, configMoneda.moneda, configMoneda.localeMoneda)} />
           <Kpi label="Apertura" value={formatearMoneda(aperturaActual, configMoneda.moneda, configMoneda.localeMoneda)} />
-          <Kpi
-            label="Diferencia apertura"
-            value={formatearMoneda(diferenciaApertura, configMoneda.moneda, configMoneda.localeMoneda)}
-            color={diferenciaApertura === 0 ? "#146c43" : "#b02a37"}
-          />
+            {caja && (
+              <Kpi
+                label="Diferencia apertura"
+                value={formatearMoneda(diferenciaApertura, configMoneda.moneda, configMoneda.localeMoneda)}
+                color={diferenciaApertura === 0 ? "#146c43" : "#b02a37"}
+              />
+            )}
           <Kpi label="Efectivo esperado" value={formatearMoneda(resumen.efectivoEsperado, configMoneda.moneda, configMoneda.localeMoneda)} />
         </div>
 
@@ -320,9 +463,12 @@ export default function CajaPage({ perfil }) {
               value={saldoApertura}
               onChange={(e) => setSaldoApertura(e.target.value)}
               style={input}
+              disabled={!puedeAbrirCerrarCaja}
             />
 
-            <button onClick={handleAbrirCaja} style={btnPrimary}>
+            <button
+              onClick={handleAbrirCaja}
+              disabled={!puedeAbrirCerrarCaja} style={btnPrimary}>
               Abrir caja
             </button>
           </div>
@@ -330,9 +476,27 @@ export default function CajaPage({ perfil }) {
 
         {estaAbierta && (
           <div style={barraAccionesCompacta}>
-            <button onClick={() => setModalMovimiento(true)} style={btnSecondarySmall}>
-              + Movimiento
-            </button>
+          <button
+            onClick={() => setModalMovimiento(true)}
+            disabled={!puedeCrearMovimientoCaja}
+            style={btnSecondarySmall}
+          >
+            + Agregar movimiento
+          </button>
+
+            {movimientos.length === 0 && (
+              <button
+              onClick={handleCorregirApertura}
+              disabled={
+                corrigiendoApertura ||
+                !puedeCorregirAperturaCaja
+              }
+                style={btnSecondarySmall}
+                disabled={corrigiendoApertura}
+              >
+                Corregir apertura
+              </button>
+            )}
 
             <input
               type="number"
@@ -342,7 +506,9 @@ export default function CajaPage({ perfil }) {
               style={inputSmall}
             />
 
-            <button onClick={handleCerrarCaja} style={btnDangerSmall}>
+            <button
+              onClick={handleCerrarCaja}
+              disabled={!puedeAbrirCerrarCaja} style={btnDangerSmall}>
               Cerrar
             </button>
           </div>
@@ -360,7 +526,9 @@ export default function CajaPage({ perfil }) {
               color={Number(caja.diferenciaCierreEfectivo || 0) === 0 ? "#146c43" : "#b02a37"}
             />
 
-            <button onClick={handleReabrirCaja} style={btnSecondary}>
+            <button
+              onClick={handleReabrirCaja}
+              disabled={!puedeAbrirCerrarCaja} style={btnSecondary}>
               Reabrir caja
             </button>
           </div>
@@ -373,7 +541,16 @@ export default function CajaPage({ perfil }) {
         <section style={card}>
           <div style={sectionHeader}>
             <h2 style={{ margin: 0 }}>Movimientos del día</h2>
-              <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+              <div
+                style={{
+                  display: "flex",
+                  gap: 8,
+                  alignItems: "center",
+                  flexWrap: "wrap",
+                  justifyContent: "flex-end",
+                  maxWidth: "100%",
+                }}
+              >
                 <span style={{ color: "#6b7280", fontSize: 13 }}>
                   {movimientos.length} movimientos
                 </span>
@@ -384,26 +561,35 @@ export default function CajaPage({ perfil }) {
                 >
                   Resumen
                 </button>
+
+                {puedeVerHistorialCaja && (
+                <button
+                style={btnSecondarySmall}
+                onClick={abrirHistorialCaja}
+                >
+                Historial
+                </button>
+                )}
               </div>
           </div>
 
-          <div style={movimientosGrid}>
-            <MovimientoTabla
-              titulo="Ingresos"
-              color="#198754"
-              fondo="rgba(25, 135, 84, 0.05)"
-              movimientos={movimientos.filter((m) => m.tipo === "ingreso")}
-              configMoneda={configMoneda}
-            />
+            <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
+              <select
+                value={filtroTipoMovimiento}
+                onChange={(e) => setFiltroTipoMovimiento(e.target.value)}
+                style={inputSmall}
+              >
+                <option value="">Todos</option>
+                <option value="ingreso">Ingresos</option>
+                <option value="egreso">Egresos</option>
+              </select>
+            </div>
 
             <MovimientoTabla
-              titulo="Egresos"
-              color="#dc3545"
-              fondo="rgba(220, 53, 69, 0.05)"
-              movimientos={movimientos.filter((m) => m.tipo === "egreso")}
+              movimientos={movimientosFiltrados}
               configMoneda={configMoneda}
+              onVerVenta={onVerVenta}
             />
-          </div>
         </section>
       )}
 
@@ -463,7 +649,9 @@ export default function CajaPage({ perfil }) {
                 style={input}
               />
 
-              <button onClick={handleCrearMovimientoManual} style={btnPrimary}>
+              <button
+                onClick={handleCrearMovimientoManual}
+                disabled={!puedeCrearMovimientoCaja} style={btnPrimary}>
                 Guardar movimiento
               </button>
             </div>
@@ -520,39 +708,266 @@ export default function CajaPage({ perfil }) {
     </div>
   </div>
 )}
+
+      {mostrarHistorial && (
+      <div style={modalOverlay}>
+
+      <div style={modalCaja}>
+
+      <div style={modalHeader}>
+
+      <h3>Historial de cajas</h3>
+
+      <button
+      style={modalCloseBtn}
+      onClick={() => setMostrarHistorial(false)}
+      >
+      ✕
+      </button>
+
+      </div>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
+          gap: 10,
+          marginBottom: 14,
+        }}
+      >
+        <input
+          type="date"
+          value={historialDesde}
+          onChange={(e) => setHistorialDesde(e.target.value)}
+          style={input}
+        />
+
+        <input
+          type="date"
+          value={historialHasta}
+          onChange={(e) => setHistorialHasta(e.target.value)}
+          style={input}
+        />
+
+        <button
+          onClick={abrirHistorialCaja}
+          style={{
+            ...btnSecondarySmall,
+            width: "100%",
+          }}
+        >
+          Filtrar
+        </button>
+      </div>
+
+      <div
+        style={{
+          display:"grid",
+          gap:10,
+          maxHeight:"60vh",
+          overflowY:"auto",
+        }}
+      >
+
+      {loadingHistorial && "Cargando..."}
+
+      {historialCajas.map((c)=>(
+      <div
+      key={c.firebaseId}
+      style={{
+      border:"1px solid #e5e7eb",
+      borderRadius:12,
+      padding:14,
+      }}
+      >
+
+<div
+  style={{
+    display:"flex",
+    justifyContent:"space-between",
+    alignItems:"center",
+    marginBottom:8,
+    cursor:"pointer",
+  }}
+  onClick={() => toggleDetalleCajaHistorial(c)}
+>
+
+<div>
+
+<strong>
+{formatearFechaCaja(c.fechaCaja)}
+</strong>
+
+</div>
+
+      <div
+      style={{
+      display:"flex",
+      alignItems:"center",
+      gap:10,
+      }}
+      >
+
+      <span>
+      {c.estado}
+      </span>
+
+      <span
+      style={{
+      fontSize:18,
+      fontWeight:800,
+      }}
+      >
+      {cajaHistorialAbiertaId === c.firebaseId ? "⌃" : "⌄"}
+      </span>
+
+      </div>
+
+      </div>
+
+      <div>
+      Apertura:
+      {" "}
+      {formatearMoneda(
+      c.saldoAperturaEfectivo,
+      configMoneda.moneda,
+      configMoneda.localeMoneda
+      )}
+      </div>
+
+      <div>
+      Cierre:
+      {" "}
+      {formatearMoneda(
+      c.saldoCierreRealEfectivo,
+      configMoneda.moneda,
+      configMoneda.localeMoneda
+      )}
+      </div>
+
+        <div>
+        Diferencia:
+        {" "}
+        {formatearMoneda(
+        c.diferenciaCierreEfectivo,
+        configMoneda.moneda,
+        configMoneda.localeMoneda
+        )}
+        </div>
+
+        {cajaHistorialAbiertaId === c.firebaseId && (
+
+        <div
+        style={{
+        marginTop:12,
+        borderTop:"1px solid #e5e7eb",
+        paddingTop:12,
+        }}
+        >
+
+        <strong>
+        Movimientos del día
+        </strong>
+
+        {(movimientosHistorial[c.fechaCaja] || []).map((m)=>{
+
+        const esIngreso =
+        m.tipo === "ingreso";
+
+        return (
+
+        <div
+        key={m.firebaseId}
+        style={{
+        display:"grid",
+        gridTemplateColumns:"1fr auto",
+        gap:10,
+        padding:"8px 0",
+        borderBottom:"1px solid #f1f5f9",
+        }}
+        >
+
+        <div>
+
+        <div
+        style={{
+        fontWeight:700,
+        }}
+        >
+        {m.descripcion || m.subtipo || "-"}
+        </div>
+
+        <small
+        style={{
+        color:"#6b7280",
+        }}
+        >
+        {m.medioPago || "-"}
+        </small>
+
+        </div>
+
+        <strong
+        style={{
+        color:
+        esIngreso
+        ? "#198754"
+        : "#dc3545",
+        }}
+        >
+
+        {esIngreso ? "+" : "-"}
+
+        {" "}
+
+        {formatearMoneda(
+        m.monto,
+        configMoneda.moneda,
+        configMoneda.localeMoneda
+        )}
+
+        </strong>
+
+        </div>
+
+        );
+
+        })}
+
+        {(movimientosHistorial[c.fechaCaja] || []).length === 0 && (
+
+        <p
+        style={{
+        color:"#777",
+        marginBottom:0,
+        }}
+        >
+        Sin movimientos
+        </p>
+
+        )}
+
+        </div>
+
+        )}
+
+        </div>
+      ))}
+
+      </div>
+
+      </div>
+
+      </div>
+      )}
     </div>
     
   );
 }
 
-function MovimientoTabla({
-  titulo,
-  movimientos,
-  configMoneda,
-  color = "#111827",
-  fondo = "#f8fafc",
-}) {
-  const total = movimientos.reduce(
-    (acc, m) => acc + Number(m.monto || 0),
-    0
-  );
-
-
-
+function MovimientoTabla({ movimientos, configMoneda, onVerVenta }) {
   return (
     <div style={tablaMovCard}>
-      <div
-        style={{
-          ...tablaMovHeader,
-          background: fondo,
-          borderBottom: `1px solid ${color}20`,
-        }}
-      >
-        <h3 style={{ margin: 0, color }}>{titulo}</h3>
-        <strong style={{ color }}>
-          {formatearMoneda(total, configMoneda.moneda, configMoneda.localeMoneda)}</strong>
-      </div>
-
       <table>
         <thead>
           <tr>
@@ -564,14 +979,44 @@ function MovimientoTabla({
         </thead>
 
         <tbody>
-          {movimientos.map((m) => (
-            <tr key={m.firebaseId}>
-              <td>{formatearFechaCaja(m.fecha)}</td>
-              <td>{m.medioPago || "-"}</td>
-              <td>{m.descripcion || m.subtipo || "-"}</td>
-              <td>{formatearMoneda(m.monto, configMoneda.moneda, configMoneda.localeMoneda)}</td>
-            </tr>
-          ))}
+          {movimientos.map((m) => {
+            const esIngreso = m.tipo === "ingreso";
+            const monto = Number(m.monto || 0);
+
+            return (
+              <tr
+                key={m.firebaseId}
+                onClick={() => {
+                  if (m.origen === "venta" && m.origenRefId && onVerVenta) {
+                    onVerVenta(m.origenRefId);
+                  }
+                }}
+                style={{
+                  background: esIngreso
+                    ? "rgba(25,135,84,0.05)"
+                    : "rgba(220,53,69,0.05)",
+                  cursor: m.origen === "venta" ? "pointer" : "default",
+                }}
+              >
+                <td>{formatearFechaCaja(m.fecha)}</td>
+                <td>{m.medioPago || "-"}</td>
+                <td>{m.descripcion || m.subtipo || "-"}</td>
+                <td
+                  style={{
+                    fontWeight: 800,
+                    color: esIngreso ? "#198754" : "#dc3545",
+                  }}
+                >
+                  {esIngreso ? "+" : "-"}{" "}
+                  {formatearMoneda(
+                    monto,
+                    configMoneda.moneda,
+                    configMoneda.localeMoneda
+                  )}
+                </td>
+              </tr>
+            );
+          })}
 
           {movimientos.length === 0 && (
             <tr>
@@ -583,7 +1028,6 @@ function MovimientoTabla({
         </tbody>
       </table>
     </div>
-    
   );
 }
 
@@ -664,6 +1108,7 @@ const sectionHeader = {
   alignItems: "center",
   gap: 12,
   marginBottom: 14,
+  flexWrap: "wrap",
 };
 
 const input = {

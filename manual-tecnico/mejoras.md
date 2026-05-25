@@ -2,7 +2,7 @@
 
 - onboarding
 - mejorar modo oscuro
-- adaptacion mobile
+
 - mejorar sistema de usuarios es decir los nombres de los privilegios, tenemos a un usuario con nombre de rol "usuario"
 
 ## clientes
@@ -39,6 +39,7 @@ ver como solucionar dni, corremos riesgo de cargar clientes duplicados porque el
 - ver de integrar factura electronica / presupuestos
 - mejorar estetica
 - asociar factura desde la vista de pedidos
+- al crear pedido permitir crear factura llevando los itens del peido ej: camiseta 2 uni / etc.
 
 ## informes
 

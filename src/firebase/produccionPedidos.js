@@ -16,6 +16,8 @@ import {
   calcularProgresoPorColumna,
 } from "../modulos/produccion/produccionUtils";
 import { obtenerColumnasProduccion } from "./produccionColumnas";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { storage } from "../firebase";
 
 const PEDIDOS_COLLECTION = "pedidos";
 
@@ -406,26 +408,77 @@ export function escucharPedidosProduccionFinalizadosRecientes(clienteId, callbac
 export async function actualizarDetalleManualProduccion({
   pedidoId,
   produccionNotaCorta = "",
-  produccionMetros = "",
+  produccionNotaLarga = "",
+  produccionImagenPortada = "",
+  produccionArchivos = [],
+  produccionEtiquetas = [],
   produccionEtiquetaId = "",
   produccionEtiquetaNombre = "",
   produccionEtiquetaColor = "",
 }) {
   const ref = doc(db, PEDIDOS_COLLECTION, pedidoId);
 
+  const etiquetasNormalizadas = Array.isArray(produccionEtiquetas)
+    ? produccionEtiquetas
+        .filter((e) => e?.id)
+        .slice(0, 4)
+        .map((e) => ({
+          id: e.id,
+          nombre: e.nombre || "",
+          color: e.color || "",
+        }))
+    : [];
+
   await updateDoc(ref, {
     produccionNotaCorta: produccionNotaCorta || "",
-    produccionMetros:
-      produccionMetros === "" || produccionMetros === null
-        ? ""
-        : Number(produccionMetros),
+    produccionNotaLarga: produccionNotaLarga || "",
+    produccionImagenPortada: produccionImagenPortada || "",
+    produccionImagenPortadaOrigen: produccionImagenPortada ? "pedido" : "",
+    produccionArchivos: produccionArchivos || [],
 
-    produccionEtiquetaId: produccionEtiquetaId || "",
-    produccionEtiquetaNombre: produccionEtiquetaNombre || "",
-    produccionEtiquetaColor: produccionEtiquetaColor || "",
+    produccionEtiquetas: etiquetasNormalizadas,
+
+    produccionEtiquetaId:
+      produccionEtiquetaId || etiquetasNormalizadas[0]?.id || "",
+
+    produccionEtiquetaNombre:
+      produccionEtiquetaNombre || etiquetasNormalizadas[0]?.nombre || "",
+
+    produccionEtiquetaColor:
+      produccionEtiquetaColor || etiquetasNormalizadas[0]?.color || "",
 
     updatedAt: serverTimestamp(),
   });
+}
+
+export async function subirArchivoProduccion({ pedidoId, archivo }) {
+  if (!pedidoId) throw new Error("Pedido inválido.");
+  if (!archivo) throw new Error("Archivo inválido.");
+
+  const extension = archivo.name.split(".").pop()?.toLowerCase();
+
+  const extensionesPermitidas = ["pdf", "xls", "xlsx", "doc", "docx", "zip"];
+
+  if (!extensionesPermitidas.includes(extension)) {
+    throw new Error("Formato no permitido. Solo PDF, Excel, Word o ZIP.");
+  }
+
+  const id = `${Date.now()}-${archivo.name}`;
+
+  const storageRef = ref(storage, `produccion/${pedidoId}/archivos/${id}`);
+
+  await uploadBytes(storageRef, archivo);
+
+  const url = await getDownloadURL(storageRef);
+
+  return {
+    id,
+    nombre: archivo.name,
+    url,
+    tipo: archivo.type || extension,
+    extension,
+    peso: archivo.size || 0,
+  };
 }
 
 export async function asignarUsuarioProduccion({

@@ -51,6 +51,7 @@ function normalizarItems({ items = [], descripcion = "", cantidad = 0, precioUni
           descripcion: (item.descripcion || "").trim(),
           cantidad: Number(item.cantidad || 0),
           precioUnitario: Number(item.precioUnitario || 0),
+          excluirDescuento: item.excluirDescuento === true,
         }))
         .filter(
           (item) =>
@@ -61,10 +62,11 @@ function normalizarItems({ items = [], descripcion = "", cantidad = 0, precioUni
     : [];
 
   if (itemsValidos.length > 0) {
-    return itemsValidos.map((item) => ({
-      ...item,
-      subtotal: item.cantidad * item.precioUnitario,
-    }));
+return itemsValidos.map((item) => ({
+  ...item,
+  subtotal: item.cantidad * item.precioUnitario,
+  excluirDescuento: item.excluirDescuento === true,
+}));
   }
 
   if (descripcion && Number(cantidad) > 0) {
@@ -194,6 +196,7 @@ export async function crearVenta({
         cantidad: item.cantidad,
         precioUnitario: item.precioUnitario,
         subtotal: item.subtotal,
+        excluirDescuento: item.excluirDescuento === true,
         origenItem: "inicial",
         estadoItem: "activo",
         motivoAnulacion: "",

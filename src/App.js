@@ -23,6 +23,8 @@ import VentaDetalle from "./modulos/ventas/VentaDetalle";
 import { obtenerVentaPorId } from "./firebase/ventas";
 import ProduccionPage from "./modulos/produccion/ProduccionPage";
 import CajaPage from "./modulos/caja/CajaPage";
+import { puedeHacer as puedeHacerPerfil } from "./utils/permisos";
+
 
 
 
@@ -40,6 +42,7 @@ export default function App() {
   return window.innerWidth > 768;
 });
   const [ventaSeleccionada, setVentaSeleccionada] = useState(null);
+  const [productosPedidoParaVenta, setProductosPedidoParaVenta] = useState([]);
   const [mostrarModalVenta, setMostrarModalVenta] = useState(false);
 
 
@@ -47,41 +50,20 @@ export default function App() {
 
   const esRutaActivacion = window.location.pathname === "/activar-cuenta";
 
-  const PERMISOS_DEFAULT_USUARIO = {
-    inicio: { ver: true },
-    clientes: { ver: false, crear: false, editar: false, eliminar: false },
-    pedidos: { ver: true, crear: false, editar: false, eliminar: false },
-    produccion: {
-      ver: true,
-      mover: true,
-      editarDetalle: true,
-      asignarUsuario: false,
-    },
-    ventas: { ver: false, crear: false, editar: false, eliminar: false },
-    informes: { ver: false },
-    caja: { ver: false, crear: false, editar: false },
-    configuracion: { ver: false },
-  };
+const puedeHacer = (modulo, accion = "ver") => {
+  return puedeHacerPerfil(perfil, modulo, accion);
+};
 
-  const puedeHacer = (modulo, accion = "ver") => {
-    if (!perfil) return false;
-
-    if (perfil.rol === "superadmin" || perfil.rol === "admin") {
-      return true;
-    }
-
-    const permisos = perfil.permisos || PERMISOS_DEFAULT_USUARIO;
-
-    return permisos?.[modulo]?.[accion] === true;
-  };
-
-  const puedeVerModulo = (modulo) => puedeHacer(modulo, "ver");
+const puedeVerModulo = (modulo) =>
+  puedeHacer(modulo, "ver");
 
 const irAVista = (nuevaVista, extra = {}) => {
   const nuevoCliente = extra.cliente ?? null;
   const nuevoPedido = extra.pedido ?? null;
   const nuevaVenta = extra.venta ?? null;
   const nuevoOrigen = extra.origen ?? null;
+const nuevosProductosPedidoParaVenta =
+  extra.productosPedido ?? [];
 
 
 
@@ -90,6 +72,8 @@ const irAVista = (nuevaVista, extra = {}) => {
   setPedidoSeleccionado(nuevoPedido);
   setVentaSeleccionada(nuevaVenta);
   setOrigenVista(nuevoOrigen);
+  setProductosPedidoParaVenta(nuevosProductosPedidoParaVenta);
+
 
   if (esRutaActivacion) return;
 
@@ -189,11 +173,13 @@ const irAVista = (nuevaVista, extra = {}) => {
             console.log("CLIENTE HABILITADO PARA ENTRAR");
           }
 
-          setPerfil({
-            ...dataPerfil,
-            moneda: monedaTenant,
-            localeMoneda: localeMonedaTenant,
-          });
+            setPerfil({
+              uid: user.uid,
+              firebaseUid: user.uid,
+              ...dataPerfil,
+              moneda: monedaTenant,
+              localeMoneda: localeMonedaTenant,
+            });
 
           setMensajeBloqueo("");
 
@@ -333,7 +319,7 @@ const irAVista = (nuevaVista, extra = {}) => {
     }, [perfil, vista]);
 
   // 🔹 Navegación desde el sidebar
-  const manejarSeleccionSidebar = (modulo) => {
+  const manejarSeleccionSidebar = (modulo, extra = {}) => {
     switch (modulo) {
       case "clientes":
         irAVista("listado");
@@ -348,7 +334,7 @@ const irAVista = (nuevaVista, extra = {}) => {
       irAVista("caja");
       break;  
       default:
-        irAVista(modulo);
+        irAVista(modulo, extra);
         break;
     }
   };
@@ -552,6 +538,13 @@ const irAVista = (nuevaVista, extra = {}) => {
             perfil={perfil}
             pedido={pedidoSeleccionado}
             origenVista={origenVista}
+            onCrearVentaDesdePedido={(pedido, productos) => {
+              irAVista("ventas-crear", {
+                pedido,
+                origen: "detallePedido",
+                productosPedido: productos,
+              });
+            }}
             onVolver={() => {
               if (origenVista === "produccion") {
                 irAVista("produccion");
@@ -574,7 +567,11 @@ const irAVista = (nuevaVista, extra = {}) => {
         )}
 
         {vista === "ventas-crear" && (
-          <VentasPage perfil={perfil} />
+          <VentasPage
+            perfil={perfil}
+            pedidoInicial={pedidoSeleccionado}
+            productosPedido={productosPedidoParaVenta}
+          />
         )}
 
         {vista === "ventas-listado" && (
@@ -601,7 +598,18 @@ const irAVista = (nuevaVista, extra = {}) => {
         )}
 
         {vista === "caja" && (
-          <CajaPage perfil={perfil} />
+          <CajaPage
+            perfil={perfil}
+            onVerVenta={async (ventaId) => {
+              try {
+                const venta = await obtenerVentaPorId(ventaId);
+                irAVista("venta-detalle", { venta });
+              } catch (error) {
+                console.error("Error abriendo venta desde caja:", error);
+                alert("No se pudo abrir la venta asociada.");
+              }
+            }}
+          />
         )}
 
         {vista === "configuracion" && (

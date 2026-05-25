@@ -12,6 +12,7 @@ import {
 import { signOut } from "firebase/auth";
 import { auth } from "../../firebase";
 import "./Sidebar.css";
+import { puedeHacer } from "../../utils/permisos";
 
 export default function Sidebar({
   onSelect,
@@ -39,6 +40,12 @@ export default function Sidebar({
     if (!puedeVerModulo) return false;
     return puedeVerModulo(modulo);
   };
+
+  const puedeCrearVentas =
+  puedeHacer(perfil, "ventas", "crear");
+
+const puedeVerListadoVentas =
+  puedeHacer(perfil, "ventas", "listado");
 
   return (
     <div className={`sidebar ${expandido ? "expandido" : "colapsado"}`}>
@@ -78,7 +85,7 @@ export default function Sidebar({
           </li>
         )}
 
-        {puede("ventas") && (
+        {(puedeCrearVentas || puedeVerListadoVentas) && (
           <li className="menu-group">
             <div
               className="menu-item-with-arrow"
@@ -98,19 +105,28 @@ export default function Sidebar({
 
             {expandido && ventasOpen && (
               <div className="sidebar-submenu">
+              {puedeCrearVentas && (
                 <div
                   className="sidebar-subitem"
-                  onClick={() => onSelect("ventas-crear")}
+                  onClick={() =>
+                    onSelect("ventas-crear", {
+                      pedido: null,
+                      productosPedido: [],
+                    })
+                  }
                 >
                   Crear venta
                 </div>
+              )}
 
+              {puedeVerListadoVentas && (
                 <div
                   className="sidebar-subitem"
                   onClick={() => onSelect("ventas-listado")}
                 >
                   Listado de ventas
                 </div>
+              )}
               </div>
             )}
           </li>

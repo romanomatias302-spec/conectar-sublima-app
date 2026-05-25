@@ -54,8 +54,14 @@ export default function VentaDetalle({ perfil, ventaId, onVolver, onVerPedido })
   const [error, setError] = useState("");
   const [exito, setExito] = useState("");
 
-  const puedeVerVentas = puedeHacer(perfil, "ventas", "ver");
-  const puedeEditarVentas = puedeHacer(perfil, "ventas", "editar");
+const puedeVerVentas =
+  puedeHacer(perfil, "ventas", "ver");
+
+const puedeEditarVentas =
+  puedeHacer(perfil, "ventas", "editar");
+
+const puedeAnularVentas =
+  puedeHacer(perfil, "ventas", "anular");
 
 
 
@@ -125,7 +131,7 @@ export default function VentaDetalle({ perfil, ventaId, onVolver, onVerPedido })
 
     const anularItem = async (item) => {
     try {
-      if (!puedeEditarVentas) return;
+      if (!puedeAnularVentas) return;
       const motivo = window.prompt("Motivo de anulación del ítem:", "");
       if (motivo === null) return;
 
@@ -149,7 +155,7 @@ export default function VentaDetalle({ perfil, ventaId, onVolver, onVerPedido })
 
   const anularPago = async (pago) => {
     try {
-      if (!puedeEditarVentas) return;
+      if (!puedeAnularVentas) return;
       const motivo = window.prompt("Motivo de anulación del pago:", "");
       if (motivo === null) return;
 
@@ -173,7 +179,7 @@ export default function VentaDetalle({ perfil, ventaId, onVolver, onVerPedido })
 
     const handleAnularVenta = async () => {
       try {
-        if (!puedeEditarVentas) return;
+        if (!puedeAnularVentas) return;
         if (!venta) return;
 
         const motivo = window.prompt("Motivo de anulación de la venta:", "");
@@ -332,7 +338,7 @@ export default function VentaDetalle({ perfil, ventaId, onVolver, onVerPedido })
               {ventaAnulada ? "Venta anulada" : "Venta activa"}
             </span>
 
-            {!ventaAnulada && (
+            {!ventaAnulada && puedeAnularVentas && (
               <button
                 className="btn btn-secondary btn-xs"
                 onClick={handleAnularVenta}
@@ -444,7 +450,9 @@ export default function VentaDetalle({ perfil, ventaId, onVolver, onVerPedido })
                           </span>
                         </td>
                         <td>
-                          {activo && !ventaAnulada && puedeEditarVentas ? (
+                          {activo &&
+                              !ventaAnulada &&
+                              puedeAnularVentas ? (
                             <button
                               className="btn btn-secondary btn-xs"
                               onClick={() => anularItem(item)}
@@ -556,7 +564,9 @@ export default function VentaDetalle({ perfil, ventaId, onVolver, onVerPedido })
                           </span>
                         </td>
                         <td>
-                          {activo && !ventaAnulada && puedeEditarVentas ? (
+                          {activo &&
+                          !ventaAnulada &&
+                          puedeAnularVentas ? (
                             <button
                               className="btn btn-secondary btn-xs"
                               onClick={() => anularPago(pago)}

@@ -84,6 +84,16 @@ const [fechaHastaFinanzas, setFechaHastaFinanzas] = useState(hoyDefault.hasta);
 const [tipoMovimientoFiltro, setTipoMovimientoFiltro] = useState("");
 const [exportandoExcel, setExportandoExcel] = useState(false);
 const [mensajeExportacion, setMensajeExportacion] = useState("");
+const [esMobile, setEsMobile] = useState(window.innerWidth <= 768);
+
+useEffect(() => {
+  const handleResize = () => {
+    setEsMobile(window.innerWidth <= 768);
+  };
+
+  window.addEventListener("resize", handleResize);
+  return () => window.removeEventListener("resize", handleResize);
+}, []);
 
 const estadoActualFiltrado = filtroUsuarioProduccion
   ? estadoActualProduccion.filter(
@@ -528,7 +538,8 @@ useEffect(() => {
               </div>
             );
           })()}
-          <table>
+          <div style={{ width: "100%", overflowX: "auto" }}>
+          <table style={{ minWidth: 720 }}>
             <thead>
               <tr>
                 <th>Fecha</th>
@@ -552,6 +563,7 @@ useEffect(() => {
               ))}
             </tbody>
           </table>
+          </div>
 
           {!loading && hayMas && (
             <div style={{ textAlign: "center", marginTop: 20 }}>
@@ -690,18 +702,11 @@ return (
         borderRadius: 12,
         padding: 16,
         marginBottom: 18,
-        display:
-          window.innerWidth <= 768
-            ? "grid"
-            : "flex",
-
-        gridTemplateColumns:
-          window.innerWidth <= 768
-            ? "1fr 1fr"
-            : undefined,
-
-        gap: 8,
+        display: esMobile ? "grid" : "flex",
+        gridTemplateColumns: esMobile ? "1fr" : "repeat(5, auto)",
+        gap: 10,
         alignItems: "end",
+        width: "100%",
       }}
     >
       <div>
@@ -749,13 +754,25 @@ return (
         </select>
       </div>
 
-      <button onClick={cargarHistorialProduccion}>
+      <button
+        onClick={cargarHistorialProduccion}
+        style={{
+          width: "100%",
+          height: 38,
+          borderRadius: 10,
+        }}
+      >
         Aplicar filtros
       </button>
 
       <button
         onClick={() => setModalHistorialAbierto(true)}
-        style={{ marginLeft: "auto" }}
+        style={{
+          width: "100%",
+          height: 38,
+          borderRadius: 10,
+          gridColumn: esMobile ? "1 / -1" : undefined,
+        }}
       >
         Ver historial detallado
       </button>
@@ -766,19 +783,32 @@ return (
     <div
       style={{
         display: "grid",
-        gridTemplateColumns: "1.3fr 0.9fr",
+        gridTemplateColumns:
+          window.innerWidth <= 768
+            ? "1fr"
+            : "1.3fr 0.9fr",
+
         gap: 18,
         marginBottom: 18,
+        alignItems: "start",
       }}
     >
-      <div style={{ background:"#fff", border:"1px solid #e5e7eb", borderRadius:12, padding:16 }}>
+      <div
+        style={{
+          background:"#fff",
+          border:"1px solid #e5e7eb",
+          borderRadius:12,
+          padding:16,
+          minWidth:0,
+          width:"100%",
+        }}
+      >
         <h3 style={{ marginTop: 0 }}>Pedidos más demorados</h3>
 
         
 
-        <div style={{ overflowX: "auto" }}>
-          
-        <table style={{ minWidth: 650 }}>
+        <div style={{ width: "100%", overflowX: "auto" }}>
+          <table style={{ minWidth: 720 }}>
           <thead>
             <tr>
               <th>Pedido</th>
@@ -807,14 +837,23 @@ return (
         )}
       </div>
 
-      <div style={{ background:"#fff", border:"1px solid #e5e7eb", borderRadius:12, padding:16 }}>
+      <div
+        style={{
+          background:"#fff",
+          border:"1px solid #e5e7eb",
+          borderRadius:12,
+          padding:16,
+          minWidth:0,
+          width:"100%",
+        }}
+      >
         <h3 style={{ marginTop: 0 }}>Carga operativa por usuario</h3>
         <p style={{ marginTop: -6, color: "#666", fontSize: 13 }}>
           Cantidad de pedidos activos que tiene asignados cada usuario.
         </p>
 
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ minWidth: 650 }}>
+        <div style={{ width: "100%", overflowX: "auto" }}>
+          <table style={{ minWidth: 720 }}>
           <thead>
             <tr>
               <th>Usuario</th>
@@ -979,15 +1018,30 @@ const productividadKpi = Object.values(productividadPorUsuarioEtapa)
                
               
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
-                <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 16 }}>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: esMobile ? "1fr" : "1fr 1fr",
+                  gap: 18,
+                }}
+              >
+                <div
+                  style={{
+                    background:"#fff",
+                    border:"1px solid #e5e7eb",
+                    borderRadius:12,
+                    padding:16,
+                    minWidth:0,
+                    width:"100%",
+                  }}
+                >
                   <h3 style={{ marginTop: 0 }}>Productividad por usuario y etapa</h3>
                   <p style={{ marginTop: -6, color: "#666", fontSize: 13 }}>
                     Mide cuánto tarda cada usuario en sacar una tarjeta de cada etapa donde intervino.
                   </p>
 
-                  <div style={{ overflowX: "auto" }}>
-                  <table style={{ minWidth: 650 }}>
+                  <div style={{ width: "100%", overflowX: "auto" }}>
+                    <table style={{ minWidth: 720 }}>
                     <thead>
                       <tr>
                         <th>Usuario</th>
@@ -1018,13 +1072,22 @@ const productividadKpi = Object.values(productividadPorUsuarioEtapa)
                   )}
                 </div>
 
-                <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 16 }}>
+                <div
+                  style={{
+                    background:"#fff",
+                    border:"1px solid #e5e7eb",
+                    borderRadius:12,
+                    padding:16,
+                    minWidth:0,
+                    width:"100%",
+                  }}
+                >
                   <h3 style={{ marginTop: 0 }}>Cuellos de botella históricos</h3>
                   <p style={{ marginTop: -6, color: "#666", fontSize: 13 }}>
                     Etapas donde las tarjetas tardaron más tiempo antes de avanzar.
                   </p>
-                  <div style={{ overflowX: "auto" }}>
-                  <table style={{ minWidth: 650 }}>
+                <div style={{ width: "100%", overflowX: "auto" }}>
+                  <table style={{ minWidth: 720 }}>
                     <thead>
                       <tr>
                         <th>Etapa</th>
@@ -1088,9 +1151,8 @@ const productividadKpi = Object.values(productividadPorUsuarioEtapa)
                         Cerrar
                       </button>
                     </div>
-
-                    <div style={{ overflowX: "auto" }}>
-                    <table style={{ minWidth: 650 }}>
+                    <div style={{ width: "100%", overflowX: "auto" }}>
+                      <table style={{ minWidth: 720 }}>
                       <thead>
                         <tr>
                           <th>Fecha</th>

@@ -9,11 +9,18 @@ import {
   orderBy,
   limit,
   serverTimestamp,
+  startAt,
+  endAt,
 } from "firebase/firestore";
 import { db } from "../firebase";
 
 export function fechaHoyInput() {
-  return new Date().toISOString().slice(0, 10);
+  const hoy = new Date();
+  const yyyy = hoy.getFullYear();
+  const mm = String(hoy.getMonth() + 1).padStart(2, "0");
+  const dd = String(hoy.getDate()).padStart(2, "0");
+
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 export async function obtenerCajaDelDia({ perfil, fechaCaja = fechaHoyInput() }) {
@@ -248,4 +255,67 @@ export async function reabrirCaja({
     reabiertaAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
+}
+
+export async function corregirAperturaCaja({
+  perfil,
+  caja,
+  nuevoSaldoAperturaEfectivo,
+}) {
+  if (!perfil?.clienteId) throw new Error("Perfil inválido.");
+  if (!caja?.firebaseId) throw new Error("Caja inválida.");
+  if (caja.estado !== "abierta") throw new Error("La caja debe estar abierta.");
+
+  const movimientos = await obtenerMovimientosCajaDia({
+    perfil,
+    fechaCaja: caja.fechaCaja,
+  });
+
+  const activos = movimientos.filter(
+    (m) => (m.estadoMovimiento || "activo") === "activo"
+  );
+
+  if (activos.length > 0) {
+    throw new Error(
+      "No se puede corregir la apertura porque la caja ya tiene movimientos. Usá un movimiento de ajuste."
+    );
+  }
+
+  const nuevoSaldo = Number(nuevoSaldoAperturaEfectivo || 0);
+  const saldoAnterior = Number(caja.saldoCierreAnteriorEfectivo || 0);
+
+  await updateDoc(doc(db, "cajas", caja.firebaseId), {
+    saldoAperturaEfectivo: nuevoSaldo,
+    diferenciaAperturaEfectivo: nuevoSaldo - saldoAnterior,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export async function obtenerHistorialCajas({
+  perfil,
+  limite = 30,
+  fechaDesde = "",
+  fechaHasta = "",
+}) {
+  if (!perfil?.clienteId) {
+    throw new Error("Perfil inválido.");
+  }
+
+  let filtros = [
+    where("clienteId", "==", perfil.clienteId),
+    orderBy("fechaCaja", "desc"),
+  ];
+
+  if (fechaHasta) filtros.push(startAt(fechaHasta));
+  if (fechaDesde) filtros.push(endAt(fechaDesde));
+
+  filtros.push(limit(limite));
+
+  const q = query(collection(db, "cajas"), ...filtros);
+  const snap = await getDocs(q);
+
+  return snap.docs.map((d) => ({
+    firebaseId: d.id,
+    ...d.data(),
+  }));
 }

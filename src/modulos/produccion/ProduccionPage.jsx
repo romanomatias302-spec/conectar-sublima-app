@@ -17,16 +17,21 @@ import {
   moverPedidosDeColumnaEliminadaAAnterior,
   recalcularPedidosPorCambioDeColumnas,
   actualizarDetalleManualProduccion,
+  subirArchivoProduccion,
   asignarUsuarioProduccion,
   obtenerHistorialProduccionPedido,
+  
 } from "../../firebase/produccionPedidos";
 import { agruparPedidosPorColumna } from "./produccionUtils";
 import ProduccionBoard from "./ProduccionBoard";
 import {
   escucharEtiquetasProduccion,
   crearEtiquetaProduccion,
+  actualizarEtiquetaProduccion,
+  desactivarEtiquetaProduccion,
 } from "../../firebase/produccionEtiquetas";
 import "./produccion.css";
+import { puedeHacer } from "../../utils/permisos";
 
 function getProduccionUIStorageKey(perfil) {
   const clienteId = perfil?.clienteId || "sin-cliente";
@@ -87,7 +92,8 @@ export default function ProduccionPage({ perfil, onVerPedido = () => {} }) {
  const [notaManual, setNotaManual] = useState("");
  const [metrosManual, setMetrosManual] = useState("");
  const [etiquetasProduccion, setEtiquetasProduccion] = useState([]);
- const [etiquetaSeleccionadaId, setEtiquetaSeleccionadaId] = useState("");
+ const [etiquetasSeleccionadasIds, setEtiquetasSeleccionadasIds] = useState([]);
+const [filtroEtiquetaId, setFiltroEtiquetaId] = useState("todas");
  const [colorManual, setColorManual] = useState("");
 const [colorManualTexto, setColorManualTexto] = useState("");
 
@@ -104,32 +110,28 @@ const [colorManualTexto, setColorManualTexto] = useState("");
  const [usuariosProduccion, setUsuariosProduccion] = useState([]);
  const [usuarioAsignadoUid, setUsuarioAsignadoUid] = useState("");
 
+ const [notaCortaManual,setNotaCortaManual]=useState("");
+  const [notaLargaManual,setNotaLargaManual]=useState("");
 
-   const PERMISOS_DEFAULT_USUARIO = {
-    inicio: { ver: true },
-    clientes: { ver: false, crear: false, editar: false, eliminar: false },
-    pedidos: { ver: true, crear: false, editar: false, eliminar: false },
-    produccion: {
-      ver: true,
-      mover: true,
-      editarDetalle: true,
-      asignarUsuario: false,
-    },
-    ventas: { ver: false, crear: false, editar: false, eliminar: false },
-    movimientos: { ver: false },
-    configuracion: { ver: false },
-  };
+  const [mostrarSelectorPortada,setMostrarSelectorPortada]=useState(false);
+
+  const [imagenPortadaProduccion,setImagenPortadaProduccion]=useState("");
+  const [archivosProduccion, setArchivosProduccion] = useState([]);
+  const [subiendoArchivoProduccion, setSubiendoArchivoProduccion] = useState(false);
+  const [imagenesPedido,setImagenesPedido]=useState([]);
 
   const puedeHacerEnProduccion = (accion = "ver") => {
-    if (!perfil) return false;
-
-    if (perfil.rol === "admin" || perfil.rol === "superadmin") {
-      return true;
-    }
-
-    const permisos = perfil.permisos || PERMISOS_DEFAULT_USUARIO;
-    return permisos?.produccion?.[accion] === true;
+    return puedeHacer(perfil, "produccion", accion);
   };
+
+const esAdminProduccion =
+  perfil?.rol === "admin" || perfil?.rol === "superadmin";
+
+const debeVerSoloAsignados =
+  !esAdminProduccion && puedeHacerEnProduccion("verSoloAsignados");
+
+const uidActual =
+  perfil?.uid || perfil?.firebaseUid || "";
 
 
 
@@ -295,8 +297,46 @@ function ordenarTarjetas(lista, modoOrden) {
   return copia;
 }
 
-function filtrarPedidosPorAsignado(lista, filtro, perfil) {
+function obtenerEtiquetasPedido(pedido) {
+  if (Array.isArray(pedido?.produccionEtiquetas)) {
+    return pedido.produccionEtiquetas.slice(0, 4);
+  }
+
+  if (pedido?.produccionEtiquetaId) {
+    return [
+      {
+        id: pedido.produccionEtiquetaId,
+        nombre: pedido.produccionEtiquetaNombre || "",
+        color: pedido.produccionEtiquetaColor || "",
+      },
+    ];
+  }
+
+  return [];
+}
+
+function filtrarPedidosPorEtiqueta(lista, etiquetaId) {
   if (!Array.isArray(lista)) return [];
+  if (!etiquetaId || etiquetaId === "todas") return lista;
+
+  if (etiquetaId === "sin_etiqueta") {
+    return lista.filter((pedido) => obtenerEtiquetasPedido(pedido).length === 0);
+  }
+
+  return lista.filter((pedido) =>
+    obtenerEtiquetasPedido(pedido).some((etiqueta) => etiqueta.id === etiquetaId)
+  );
+}
+
+function filtrarPedidosPorAsignado(lista, filtro, perfil, forzarSoloAsignados = false) {
+  if (!Array.isArray(lista)) return [];
+
+  const uidActual = perfil?.uid || perfil?.firebaseUid || "";
+
+  if (forzarSoloAsignados) {
+    if (!uidActual) return [];
+    return lista.filter((p) => p.produccionAsignadoUid === uidActual);
+  }
 
   if (filtro === "todos") return lista;
 
@@ -305,7 +345,6 @@ function filtrarPedidosPorAsignado(lista, filtro, perfil) {
   }
 
   if (filtro === "mios") {
-    const uidActual = perfil?.uid || perfil?.firebaseUid || "";
     if (!uidActual) return lista;
     return lista.filter((p) => p.produccionAsignadoUid === uidActual);
   }
@@ -316,19 +355,29 @@ function filtrarPedidosPorAsignado(lista, filtro, perfil) {
 
 
   const pedidosPorColumna = useMemo(() => {
-  const pedidosFiltrados = filtrarPedidosPorAsignado(pedidos, filtroAsignado, perfil);
-  const finalizadosFiltrados = filtrarPedidosPorAsignado(
-    pedidosFinalizadosRecientes,
+  const pedidosFiltrados = filtrarPedidosPorAsignado(
+    pedidos,
     filtroAsignado,
-    perfil
+    perfil,
+    debeVerSoloAsignados
   );
-  const animadosFiltrados = filtrarPedidosPorAsignado(
-    animandoFinalizados,
-    filtroAsignado,
-    perfil
-  );
-
-  const agrupadoBase = agruparPedidosPorColumna(columnas, pedidosFiltrados);
+const finalizadosFiltrados = filtrarPedidosPorAsignado(
+  pedidosFinalizadosRecientes,
+  filtroAsignado,
+  perfil,
+  debeVerSoloAsignados
+);
+const animadosFiltrados = filtrarPedidosPorAsignado(
+  animandoFinalizados,
+  filtroAsignado,
+  perfil,
+  debeVerSoloAsignados
+);
+const pedidosFiltradosPorEtiqueta = filtrarPedidosPorEtiqueta(
+  pedidosFiltrados,
+  filtroEtiquetaId
+);
+  const agrupadoBase = agruparPedidosPorColumna(columnas, pedidosFiltradosPorEtiqueta);
 
   const columnaFinal = columnas.find((c) => c.esFinal);
   if (!columnaFinal) {
@@ -343,7 +392,17 @@ function filtrarPedidosPorAsignado(lista, filtro, perfil) {
     agrupadoBase[columnaFinal.id] = [];
   }
 
-    finalizadosFiltrados.forEach((pedidoFinalizado) => {
+    const finalizadosFiltradosPorEtiqueta = filtrarPedidosPorEtiqueta(
+      finalizadosFiltrados,
+      filtroEtiquetaId
+    );
+
+    const animadosFiltradosPorEtiqueta = filtrarPedidosPorEtiqueta(
+      animadosFiltrados,
+      filtroEtiquetaId
+    );
+
+    finalizadosFiltradosPorEtiqueta.forEach((pedidoFinalizado) => {
     const yaExiste = agrupadoBase[columnaFinal.id].some(
       (p) => (p.firebaseId || p.id) === (pedidoFinalizado.firebaseId || pedidoFinalizado.id)
     );
@@ -353,7 +412,7 @@ function filtrarPedidosPorAsignado(lista, filtro, perfil) {
     }
   });
 
-    animadosFiltrados.forEach((pedidoAnimado) => {
+    animadosFiltradosPorEtiqueta.forEach((pedidoAnimado) => {
     const yaExiste = agrupadoBase[columnaFinal.id].some(
       (p) => (p.firebaseId || p.id) === (pedidoAnimado.firebaseId || pedidoAnimado.id)
     );
@@ -376,7 +435,9 @@ function filtrarPedidosPorAsignado(lista, filtro, perfil) {
   animandoFinalizados,
   ordenTarjetas,
   filtroAsignado,
+  filtroEtiquetaId,
   perfil,
+  debeVerSoloAsignados,
 ]);
 
   async function manejarMoverPedido(pedidoId, columnaDestinoId) {
@@ -587,6 +648,19 @@ function toggleColumnaContraida(columnaId) {
   });
 }
 
+  async function cargarProductosDelPedidoProduccion(pedidoId) {
+  if (!pedidoId) return [];
+
+  const snapshot = await getDocs(
+    collection(db, `pedidos/${pedidoId}/productos`)
+  );
+
+  return snapshot.docs.map((docu) => ({
+    id: docu.id,
+    ...docu.data(),
+  }));
+}
+
   async function abrirDetalleManual(pedido) {
     if (!puedeHacerEnProduccion("editarDetalle")) return;
 
@@ -597,8 +671,34 @@ function toggleColumnaContraida(columnaId) {
         ? ""
         : String(pedido.produccionMetros)
     );
-setEtiquetaSeleccionadaId(pedido?.produccionEtiquetaId || "");
+const etiquetasActuales = obtenerEtiquetasPedido(pedido);
+setEtiquetasSeleccionadasIds(etiquetasActuales.map((e) => e.id).filter(Boolean));
     setUsuarioAsignadoUid(pedido?.produccionAsignadoUid || "");
+    setNotaCortaManual(
+    pedido?.produccionNotaCorta || ""
+    );
+
+    setNotaLargaManual(
+    pedido?.produccionNotaLarga || ""
+    );
+
+    setArchivosProduccion(pedido?.produccionArchivos || []);
+
+    setImagenPortadaProduccion(
+    pedido?.produccionImagenPortada || ""
+    );
+
+    setMostrarSelectorPortada(false);
+
+const productosDelPedido = await cargarProductosDelPedidoProduccion(
+  pedido?.firebaseId
+);
+
+const imagenesDetectadas = obtenerImagenesPedido(productosDelPedido);
+
+setImagenesPedido(imagenesDetectadas);
+
+console.log("IMÁGENES PRODUCCIÓN DETECTADAS:", imagenesDetectadas);
 
     try {
       setLoadingHistorialProduccion(true);
@@ -612,17 +712,71 @@ setEtiquetaSeleccionadaId(pedido?.produccionEtiquetaId || "");
     }
   }
 
+function obtenerImagenesPedido(productos = []) {
+  const resultado = [];
+
+  productos.forEach((prod) => {
+    (prod?.imagenes || []).forEach((img, idx) => {
+      const normalizada =
+        typeof img === "string"
+          ? { url: img, tipo: "link", portada: false }
+          : img;
+
+      if (!normalizada?.url) return;
+
+      resultado.push({
+        id: `${prod.id || prod.productoNombre || "producto"}-${idx}`,
+        url: normalizada.url,
+        portada: normalizada.portada || false,
+        producto: prod.productoNombre || prod.producto || "Producto",
+        tipo: normalizada.tipo || "link",
+      });
+    });
+  });
+
+  return resultado;
+}
+
 function cerrarDetalleManual() {
   setPedidoEditandoDetalle(null);
   setNotaManual("");
   setMetrosManual("");
-  setEtiquetaSeleccionadaId("");
+  setEtiquetasSeleccionadasIds([]);
   setUsuarioAsignadoUid("");
   setHistorialProduccion([]);
   setLoadingHistorialProduccion(false);
+  setArchivosProduccion([]);
+  setSubiendoArchivoProduccion(false);
 }
 
+async function manejarSubirArchivosProduccion(e) {
+  try {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
 
+    setSubiendoArchivoProduccion(true);
+
+    const nuevos = [];
+
+    for (const archivo of files) {
+      const subido = await subirArchivoProduccion({
+        pedidoId: pedidoEditandoDetalle.firebaseId,
+        archivo,
+      });
+
+      nuevos.push(subido);
+    }
+
+    setArchivosProduccion((prev) => [...prev, ...nuevos]);
+
+    e.target.value = "";
+  } catch (error) {
+    console.error("Error subiendo archivo de producción:", error);
+    alert(error.message || "No se pudo subir el archivo.");
+  } finally {
+    setSubiendoArchivoProduccion(false);
+  }
+}
 
 async function guardarDetalleManual() {
   try {
@@ -631,8 +785,14 @@ async function guardarDetalleManual() {
 
     setGuardandoDetalleManual(true);
 
-    const etiquetaSeleccionada =
-      etiquetasProduccion.find((e) => e.id === etiquetaSeleccionadaId) || null;
+const etiquetasSeleccionadas = etiquetasProduccion
+  .filter((e) => etiquetasSeleccionadasIds.includes(e.id))
+  .slice(0, 4)
+  .map((e) => ({
+    id: e.id,
+    nombre: e.nombre || "",
+    color: e.color || "",
+  }));
 
     const usuarioSeleccionado =
       usuariosProduccion.find((u) => u.uid === usuarioAsignadoUid) || null;
@@ -648,14 +808,32 @@ if (puedeHacerEnProduccion("asignarUsuario")) {
   });
 }
 
-    await actualizarDetalleManualProduccion({
-      pedidoId: pedidoEditandoDetalle.firebaseId,
-      produccionNotaCorta: notaManual,
-      produccionMetros: metrosManual,
-      produccionEtiquetaId: etiquetaSeleccionada?.id || "",
-      produccionEtiquetaNombre: etiquetaSeleccionada?.nombre || "",
-      produccionEtiquetaColor: etiquetaSeleccionada?.color || "",
-    });
+await actualizarDetalleManualProduccion({
+pedidoId: pedidoEditandoDetalle.firebaseId,
+
+produccionNotaCorta:
+notaCortaManual,
+
+produccionNotaLarga:
+notaLargaManual,
+
+produccionImagenPortada:
+imagenPortadaProduccion,
+
+produccionArchivos: 
+archivosProduccion,
+
+produccionEtiquetas: etiquetasSeleccionadas,
+
+produccionEtiquetaId:
+etiquetasSeleccionadas[0]?.id || "",
+
+produccionEtiquetaNombre:
+etiquetasSeleccionadas[0]?.nombre || "",
+
+produccionEtiquetaColor:
+etiquetasSeleccionadas[0]?.color || "",
+});
 
     cerrarDetalleManual();
   } catch (error) {
@@ -690,6 +868,56 @@ async function guardarNuevaEtiquetaProduccion() {
     console.error("Error creando etiqueta de producción:", error);
   } finally {
     setGuardandoEtiqueta(false);
+  }
+}
+
+async function manejarEditarEtiquetaProduccion(etiqueta) {
+  try {
+    if (!puedeHacerEnProduccion("editarDetalle")) return;
+    if (!perfil?.clienteId || !etiqueta?.id) return;
+
+    const nuevoNombre = window.prompt(
+      "Nuevo nombre de la etiqueta:",
+      etiqueta.nombre || ""
+    );
+
+    if (nuevoNombre === null) return;
+
+    const nombreLimpio = nuevoNombre.trim();
+    if (!nombreLimpio) return;
+
+    await actualizarEtiquetaProduccion({
+      clienteId: perfil.clienteId,
+      etiquetaId: etiqueta.id,
+      nombre: nombreLimpio,
+      color: etiqueta.color || "rojo",
+    });
+  } catch (error) {
+    console.error("Error editando etiqueta:", error);
+  }
+}
+
+async function manejarEliminarEtiquetaProduccion(etiqueta) {
+  try {
+    if (!puedeHacerEnProduccion("editarDetalle")) return;
+    if (!perfil?.clienteId || !etiqueta?.id) return;
+
+    const ok = window.confirm(
+      `¿Seguro que querés eliminar la etiqueta "${etiqueta.nombre}"? No se borrará de pedidos anteriores, solo dejará de estar disponible.`
+    );
+
+    if (!ok) return;
+
+    await desactivarEtiquetaProduccion({
+      clienteId: perfil.clienteId,
+      etiquetaId: etiqueta.id,
+    });
+
+    setEtiquetasSeleccionadasIds((prev) =>
+      prev.filter((id) => id !== etiqueta.id)
+    );
+  } catch (error) {
+    console.error("Error eliminando etiqueta:", error);
   }
 }
 
@@ -745,6 +973,22 @@ async function guardarNuevaEtiquetaProduccion() {
                 </select>
 
                 <select
+                  value={filtroEtiquetaId}
+                  onChange={(e) => setFiltroEtiquetaId(e.target.value)}
+                  className="produccion-select-orden"
+                >
+                  <option value="todas">Todas las etiquetas</option>
+                  <option value="sin_etiqueta">Sin etiqueta</option>
+
+                  {etiquetasProduccion.map((etiqueta) => (
+                    <option key={etiqueta.id} value={etiqueta.id}>
+                      {etiqueta.nombre}
+                    </option>
+                  ))}
+                </select>
+
+              {!debeVerSoloAsignados ? (
+                <select
                   value={filtroAsignado}
                   onChange={(e) => setFiltroAsignado(e.target.value)}
                   className="produccion-select-orden"
@@ -759,6 +1003,11 @@ async function guardarNuevaEtiquetaProduccion() {
                     </option>
                   ))}
                 </select>
+              ) : (
+                <div className="produccion-select-orden">
+                  Solo mis pedidos asignados
+                </div>
+              )}
 
                 {puedeGestionarColumnas && (
                     <button
@@ -835,25 +1084,36 @@ async function guardarNuevaEtiquetaProduccion() {
     >
       <h3>Detalle manual de producción</h3>
 
-      <label>Metros</label>
-      <input
-        type="number"
-        step="0.01"
-        value={metrosManual}
-        onChange={(e) => setMetrosManual(e.target.value)}
-        className="produccion-modal-input"
-        placeholder="Ej: 42"
-      />
+      <div className="produccion-modal-section">
+      <h4>Notas internas</h4>
 
       <label>Nota corta</label>
       <input
         type="text"
         maxLength={60}
-        value={notaManual}
-        onChange={(e) => setNotaManual(e.target.value)}
+        value={notaCortaManual}
+        onChange={(e) => setNotaCortaManual(e.target.value)}
         className="produccion-modal-input"
-        placeholder="Ej: Mandar hoy / Esperar 200 mts"
+        placeholder="Ej: Mandar hoy / Esperar tela / Revisar logo"
       />
+
+      <label>Nota larga</label>
+
+      <textarea
+        rows={4}
+        value={notaLargaManual}
+        onChange={(e) => setNotaLargaManual(e.target.value)}
+        className="produccion-modal-input"
+        placeholder="Detalle interno para producción..."
+        style={{
+          resize: "vertical",
+          minHeight: 110,
+        }}
+      />
+      </div>
+
+      <div className="produccion-modal-section">
+      <h4>Asignación</h4>
 
       {puedeHacerEnProduccion("asignarUsuario") && (
         <>
@@ -874,31 +1134,85 @@ async function guardarNuevaEtiquetaProduccion() {
           </div>
         </>
       )}
-      <label>Etiqueta</label>
-      <div className="produccion-asignacion-box">
-        <select
-          value={etiquetaSeleccionadaId}
-          onChange={(e) => setEtiquetaSeleccionadaId(e.target.value)}
-          className="produccion-modal-input"
-        >
-          <option value="">Sin etiqueta</option>
-          {etiquetasProduccion.map((etiqueta) => (
-            <option key={etiqueta.id} value={etiqueta.id}>
-              {etiqueta.nombre}
-            </option>
-          ))}
-        </select>
 
-        {puedeHacerEnProduccion("editarDetalle") && (
-          <button
-            type="button"
-            className="btn-produccion-secundario"
-            onClick={() => setMostrarNuevaEtiqueta((prev) => !prev)}
-          >
-            + Etiqueta
-          </button>
-        )}
       </div>
+
+      <div className="produccion-modal-section">
+        <h4>Etiquetas</h4>
+
+<details className="produccion-etiquetas-details">
+  <summary>
+    Etiquetas seleccionadas: {etiquetasSeleccionadasIds.length}/4
+  </summary>
+
+  <div className="produccion-etiquetas-checklist">
+    {etiquetasProduccion.map((etiqueta) => {
+      const activa = etiquetasSeleccionadasIds.includes(etiqueta.id);
+      const maximoAlcanzado =
+        etiquetasSeleccionadasIds.length >= 4 && !activa;
+
+      return (
+<div key={etiqueta.id} className="produccion-etiqueta-check-row">
+  <label className="produccion-etiqueta-check">
+    <input
+      type="checkbox"
+      checked={activa}
+      disabled={maximoAlcanzado}
+      onChange={() => {
+        setEtiquetasSeleccionadasIds((prev) => {
+          if (prev.includes(etiqueta.id)) {
+            return prev.filter((id) => id !== etiqueta.id);
+          }
+
+          if (prev.length >= 4) return prev;
+
+          return [...prev, etiqueta.id];
+        });
+      }}
+    />
+
+    <span className="produccion-etiqueta-preview">
+      {etiqueta.nombre}
+    </span>
+  </label>
+
+  {puedeHacerEnProduccion("editarDetalle") && (
+    <div className="produccion-etiqueta-actions">
+      <button
+        type="button"
+        onClick={() => manejarEditarEtiquetaProduccion(etiqueta)}
+      >
+        ✎
+      </button>
+
+      <button
+        type="button"
+        onClick={() => manejarEliminarEtiquetaProduccion(etiqueta)}
+      >
+        ×
+      </button>
+    </div>
+  )}
+</div>
+      );
+    })}
+  </div>
+</details>
+
+<small className="produccion-hint">
+  Podés seleccionar hasta 4 etiquetas por tarjeta.
+</small>
+
+{puedeHacerEnProduccion("editarDetalle") && (
+  <button
+    type="button"
+    className="btn-produccion-secundario"
+    onClick={() => setMostrarNuevaEtiqueta((prev) => !prev)}
+  >
+    + Etiqueta
+  </button>
+  
+)}
 
       {mostrarNuevaEtiqueta && puedeHacerEnProduccion("editarDetalle") && (
         <div className="produccion-etiqueta-nueva-box">
@@ -988,6 +1302,198 @@ async function guardarNuevaEtiquetaProduccion() {
           </div>
         </div>
       )}
+
+</div>
+
+<div className="produccion-modal-section">
+  <h4>Portada</h4>
+
+ <label>Imagen de portada</label>
+
+<div className="produccion-portada-box">
+  {imagenPortadaProduccion ? (
+    <>
+      <img
+        src={imagenPortadaProduccion}
+        alt=""
+        style={{
+          width: "100%",
+          maxHeight: 180,
+          objectFit: "contain",
+          borderRadius: 10,
+          marginTop: 6,
+          border: "1px solid #e5e7eb",
+        }}
+      />
+
+      <div
+        style={{
+          display: "flex",
+          gap: 8,
+          marginTop: 10,
+          flexWrap: "wrap",
+        }}
+      >
+        <button
+          type="button"
+          className="btn-produccion-secundario"
+          onClick={() => setMostrarSelectorPortada((v) => !v)}
+        >
+          Cambiar portada
+        </button>
+
+        <button
+          type="button"
+          className="btn-produccion-cancelar"
+          onClick={() => {
+            setImagenPortadaProduccion("");
+            setMostrarSelectorPortada(false);
+          }}
+        >
+          Quitar portada
+        </button>
+      </div>
+    </>
+  ) : (
+    <button
+      type="button"
+      className="btn-produccion-secundario"
+      onClick={() => setMostrarSelectorPortada((v) => !v)}
+    >
+      Ver más imágenes del pedido
+    </button>
+  )}
+
+  {mostrarSelectorPortada && (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fill,minmax(90px,1fr))",
+        gap: 10,
+        marginTop: 12,
+        maxHeight: 220,
+        overflowY: "auto",
+      }}
+    >
+      {imagenesPedido.map((img) => (
+        <div
+          key={img.id}
+          style={{
+            cursor: "pointer",
+            border:
+              imagenPortadaProduccion === img.url
+                ? "3px solid #00aeef"
+                : "1px solid #ddd",
+            borderRadius: 10,
+            overflow: "hidden",
+          }}
+          onClick={() => {
+            setImagenPortadaProduccion(img.url);
+            setMostrarSelectorPortada(false);
+          }}
+        >
+          <img
+            src={img.url}
+            alt=""
+            style={{
+              width: "100%",
+              height: 90,
+              objectFit: "cover",
+            }}
+          />
+
+          <div style={{ padding: 4, fontSize: 11 }}>
+            {img.producto}
+          </div>
+        </div>
+      ))}
+
+      {imagenesPedido.length === 0 && (
+        <div style={{ color: "#666" }}>
+          Este pedido no tiene imágenes.
+        </div>
+      )}
+    </div>
+  )}
+</div>
+
+<div className="produccion-modal-section">
+  <h4>Archivos</h4>
+<label>Archivos de producción</label>
+
+<div className="produccion-archivos-box">
+  <input
+    type="file"
+    multiple
+    accept=".pdf,.xls,.xlsx,.doc,.docx,.zip"
+    onChange={manejarSubirArchivosProduccion}
+    className="produccion-modal-input"
+  />
+
+  {subiendoArchivoProduccion && (
+    <p className="produccion-historial-empty">Subiendo archivo...</p>
+  )}
+
+{archivosProduccion.length > 0 && (
+  <div className="produccion-archivos-lista">
+    {archivosProduccion.map((archivo) => {
+      const ext = archivo.extension || archivo.nombre?.split(".").pop()?.toLowerCase();
+
+      const icono =
+        ext === "pdf"
+          ? "📕"
+          : ["xls", "xlsx"].includes(ext)
+          ? "📊"
+          : ["doc", "docx"].includes(ext)
+          ? "📄"
+          : ext === "zip"
+          ? "🗜️"
+          : "📎";
+
+      return (
+        <div key={archivo.id} className="produccion-archivo-item">
+          <a href={archivo.url} target="_blank" rel="noreferrer">
+            <span style={{ marginRight: 6 }}>{icono}</span>
+            {archivo.nombre}
+          </a>
+
+          <div style={{ display: "flex", gap: 6 }}>
+            <a
+              href={archivo.url}
+              target="_blank"
+              rel="noreferrer"
+              className="btn-produccion-secundario"
+              style={{
+                textDecoration: "none",
+                display: "inline-flex",
+                alignItems: "center",
+              }}
+            >
+              Ver
+            </a>
+
+            <button
+              type="button"
+              className="btn-produccion-cancelar"
+              onClick={() => {
+                setArchivosProduccion((prev) =>
+                  prev.filter((a) => a.id !== archivo.id)
+                );
+              }}
+            >
+              Quitar
+            </button>
+          </div>
+        </div>
+      );
+    })}
+  </div>
+)}
+</div>
+</div>
+</div>
+
+
 
       <div className="produccion-modal-actions">
         <button className="btn-produccion-cancelar" onClick={cerrarDetalleManual}>

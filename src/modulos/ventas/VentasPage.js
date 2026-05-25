@@ -19,7 +19,28 @@ const itemVacio = () => ({
   descripcion: "",
   cantidad: 1,
   precioUnitario: 0,
+  excluirDescuento: false,
 });
+
+function convertirProductosPedidoAVenta(productos = []) {
+  return productos.map((producto) => ({
+    descripcion:
+      producto.productoNombre ||
+      producto.producto ||
+      "",
+
+    cantidad:
+      Number(
+        producto.totalTalles ||
+        producto.cantidad ||
+        1
+      ),
+
+    precioUnitario: 0,
+    
+    excluirDescuento: false,
+  }));
+}
 
 const clienteRapidoInicial = {
   nombre: "",
@@ -27,7 +48,11 @@ const clienteRapidoInicial = {
   telefono: "",
 };
 
-export default function VentasPage({ perfil }) {
+export default function VentasPage({
+  perfil,
+  pedidoInicial = null,
+  productosPedido = [],
+}) {
   const [clientes, setClientes] = useState([]);
   const [pedidos, setPedidos] = useState([]);
   
@@ -50,6 +75,11 @@ export default function VentasPage({ perfil }) {
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
   const [exito, setExito] = useState("");
+  const [mostrarImportarPedido, setMostrarImportarPedido] =
+  useState(false);
+
+const [pedidoImportado, setPedidoImportado] =
+  useState(false);
 
   const configMoneda = obtenerConfigMonedaDesdePerfil(perfil);
 
@@ -108,6 +138,26 @@ export default function VentasPage({ perfil }) {
     cargarDatosBase();
   }, [perfil]);
 
+useEffect(() => {
+  if (
+    pedidoInicial &&
+    productosPedido.length &&
+    !pedidoImportado
+  ) {
+    setMostrarImportarPedido(true);
+    return;
+  }
+
+  if (!pedidoInicial && !productosPedido.length) {
+    resetearFormulario();
+    setPedidoImportado(false);
+    setMostrarImportarPedido(false);
+  }
+}, [
+  pedidoInicial,
+  productosPedido,
+]);
+
   const clientesFiltrados = useMemo(() => {
     const texto = (busquedaCliente || "").trim().toLowerCase();
     if (!texto) return clientes;
@@ -136,26 +186,45 @@ export default function VentasPage({ perfil }) {
     [pedidos, pedidoRefId]
   );
 
-  const itemsNormalizados = useMemo(
-    () =>
-      items.map((item) => ({
-        ...item,
-        cantidad: Number(item.cantidad || 0),
-        precioUnitario: Number(item.precioUnitario || 0),
-        subtotal: Number(item.cantidad || 0) * Number(item.precioUnitario || 0),
-      })),
-    [items]
-  );
+const itemsNormalizados = useMemo(
+  () =>
+    items.map((item) => ({
+      ...item,
+      cantidad: Number(item.cantidad || 0),
+      precioUnitario: Number(item.precioUnitario || 0),
+      excluirDescuento: item.excluirDescuento === true,
+      subtotal:
+        Number(item.cantidad || 0) *
+        Number(item.precioUnitario || 0),
+    })),
+  [items]
+);
 
   const subtotal = useMemo(
     () => itemsNormalizados.reduce((acc, item) => acc + item.subtotal, 0),
     [itemsNormalizados]
   );
 
-  const total = useMemo(
-    () => subtotal - Number(descuento || 0),
-    [subtotal, descuento]
-  );
+  const subtotalAplicableDescuento = useMemo(
+  () =>
+    itemsNormalizados
+      .filter((item) => item.excluirDescuento !== true)
+      .reduce((acc, item) => acc + item.subtotal, 0),
+  [itemsNormalizados]
+);
+
+const descuentoMonto = useMemo(() => {
+  const porcentaje = Number(descuento || 0);
+
+  if (porcentaje <= 0) return 0;
+
+  return subtotalAplicableDescuento * (porcentaje / 100);
+}, [subtotalAplicableDescuento, descuento]);
+
+const total = useMemo(
+  () => subtotal - descuentoMonto,
+  [subtotal, descuentoMonto]
+);
 
  const totalPagadoInicial = useMemo(() => {
     return pagosIniciales.reduce(
@@ -266,6 +335,99 @@ export default function VentasPage({ perfil }) {
         setPagosIniciales((prev) => prev.filter((_, i) => i !== index));
     };
 
+const importarPedidoComoVenta = () => {
+  console.log("========== IMPORTAR PEDIDO COMO VENTA ==========");
+console.log("pedidoInicial:", pedidoInicial);
+console.log("productosPedido:", productosPedido);
+console.log("clientes:", clientes);
+console.log("clienteRefId actual antes:", clienteRefId);
+console.log("busquedaCliente actual antes:", busquedaCliente);
+  const clientePedidoNombre = (
+    pedidoInicial?.clienteNombre ||
+    pedidoInicial?.cliente ||
+    ""
+  )
+    .toString()
+    .trim()
+    .toLowerCase();
+
+  const clientePedidoDni = (
+    pedidoInicial?.clienteDNI ||
+    pedidoInicial?.dni ||
+    ""
+  )
+    .toString()
+    .trim();
+
+const cliente =
+  clientes.find(
+    (c) =>
+      pedidoInicial?.clienteRefId &&
+      c.firebaseId === pedidoInicial.clienteRefId
+  ) ||
+  clientes.find((c) => {
+    const nombreCliente = String(c.nombre || "")
+      .trim()
+      .toLowerCase();
+
+    const dniCliente = String(c.dni || "").trim();
+
+    return (
+      clientePedidoNombre &&
+      clientePedidoDni &&
+      nombreCliente === clientePedidoNombre &&
+      dniCliente === clientePedidoDni
+    );
+  }) ||
+  clientes.find((c) => {
+    const nombreCliente = String(c.nombre || "")
+      .trim()
+      .toLowerCase();
+
+    return (
+      clientePedidoNombre &&
+      nombreCliente === clientePedidoNombre
+    );
+  });
+
+console.log("clientePedidoNombre:", clientePedidoNombre);
+console.log("clientePedidoDni:", clientePedidoDni);
+console.log("cliente encontrado:", cliente);
+
+if (cliente) {
+  const textoCliente = `${cliente.nombre || ""}${
+    cliente.dni ? ` - ${cliente.dni}` : ""
+  }`;
+
+  setClienteRefId("");
+  setBusquedaCliente("");
+
+  setTimeout(() => {
+    setClienteRefId(cliente.firebaseId);
+    setBusquedaCliente(textoCliente);
+  }, 0);
+} else {
+  setClienteRefId("");
+
+  setBusquedaCliente(
+    pedidoInicial?.clienteNombre ||
+      pedidoInicial?.cliente ||
+      ""
+  );
+
+  setError(
+    "No se encontró automáticamente el cliente del pedido. Seleccionalo manualmente antes de guardar."
+  );
+}
+
+  setPedidoRefId(pedidoInicial?.firebaseId || "");
+
+  setItems(convertirProductosPedidoAVenta(productosPedido));
+
+  setPedidoImportado(true);
+  setMostrarImportarPedido(false);
+};
+
   const guardarVenta = async () => {
     try {
       if (!puedeCrearVentas) {
@@ -299,7 +461,7 @@ export default function VentasPage({ perfil }) {
         cliente,
         fechaVenta,
         items: itemsValidos,
-        descuento: Number(descuento || 0),
+        descuento: Number(descuentoMonto || 0),
         pedidoAsociado: pedidoSeleccionado || null,
         pagosIniciales: pagosIniciales.map((pago) => ({
           monto: Number(pago.monto || 0),
@@ -333,6 +495,87 @@ export default function VentasPage({ perfil }) {
 
       {error && <div className="ventas-alert ventas-alert-error">{error}</div>}
       {exito && <div className="ventas-alert ventas-alert-ok">{exito}</div>}
+
+      {mostrarImportarPedido && (
+        <div className="ventas-importar-overlay">
+
+        <div className="ventas-importar-modal">
+
+        <h3>
+        Crear factura desde pedido
+        </h3>
+
+        <p>
+        Pedido #{pedidoInicial?.id}
+        </p>
+
+        <div
+        className="ventas-importar-preview"
+        >
+
+        {productosPedido.map((p,index)=>(
+
+        <div
+        key={index}
+        className="ventas-importar-item"
+        >
+
+        <strong>
+        {
+        p.productoNombre ||
+        p.producto
+        }
+        </strong>
+
+        <span>
+        {
+        p.totalTalles ||
+        p.cantidad
+        }
+        uni.
+        </span>
+
+        </div>
+
+        ))}
+
+        </div>
+
+        <p>
+        ¿Querés crear la factura usando estos productos?
+        Se cargarán descripción y cantidad.
+      
+        </p>
+
+        <div
+        className="ventas-importar-actions"
+        >
+
+        <button
+        onClick={()=>{
+        setMostrarImportarPedido(false);
+        setPedidoImportado(true);
+        }}
+        >
+        No
+        </button>
+
+        <button
+        onClick={
+        importarPedidoComoVenta
+
+        }
+        >
+        Sí, importar
+        </button>
+
+
+        </div>
+
+        </div>
+
+        </div>
+        )}
 
       <div className="ventas-layout">
         <section className="ventas-card ventas-card-lg">
@@ -368,6 +611,9 @@ export default function VentasPage({ perfil }) {
 
                     if (clienteEncontrado) {
                       setClienteRefId(clienteEncontrado.firebaseId);
+                    }
+                    else {
+                      setClienteRefId("");
                     }
                   }}
                   disabled={!puedeCrearVentas}
@@ -487,6 +733,7 @@ export default function VentasPage({ perfil }) {
                   <th>Precio unitario</th>
                   <th>Subtotal</th>
                   <th>Acción</th>
+                  <th>Excluir desc.</th>
                 </tr>
               </thead>
               <tbody>
@@ -534,6 +781,17 @@ export default function VentasPage({ perfil }) {
                         Eliminar
                       </button>
                     </td>
+                    <td style={{ textAlign: "center" }}>
+                      <input
+                        type="checkbox"
+                        checked={item.excluirDescuento === true}
+                        onChange={(e) =>
+                          actualizarItem(index, "excluirDescuento", e.target.checked)
+                        }
+                        disabled={!puedeCrearVentas}
+                        title="Excluir este ítem del descuento porcentual"
+                      />
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -564,14 +822,32 @@ export default function VentasPage({ perfil }) {
               </div>
 
               <div className="ventas-field">
-                <label>Descuento</label>
-                <input
-                  type="number"
-                  min="0"
-                  value={descuento}
-                  onChange={(e) => setDescuento(e.target.value)}
-                  disabled={!puedeCrearVentas}
-                />
+                <label>Descuento (%)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={descuento}
+                    onChange={(e) => setDescuento(e.target.value)}
+                    disabled={!puedeCrearVentas}
+                    placeholder="Ej: 10"
+                  />
+                  <small>
+                    Descuento aplicado:{" "}
+                    {formatearMoneda(
+                      descuentoMonto,
+                      configMoneda.moneda,
+                      configMoneda.localeMoneda
+                    )}
+                  </small>
+                  <small>
+                    Base con descuento:{" "}
+                    {formatearMoneda(
+                      subtotalAplicableDescuento,
+                      configMoneda.moneda,
+                      configMoneda.localeMoneda
+                    )}
+                  </small>
               </div>
 
               <div className="ventas-resumen-row ventas-total">

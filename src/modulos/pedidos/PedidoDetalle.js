@@ -19,7 +19,13 @@ import {
 } from "firebase/firestore";
 
 
-export default function PedidoDetalle({ pedido, onVolver, perfil, onVerVenta }) {
+export default function PedidoDetalle({
+  pedido,
+  onVolver,
+  perfil,
+  onVerVenta,
+  onCrearVentaDesdePedido,
+}) {
   const [productos, setProductos] = useState([]);
   const [mostrarModal, setMostrarModal] = useState(false);
   const [productoEditando, setProductoEditando] = useState(null);
@@ -137,6 +143,19 @@ const usados = Object.entries(talles)
 return usados.length ? usados : [];
 
   };
+
+  const manejarCrearVentaDesdePedido = () => {
+  if (!pedido?.firebaseId) return;
+
+  if (!productos.length) {
+    alert("Este pedido no tiene productos cargados para facturar.");
+    return;
+  }
+
+  if (onCrearVentaDesdePedido) {
+    onCrearVentaDesdePedido(pedido, productos);
+  }
+};
 
   const obtenerImagenPortada = (producto) => {
     const imagenes = producto?.imagenes || [];
@@ -363,19 +382,37 @@ case "tallesResumen": {
           alignItems: "center",
         }}
       >
-        {!pedido?.ventaRefId && (
-          <div
-            style={{
-              background: "rgba(220, 53, 69, 0.10)",
-              color: "#b02a37",
-              padding: "10px 14px",
-              borderRadius: "10px",
-              fontWeight: 600,
-            }}
-          >
-            Este pedido no tiene factura asociada
-          </div>
-        )}
+{!pedido?.ventaRefId && (
+  <>
+    <div
+      style={{
+        background: "rgba(220, 53, 69, 0.10)",
+        color: "#b02a37",
+        padding: "10px 14px",
+        borderRadius: "10px",
+        fontWeight: 600,
+      }}
+    >
+      Este pedido no tiene factura asociada
+    </div>
+
+    <button
+      type="button"
+      onClick={manejarCrearVentaDesdePedido}
+      style={{
+        background: "#0d6efd",
+        color: "#fff",
+        padding: "10px 14px",
+        borderRadius: "10px",
+        fontWeight: 700,
+        border: "none",
+        cursor: "pointer",
+      }}
+    >
+      Crear / asociar factura
+    </button>
+  </>
+)}
 
         {pedido?.ventaRefId && (pedido?.ventaEstado || "activa") === "activa" && (
           <button

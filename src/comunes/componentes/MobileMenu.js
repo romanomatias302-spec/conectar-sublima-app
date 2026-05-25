@@ -26,9 +26,9 @@ export default function MobileMenu({ vistaActual, onSelect, onCrear, perfil }) {
     onCrear(tipo);
   };
 
-  const irA = (vista) => {
+const irA = (vista, extra = {}) => {
   setMenuAbierto(false);
-  onSelect(vista);
+  onSelect(vista, extra);
 };
 
   const puedeVerInicio = puedeHacer(perfil, "inicio", "ver");
@@ -37,6 +37,11 @@ export default function MobileMenu({ vistaActual, onSelect, onCrear, perfil }) {
   const puedeVerConfiguracion = puedeHacer(perfil, "configuracion", "ver");
   const puedeVerProduccion = puedeHacer(perfil, "produccion", "ver");
 const puedeVerVentas = puedeHacer(perfil, "ventas", "ver");
+const puedeCrearVentas =
+  puedeHacer(perfil, "ventas", "crear");
+
+const puedeVerListadoVentas =
+  puedeHacer(perfil, "ventas", "listado");
 const puedeVerCaja = puedeHacer(perfil, "caja", "ver");
 const puedeVerInformes = puedeHacer(perfil, "informes", "ver");
 
@@ -144,15 +149,28 @@ const puedeVerInformes = puedeHacer(perfil, "informes", "ver");
       </button>
     )}
 
-    {puedeVerVentas && (
+    {(puedeCrearVentas || puedeVerListadoVentas) && (
       <>
-        <button onClick={() => irA("ventas-crear")}>
-          <CreditCard size={18} /> Crear venta
-        </button>
+      <>
+        {puedeCrearVentas && (
+          <button onClick={() =>
+            irA("ventas-crear", {
+              pedido: null,
+              productosPedido: [],
+            })
+          }>
+            <CreditCard size={18} />
+            Crear venta
+          </button>
+        )}
 
-        <button onClick={() => irA("ventas-listado")}>
-          <CreditCard size={18} />Listado ventas
-        </button>
+        {puedeVerListadoVentas && (
+          <button onClick={() => irA("ventas-listado")}>
+            <CreditCard size={18} />
+            Listado ventas
+          </button>
+        )}
+      </>
       </>
     )}
 
