@@ -12,6 +12,7 @@ import {
 import { signOut } from "firebase/auth";
 import { auth } from "../../firebase";
 import "./Sidebar.css";
+import logoZalfro from "../../assets/logo-zalfro.png";
 import { puedeHacer } from "../../utils/permisos";
 
 export default function Sidebar({
@@ -53,7 +54,13 @@ const puedeVerListadoVentas =
         <button className="toggle-btn" onClick={onToggle}>
           <FaBars />
         </button>
-        {expandido && <h2>PedidoSimple</h2>}
+        {expandido && (
+          <img
+            src={logoZalfro}
+            alt="Zalfro"
+            className="sidebar-logo"
+          />
+        )}
       </div>
 
       <ul className="menu">

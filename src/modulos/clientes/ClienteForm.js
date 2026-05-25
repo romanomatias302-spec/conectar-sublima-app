@@ -1,5 +1,14 @@
 import React, { useState } from "react";
-import { collection, doc, addDoc, updateDoc } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  addDoc,
+  updateDoc,
+  getDocs,
+  query,
+  where,
+  limit,
+} from "firebase/firestore";
 import { db } from "../../firebase";
 import { puedeHacer } from "../../utils/permisos";
 
@@ -28,6 +37,30 @@ export default function ClienteForm({ cliente, onVolver, onCancelar, onGuardar, 
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
+  const buscarClienteExistentePorDni = async (dni) => {
+  const dniNormalizado = String(dni || "").trim();
+
+  if (!dniNormalizado) return null;
+
+  const q = query(
+    collection(db, "clientes"),
+    where("clienteId", "==", perfil?.clienteId || ""),
+    where("dni", "==", dniNormalizado),
+    limit(5)
+  );
+
+  const snapshot = await getDocs(q);
+
+  const encontrados = snapshot.docs
+    .map((d) => ({
+      firebaseId: d.id,
+      ...d.data(),
+    }))
+    .filter((c) => c.firebaseId !== cliente?.firebaseId);
+
+  return encontrados[0] || null;
+};
+
   const guardarCliente = async () => {
      if (!cliente && !puedeCrearClientes) {
       setError("No tenés permisos para crear clientes.");
@@ -49,6 +82,14 @@ export default function ClienteForm({ cliente, onVolver, onCancelar, onGuardar, 
     }
 
     try {
+      const clienteExistente = await buscarClienteExistentePorDni(formData.dni);
+
+      if (clienteExistente) {
+        setError(
+          `Ya existe un cliente con el DNI ${formData.dni}: ${clienteExistente.nombre || "Sin nombre"}. Revisá si corresponde usar ese cliente en lugar de crear uno nuevo.`
+        );
+        return;
+      }
       console.log("PERFIL EN ClienteForm:", perfil);
       const datosAGuardar = {
         ...formData,

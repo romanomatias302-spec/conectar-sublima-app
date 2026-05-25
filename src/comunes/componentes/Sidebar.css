@@ -282,3 +282,18 @@
     width: 230px !important;
   }
 }
+
+.sidebar-logo{
+  height:55px;
+  width:auto;
+  object-fit:contain;
+  display:block;
+}
+
+.sidebar.expandido .sidebar-header{
+  gap:12px;
+}
+
+body.dark-mode .sidebar-logo{
+  filter:none;
+}

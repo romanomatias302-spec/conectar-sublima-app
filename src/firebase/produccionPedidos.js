@@ -16,7 +16,11 @@ import {
   calcularProgresoPorColumna,
 } from "../modulos/produccion/produccionUtils";
 import { obtenerColumnasProduccion } from "./produccionColumnas";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import {
+  ref,
+  uploadBytes,
+  getDownloadURL,
+} from "firebase/storage";
 import { storage } from "../firebase";
 
 const PEDIDOS_COLLECTION = "pedidos";
@@ -458,6 +462,16 @@ export async function subirArchivoProduccion({ pedidoId, archivo }) {
   const extension = archivo.name.split(".").pop()?.toLowerCase();
 
   const extensionesPermitidas = ["pdf", "xls", "xlsx", "doc", "docx", "zip"];
+  const MAX_MB = 10;
+
+if (
+  archivo.size >
+  MAX_MB * 1024 * 1024
+) {
+  throw new Error(
+    `Máximo ${MAX_MB}MB por archivo.`
+  );
+}
 
   if (!extensionesPermitidas.includes(extension)) {
     throw new Error("Formato no permitido. Solo PDF, Excel, Word o ZIP.");
@@ -478,6 +492,49 @@ export async function subirArchivoProduccion({ pedidoId, archivo }) {
     tipo: archivo.type || extension,
     extension,
     peso: archivo.size || 0,
+  };
+}
+
+export async function subirImagenPortadaProduccion({
+  pedidoId,
+  archivo,
+}) {
+  if (!pedidoId) throw new Error("Pedido inválido.");
+  if (!archivo) throw new Error("Imagen inválida.");
+
+  const tipos = [
+    "image/png",
+    "image/jpeg",
+    "image/webp",
+  ];
+
+  if (!tipos.includes(archivo.type)) {
+    throw new Error(
+      "Solo JPG, PNG o WEBP."
+    );
+  }
+
+  if (archivo.size > 5 * 1024 * 1024) {
+    throw new Error(
+      "Máximo 5MB para portada."
+    );
+  }
+
+  const id = `portada-${Date.now()}`;
+
+  const storageRef = ref(
+    storage,
+    `produccion/${pedidoId}/portada/${id}`
+  );
+
+  await uploadBytes(storageRef, archivo);
+
+  const url =
+    await getDownloadURL(storageRef);
+
+  return {
+    url,
+    origen: "produccion",
   };
 }
 

@@ -299,3 +299,172 @@ body.dark-mode .menu-flotante-modulos button svg {
 .menu-flotante-separador {
   margin: 6px 0 !important;
 }
+
+.mobile-overlay{
+position:fixed;
+inset:0;
+background:rgba(0,0,0,.35);
+z-index:150;
+}
+
+.mobile-drawer{
+position:fixed;
+
+top:0;
+right:0;
+
+height:100vh;
+
+width:75vw;
+max-width:320px;
+
+z-index:160;
+
+background:inherit;
+
+animation:drawer .18s ease;
+}
+
+.mobile-drawer-content{
+height:100%;
+
+display:flex;
+
+flex-direction:column;
+
+padding:18px;
+}
+
+.mobile-drawer-header{
+display:flex;
+
+justify-content:space-between;
+
+align-items:center;
+
+margin-bottom:16px;
+}
+
+.mobile-drawer-header button{
+background:none;
+border:none;
+}
+
+.mobile-logout{
+margin-top:auto;
+
+width:100%;
+
+padding:14px;
+
+border:none;
+
+border-radius:12px;
+
+display:flex;
+
+gap:10px;
+
+align-items:center;
+}
+
+body.dark-mode .mobile-drawer{
+background:#1f1f1f;
+}
+
+body:not(.dark-mode) .mobile-drawer{
+background:white;
+}
+
+@keyframes drawer{
+from{
+transform:translateX(100%);
+}
+
+to{
+transform:none;
+}
+}
+
+.menu-flotante-crear {
+  width: min(86vw, 280px);
+  max-height: none;
+}
+
+.mobile-drawer .menu-flotante-modulos {
+  padding: 0 !important;
+  gap: 4px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+
+.mobile-drawer .menu-flotante-modulos button {
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  justify-content: flex-start !important;
+  text-align: left !important;
+  padding: 12px 4px !important;
+  color: #0096d1 !important;
+  font-weight: 600;
+}
+
+.mobile-drawer .menu-flotante-modulos button svg {
+  color: #0096d1 !important;
+  stroke: #0096d1 !important;
+}
+
+.mobile-drawer .menu-flotante-modulos button:hover {
+  background: rgba(0, 150, 209, 0.08) !important;
+  border-radius: 10px !important;
+}
+
+.mobile-drawer .mobile-logout {
+  background: transparent !important;
+  justify-content: flex-start !important;
+  color: #0096d1 !important;
+  font-weight: 600;
+  padding: 12px 4px !important;
+}
+
+.mobile-drawer .mobile-logout svg {
+  color: #0096d1 !important;
+  stroke: #0096d1 !important;
+}
+
+.menu-flotante-crear {
+  background: #fff !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,.18) !important;
+  border: none !important;
+}
+
+.menu-flotante-crear button {
+  background: transparent !important;
+  color: #0096d1 !important;
+  justify-content: flex-start !important;
+  font-weight: 600;
+}
+
+.menu-flotante-crear button svg {
+  color: #0096d1 !important;
+  stroke: #0096d1 !important;
+}
+
+.menu-flotante-crear button:hover {
+  background: rgba(0,150,209,.08) !important;
+  border-radius: 10px;
+}
+
+body.dark-mode .menu-flotante-crear {
+  background: #1f1f1f !important;
+}
+
+.mobile-overlay-crear {
+  z-index: 115 !important;
+  background: rgba(0,0,0,.18) !important;
+}
+
+.menu-flotante-crear {
+  z-index: 130 !important;
+}

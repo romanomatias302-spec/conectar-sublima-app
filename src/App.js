@@ -339,15 +339,22 @@ const nuevosProductosPedidoParaVenta =
     }
   };
 
-    const abrirVentaDesdePedido = async (ventaId) => {
-      try {
-        const venta = await obtenerVentaPorId(ventaId);
-        irAVista("venta-detalle", { venta });
-      } catch (error) {
-        console.error("Error abriendo venta desde pedido:", error);
-        alert("No se pudo abrir la factura asociada.");
-      }
-    };
+
+
+const abrirVentaDesdePedido = async (ventaId) => {
+  try {
+    const venta = await obtenerVentaPorId(ventaId);
+
+irAVista("venta-detalle", {
+  venta,
+  pedido: pedidoSeleccionado,
+  origen: "detallePedido",
+});
+  } catch (error) {
+    console.error("Error abriendo venta desde pedido:", error);
+    alert("No se pudo abrir la factura asociada.");
+  }
+};
 
     const abrirPedidoDesdeVenta = async (pedidoId) => {
       try {
@@ -388,6 +395,7 @@ const nuevosProductosPedidoParaVenta =
     case "pedidos":
       irAVista("pedidos");
       break;
+      
 
     case "produccion":
       irAVista("produccion");
@@ -515,6 +523,7 @@ const nuevosProductosPedidoParaVenta =
         {vista === "pedidos" && (
           <PedidosList
             perfil={perfil}
+            abrirNuevo={pedidoSeleccionado?.abrirNuevo === true}
             onVerDetalle={(pedido) => {
               irAVista("detallePedido", { pedido, origen: "pedidos" });
             }}
@@ -538,6 +547,7 @@ const nuevosProductosPedidoParaVenta =
             perfil={perfil}
             pedido={pedidoSeleccionado}
             origenVista={origenVista}
+            onVerVenta={abrirVentaDesdePedido}
             onCrearVentaDesdePedido={(pedido, productos) => {
               irAVista("ventas-crear", {
                 pedido,
@@ -582,15 +592,24 @@ const nuevosProductosPedidoParaVenta =
           />
         )}
 
-        {vista === "venta-detalle" && ventaSeleccionada && (
-          <VentaDetalle
-            perfil={perfil}
-            ventaId={ventaSeleccionada.firebaseId}
-            onVolver={() => irAVista("ventas-listado")}
-            onVerPedido={abrirPedidoDesdeVenta}
-            
-          />
-        )}
+{vista === "venta-detalle" && ventaSeleccionada && (
+  <VentaDetalle
+    perfil={perfil}
+    ventaId={ventaSeleccionada.firebaseId}
+    onVolver={() => {
+      if (origenVista === "detallePedido") {
+        irAVista("detallePedido", {
+          pedido: pedidoSeleccionado,
+          origen: "pedidos",
+        });
+        return;
+      }
+
+      irAVista("ventas-listado");
+    }}
+    onVerPedido={abrirPedidoDesdeVenta}
+  />
+)}
 
 
         {vista === "movimientos" && (
@@ -633,10 +652,21 @@ const nuevosProductosPedidoParaVenta =
         onSelect={manejarSeleccionSidebar}
         perfil={perfil}
         onCrear={(tipo) => {
-          if (tipo === "pedido") {
-            irAVista("pedidos", { pedido: null });
+        if (tipo === "pedido") {
+          irAVista("pedidos", {
+            pedido: { abrirNuevo: true },
+          });
+
           } else if (tipo === "cliente") {
-            irAVista("formulario", { cliente: null });
+            irAVista("formulario", {
+              cliente: null,
+            });
+
+          } else if (tipo === "venta") {
+            irAVista("ventas-crear", {
+              pedido: null,
+              productosPedido: [],
+            });
           }
         }}
       />

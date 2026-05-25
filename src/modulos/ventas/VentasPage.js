@@ -268,52 +268,96 @@ const total = useMemo(
     setClienteRapido(clienteRapidoInicial);
   };
 
-  const guardarClienteRapido = async () => {
-    try {
-      if (!puedeCrearClientes) {
-        setError("No tenés permisos para crear clientes.");
-        return;
-      }
-      if (!clienteRapido.nombre.trim()) {
-        setError("El nombre del cliente rápido es obligatorio.");
-        return;
-      }
+  const usarClienteExistenteEnVenta = (clienteExistente) => {
+  if (!clienteExistente?.firebaseId) return;
 
-      const datos = {
-        nombre: clienteRapido.nombre.trim(),
-        dni: clienteRapido.dni ? clienteRapido.dni.toString() : "",
-        telefono: clienteRapido.telefono || "",
-        direccion: "",
-        localidad: "",
-        provincia: "",
-        email: "",
-        clienteId: perfil?.clienteId || "",
-      };
+  setClienteRefId(clienteExistente.firebaseId);
 
-      const docRef = await addDoc(collection(db, "clientes"), {
-        ...datos,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
+  setBusquedaCliente(
+    `${clienteExistente.nombre || ""}${
+      clienteExistente.dni ? ` - ${clienteExistente.dni}` : ""
+    }`
+  );
 
-      const nuevoCliente = {
-        firebaseId: docRef.id,
-        ...datos,
-      };
+  setClienteRapido(clienteRapidoInicial);
+  setMostrarClienteRapido(false);
+  setError("");
+};
 
-      setClientes((prev) => [nuevoCliente, ...prev]);
-      setClienteRefId(docRef.id);
-      setBusquedaCliente(
-        `${nuevoCliente.nombre}${nuevoCliente.dni ? ` - ${nuevoCliente.dni}` : ""}`
-      );
-      setClienteRapido(clienteRapidoInicial);
-      setMostrarClienteRapido(false);
-      setError("");
-    } catch (err) {
-      console.error(err);
-      setError("No se pudo crear el cliente rápido.");
+const guardarClienteRapido = async () => {
+  try {
+    if (!puedeCrearClientes) {
+      setError("No tenés permisos para crear clientes.");
+      return;
     }
-  };
+
+    const nombreLimpio = (clienteRapido.nombre || "").trim();
+    const dniLimpio = String(clienteRapido.dni || "").trim();
+
+    if (!nombreLimpio) {
+      setError("El nombre del cliente rápido es obligatorio.");
+      return;
+    }
+
+    if (dniLimpio) {
+      const existentePorDni = clientes.find(
+        (c) => String(c.dni || "").trim() === dniLimpio
+      );
+
+      if (existentePorDni) {
+        const usarExistente = window.confirm(
+          `Ya existe un cliente con el DNI ${dniLimpio}: ${
+            existentePorDni.nombre || "Sin nombre"
+          }.\n\n¿Querés usar ese cliente para esta venta?`
+        );
+
+        if (usarExistente) {
+          usarClienteExistenteEnVenta(existentePorDni);
+          return;
+        }
+
+        setError(
+          "No se creó un cliente nuevo para evitar duplicar el DNI. Si realmente es otra persona, primero revisá/corregí el cliente existente."
+        );
+        return;
+      }
+    }
+
+    const datos = {
+      nombre: nombreLimpio,
+      dni: dniLimpio,
+      telefono: clienteRapido.telefono || "",
+      direccion: "",
+      localidad: "",
+      provincia: "",
+      email: "",
+      clienteId: perfil?.clienteId || "",
+    };
+
+    const docRef = await addDoc(collection(db, "clientes"), {
+      ...datos,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+
+    const nuevoCliente = {
+      firebaseId: docRef.id,
+      ...datos,
+    };
+
+    setClientes((prev) => [nuevoCliente, ...prev]);
+    setClienteRefId(docRef.id);
+    setBusquedaCliente(
+      `${nuevoCliente.nombre}${nuevoCliente.dni ? ` - ${nuevoCliente.dni}` : ""}`
+    );
+    setClienteRapido(clienteRapidoInicial);
+    setMostrarClienteRapido(false);
+    setError("");
+  } catch (err) {
+    console.error(err);
+    setError("No se pudo crear el cliente rápido.");
+  }
+};
 
     const actualizarPagoInicial = (index, campo, valor) => {
         setPagosIniciales((prev) =>

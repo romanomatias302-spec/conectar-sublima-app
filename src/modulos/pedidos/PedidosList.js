@@ -23,9 +23,10 @@ import { sincronizarPedidoDesdeEstadoManual } from "../../firebase/produccionPed
 import { puedeHacer } from "../../utils/permisos";
 
 export default function PedidosList({
-  onVerDetalle = () => {},
-  onIrProduccion = () => {},
   perfil,
+  onVerDetalle,
+  onIrProduccion,
+  abrirNuevo = false,
 }) {
   const [pedidos, setPedidos] = useState([]);
   const [busqueda, setBusqueda] = useState("");
@@ -262,6 +263,14 @@ export default function PedidosList({
 
     return () => clearTimeout(timer);
   }, [busqueda]);
+
+  useEffect(() => {
+  if (!abrirNuevo) return;
+  if (!puedeCrearPedidos) return;
+
+  setPedidoEditar(null);
+  setMostrarModal(true);
+}, [abrirNuevo, puedeCrearPedidos]);
 
   const eliminarPedido = async (firebaseId) => {
     if (!puedeEliminarPedidos) return;

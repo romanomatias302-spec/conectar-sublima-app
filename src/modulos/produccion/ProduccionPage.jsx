@@ -18,6 +18,7 @@ import {
   recalcularPedidosPorCambioDeColumnas,
   actualizarDetalleManualProduccion,
   subirArchivoProduccion,
+  subirImagenPortadaProduccion,
   asignarUsuarioProduccion,
   obtenerHistorialProduccionPedido,
   
@@ -86,6 +87,7 @@ export default function ProduccionPage({ perfil, onVerPedido = () => {} }) {
 
   const [ordenTarjetas, setOrdenTarjetas] = useState("normal");
   const [filtroAsignado, setFiltroAsignado] = useState("todos");
+  const [busquedaProduccion, setBusquedaProduccion] = useState("");
   
 
  const [pedidoEditandoDetalle, setPedidoEditandoDetalle] = useState(null);
@@ -119,6 +121,8 @@ const [colorManualTexto, setColorManualTexto] = useState("");
   const [archivosProduccion, setArchivosProduccion] = useState([]);
   const [subiendoArchivoProduccion, setSubiendoArchivoProduccion] = useState(false);
   const [imagenesPedido,setImagenesPedido]=useState([]);
+  const [subiendoPortada,setSubiendoPortada]=
+  useState(false);
 
   const puedeHacerEnProduccion = (accion = "ver") => {
     return puedeHacer(perfil, "produccion", accion);
@@ -328,6 +332,37 @@ function filtrarPedidosPorEtiqueta(lista, etiquetaId) {
   );
 }
 
+function filtrarPedidosPorBusqueda(lista, textoBusqueda) {
+  if (!Array.isArray(lista)) return [];
+
+  const texto = String(textoBusqueda || "")
+    .trim()
+    .toLowerCase();
+
+  if (!texto) return lista;
+
+  return lista.filter((pedido) => {
+    const numeroPedido = String(
+      pedido.id ||
+        pedido.numeroPedido ||
+        pedido.numero ||
+        ""
+    ).toLowerCase();
+
+    const cliente = String(
+      pedido.cliente ||
+        pedido.clienteNombre ||
+        pedido.nombreCliente ||
+        ""
+    ).toLowerCase();
+
+    return (
+      numeroPedido.includes(texto) ||
+      cliente.includes(texto)
+    );
+  });
+}
+
 function filtrarPedidosPorAsignado(lista, filtro, perfil, forzarSoloAsignados = false) {
   if (!Array.isArray(lista)) return [];
 
@@ -377,7 +412,13 @@ const pedidosFiltradosPorEtiqueta = filtrarPedidosPorEtiqueta(
   pedidosFiltrados,
   filtroEtiquetaId
 );
-  const agrupadoBase = agruparPedidosPorColumna(columnas, pedidosFiltradosPorEtiqueta);
+
+const pedidosFiltradosPorBusqueda = filtrarPedidosPorBusqueda(
+  pedidosFiltradosPorEtiqueta,
+  busquedaProduccion
+);
+
+  const agrupadoBase = agruparPedidosPorColumna(columnas, pedidosFiltradosPorBusqueda);
 
   const columnaFinal = columnas.find((c) => c.esFinal);
   if (!columnaFinal) {
@@ -402,7 +443,17 @@ const pedidosFiltradosPorEtiqueta = filtrarPedidosPorEtiqueta(
       filtroEtiquetaId
     );
 
-    finalizadosFiltradosPorEtiqueta.forEach((pedidoFinalizado) => {
+    const finalizadosFiltradosPorBusqueda = filtrarPedidosPorBusqueda(
+  finalizadosFiltradosPorEtiqueta,
+  busquedaProduccion
+);
+
+const animadosFiltradosPorBusqueda = filtrarPedidosPorBusqueda(
+  animadosFiltradosPorEtiqueta,
+  busquedaProduccion
+);
+
+    finalizadosFiltradosPorBusqueda.forEach((pedidoFinalizado) => {
     const yaExiste = agrupadoBase[columnaFinal.id].some(
       (p) => (p.firebaseId || p.id) === (pedidoFinalizado.firebaseId || pedidoFinalizado.id)
     );
@@ -412,7 +463,7 @@ const pedidosFiltradosPorEtiqueta = filtrarPedidosPorEtiqueta(
     }
   });
 
-    animadosFiltradosPorEtiqueta.forEach((pedidoAnimado) => {
+    animadosFiltradosPorBusqueda.forEach((pedidoAnimado) => {
     const yaExiste = agrupadoBase[columnaFinal.id].some(
       (p) => (p.firebaseId || p.id) === (pedidoAnimado.firebaseId || pedidoAnimado.id)
     );
@@ -438,6 +489,7 @@ const pedidosFiltradosPorEtiqueta = filtrarPedidosPorEtiqueta(
   filtroEtiquetaId,
   perfil,
   debeVerSoloAsignados,
+  busquedaProduccion,
 ]);
 
   async function manejarMoverPedido(pedidoId, columnaDestinoId) {
@@ -758,6 +810,16 @@ async function manejarSubirArchivosProduccion(e) {
 
     const nuevos = [];
 
+    if (
+    archivosProduccion.length +
+    files.length >
+    5
+    ){
+    throw new Error(
+    "Máximo 5 archivos."
+    );
+}
+
     for (const archivo of files) {
       const subido = await subirArchivoProduccion({
         pedidoId: pedidoEditandoDetalle.firebaseId,
@@ -776,6 +838,42 @@ async function manejarSubirArchivosProduccion(e) {
   } finally {
     setSubiendoArchivoProduccion(false);
   }
+}
+
+async function manejarSubirPortada(e) {
+try {
+
+const archivo =
+e.target.files?.[0];
+
+if (!archivo) return;
+
+setSubiendoPortada(true);
+
+const subida =
+await subirImagenPortadaProduccion({
+pedidoId:
+pedidoEditandoDetalle.firebaseId,
+archivo,
+});
+
+setImagenPortadaProduccion(
+subida.url
+);
+
+setMostrarSelectorPortada(false);
+
+}
+catch(error){
+
+alert(
+error.message
+);
+
+}
+finally{
+setSubiendoPortada(false);
+}
 }
 
 async function guardarDetalleManual() {
@@ -962,6 +1060,7 @@ async function manejarEliminarEtiquetaProduccion(etiqueta) {
             <h2>Producción</h2>
 
             <div className="produccion-page-header-actions">
+
                 <select
                   value={ordenTarjetas}
                   onChange={(e) => setOrdenTarjetas(e.target.value)}
@@ -1017,6 +1116,15 @@ async function manejarEliminarEtiquetaProduccion(etiqueta) {
                         + Columna
                     </button>
                     )}
+            </div>
+            <div className="produccion-busqueda-wrapper">
+              <input
+                type="text"
+                value={busquedaProduccion}
+                onChange={(e) => setBusquedaProduccion(e.target.value)}
+                className="produccion-busqueda-input"
+                placeholder="Buscar pedido o cliente..."
+              />
             </div>
         </div>
 
@@ -1408,11 +1516,34 @@ async function manejarEliminarEtiquetaProduccion(etiqueta) {
         </div>
       ))}
 
-      {imagenesPedido.length === 0 && (
-        <div style={{ color: "#666" }}>
-          Este pedido no tiene imágenes.
-        </div>
-      )}
+{imagenesPedido.length === 0 && (
+<div>
+
+<div
+style={{
+color:"#666",
+marginBottom:10,
+}}
+>
+Este pedido no tiene imágenes.
+</div>
+
+<input
+type="file"
+accept="image/*"
+onChange={
+manejarSubirPortada
+}
+/>
+
+{subiendoPortada && (
+<div>
+Subiendo portada...
+</div>
+)}
+
+</div>
+)}
     </div>
   )}
 </div>
@@ -1451,37 +1582,37 @@ async function manejarEliminarEtiquetaProduccion(etiqueta) {
           : "📎";
 
       return (
-        <div key={archivo.id} className="produccion-archivo-item">
-          <a href={archivo.url} target="_blank" rel="noreferrer">
-            <span style={{ marginRight: 6 }}>{icono}</span>
-            {archivo.nombre}
+        <div key={archivo.id} className="produccion-archivo-item compacto">
+          <a
+            href={archivo.url}
+            target="_blank"
+            rel="noreferrer"
+            className="produccion-archivo-nombre"
+            title={archivo.nombre}
+          >
+            <span>{icono}</span>
+            <span>{archivo.nombre}</span>
           </a>
 
-          <div style={{ display: "flex", gap: 6 }}>
-            <a
-              href={archivo.url}
-              target="_blank"
-              rel="noreferrer"
-              className="btn-produccion-secundario"
-              style={{
-                textDecoration: "none",
-                display: "inline-flex",
-                alignItems: "center",
-              }}
-            >
+          <div className="produccion-archivo-acciones">
+            <a href={archivo.url} target="_blank" rel="noreferrer">
               Ver
+            </a>
+
+            <a href={archivo.url} download={archivo.nombre} title="Descargar">
+              ↓
             </a>
 
             <button
               type="button"
-              className="btn-produccion-cancelar"
               onClick={() => {
                 setArchivosProduccion((prev) =>
                   prev.filter((a) => a.id !== archivo.id)
                 );
               }}
+              title="Quitar"
             >
-              Quitar
+              ✕
             </button>
           </div>
         </div>
