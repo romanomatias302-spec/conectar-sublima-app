@@ -122,6 +122,7 @@ export default function PedidoFormModal({ onClose, onPedidoCreado, pedido, perfi
 
   // 🔹 Guardar (crear o actualizar)
   const guardarPedido = async () => {
+    if (loading) return;
 
     if (!pedido && !puedeCrearPedidos) {
       setError("No tenés permisos para crear pedidos.");
@@ -309,7 +310,11 @@ export default function PedidoFormModal({ onClose, onPedidoCreado, pedido, perfi
           <button className="cancelar" onClick={onClose}>
             Cancelar
           </button>
-          <button onClick={guardarPedido} disabled={loading || soloLectura}>
+          <button
+            type="button"
+            onClick={guardarPedido}
+            disabled={loading || soloLectura}
+          >
             {loading
               ? "Guardando..."
               : pedido

@@ -287,6 +287,9 @@ body.dark-mode .menu-flotante-modulos button svg {
 .menu-flotante-modulos {
   gap: 10px !important;
   padding: 12px !important;
+  flex: 1;
+  overflow-y: visible;
+  padding-bottom: 0;
 }
 
 .menu-flotante-modulos button {
@@ -326,13 +329,15 @@ animation:drawer .18s ease;
 }
 
 .mobile-drawer-content{
-height:100%;
+
 
 display:flex;
 
 flex-direction:column;
 
-padding:18px;
+
+
+
 }
 
 .mobile-drawer-header{
@@ -351,7 +356,7 @@ border:none;
 }
 
 .mobile-logout{
-margin-top:auto;
+margin-top:200px;
 
 width:100%;
 
@@ -468,3 +473,22 @@ body.dark-mode .menu-flotante-crear {
 .menu-flotante-crear {
   z-index: 130 !important;
 }
+
+.desktop-only-btn {
+  display: inline-flex;
+}
+
+.mobile-only-btn {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .desktop-only-btn {
+    display: none !important;
+  }
+
+  .mobile-only-btn {
+    display: flex !important;
+  }
+}
+

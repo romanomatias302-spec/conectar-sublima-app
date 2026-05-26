@@ -39,8 +39,8 @@ const sensors = useSensors(
   }),
   useSensor(TouchSensor, {
     activationConstraint: {
-      delay: 250,
-      tolerance: 8,
+      delay: 450,
+      tolerance: 12,
     },
   })
 );

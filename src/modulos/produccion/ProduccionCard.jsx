@@ -61,6 +61,7 @@ export default function ProduccionCard({
   puedeEditarDetalleManual = true,
 }) {
   const id = pedido.firebaseId || pedido.id;
+  const esMobile = window.innerWidth <= 768;
 
   const {
     attributes,
@@ -106,14 +107,32 @@ const etiquetasPedido = obtenerEtiquetasPedido(pedido);
       ref={setNodeRef}
       style={style}
       className={`produccion-card ${isDragging ? "dragging" : ""} ${pedido.__animandoSalida ? "finalizando" : ""}`}
-      {...(pedido.produccionFinalizada === true || !puedeMoverPedidos ? {} : listeners)}
-      {...(pedido.produccionFinalizada === true || !puedeMoverPedidos ? {} : attributes)}
+      {...(
+        !esMobile && pedido.produccionFinalizada !== true && puedeMoverPedidos
+          ? listeners
+          : {}
+      )}
+      {...(
+        !esMobile && pedido.produccionFinalizada !== true && puedeMoverPedidos
+          ? attributes
+          : {}
+      )}
     >
-      <button
-        type="button"
-        className="produccion-card-drag-handle"
+        <button
+          type="button"
+          className="produccion-card-drag-handle"
+          {...(
+            esMobile && pedido.produccionFinalizada !== true && puedeMoverPedidos
+              ? listeners
+              : {}
+          )}
+          {...(
+            esMobile && pedido.produccionFinalizada !== true && puedeMoverPedidos
+              ? attributes
+              : {}
+          )}
 
-        title={
+          title={
           pedido.produccionFinalizada === true
             ? "Pedido finalizado"
             : !puedeMoverPedidos

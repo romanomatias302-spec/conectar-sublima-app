@@ -113,13 +113,29 @@ const puedeVerInformes = puedeHacer(perfil, "informes", "ver");
         )}
 
 
+<>
+      <button
+        className={`menu-btn mobile-only-btn ${menuAbierto ? "active" : ""}`}
+        onClick={toggleMenu}
+      >
+        <Menu size={22} />
+        <span>Menú</span>
+      </button>
+
+      {puedeVerVentas && (
         <button
-          className={`menu-btn ${menuAbierto ? "active" : ""}`}
-          onClick={toggleMenu}
+          className={`menu-btn desktop-only-btn ${
+            vistaActual === "ventas-crear" || vistaActual === "ventas-listado"
+              ? "active"
+              : ""
+          }`}
+          onClick={() => irA("ventas-listado")}
         >
-          <Menu size={22} />
-          <span>Menú</span>
+          <CreditCard size={22} />
+          <span>Ventas</span>
         </button>
+      )}
+    </>
 
       </nav>
 
@@ -244,6 +260,13 @@ const puedeVerInformes = puedeHacer(perfil, "informes", "ver");
           {puedeVerInformes && (
             <button onClick={() => irA("movimientos")}>
               <BarChart3 size={18} /> Informes
+            </button>
+          )}
+
+          {puedeVerConfiguracion && (
+            <button onClick={() => irA("configuracion")}>
+              <Settings size={18} />
+              Configuración
             </button>
           )}
 

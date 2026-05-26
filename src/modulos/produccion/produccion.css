@@ -1592,9 +1592,13 @@ body.dark-mode .produccion-historial-empty {
   }
 }
 @media (max-width: 768px) {
-  .produccion-card {
-    touch-action: none !important;
-  }
+.produccion-card {
+  touch-action: pan-y !important;
+}
+
+.produccion-card-drag-handle {
+  touch-action: none !important;
+}
 }
 
 /* =========================
@@ -2132,4 +2136,40 @@ body.dark-mode .produccion-etiqueta-actions button:last-child {
   font-weight: 800;
   cursor: pointer;
   padding: 0;
+}
+
+@media (max-width: 768px) {
+  .produccion-board-wrapper {
+    height: calc(100vh - 190px) !important;
+    max-height: calc(100vh - 190px) !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .produccion-column {
+    min-width: calc(88vw - 48px) !important;
+    max-width: calc(88vw - 48px) !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    overflow: hidden !important;
+  }
+
+  .produccion-column-body {
+    flex: 1 !important;
+    height: calc(100% - 58px) !important;
+    max-height: none !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 28px !important;
+  }
+
+  .produccion-card {
+    touch-action: pan-y !important;
+  }
+
+  .produccion-card-drag-handle {
+    touch-action: none !important;
+  }
 }
