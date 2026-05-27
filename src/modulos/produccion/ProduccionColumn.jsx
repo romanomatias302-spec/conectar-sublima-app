@@ -23,6 +23,7 @@ export default function ProduccionColumn({
   ahoraTick,
   puedeMoverPedidos = true,
   puedeEditarDetalleManual = true,
+  resaltada = false,
 }) {
   const { setNodeRef } = useDroppable({
     id: columna.id,
@@ -38,10 +39,10 @@ export default function ProduccionColumn({
   return (
     <div
       ref={setNodeRef}
-      className={`produccion-column ${estaContraida ? "contraida" : ""}`}
+      className={`produccion-column ${estaContraida ? "contraida" : ""} ${resaltada ? "drop-confirmado" : ""}`}
       style={{
-        background: columna.colorFondo || "#f6f7f9",
-        borderColor: columna.colorBorde || "#d9dee8",
+        background: "#f6f7f9",
+        borderColor: "#d9dee8",
       }}
     >
       <div className="produccion-column-header">

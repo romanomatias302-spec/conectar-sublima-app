@@ -108,6 +108,8 @@ const [colorManualTexto, setColorManualTexto] = useState("");
  const [historialProduccion, setHistorialProduccion] = useState([]);
  const [loadingHistorialProduccion, setLoadingHistorialProduccion] = useState(false);
 
+ const [mostrarHistorialGeneral, setMostrarHistorialGeneral] = useState(false);
+
 
  const [usuariosProduccion, setUsuariosProduccion] = useState([]);
  const [usuarioAsignadoUid, setUsuarioAsignadoUid] = useState("");
@@ -118,10 +120,12 @@ const [colorManualTexto, setColorManualTexto] = useState("");
   const [mostrarSelectorPortada,setMostrarSelectorPortada]=useState(false);
 
   const [imagenPortadaProduccion,setImagenPortadaProduccion]=useState("");
+  const [imagenPreviewProduccion, setImagenPreviewProduccion] = useState("");
   const [archivosProduccion, setArchivosProduccion] = useState([]);
   const [subiendoArchivoProduccion, setSubiendoArchivoProduccion] = useState(false);
   const [imagenesPedido,setImagenesPedido]=useState([]);
   const [subiendoPortada,setSubiendoPortada]=
+
   useState(false);
 
   const puedeHacerEnProduccion = (accion = "ver") => {
@@ -1057,7 +1061,17 @@ async function manejarEliminarEtiquetaProduccion(etiqueta) {
     <div className="produccion-page">
       <div className="produccion-page-header">
         <div className="produccion-page-header-top">
-            <h2>Producción</h2>
+            <div className="produccion-titulo-row">
+              <h2>Producción</h2>
+
+              <button
+                type="button"
+                className="btn-produccion-secundario"
+                onClick={() => setMostrarHistorialGeneral(true)}
+              >
+                Historial
+              </button>
+            </div>
 
             <div className="produccion-page-header-actions">
 
@@ -1346,45 +1360,7 @@ async function manejarEliminarEtiquetaProduccion(etiqueta) {
             ))}
           </div>
 
-                <div className="produccion-historial-box">
-        <h4 className="produccion-historial-title">Historial de movimientos</h4>
 
-        {loadingHistorialProduccion ? (
-          <p className="produccion-historial-empty">Cargando historial...</p>
-        ) : historialProduccion.length === 0 ? (
-          <p className="produccion-historial-empty">Todavía no hay movimientos registrados.</p>
-        ) : (
-          <div className="produccion-historial-lista">
-            {historialProduccion.map((item) => (
-              <div key={item.firebaseId} className="produccion-historial-item">
-                <div className="produccion-historial-top">
-                  <span className="produccion-historial-fecha">
-                    {formatearFechaHistorial(item.createdAt)}
-                  </span>
-                </div>
-
-                <div className="produccion-historial-linea">
-                  <strong>{item.columnaOrigenNombre || "Sin origen"}</strong>
-                  <span className="produccion-historial-flecha">→</span>
-                  <strong>{item.columnaDestinoNombre || "Sin destino"}</strong>
-                </div>
-
-                <div className="produccion-historial-meta">
-                  <span>
-                    Movió: {item.usuarioActorNombre || "-"}
-                  </span>
-                </div>
-
-                <div className="produccion-historial-meta">
-                  <span>
-                    Asignado: {item.usuarioAsignadoNombre || "Sin asignar"}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
 
           <div className="produccion-modal-actions">
             <button
@@ -1424,6 +1400,8 @@ async function manejarEliminarEtiquetaProduccion(etiqueta) {
       <img
         src={imagenPortadaProduccion}
         alt=""
+        title="Ver imagen"
+        onClick={() => setImagenPreviewProduccion(imagenPortadaProduccion)}
         style={{
           width: "100%",
           maxHeight: 180,
@@ -1431,46 +1409,62 @@ async function manejarEliminarEtiquetaProduccion(etiqueta) {
           borderRadius: 10,
           marginTop: 6,
           border: "1px solid #e5e7eb",
+          cursor: "zoom-in",
         }}
       />
 
-      <div
-        style={{
-          display: "flex",
-          gap: 8,
-          marginTop: 10,
-          flexWrap: "wrap",
-        }}
-      >
+      <div className="produccion-portada-actions">
+        <button
+          type="button"
+          className="btn-produccion-secundario"
+          onClick={() => setImagenPreviewProduccion(imagenPortadaProduccion)}
+        >
+          Ver portada
+        </button>
+
         <button
           type="button"
           className="btn-produccion-secundario"
           onClick={() => setMostrarSelectorPortada((v) => !v)}
         >
           Cambiar portada
-        </button>
+          </button>
+
+          <button
+            type="button"
+            className="btn-produccion-cancelar"
+            onClick={() => {
+              setImagenPortadaProduccion("");
+              setMostrarSelectorPortada(false);
+            }}
+          >
+            Quitar
+          </button>
+        </div>
 
         <button
           type="button"
-          className="btn-produccion-cancelar"
-          onClick={() => {
-            setImagenPortadaProduccion("");
-            setMostrarSelectorPortada(false);
-          }}
+          className="btn-produccion-secundario produccion-btn-full"
+          disabled={imagenesPedido.length === 0}
+          onClick={() => setMostrarSelectorPortada((v) => !v)}
         >
-          Quitar portada
+          {imagenesPedido.length > 0
+            ? `Ver imágenes del pedido (${imagenesPedido.length})`
+            : "Sin imágenes del pedido"}
         </button>
-      </div>
-    </>
-  ) : (
-    <button
-      type="button"
-      className="btn-produccion-secundario"
-      onClick={() => setMostrarSelectorPortada((v) => !v)}
-    >
-      Ver más imágenes del pedido
-    </button>
-  )}
+          </>
+        ) : (
+        <button
+          type="button"
+          className="btn-produccion-secundario produccion-btn-full"
+          disabled={imagenesPedido.length === 0}
+          onClick={() => setMostrarSelectorPortada((v) => !v)}
+        >
+          {imagenesPedido.length > 0
+            ? `Ver imágenes del pedido (${imagenesPedido.length})`
+            : "Sin imágenes del pedido"}
+        </button>
+      )}
 
   {mostrarSelectorPortada && (
     <div
@@ -1510,60 +1504,70 @@ async function manejarEliminarEtiquetaProduccion(etiqueta) {
             }}
           />
 
-          <div style={{ padding: 4, fontSize: 11 }}>
-            {img.producto}
+          <div className="produccion-img-selector-footer">
+            <span>{img.producto}</span>
+
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setImagenPreviewProduccion(img.url);
+              }}
+            >
+              Ver
+            </button>
           </div>
         </div>
       ))}
 
-{imagenesPedido.length === 0 && (
-<div>
+        {imagenesPedido.length === 0 && (
+        <div>
 
-<div
-style={{
-color:"#666",
-marginBottom:10,
-}}
->
-Este pedido no tiene imágenes.
-</div>
+        <div
+        style={{
+        color:"#666",
+        marginBottom:10,
+        }}
+        >
+        Este pedido no tiene imágenes.
+        </div>
 
-<input
-type="file"
-accept="image/*"
-onChange={
-manejarSubirPortada
-}
-/>
+        <input
+        type="file"
+        accept="image/*"
+        onChange={
+        manejarSubirPortada
+        }
+        />
 
-{subiendoPortada && (
-<div>
-Subiendo portada...
-</div>
-)}
+        {subiendoPortada && (
+        <div>
+        Subiendo portada...
+        </div>
+        )}
 
-</div>
-)}
-    </div>
-  )}
-</div>
+        </div>
+        )}
+            </div>
+          )}
+        </div>
 
-<div className="produccion-modal-section">
-  <h4>Archivos</h4>
-<label>Archivos de producción</label>
+        <div className="produccion-modal-section">
+          <h4>Archivos</h4>
+        <label>Archivos de producción</label>
 
-<div className="produccion-archivos-box">
-  <input
-    type="file"
-    multiple
-    accept=".pdf,.xls,.xlsx,.doc,.docx,.zip"
-    onChange={manejarSubirArchivosProduccion}
-    className="produccion-modal-input"
-  />
+        <div className="produccion-archivos-box">
+          <input
+            type="file"
+            multiple
+            accept=".pdf,.xls,.xlsx,.doc,.docx,.zip"
+            onChange={manejarSubirArchivosProduccion}
+            className="produccion-modal-input"
+          />
 
-  {subiendoArchivoProduccion && (
-    <p className="produccion-historial-empty">Subiendo archivo...</p>
-  )}
+          {subiendoArchivoProduccion && (
+            <p className="produccion-historial-empty">Subiendo archivo...</p>
+          )}
 
 {archivosProduccion.length > 0 && (
   <div className="produccion-archivos-lista">
@@ -1615,6 +1619,7 @@ Subiendo portada...
               ✕
             </button>
           </div>
+
         </div>
       );
     })}
@@ -1642,6 +1647,56 @@ Subiendo portada...
     </div>
   </div>
 )}
+
+    {mostrarHistorialGeneral && (
+      <div
+        className="produccion-modal-overlay"
+        onClick={() => setMostrarHistorialGeneral(false)}
+      >
+        <div
+          className="produccion-modal"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <h3>Historial de producción</h3>
+
+          <p className="produccion-historial-empty">
+            Próximo paso: acá vamos a mostrar movimientos recientes de todos los pedidos,
+            con filtros por fecha, usuario y columna.
+          </p>
+
+          <div className="produccion-modal-actions">
+            <button
+              type="button"
+              className="btn-produccion-cancelar"
+              onClick={() => setMostrarHistorialGeneral(false)}
+            >
+              Cerrar
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+      {imagenPreviewProduccion && (
+        <div
+          className="produccion-imagen-preview-overlay"
+          onClick={() => setImagenPreviewProduccion("")}
+        >
+          <div
+            className="produccion-imagen-preview-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="produccion-imagen-preview-close"
+              onClick={() => setImagenPreviewProduccion("")}
+            >
+              ×
+            </button>
+
+            <img src={imagenPreviewProduccion} alt="" />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

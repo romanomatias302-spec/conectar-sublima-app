@@ -7,7 +7,8 @@ import {
   pointerWithin,
 } from "@dnd-kit/core";
 import ProduccionColumn from "./ProduccionColumn";
-import { restrictToFirstScrollableAncestor } from "@dnd-kit/modifiers";
+
+import { useState } from "react";
 
 export default function ProduccionBoard({
   columnas,
@@ -31,6 +32,9 @@ export default function ProduccionBoard({
   puedeMoverPedidos = true,
   puedeEditarDetalleManual = true,
 }) {
+
+const [columnaResaltadaId, setColumnaResaltadaId] = useState(null);
+
 const sensors = useSensors(
   useSensor(PointerSensor, {
     activationConstraint: {
@@ -43,7 +47,33 @@ const sensors = useSensors(
       tolerance: 12,
     },
   })
+
 );
+
+
+function manejarDragMove(event) {
+  const wrapper = document.querySelector(".produccion-board-wrapper");
+  if (!wrapper) return;
+
+  const rect = wrapper.getBoundingClientRect();
+  const activeRect = event?.active?.rect?.current?.translated;
+
+  if (!activeRect) return;
+
+  const x = activeRect.left + activeRect.width / 2;
+
+  const zona = 90;
+  const velocidad = 18;
+
+  if (x > rect.right - zona) {
+    wrapper.scrollLeft += velocidad;
+  }
+
+  if (x < rect.left + zona) {
+    wrapper.scrollLeft -= velocidad;
+  }
+}
+
 
   function manejarDragEnd(event) {
     if (!puedeMoverPedidos) return;
@@ -58,19 +88,25 @@ const sensors = useSensors(
     if (!pedidoId || !columnaDestinoId) return;
 
     onMoverPedido?.(pedidoId, columnaDestinoId);
+    setColumnaResaltadaId(columnaDestinoId);
+
+    setTimeout(() => {
+      setColumnaResaltadaId(null);
+    }, 2200);
   }
 
   return (
     <DndContext
       sensors={sensors}
       collisionDetection={pointerWithin}
-      modifiers={[restrictToFirstScrollableAncestor]}
-      autoScroll={puedeMoverPedidos}
+      modifiers={[]}
+      autoScroll={false}
       measuring={{
         droppable: {
           strategy: "always",
         },
       }}
+      onDragMove={manejarDragMove}
       onDragEnd={manejarDragEnd}
     >
       <div className="produccion-board">
@@ -113,6 +149,7 @@ const sensors = useSensors(
               ahoraTick={ahoraTick}
               puedeMoverPedidos={puedeMoverPedidos}
               puedeEditarDetalleManual={puedeEditarDetalleManual}
+              resaltada={columnaResaltadaId === columna.id}
             />
           );
         })}

@@ -63,13 +63,14 @@ export default function ProduccionCard({
   const id = pedido.firebaseId || pedido.id;
   const esMobile = window.innerWidth <= 768;
 
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    isDragging,
-  } = useDraggable({
+const {
+  attributes,
+  listeners,
+  setNodeRef,
+  setActivatorNodeRef,
+  transform,
+  isDragging,
+} = useDraggable({
     id,
     disabled: pedido.produccionFinalizada === true || !puedeMoverPedidos,
   });
@@ -118,21 +119,21 @@ const etiquetasPedido = obtenerEtiquetasPedido(pedido);
           : {}
       )}
     >
-        <button
-          type="button"
-          className="produccion-card-drag-handle"
-          {...(
-            esMobile && pedido.produccionFinalizada !== true && puedeMoverPedidos
-              ? listeners
-              : {}
-          )}
-          {...(
-            esMobile && pedido.produccionFinalizada !== true && puedeMoverPedidos
-              ? attributes
-              : {}
-          )}
-
-          title={
+      <button
+        ref={esMobile ? setActivatorNodeRef : undefined}
+        type="button"
+        className="produccion-card-drag-handle"
+        {...(
+          esMobile && pedido.produccionFinalizada !== true && puedeMoverPedidos
+            ? listeners
+            : {}
+        )}
+        {...(
+          esMobile && pedido.produccionFinalizada !== true && puedeMoverPedidos
+            ? attributes
+            : {}
+        )}
+        title={
           pedido.produccionFinalizada === true
             ? "Pedido finalizado"
             : !puedeMoverPedidos
