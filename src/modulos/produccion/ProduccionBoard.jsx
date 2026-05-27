@@ -53,6 +53,7 @@ const sensors = useSensors(
 
 function manejarDragMove(event) {
   const wrapper = document.querySelector(".produccion-board-wrapper");
+
   if (!wrapper) return;
 
   const rect = wrapper.getBoundingClientRect();
@@ -61,16 +62,30 @@ function manejarDragMove(event) {
   if (!activeRect) return;
 
   const x = activeRect.left + activeRect.width / 2;
+  const y = activeRect.top + activeRect.height / 2;
 
-  const zona = 90;
-  const velocidad = 18;
+  const zonaX = 90;
+  const zonaY = 120;
 
-  if (x > rect.right - zona) {
-    wrapper.scrollLeft += velocidad;
+  const velocidadX = 18;
+  const velocidadY = 16;
+
+  // Horizontal
+  if (x > rect.right - zonaX) {
+    wrapper.scrollLeft += velocidadX;
   }
 
-  if (x < rect.left + zona) {
-    wrapper.scrollLeft -= velocidad;
+  if (x < rect.left + zonaX) {
+    wrapper.scrollLeft -= velocidadX;
+  }
+
+  // Vertical
+  if (y > rect.bottom - zonaY) {
+    wrapper.scrollTop += velocidadY;
+  }
+
+  if (y < rect.top + zonaY) {
+    wrapper.scrollTop -= velocidadY;
   }
 }
 
