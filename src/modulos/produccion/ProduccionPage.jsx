@@ -1454,16 +1454,28 @@ async function manejarEliminarEtiquetaProduccion(etiqueta) {
         </button>
           </>
         ) : (
-        <button
-          type="button"
-          className="btn-produccion-secundario produccion-btn-full"
-          disabled={imagenesPedido.length === 0}
-          onClick={() => setMostrarSelectorPortada((v) => !v)}
-        >
-          {imagenesPedido.length > 0
-            ? `Ver imágenes del pedido (${imagenesPedido.length})`
-            : "Sin imágenes del pedido"}
-        </button>
+        <>
+          {imagenesPedido.length > 0 ? (
+            <button
+              type="button"
+              className="btn-produccion-secundario produccion-btn-full"
+              onClick={() => setMostrarSelectorPortada((v) => !v)}
+            >
+              Ver imágenes del pedido ({imagenesPedido.length})
+            </button>
+          ) : (
+            <label className="btn-produccion-secundario produccion-btn-full">
+              Subir portada
+
+              <input
+                type="file"
+                accept="image/*"
+                style={{ display: "none" }}
+                onChange={manejarSubirPortada}
+              />
+            </label>
+          )}
+        </>
       )}
 
   {mostrarSelectorPortada && (
