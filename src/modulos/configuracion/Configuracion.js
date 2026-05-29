@@ -8,7 +8,15 @@ import {
   FaUserCog,
 } from "react-icons/fa";
 import ConfiguracionProductos from "./ConfiguracionProductos";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
+import {
+  doc,
+  getDoc,
+  updateDoc,
+  collection,
+  query,
+  where,
+  getDocs,
+} from "firebase/firestore";
 import { db } from "../../firebase";
 import ConfiguracionUsuarios from "./ConfiguracionUsuarios";
 
@@ -19,12 +27,15 @@ export default function Configuracion({ modoOscuro, setModoOscuro, perfil, onAct
 
   const [logoUrl, setLogoUrl] = useState("");
   const [nombreVisible, setNombreVisible] = useState("");
+  const [cuentaSaas, setCuentaSaas] = useState(null);
   const [guardandoConfig, setGuardandoConfig] = useState(false);
   const [mensajeConfig, setMensajeConfig] = useState("");
   const [moneda, setMoneda] = useState(perfil?.moneda || "ARS");
   
   const [guardandoMoneda, setGuardandoMoneda] = useState(false);
   const [mensajeMoneda, setMensajeMoneda] = useState("");
+
+  const [periodosCuenta, setPeriodosCuenta] = useState([]);
 
   const MONEDAS_CONFIG = {
     ARS: { moneda: "ARS", localeMoneda: "es-AR", label: "ARS - Peso argentino" },
@@ -51,6 +62,69 @@ export default function Configuracion({ modoOscuro, setModoOscuro, perfil, onAct
           const data = snap.data();
           setLogoUrl(data.logoUrl || "");
           setNombreVisible(data.nombreVisible || data.nombre || "");
+          setCuentaSaas({
+            planNombre: data.planNombre || data.plan || "Sin plan",
+            estadoSuscripcion: data.estadoSuscripcion || data.estado || "activo",
+            fechaVencimiento: data.fechaVencimiento || data.fechaProximoCargo || "",
+            planPrecio: data.planPrecio || data.mantenimientoMensual || 0,
+            saldoCuentaCorriente: data.saldoCuentaCorriente || 0,
+            moneda: data.moneda || "ARS",
+            ultimoPago: data.ultimoPago || "",
+            pais: data.pais || "-",
+            metodoCobro: data.metodoCobro || "manual",
+            suspendidoPorSistema: data.suspendidoPorSistema || false,
+            suspendidoManual: data.suspendidoManual || false,
+          });
+
+          const pagosRef = collection(db, "saas_pagos");
+          const pagosQuery = query(
+            pagosRef,
+            where("clienteSaasId", "==", perfil.clienteId)
+          );
+
+          const pagosSnap = await getDocs(pagosQuery);
+
+          const movimientos = pagosSnap.docs.map((docu) => ({
+            id: docu.id,
+            ...docu.data(),
+          }));
+
+          const periodos = Object.values(
+            movimientos
+              .filter((mov) => mov.anulado !== true && mov.periodoFacturado)
+              .reduce((acc, mov) => {
+                const periodo = mov.periodoFacturado;
+                const monto = Number(mov.monto || 0);
+                const tipo = mov.tipoMovimiento || "pago";
+
+                if (!acc[periodo]) {
+                  acc[periodo] = {
+                    periodo,
+                    cargos: 0,
+                    pagos: 0,
+                    saldo: 0,
+                    fechaVencimiento: mov.fechaVencimiento || "",
+                  };
+                }
+
+                if (tipo === "cargo" || tipo === "ajuste") {
+                  acc[periodo].cargos += monto;
+                  acc[periodo].fechaVencimiento =
+                    mov.fechaVencimiento || acc[periodo].fechaVencimiento;
+                }
+
+                if (tipo === "pago" || tipo === "credito") {
+                  acc[periodo].pagos += monto;
+                }
+
+                acc[periodo].saldo = acc[periodo].cargos - acc[periodo].pagos;
+
+                return acc;
+              }, {})
+          ).sort((a, b) => (a.periodo < b.periodo ? 1 : -1));
+
+          setPeriodosCuenta(periodos);
+
         }
       } catch (error) {
         console.error("Error al cargar configuración del cliente:", error);
@@ -59,6 +133,10 @@ export default function Configuracion({ modoOscuro, setModoOscuro, perfil, onAct
 
     cargarConfigCliente();
   }, [perfil]);
+
+
+
+
 
   const toggleModoOscuro = () => {
     const nuevoModo = !modoOscuro;
@@ -140,6 +218,25 @@ export default function Configuracion({ modoOscuro, setModoOscuro, perfil, onAct
     }
   };
 
+  const formatearMonedaCuenta = (valor, monedaActual = "ARS") => {
+  return new Intl.NumberFormat("es-AR", {
+    style: "currency",
+    currency: monedaActual || "ARS",
+    minimumFractionDigits: 0,
+  }).format(Number(valor || 0));
+};
+
+const thCuenta = {
+  textAlign: "left",
+  padding: "12px",
+  background: "#0796c9",
+  color: "#fff",
+};
+
+const tdCuenta = {
+  padding: "12px",
+  borderBottom: "1px solid #e5e7eb",
+};
 
 
   return (
@@ -320,14 +417,154 @@ export default function Configuracion({ modoOscuro, setModoOscuro, perfil, onAct
         </section>
       )}
 
-        {pestañaActiva === "cuenta" && (
-          <section className="config-section">
-            <h2>Cuenta y otros</h2>
-            <p className="config-note">
-              Próximamente podrás personalizar tu cuenta, idioma, notificaciones y más.
-            </p>
-          </section>
-        )}
+      {pestañaActiva === "cuenta" && (
+        <section className="config-section">
+          <h2>Cuenta</h2>
+          <p className="config-note">
+            Consultá el estado de tu suscripción, períodos facturados y pagos registrados.
+          </p>
+
+          {!cuentaSaas ? (
+            <p>Cargando información de cuenta...</p>
+          ) : (
+            <>
+              <div
+                className="container-secundaria"
+                style={{
+                  marginBottom: 20,
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                  gap: 12,
+                }}
+              >
+                <div>
+                  <strong>Plan actual</strong>
+                  <p>{cuentaSaas.planNombre}</p>
+                </div>
+
+                <div>
+                  <strong>Estado</strong>
+                  <p>
+                    {cuentaSaas.suspendidoManual || cuentaSaas.suspendidoPorSistema
+                      ? "Suspendido"
+                      : "Activo"}
+                  </p>
+                </div>
+
+
+
+
+
+                <div>
+                  <strong>Saldo total</strong>
+                  <p
+                    style={{
+                      color:
+                        Number(cuentaSaas.saldoCuentaCorriente || 0) > 0
+                          ? "#dc2626"
+                          : Number(cuentaSaas.saldoCuentaCorriente || 0) < 0
+                          ? "#2563eb"
+                          : "#16a34a",
+                      fontWeight: 800,
+                    }}
+                  >
+                    {Number(cuentaSaas.saldoCuentaCorriente || 0) > 0
+                      ? `Debe ${formatearMonedaCuenta(
+                          cuentaSaas.saldoCuentaCorriente,
+                          cuentaSaas.moneda
+                        )}`
+                      : Number(cuentaSaas.saldoCuentaCorriente || 0) < 0
+                      ? `A favor ${formatearMonedaCuenta(
+                          Math.abs(cuentaSaas.saldoCuentaCorriente),
+                          cuentaSaas.moneda
+                        )}`
+                      : "Al día"}
+                  </p>
+                </div>
+              </div>
+
+              <div style={{ overflowX: "auto" }}>
+                <h3>Períodos facturados</h3>
+
+                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr>
+                      <th style={thCuenta}>Período</th>
+                      <th style={thCuenta}>Cargo</th>
+                      <th style={thCuenta}>Pagado</th>
+                      <th style={thCuenta}>Saldo</th>
+                      <th style={thCuenta}>Vencimiento</th>
+                      <th style={thCuenta}>Estado</th>
+                      <th style={thCuenta}>Acción</th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {periodosCuenta.map((p) => (
+                      <tr key={p.periodo}>
+                        <td style={tdCuenta}>{p.periodo}</td>
+                        <td style={tdCuenta}>
+                          {formatearMonedaCuenta(p.cargos, cuentaSaas.moneda)}
+                        </td>
+                        <td style={tdCuenta}>
+                          {formatearMonedaCuenta(p.pagos, cuentaSaas.moneda)}
+                        </td>
+                        <td style={tdCuenta}>
+                          {formatearMonedaCuenta(p.saldo, cuentaSaas.moneda)}
+                        </td>
+                        <td style={tdCuenta}>{p.fechaVencimiento || "-"}</td>
+                        <td style={tdCuenta}>
+                          <strong
+                            style={{
+                              color: p.saldo > 0 ? "#dc2626" : "#16a34a",
+                            }}
+                          >
+                            {p.saldo > 0 ? "Pendiente" : "Pagado"}
+                          </strong>
+                        </td>
+                        <td style={tdCuenta}>
+                          {p.saldo > 0 ? (
+                        <button
+                          className="btn-primary"
+                          onClick={() => {
+                            if (cuentaSaas.metodoCobro === "mercadopago") {
+                              alert("Próximo paso: abrir checkout de Mercado Pago.");
+                              return;
+                            }
+
+                            alert(
+                              "Para informar el pago, comunicate con el administrador indicando el período " +
+                                p.periodo +
+                                " y el importe " +
+                                formatearMonedaCuenta(p.saldo, cuentaSaas.moneda)
+                            );
+                          }}
+                        >
+                          {cuentaSaas.metodoCobro === "mercadopago"
+                            ? "Pagar con Mercado Pago"
+                            : "Informar pago"}
+                        </button>
+                          ) : (
+                            "-"
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+
+                    {periodosCuenta.length === 0 && (
+                      <tr>
+                        <td style={tdCuenta} colSpan="7">
+                          Todavía no hay períodos facturados.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </section>
+      )}
       </div>
     </div>
   );

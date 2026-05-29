@@ -17,6 +17,7 @@ import {
 import {
   registrarMovimientoSaas,
   obtenerPagosSaas,
+  anularMovimientoSaas,
 } from "../../firebase/saasPagos";
 
 export default function DuenoSaasPanel() {
@@ -44,6 +45,15 @@ const [filtroEstado, setFiltroEstado] = useState("todos");
 const [busquedaCliente, setBusquedaCliente] = useState("");
 const [pagosCliente, setPagosCliente] = useState([]);
 const [mostrarPago, setMostrarPago] = useState(false);
+const [mostrarCargoMasivo, setMostrarCargoMasivo] = useState(false);
+
+const [formCargoMasivo, setFormCargoMasivo] = useState({
+  planNombre: "",
+  monto: "",
+  fechaPago: new Date().toISOString().slice(0, 10),
+  concepto: "mensualidad",
+  observacion: "Cargo mensual masivo",
+});
 
 const [formPago, setFormPago] = useState({
   tipoMovimiento: "pago",
@@ -51,6 +61,7 @@ const [formPago, setFormPago] = useState({
   fechaPago: new Date().toISOString().slice(0, 10),
   medioPago: "transferencia",
   concepto: "mensualidad",
+  periodoFacturado: "",
   observacion: "",
 });
 
@@ -280,8 +291,54 @@ const clientesFiltrados = clientes
     return aActivo ? -1 : 1;
   });
 
-  const resumenCuenta = pagosCliente.reduce(
+const periodoActual = new Date().toISOString().slice(0, 7);
+
+const periodosDisponibles = [
+  ...new Set([
+    periodoActual,
+    ...pagosCliente
+      .filter((p) => p.anulado !== true)
+      .map((p) => p.periodoFacturado)
+      .filter(Boolean),
+  ]),
+].sort().reverse();
+
+
+const resumenPorPeriodo = Object.values(
+  pagosCliente
+    .filter((mov) => mov.anulado !== true && mov.periodoFacturado)
+    .reduce((acc, mov) => {
+      const periodo = mov.periodoFacturado;
+      const monto = Number(mov.monto || 0);
+      const tipo = mov.tipoMovimiento || "pago";
+
+      if (!acc[periodo]) {
+        acc[periodo] = {
+          periodo,
+          cargos: 0,
+          pagos: 0,
+          saldo: 0,
+        };
+      }
+
+      if (tipo === "cargo" || tipo === "ajuste") {
+        acc[periodo].cargos += monto;
+      }
+
+      if (tipo === "pago" || tipo === "credito") {
+        acc[periodo].pagos += monto;
+      }
+
+      acc[periodo].saldo = acc[periodo].cargos - acc[periodo].pagos;
+
+      return acc;
+    }, {})
+).sort((a, b) => (a.periodo < b.periodo ? 1 : -1));
+
+const resumenCuenta = pagosCliente.reduce(
   (acc, mov) => {
+    if (mov.anulado === true) return acc;
+
     const monto = Number(mov.monto || 0);
     const tipo = mov.tipoMovimiento || "pago";
 
@@ -299,6 +356,78 @@ const clientesFiltrados = clientes
   { cargos: 0, pagos: 0, saldo: 0 }
 );
 
+const planesDisponibles = [
+  ...new Set(
+    clientes
+      .map((c) => c.planNombre || c.plan)
+      .filter(Boolean)
+  ),
+];
+
+const clientesParaCargoMasivo = clientes.filter((c) => {
+  const planCliente = c.planNombre || c.plan;
+
+  if (planCliente !== formCargoMasivo.planNombre) return false;
+
+  if (c.suspendidoManual === true) return false;
+  if ((c.estado || "") === "inactivo") return false;
+  if ((c.estadoSuscripcion || "") === "cancelado") return false;
+
+  return true;
+});
+
+const emitirCargoMasivo = async () => {
+  if (!formCargoMasivo.planNombre) {
+    alert("Seleccioná un plan.");
+    return;
+  }
+
+  if (!formCargoMasivo.monto || Number(formCargoMasivo.monto) <= 0) {
+    alert("Ingresá un monto válido.");
+    return;
+  }
+
+  const ok = window.confirm(
+    `Se emitirá un cargo de ${formatearMoneda(
+      formCargoMasivo.monto
+    )} a ${clientesParaCargoMasivo.length} clientes del plan ${
+      formCargoMasivo.planNombre
+    }. ¿Continuar?`
+  );
+
+  if (!ok) return;
+
+  try {
+    for (const cliente of clientesParaCargoMasivo) {
+      await registrarMovimientoSaas({
+        clienteSaas: cliente,
+        tipoMovimiento: "cargo",
+        monto: Number(formCargoMasivo.monto),
+        fechaPago: formCargoMasivo.fechaPago,
+        medioPago: "",
+        concepto: formCargoMasivo.concepto,
+        observacion: formCargoMasivo.observacion,
+      });
+    }
+
+    await cargarClientes();
+    setMostrarCargoMasivo(false);
+
+    setFormCargoMasivo({
+      planNombre: "",
+      monto: "",
+      fechaPago: new Date().toISOString().slice(0, 10),
+      concepto: "mensualidad",
+      observacion: "Cargo mensual masivo",
+    });
+  } catch (error) {
+    console.error(error);
+    alert("No se pudo emitir el cargo masivo.");
+  }
+};
+
+
+
   return (
     <div style={{ padding: 30 }}>
       <div style={topbar}>
@@ -312,6 +441,13 @@ const clientesFiltrados = clientes
         <div style={{ display: "flex", gap: 10 }}>
           <button onClick={abrirNuevoCliente} style={btnNuevo}>
             + Nuevo cliente
+          </button>
+
+          <button
+            onClick={() => setMostrarCargoMasivo(true)}
+            style={btnGestionar}
+          >
+            + Cargo mensual masivo
           </button>
 
           <button onClick={cerrarSesion} style={btnSalir}>
@@ -349,16 +485,19 @@ const clientesFiltrados = clientes
         ) : (
 
 
+          
           <table style={table}>
             <thead>
               <tr>
                 <th style={th}>Empresa</th>
                 <th style={th}>Estado</th>
                 <th style={th}>Plan</th>
+                <th style={th}>País</th>
+                <th style={th}>Cobro</th>
                 <th style={th}>Mantenimiento</th>
                 <th style={th}>Saldo</th>
                 <th style={th}>Último pago</th>
-                <th style={th}>Próximo cargo</th>
+                <th style={th}>Vencimiento</th>
                 <th style={th}>Acciones</th>
               </tr>
             </thead>
@@ -374,11 +513,32 @@ const clientesFiltrados = clientes
                   }
                 >
                   <td style={td}>{c.nombre || "-"}</td>
-                  <td style={td}>{c.estado || "-"}</td>
-                  <td style={td}>{c.plan || "-"}</td>
                   <td style={td}>
-                    {c.mantenimientoMensual ? `$${c.mantenimientoMensual}` : "-"}
+                    {c.suspendidoManual
+                      ? "Suspendido manual"
+                      : c.suspendidoPorSistema
+                      ? "Suspendido por deuda"
+                      : c.estado === "suspendido"
+                      ? "Suspendido"
+                      : "Activo"}
                   </td>
+                    <td style={td}>{c.planNombre || c.plan || "-"}</td>
+
+                    <td style={td}>{c.pais || "-"}</td>
+
+                    <td style={td}>
+                      {c.metodoCobro === "mercadopago"
+                        ? "Mercado Pago"
+                        : c.metodoCobro === "stripe"
+                        ? "Stripe"
+                        : c.metodoCobro === "paypal"
+                        ? "PayPal"
+                        : "Manual"}
+                    </td>
+
+                    <td style={td}>
+                      {formatearMoneda(c.planPrecio || c.mantenimientoMensual || 0)}
+                    </td>
 
                   <td style={td}>
                     <span
@@ -401,7 +561,9 @@ const clientesFiltrados = clientes
                   </td>
 
                   <td style={td}>{formatearFecha(c.ultimoPago)}</td>
-                  <td style={td}>{formatearFecha(c.fechaProximoCargo)}</td>
+                  <td style={td}>
+                    {formatearFecha(c.fechaVencimiento || c.fechaProximoCargo)}
+                  </td>
                   <td style={td}>
                     <div style={{ display: "flex", gap: 8 }}>
                       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -435,10 +597,18 @@ const clientesFiltrados = clientes
 
                         <button
                           onClick={async () => {
-                            const nuevoEstado =
-                              (c.estado || "activo") === "activo"
-                                ? "suspendido"
-                                : "activo";
+                          const nuevoEstado =
+                            (c.estado || "activo") === "activo"
+                              ? "suspendido"
+                              : "activo";
+
+                          await updateDoc(doc(db, "clientes-saas", c.id), {
+                            estado: nuevoEstado,
+                            suspendidoManual: nuevoEstado === "suspendido",
+                            suspendidoPorSistema: false,
+                            motivoSuspension: nuevoEstado === "suspendido" ? "manual" : "",
+                            updatedAt: serverTimestamp(),
+                          });
 
                             await updateDoc(doc(db, "clientes-saas", c.id), {
                               estado: nuevoEstado,
@@ -533,6 +703,75 @@ const clientesFiltrados = clientes
                 })
                 .map((u) => {
                   const usuarioActivo = u.activo !== false;
+
+                  const planesDisponibles = [
+                    ...new Set(
+                      clientes
+                        .map((c) => c.planNombre || c.plan)
+                        .filter(Boolean)
+                    ),
+                  ];
+
+                  const clientesParaCargoMasivo = clientes.filter((c) => {
+                    const planCliente = c.planNombre || c.plan;
+
+                    if (planCliente !== formCargoMasivo.planNombre) return false;
+
+                    // No cobrar clientes suspendidos manualmente por nosotros
+                    if (c.suspendidoManual === true) return false;
+
+                    // No cobrar clientes inactivos/cancelados
+                    if ((c.estado || "") === "inactivo") return false;
+                    if ((c.estadoSuscripcion || "") === "cancelado") return false;
+
+                    return true;
+                  });
+
+                  const emitirCargoMasivo = async () => {
+                    if (!formCargoMasivo.planNombre) {
+                      alert("Seleccioná un plan.");
+                      return;
+                    }
+
+                    if (!formCargoMasivo.monto || Number(formCargoMasivo.monto) <= 0) {
+                      alert("Ingresá un monto válido.");
+                      return;
+                    }
+
+                    const ok = window.confirm(
+                      `Se emitirá un cargo de ${formatearMoneda(formCargoMasivo.monto)} a ${clientesParaCargoMasivo.length} clientes del plan ${formCargoMasivo.planNombre}. ¿Continuar?`
+                    );
+
+                    if (!ok) return;
+
+                    try {
+                      for (const cliente of clientesParaCargoMasivo) {
+                        await registrarMovimientoSaas({
+                          clienteSaas: cliente,
+                          tipoMovimiento: "cargo",
+                          monto: Number(formCargoMasivo.monto),
+                          fechaPago: formCargoMasivo.fechaPago,
+                          medioPago: "",
+                          concepto: formCargoMasivo.concepto,
+                          observacion: formCargoMasivo.observacion,
+                        });
+                      }
+
+                      await cargarClientes();
+                      setMostrarCargoMasivo(false);
+
+                      setFormCargoMasivo({
+                        planNombre: "",
+                        monto: "",
+                        fechaPago: new Date().toISOString().slice(0, 10),
+                        concepto: "mensualidad",
+                        observacion: "Cargo mensual masivo",
+                      });
+                    } catch (error) {
+                      console.error(error);
+                      alert("No se pudo emitir el cargo masivo.");
+                    }
+                  };
 
                   return (
                     <tr
@@ -632,124 +871,231 @@ const clientesFiltrados = clientes
 )}    
 
       {clienteCuentaCorriente && (
-  <div style={overlay}>
-    <div style={{ ...modal, maxWidth: 1000 }}>
-      <div style={detalleHeader}>
-        <div>
-          <h2 style={{ margin: 0 }}>
-            Cuenta corriente - {clienteCuentaCorriente.nombre}
-          </h2>
+        <div style={overlay}>
+          <div style={{ ...modal, maxWidth: 1000 }}>
+            <div style={detalleHeader}>
+              <div>
+                <h2 style={{ margin: 0 }}>
+                  Cuenta corriente - {clienteCuentaCorriente.nombre}
+                </h2>
+              </div>
+
+              <div style={{ display: "flex", gap: 10 }}>
+              <button
+                onClick={() => {
+                  setFormPago((prev) => ({
+                    ...prev,
+                    tipoMovimiento: "cargo",
+                    concepto: "mensualidad",
+                    medioPago: "",
+                  }));
+                  setMostrarPago(true);
+                }}
+                style={btnNuevo}
+              >
+                + Emitir cargo
+              </button>
+
+              <button
+                onClick={() => {
+                  setFormPago((prev) => ({
+                    ...prev,
+                    tipoMovimiento: "pago",
+                    concepto: "pago",
+                    medioPago: "transferencia",
+                  }));
+                  setMostrarPago(true);
+                }}
+                style={btnGestionar}
+              >
+                + Registrar pago
+              </button>
+
+                <button
+                  onClick={() => setClienteCuentaCorriente(null)}
+                  style={btnSec}
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
+              <div style={miniCard}>
+                <strong>Total cargos</strong>
+                <span>${resumenCuenta.cargos}</span>
+              </div>
+
+              <div style={miniCard}>
+                <strong>Total pagos</strong>
+                <span>${resumenCuenta.pagos}</span>
+              </div>
+
+              <div style={miniCard}>
+                <strong>Saldo</strong>
+                <span
+                  style={{
+                    color:
+                      resumenCuenta.saldo > 0
+                        ? "#dc2626"
+                        : resumenCuenta.saldo < 0
+                        ? "#16a34a"
+                        : "#111827",
+                    fontWeight: 800,
+                  }}
+                >
+                  {resumenCuenta.saldo > 0
+                    ? `Debe $${resumenCuenta.saldo}`
+                    : resumenCuenta.saldo < 0
+                    ? `A favor $${Math.abs(resumenCuenta.saldo)}`
+                    : "$0"}
+                </span>
+              </div>
+            </div>
+
+            {resumenPorPeriodo.length > 0 && (
+              <div style={{ marginBottom: 18 }}>
+                <h3>Estado por período</h3>
+
+                <table style={table}>
+                  <thead>
+                    <tr>
+                      <th style={th}>Período</th>
+                      <th style={th}>Cargos</th>
+                      <th style={th}>Pagos</th>
+                      <th style={th}>Saldo</th>
+                      <th style={th}>Estado</th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {resumenPorPeriodo.map((p) => (
+                      <tr key={p.periodo}>
+                        <td style={td}>{p.periodo}</td>
+                        <td style={td}>{formatearMoneda(p.cargos)}</td>
+                        <td style={td}>{formatearMoneda(p.pagos)}</td>
+                        <td style={td}>{formatearMoneda(p.saldo)}</td>
+                        <td style={td}>
+                          <strong
+                            style={{
+                              color: p.saldo > 0 ? "#dc2626" : "#16a34a",
+                            }}
+                          >
+                            {p.saldo > 0 ? "Pendiente" : "Pagado"}
+                          </strong>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            <table style={table}>
+              <thead>
+                <tr>
+                  <th style={th}>Fecha</th>
+                  <th style={th}>Período</th>
+                  <th style={th}>Tipo</th>
+                  <th style={th}>Concepto</th>
+                  <th style={th}>Medio</th>
+                  <th style={th}>Monto</th>
+                  <th style={th}>Observación</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {pagosCliente.map((p) => (
+                  <tr
+                    key={p.id}
+                    style={{
+                      opacity: p.anulado ? 0.45 : 1,
+                      background: p.anulado ? "#f3f4f6" : "#fff",
+                      textDecoration: p.anulado ? "line-through" : "none",
+                    }}
+                  >
+                    <td style={td}>{p.fechaPago || "-"}</td>
+                    <td style={td}>{p.periodoFacturado || "-"}</td>
+                    <td style={td}>{p.fechaPago || "-"}</td>
+                    <td style={td}>{p.tipoMovimiento || "pago"}</td>
+                    <td style={td}>{p.concepto || "-"}</td>
+                    <td style={td}>{p.medioPago || "-"}</td>
+                    <td style={td}>{formatearMoneda(p.monto)}</td>
+                    <td style={td}>
+                      {p.anulado
+                        ? `ANULADO: ${p.motivoAnulacion || "-"}`
+                        : p.observacion || "-"}
+                    </td>
+                    <td style={td}>
+                      {!p.anulado && (
+                        <button
+                          style={{
+                            ...btnEditar,
+                            background: "#dc2626",
+                          }}
+                          onClick={async () => {
+                            const motivo = window.prompt(
+                              "Motivo de anulación:",
+                              "Error de carga"
+                            );
+
+                            if (!motivo) return;
+
+                            const ok = window.confirm(
+                              "¿Seguro que querés anular este movimiento? El saldo se recalculará automáticamente."
+                            );
+
+                            if (!ok) return;
+
+                            try {
+                              await anularMovimientoSaas({
+                                movimientoId: p.id,
+                                clienteSaasId: clienteCuentaCorriente.id,
+                                motivoAnulacion: motivo,
+                              });
+
+                              const pagos = await obtenerPagosSaas(clienteCuentaCorriente.id);
+                              setPagosCliente(pagos);
+
+                              await cargarClientes();
+                              const clientesSnap = await getDocs(collection(db, "clientes-saas"));
+                              const clientesActualizados = clientesSnap.docs.map((docu) => ({
+                                id: docu.id,
+                                ...docu.data(),
+                              }));
+
+                              const clienteActualizado = clientesActualizados.find(
+                                (c) => c.id === clienteCuentaCorriente.id
+                              );
+
+                              if (clienteActualizado) {
+                                setClienteCuentaCorriente(clienteActualizado);
+                              }
+                            } catch (error) {
+                              console.error(error);
+                              alert(error.message || "No se pudo anular el movimiento.");
+                            }
+                          }}
+                        >
+                          Anular
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+
+                {pagosCliente.length === 0 && (
+                  <tr>
+                    <td style={td} colSpan="8">
+                      No hay movimientos registrados.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
-
-        <div style={{ display: "flex", gap: 10 }}>
-        <button
-          onClick={() => {
-            setFormPago((prev) => ({
-              ...prev,
-              tipoMovimiento: "cargo",
-              concepto: "mensualidad",
-              medioPago: "",
-            }));
-            setMostrarPago(true);
-          }}
-          style={btnNuevo}
-        >
-          + Emitir cargo
-        </button>
-
-        <button
-          onClick={() => {
-            setFormPago((prev) => ({
-              ...prev,
-              tipoMovimiento: "pago",
-              concepto: "pago",
-              medioPago: "transferencia",
-            }));
-            setMostrarPago(true);
-          }}
-          style={btnGestionar}
-        >
-          + Registrar pago
-        </button>
-
-          <button
-            onClick={() => setClienteCuentaCorriente(null)}
-            style={btnSec}
-          >
-            Cerrar
-          </button>
-        </div>
-      </div>
-
-      <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
-        <div style={miniCard}>
-          <strong>Total cargos</strong>
-          <span>${resumenCuenta.cargos}</span>
-        </div>
-
-        <div style={miniCard}>
-          <strong>Total pagos</strong>
-          <span>${resumenCuenta.pagos}</span>
-        </div>
-
-        <div style={miniCard}>
-          <strong>Saldo</strong>
-          <span
-            style={{
-              color:
-                resumenCuenta.saldo > 0
-                  ? "#dc2626"
-                  : resumenCuenta.saldo < 0
-                  ? "#16a34a"
-                  : "#111827",
-              fontWeight: 800,
-            }}
-          >
-            {resumenCuenta.saldo > 0
-              ? `Debe $${resumenCuenta.saldo}`
-              : resumenCuenta.saldo < 0
-              ? `A favor $${Math.abs(resumenCuenta.saldo)}`
-              : "$0"}
-          </span>
-        </div>
-      </div>
-
-      <table style={table}>
-        <thead>
-          <tr>
-            <th style={th}>Fecha</th>
-            <th style={th}>Tipo</th>
-            <th style={th}>Concepto</th>
-            <th style={th}>Medio</th>
-            <th style={th}>Monto</th>
-            <th style={th}>Observación</th>
-          </tr>
-        </thead>
-
-        <tbody>
-          {pagosCliente.map((p) => (
-            <tr key={p.id}>
-              <td style={td}>{p.fechaPago || "-"}</td>
-              <td style={td}>{p.tipoMovimiento || "pago"}</td>
-              <td style={td}>{p.concepto || "-"}</td>
-              <td style={td}>{p.medioPago || "-"}</td>
-              <td style={td}>{formatearMoneda(p.monto)}</td>
-              <td style={td}>{p.observacion || "-"}</td>
-            </tr>
-          ))}
-
-          {pagosCliente.length === 0 && (
-            <tr>
-              <td style={td} colSpan="6">
-                No hay pagos registrados.
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
-    </div>
-  </div>
-)}
+      )}
 
       {mostrarForm && (
         <ClienteSaasForm
@@ -766,6 +1112,107 @@ const clientesFiltrados = clientes
         />
       )}
 
+      {mostrarCargoMasivo && (
+        <div style={overlay}>
+          <div style={modal}>
+            <h2 style={{ marginTop: 0 }}>Cargo mensual masivo</h2>
+
+            <div style={form}>
+              <label>Plan</label>
+              <select
+                value={formCargoMasivo.planNombre}
+                onChange={(e) => {
+                  const planSeleccionado = e.target.value;
+                  const clienteReferencia = clientes.find(
+                    (c) => (c.planNombre || c.plan) === planSeleccionado
+                  );
+
+                  setFormCargoMasivo((prev) => ({
+                    ...prev,
+                    planNombre: planSeleccionado,
+                    monto:
+                      clienteReferencia?.planPrecio ||
+                      clienteReferencia?.mantenimientoMensual ||
+                      "",
+                  }));
+                }}
+                style={input}
+              >
+                <option value="">Seleccionar plan</option>
+                {planesDisponibles.map((plan) => (
+                  <option key={plan} value={plan}>
+                    {plan}
+                  </option>
+                ))}
+              </select>
+
+              <label>Monto del cargo</label>
+              <input
+                type="number"
+                value={formCargoMasivo.monto}
+                onChange={(e) =>
+                  setFormCargoMasivo((prev) => ({
+                    ...prev,
+                    monto: e.target.value,
+                  }))
+                }
+                style={input}
+              />
+
+              <strong>
+                {formatearMoneda(formCargoMasivo.monto)}
+              </strong>
+
+              <label>Fecha del cargo</label>
+              <input
+                type="date"
+                value={formCargoMasivo.fechaPago}
+                onChange={(e) =>
+                  setFormCargoMasivo((prev) => ({
+                    ...prev,
+                    fechaPago: e.target.value,
+                  }))
+                }
+                style={input}
+              />
+
+              <label>Observación</label>
+              <input
+                value={formCargoMasivo.observacion}
+                onChange={(e) =>
+                  setFormCargoMasivo((prev) => ({
+                    ...prev,
+                    observacion: e.target.value,
+                  }))
+                }
+                style={input}
+              />
+
+              <div style={miniCard}>
+                <strong>Clientes incluidos</strong>
+                <span>{clientesParaCargoMasivo.length}</span>
+                <small>
+                  Se excluyen clientes suspendidos manualmente, inactivos o cancelados.
+                </small>
+              </div>
+
+              <div style={actions}>
+                <button
+                  style={btnSec}
+                  onClick={() => setMostrarCargoMasivo(false)}
+                >
+                  Cancelar
+                </button>
+
+                <button style={btnPri} onClick={emitirCargoMasivo}>
+                  Emitir cargos
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {mostrarPago && clienteCuentaCorriente && (
   <div style={overlay}>
     <div style={modal}>
@@ -778,6 +1225,7 @@ const clientesFiltrados = clientes
 </h2>
 
       <div style={form}>
+        <label>Tipo de movimiento</label>
         <select
           value={formPago.tipoMovimiento}
           onChange={(e) =>
@@ -818,6 +1266,25 @@ const clientesFiltrados = clientes
           style={input}
         />
 
+        <label>Período</label>
+        <select
+          value={formPago.periodoFacturado}
+          onChange={(e) =>
+            setFormPago((prev) => ({
+              ...prev,
+              periodoFacturado: e.target.value,
+            }))
+          }
+          style={input}
+        >
+          <option value="">Sin período</option>
+          {periodosDisponibles.map((periodo) => (
+            <option key={periodo} value={periodo}>
+              {periodo}
+            </option>
+          ))}
+        </select>
+        <label>Concepto</label>  
         <select
           value={formPago.concepto}
           onChange={(e) =>
@@ -916,15 +1383,16 @@ const clientesFiltrados = clientes
                   fechaPago: new Date().toISOString().slice(0, 10),
                   medioPago: "transferencia",
                   concepto: "mensualidad",
+                  periodoFacturado: "",
                   observacion: "",
-                });
+                });;
               } catch (error) {
                 console.error(error);
                 alert(error.message || "No se pudo registrar el pago.");
               }
             }}
           >
-            Guardar pago
+            {formPago.tipoMovimiento === "cargo" ? "Guardar cargo" : "Guardar pago"}
           </button>
         </div>
       </div>

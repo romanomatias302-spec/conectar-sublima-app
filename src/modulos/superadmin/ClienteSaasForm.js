@@ -7,36 +7,69 @@ export default function ClienteSaasForm({
   onClose,
   onGuardado,
 }) {
-    const [formData, setFormData] = useState({
-        nombre: "",
-        estado: "activo",
-        plan: "instalacion",
-        costoInstalacion: 300000,
-        mantenimientoMensual: "",
-        fechaProximoCargo: "",
-        estadoCuenta: "al_dia",
-        ultimoPago: "",
-        fechaAlta: "",
-        proximoVencimiento: "",
-        observaciones: "",
-    });
+const [formData, setFormData] = useState({
+  nombre: "",
+  estado: "activo",
+
+
+
+  plan: "instalacion",
+  planNombre: "Inicial",
+  planPrecio: 20000,
+  moneda: "ARS",
+
+  pais: "Argentina",
+  metodoCobro: "manual",
+
+  costoInstalacion: 300000,
+  mantenimientoMensual: 20000,
+
+  fechaAlta: "",
+  
+  
+  
+
+  estadoCuenta: "al_dia",
+  estadoSuscripcion: "activo",
+
+  saldoPeriodo: 0,
+  totalPagadoPeriodo: 0,
+
+  observaciones: "",
+});
 
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (clienteEditando) {
-            setFormData({
+      setFormData({
         nombre: clienteEditando.nombre || "",
         estado: clienteEditando.estado || "activo",
+
+
+
         plan: clienteEditando.plan || "instalacion",
+        planNombre: clienteEditando.planNombre || clienteEditando.plan || "Inicial",
+        planPrecio: clienteEditando.planPrecio || clienteEditando.mantenimientoMensual || 20000,
+        moneda: clienteEditando.moneda || "ARS",
+
+        pais: clienteEditando.pais || "Argentina",
+        metodoCobro: clienteEditando.metodoCobro || "manual",
+
         costoInstalacion: clienteEditando.costoInstalacion || 300000,
         mantenimientoMensual: clienteEditando.mantenimientoMensual || 20000,
-        ultimoPago: clienteEditando.ultimoPago || "",
+
         fechaAlta: clienteEditando.fechaAlta || "",
-        proximoVencimiento: clienteEditando.proximoVencimiento || "",
-        observaciones: clienteEditando.observaciones || "",
-        fechaProximoCargo: clienteEditando.fechaProximoCargo || "",
+        
+        
+
         estadoCuenta: clienteEditando.estadoCuenta || "al_dia",
+        estadoSuscripcion: clienteEditando.estadoSuscripcion || clienteEditando.estado || "activo",
+
+        saldoPeriodo: clienteEditando.saldoPeriodo || 0,
+        totalPagadoPeriodo: clienteEditando.totalPagadoPeriodo || 0,
+
+        observaciones: clienteEditando.observaciones || "",
       });
     }
   }, [clienteEditando]);
@@ -61,12 +94,36 @@ export default function ClienteSaasForm({
         return `${yyyy}-${mm}-${dd}`;
     };
 
+    const sumarDias = (fechaStr, dias) => {
+      if (!fechaStr) return "";
+
+      const partes = fechaStr.split("-");
+      if (partes.length !== 3) return "";
+
+      const anio = Number(partes[0]);
+      const mes = Number(partes[1]) - 1;
+      const dia = Number(partes[2]);
+
+      const fecha = new Date(anio, mes, dia);
+      fecha.setDate(fecha.getDate() + dias);
+
+      const yyyy = fecha.getFullYear();
+      const mm = String(fecha.getMonth() + 1).padStart(2, "0");
+      const dd = String(fecha.getDate()).padStart(2, "0");
+
+      return `${yyyy}-${mm}-${dd}`;
+    };
+
     const handleChange = (e) => {
         const { name, value } = e.target;
 
         setFormData((prev) => {
         const nuevoValor =
-            name === "costoInstalacion" || name === "mantenimientoMensual"
+            name === "costoInstalacion" ||
+            name === "mantenimientoMensual" ||
+            name === "planPrecio" ||
+            name === "saldoPeriodo" ||
+            name === "totalPagadoPeriodo"
             ? Number(value)
             : value;
 
@@ -75,9 +132,10 @@ export default function ClienteSaasForm({
             [name]: nuevoValor,
         };
 
-        // Si cambia el último pago, recalculamos el próximo vencimiento
-        if (name === "ultimoPago") {
-          nuevoForm.fechaProximoCargo = sumarUnMes(value);
+        if (name === "fechaAlta") {
+          const proximoCargo = sumarUnMes(value);
+          nuevoForm.fechaProximoCargo = proximoCargo;
+          nuevoForm.fechaVencimiento = sumarDias(proximoCargo, 7);
         }
 
         return nuevoForm;
@@ -91,10 +149,21 @@ export default function ClienteSaasForm({
     try {
       setLoading(true);
 
+      const dataAGuardar = {
+        ...formData,
+
+        // compatibilidad con código viejo
+        plan: formData.planNombre,
+        mantenimientoMensual: Number(formData.planPrecio || 0),
+        fechaProximoCargo: sumarUnMes(formData.fechaAlta),
+        fechaVencimiento: sumarDias(sumarUnMes(formData.fechaAlta), 7),
+        estado: formData.estado,
+      };
+
       if (clienteEditando?.id) {
-        await updateDoc(doc(db, "clientes-saas", clienteEditando.id), formData);
+        await updateDoc(doc(db, "clientes-saas", clienteEditando.id), dataAGuardar);
       } else {
-        await addDoc(collection(db, "clientes-saas"), formData);
+        await addDoc(collection(db, "clientes-saas"), dataAGuardar);
       }
 
       onGuardado();
@@ -113,93 +182,185 @@ export default function ClienteSaasForm({
           {clienteEditando ? "Editar cliente SaaS" : "Nuevo cliente SaaS"}
         </h2>
 
-        <form onSubmit={handleGuardar} style={form}>
-          <input
-            name="nombre"
-            placeholder="Nombre de la empresa"
-            value={formData.nombre}
-            onChange={handleChange}
-            style={input}
-          />
+      <form onSubmit={handleGuardar} style={form}>
+      <div style={campo}>
+        <label style={label}>Nombre de la empresa</label>
+        <input
+          name="nombre"
+          value={formData.nombre}
+          onChange={handleChange}
+          style={input}
+        />
+      </div>
 
-          <select
-            name="estado"
-            value={formData.estado}
-            onChange={handleChange}
-            style={input}
-          >
-            <option value="activo">Activo</option>
-            <option value="mora">Mora</option>
-            <option value="suspendido">Suspendido</option>
-          </select>
+      <div style={campo}>
+        <label style={label}>Estado del cliente</label>
+        <select
+          name="estado"
+          value={formData.estado}
+          onChange={handleChange}
+          style={input}
+        >
+          <option value="activo">Activo</option>
+          <option value="mora">Mora</option>
+          <option value="suspendido">Suspendido</option>
+        </select>
+      </div>
 
-          <input
-            name="plan"
-            placeholder="Plan"
-            value={formData.plan}
-            onChange={handleChange}
-            style={input}
-          />
+      <div style={campo}>
+        <label style={label}>Plan</label>
+        <select
+          name="planNombre"
+          value={formData.planNombre}
+          onChange={handleChange}
+          style={input}
+        >
+          <option value="Inicial">Inicial</option>
+          <option value="Mensual">Mensual</option>
+          <option value="Premium">Premium</option>
+          <option value="Personalizado">Personalizado</option>
+        </select>
+      </div>
 
-          <input
-            name="costoInstalacion"
-            type="number"
-            placeholder="Costo instalación"
-            value={formData.costoInstalacion}
-            onChange={handleChange}
-            style={input}
-          />
+      <div style={campo}>
+        <label style={label}>Moneda</label>
+        <select
+          name="moneda"
+          value={formData.moneda}
+          onChange={handleChange}
+          style={input}
+        >
+          <option value="ARS">ARS</option>
+          <option value="USD">USD</option>
+          <option value="PEN">PEN</option>
+          <option value="CLP">CLP</option>
+          <option value="MXN">MXN</option>
+        </select>
+      </div>
 
-          <input
-            name="mantenimientoMensual"
-            type="number"
-            placeholder="Mantenimiento mensual"
-            value={formData.mantenimientoMensual}
-            onChange={handleChange}
-            style={input}
-          />
+      <div style={campo}>
+        <label style={label}>País</label>
+        <select
+          name="pais"
+          value={formData.pais}
+          onChange={handleChange}
+          style={input}
+        >
+          <option value="Argentina">Argentina</option>
+          <option value="México">México</option>
+          <option value="Colombia">Colombia</option>
+          <option value="Ecuador">Ecuador</option>
+          <option value="Perú">Perú</option>
+          <option value="Chile">Chile</option>
+          <option value="Estados Unidos">Estados Unidos</option>
+          <option value="Otro">Otro</option>
+        </select>
+      </div>
 
-          <input
-            name="ultimoPago"
-            type="date"
-            value={formData.ultimoPago}
-            onChange={handleChange}
-            style={input}
-          />
+      <div style={campo}>
+        <label style={label}>Método de cobro</label>
+        <select
+          name="metodoCobro"
+          value={formData.metodoCobro}
+          onChange={handleChange}
+          style={input}
+        >
+          <option value="manual">Manual</option>
+          <option value="mercadopago">Mercado Pago</option>
+          <option value="stripe">Stripe</option>
+          <option value="paypal">PayPal</option>
+        </select>
+      </div>
 
-          <input
-            name="fechaAlta"
-            placeholder="Fecha alta"
-            value={formData.fechaAlta}
-            onChange={handleChange}
-            style={input}
-          />
+      <div style={campo}>
+        <label style={label}>Precio mensual</label>
+        <input
+          name="planPrecio"
+          type="number"
+          placeholder="0"
+          value={formData.planPrecio}
+          onChange={handleChange}
+          style={input}
+        />
+        <small style={{ color: "#64748b" }}>
+          {new Intl.NumberFormat("es-AR", {
+            style: "currency",
+            currency: formData.moneda || "ARS",
+            minimumFractionDigits: 0,
+          }).format(Number(formData.planPrecio || 0))}
+        </small>
+      </div>
 
-          <input
-            name="fechaProximoCargo"
-            type="date"
-            value={formData.fechaProximoCargo}
-            onChange={handleChange}
-            style={input}
-          />
+      <div style={campo}>
+        <label style={label}>Fecha de alta</label>
+        <input
+          name="fechaAlta"
+          type="date"
+          value={formData.fechaAlta}
+          onChange={handleChange}
+          style={input}
+        />
+      </div>
 
-          <textarea
-            name="observaciones"
-            placeholder="Observaciones"
-            value={formData.observaciones}
-            onChange={handleChange}
-            style={{ ...input, minHeight: 90, resize: "vertical" }}
-          />
+      <div
+        style={{
+          background: "#f8fafc",
+          border: "1px solid #e2e8f0",
+          borderRadius: 10,
+          padding: 12,
+          fontSize: 13,
+          lineHeight: 1.6,
+        }}
+      >
+        <div>
+          <strong>Próximo cobro:</strong>{" "}
+          {formData.fechaProximoCargo || "-"}
+        </div>
 
-          <div style={actions}>
-            <button type="button" onClick={onClose} style={btnSec}>
-              Cancelar
-            </button>
-            <button type="submit" disabled={loading} style={btnPri}>
-              {loading ? "Guardando..." : "Guardar"}
-            </button>
-          </div>
-        </form>
+        <div>
+          <strong>Vencimiento límite:</strong>{" "}
+          {formData.fechaVencimiento || "-"}
+        </div>
+
+        <small style={{ color: "#64748b" }}>
+          Se calcula automáticamente: fecha de alta + 1 mes + 7 días de gracia.
+        </small>
+      </div>
+
+      <div style={campo}>
+        <label style={label}>Estado de suscripción</label>
+        <select
+          name="estadoSuscripcion"
+          value={formData.estadoSuscripcion}
+          onChange={handleChange}
+          style={input}
+        >
+          <option value="activo">Suscripción activa</option>
+          <option value="mora">En mora</option>
+          <option value="suspendido">Suspendida</option>
+          <option value="cancelado">Cancelada</option>
+        </select>
+      </div>
+
+      <div style={campo}>
+        <label style={label}>Observaciones</label>
+        <textarea
+          name="observaciones"
+          value={formData.observaciones}
+          onChange={handleChange}
+          style={{ ...input, minHeight: 90, resize: "vertical", paddingTop: 10 }}
+        />
+      </div>
+
+      <div style={actions}>
+        <button type="button" onClick={onClose} style={btnSec}>
+          Cancelar
+        </button>
+        <button type="submit" disabled={loading} style={btnPri}>
+          {loading ? "Guardando..." : "Guardar"}
+        </button>
+      </div>
+    </form>
       </div>
     </div>
   );
@@ -218,6 +379,8 @@ const overlay = {
 const modal = {
   width: "100%",
   maxWidth: 520,
+  maxHeight: "90vh",
+  overflowY: "auto",
   background: "#fff",
   borderRadius: 14,
   padding: 24,
@@ -228,6 +391,18 @@ const form = {
   display: "flex",
   flexDirection: "column",
   gap: 12,
+};
+
+const campo = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 6,
+};
+
+const label = {
+  fontSize: 13,
+  fontWeight: 600,
+  color: "#334155",
 };
 
 const input = {
