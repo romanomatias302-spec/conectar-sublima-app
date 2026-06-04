@@ -36,6 +36,8 @@ export default function Configuracion({ modoOscuro, setModoOscuro, perfil, onAct
   const [mensajeMoneda, setMensajeMoneda] = useState("");
 
   const [periodosCuenta, setPeriodosCuenta] = useState([]);
+  const URL_CREAR_PREFERENCIA_MP =
+  "https://us-central1-conectarsublimados-7881e.cloudfunctions.net/crearPreferenciaMercadoPago";
 
   const MONEDAS_CONFIG = {
     ARS: { moneda: "ARS", localeMoneda: "es-AR", label: "ARS - Peso argentino" },
@@ -236,6 +238,38 @@ const thCuenta = {
 const tdCuenta = {
   padding: "12px",
   borderBottom: "1px solid #e5e7eb",
+};
+
+const pagarPeriodoMercadoPago = async (periodo) => {
+  try {
+    const response = await fetch(
+      URL_CREAR_PREFERENCIA_MP,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          clienteSaasId: perfil.clienteId,
+          periodoFacturado: periodo.periodo,
+          monto: periodo.saldo,
+        }),
+      }
+    );
+
+    const data = await response.json();
+
+const urlPago = data.sandbox_init_point || data.init_point;
+
+if (!urlPago) {
+  throw new Error("No se recibió URL de pago");
+}
+
+window.location.href = urlPago;
+  } catch (error) {
+    console.error(error);
+    alert("No se pudo iniciar el pago.");
+  }
 };
 
 
@@ -528,7 +562,7 @@ const tdCuenta = {
                           className="btn-primary"
                           onClick={() => {
                             if (cuentaSaas.metodoCobro === "mercadopago") {
-                              alert("Próximo paso: abrir checkout de Mercado Pago.");
+                              pagarPeriodoMercadoPago(p);
                               return;
                             }
 

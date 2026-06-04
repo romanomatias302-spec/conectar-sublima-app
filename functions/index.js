@@ -51,16 +51,22 @@ function diffDias(fechaA, fechaB) {
   return Math.round((a - b) / msDia);
 }
 
+function inicioDia(fecha) {
+  return new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate());
+}
+
 function obtenerCicloActual(fechaAltaStr, hoy) {
   const fechaAlta = normalizarFecha(fechaAltaStr);
 
-  let meses = 1;
   if (!fechaAlta) {
     return null;
   }
+
+  const hoyInicio = inicioDia(hoy);
+  let meses = 1;
   let fechaCobro = sumarMeses(fechaAlta, meses);
 
-  while (fechaCobro < hoy) {
+  while (sumarDias(fechaCobro, 7) < hoyInicio) {
     meses += 1;
     fechaCobro = sumarMeses(fechaAlta, meses);
   }
@@ -169,11 +175,12 @@ if (saldo > 0) {
 }
 
 async function procesarCargosSaas({ modoPrueba = false } = {}) {
-  const hoy = new Date();
+  const hoy = inicioDia(new Date());
   const clientesSnap = await db.collection("clientes-saas").get();
 
-  let cargosEmitidos = 0;
-  const simulados = [];
+let cargosEmitidos = 0;
+const simulados = [];
+const omitidos = [];
 
   for (const docu of clientesSnap.docs) {
     const cliente = {
@@ -181,32 +188,85 @@ async function procesarCargosSaas({ modoPrueba = false } = {}) {
       ...docu.data(),
     };
 
-    if (!cliente.fechaAlta) {
-      await recalcularEstadoCuentaCliente(cliente.id);
-      continue;
-    }
-    if (cliente.suspendidoManual === true) continue;
-    if ((cliente.estado || "") === "inactivo") continue;
-    if ((cliente.estadoSuscripcion || "") === "cancelado") continue;
+if (!cliente.fechaAlta) {
+  if (modoPrueba) {
+    omitidos.push({
+      clienteNombre: cliente.nombre || "",
+      motivo: "Sin fechaAlta",
+    });
+  }
+
+  await recalcularEstadoCuentaCliente(cliente.id);
+  continue;
+}
+
+if (cliente.suspendidoManual === true) {
+  if (modoPrueba) {
+    omitidos.push({
+      clienteNombre: cliente.nombre || "",
+      motivo: "Suspendido manualmente",
+    });
+  }
+  continue;
+}
+
+if ((cliente.estado || "") === "inactivo") {
+  if (modoPrueba) {
+    omitidos.push({
+      clienteNombre: cliente.nombre || "",
+      motivo: "Cliente inactivo",
+    });
+  }
+  continue;
+}
+
+if ((cliente.estadoSuscripcion || "") === "cancelado") {
+  if (modoPrueba) {
+    omitidos.push({
+      clienteNombre: cliente.nombre || "",
+      motivo: "Suscripción cancelada",
+    });
+  }
+  continue;
+}
 
     const diasAnticipacionCargo = Number(cliente.diasAnticipacionCargo || 10);
     const diasGracia = Number(cliente.diasGracia || 7);
 
     const ciclo = obtenerCicloActual(cliente.fechaAlta, hoy);
 
-    if (!ciclo) continue;
+    if (!ciclo) {
+      if (modoPrueba) {
+        omitidos.push({
+          clienteNombre: cliente.nombre || "",
+          motivo: "No se pudo calcular ciclo",
+          fechaAlta: cliente.fechaAlta,
+        });
+      }
+      continue;
+    }
 
     const {fechaCobro, periodoFacturado} = ciclo;
 
     const fechaEmision = sumarDias(fechaCobro, -diasAnticipacionCargo);
     const fechaVencimiento = sumarDias(fechaCobro, diasGracia);
 
-    const diasParaEmitir = diffDias(fechaEmision, hoy);
+if (hoy < inicioDia(fechaEmision)) {
+  if (modoPrueba) {
+    omitidos.push({
+      clienteNombre: cliente.nombre || "",
+      motivo: "Todavía no llegó la fecha de emisión",
+      fechaAlta: cliente.fechaAlta,
+      fechaCobro: fechaISO(fechaCobro),
+      fechaEmision: fechaISO(fechaEmision),
+      hoy: fechaISO(hoy),
+      periodoFacturado,
+    });
+  }
 
-    if (diasParaEmitir !== 0) {
-      await recalcularEstadoCuentaCliente(cliente.id);
-      continue;
-    }
+  await recalcularEstadoCuentaCliente(cliente.id);
+  continue;
+}
 
 const cargoExistenteSnap = await db
   .collection("saas_pagos")
@@ -222,12 +282,30 @@ const yaExisteCargoActivo = cargoExistenteSnap.docs.some((docCargo) => {
 });
 
 if (yaExisteCargoActivo) {
+  if (modoPrueba) {
+    omitidos.push({
+      clienteNombre: cliente.nombre || "",
+      motivo: "Ya existe cargo activo para el período",
+      periodoFacturado,
+    });
+  }
+
   await recalcularEstadoCuentaCliente(cliente.id);
   continue;
 }
 
     const monto = Number(cliente.planPrecio || cliente.mantenimientoMensual || 0);
-    if (monto <= 0) continue;
+    if (monto <= 0) {
+    if (modoPrueba) {
+      omitidos.push({
+        clienteNombre: cliente.nombre || "",
+        motivo: "Monto cero o inválido",
+        monto,
+      });
+    }
+
+    continue;
+  }
 
     const movimiento = {
       clienteSaasId: cliente.id,
@@ -267,11 +345,12 @@ if (yaExisteCargoActivo) {
     cargosEmitidos += 1;
   }
 
-  return {
-    modoPrueba,
-    cargosEmitidos,
-    simulados,
-  };
+return {
+  modoPrueba,
+  cargosEmitidos,
+  simulados,
+  omitidos,
+};
 }
 
 exports.emitirCargosSaasAutomaticos = onSchedule(

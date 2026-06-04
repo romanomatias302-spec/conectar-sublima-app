@@ -24,6 +24,8 @@ export default function DuenoSaasPanel() {
   const [clientes, setClientes] = useState([]);
   const [usuarios, setUsuarios] = useState([]);
   const [invitaciones, setInvitaciones] = useState([]);
+  const [movimientosSaas, setMovimientosSaas] = useState([]);
+  const [usoClientes, setUsoClientes] = useState({});
   const [loading, setLoading] = useState(true);
 
   const [mostrarForm, setMostrarForm] = useState(false);
@@ -43,9 +45,11 @@ export default function DuenoSaasPanel() {
 
 const [filtroEstado, setFiltroEstado] = useState("todos");
 const [busquedaCliente, setBusquedaCliente] = useState("");
+const [filtroPlan, setFiltroPlan] = useState("todos");
 const [pagosCliente, setPagosCliente] = useState([]);
 const [mostrarPago, setMostrarPago] = useState(false);
 const [mostrarCargoMasivo, setMostrarCargoMasivo] = useState(false);
+const [menuClienteAbierto, setMenuClienteAbierto] = useState(null);
 
 const [formCargoMasivo, setFormCargoMasivo] = useState({
   planNombre: "",
@@ -71,12 +75,25 @@ const [formPago, setFormPago] = useState({
 
 
 
-  const formatearFecha = (valor) => {
-    if (!valor) return "-";
-    if (valor.seconds) return new Date(valor.seconds * 1000).toLocaleDateString("es-AR");
-    if (typeof valor === "string") return valor;
-    return "-";
-  };
+const formatearFecha = (valor) => {
+  if (!valor) return "-";
+
+  let fecha = null;
+
+  if (typeof valor === "string") {
+    fecha = new Date(valor);
+  } else if (valor.seconds) {
+    fecha = new Date(valor.seconds * 1000);
+  }
+
+  if (!fecha || isNaN(fecha.getTime())) return "-";
+
+  const dia = String(fecha.getDate()).padStart(2, "0");
+  const mes = String(fecha.getMonth() + 1).padStart(2, "0");
+  const anio = fecha.getFullYear();
+
+  return `${dia}/${mes}/${anio}`;
+};
 
   const formatearMoneda = (valor) => {
   return new Intl.NumberFormat("es-AR", {
@@ -101,6 +118,103 @@ const [formPago, setFormPago] = useState({
       setLoading(false);
     }
   };
+
+  const cargarMovimientosSaas = async () => {
+  try {
+    const snapshot = await getDocs(collection(db, "saas_pagos"));
+
+    const lista = snapshot.docs.map((docu) => ({
+      id: docu.id,
+      ...docu.data(),
+    }));
+
+    setMovimientosSaas(lista);
+  } catch (error) {
+    console.error("Error cargando movimientos SaaS:", error);
+  }
+};
+
+const cargarUsoClientes = async () => {
+  try {
+    const [pedidosSnap, ventasSnap] = await Promise.all([
+      getDocs(collection(db, "pedidos")),
+      getDocs(collection(db, "ventas")),
+    ]);
+
+    const uso = {};
+
+    pedidosSnap.docs.forEach((docu) => {
+      const data = docu.data();
+      const clienteId = data.clienteId;
+      if (!clienteId) return;
+
+      if (!uso[clienteId]) {
+        uso[clienteId] = {
+        pedidos: 0,
+        pedidosUltimos30: 0,
+        ultimoUso: "",
+        };
+      }
+
+      uso[clienteId].pedidos += 1;
+      const hace30Dias = new Date();
+      hace30Dias.setDate(hace30Dias.getDate() - 30);
+
+      const fechaPedido =
+        data.createdAt?.seconds
+          ? new Date(data.createdAt.seconds * 1000)
+          : data.fechaPedido
+          ? new Date(data.fechaPedido)
+          : null;
+
+      if (fechaPedido && fechaPedido >= hace30Dias) {
+        uso[clienteId].pedidosUltimos30 += 1;
+      }
+
+      const fechaUso =
+        data.updatedAt?.seconds
+          ? new Date(data.updatedAt.seconds * 1000).toISOString().slice(0, 10)
+          : data.createdAt?.seconds
+          ? new Date(data.createdAt.seconds * 1000).toISOString().slice(0, 10)
+          : "";
+
+      if (fechaUso && fechaUso > uso[clienteId].ultimoUso) {
+        uso[clienteId].ultimoUso = fechaUso;
+      }
+    });
+
+    ventasSnap.docs.forEach((docu) => {
+      const data = docu.data();
+      const clienteId = data.clienteId;
+      if (!clienteId) return;
+
+      if (!uso[clienteId]) {
+        uso[clienteId] = {
+          pedidos: 0,
+          ventas: 0,
+          ultimoUso: "",
+        };
+      }
+
+      uso[clienteId].ventas += 1;
+
+      const fechaUso =
+        data.updatedAt?.seconds
+          ? new Date(data.updatedAt.seconds * 1000).toISOString().slice(0, 10)
+          : data.createdAt?.seconds
+          ? new Date(data.createdAt.seconds * 1000).toISOString().slice(0, 10)
+          : "";
+
+      if (fechaUso && fechaUso > uso[clienteId].ultimoUso) {
+        uso[clienteId].ultimoUso = fechaUso;
+      }
+    });
+
+    setUsoClientes(uso);
+  } catch (error) {
+    console.error("Error cargando uso por cliente:", error);
+  }
+};
 
   const cargarUsuarios = async () => {
     try {
@@ -133,10 +247,12 @@ const [formPago, setFormPago] = useState({
     }
   };
 
-  const cargarTodo = async () => {
-    await cargarClientes();
-    await cargarUsuarios();
-  };
+const cargarTodo = async () => {
+  await cargarClientes();
+  await cargarUsuarios();
+  await cargarMovimientosSaas();
+  await cargarUsoClientes();
+};
 
   useEffect(() => {
     cargarTodo();
@@ -249,6 +365,49 @@ const [formPago, setFormPago] = useState({
     }
   };
 
+  const movimientosSaasActivos = movimientosSaas.filter(
+  (m) => m.anulado !== true
+);
+
+const pagosSaasActivos = movimientosSaasActivos.filter(
+  (m) => m.tipoMovimiento === "pago"
+);
+
+const pagosPorCliente = pagosSaasActivos.reduce((acc, pago) => {
+  const clienteId = pago.clienteSaasId;
+  if (!clienteId) return acc;
+
+  if (!acc[clienteId]) {
+    acc[clienteId] = {
+      cantidadPagos: 0,
+      totalPagado: 0,
+      ultimoPago: "",
+    };
+  }
+
+  acc[clienteId].cantidadPagos += 1;
+  acc[clienteId].totalPagado += Number(pago.monto || 0);
+
+  if (pago.fechaPago && pago.fechaPago > acc[clienteId].ultimoPago) {
+    acc[clienteId].ultimoPago = pago.fechaPago;
+  }
+
+  return acc;
+}, {});
+
+const resumenDashboard = {
+  totalClientes: clientes.length,
+  activos: clientes.filter((c) => (c.estado || "activo") === "activo").length,
+  suspendidos: clientes.filter((c) => (c.estado || "") === "suspendido").length,
+  enPrueba: clientes.filter((c) => c.estadoSuscripcion === "prueba").length,
+  conDeuda: clientes.filter((c) => Number(c.saldoCuentaCorriente || 0) > 0).length,
+  saldoPendiente: clientes.reduce((acc, c) => {
+    const saldo = Number(c.saldoCuentaCorriente || 0);
+    return saldo > 0 ? acc + saldo : acc;
+  }, 0),
+  pagosRegistrados: pagosSaasActivos.length,
+};
+
 const clientesFiltrados = clientes
   .filter((c) => {
     const texto = busquedaCliente.trim().toLowerCase();
@@ -280,7 +439,11 @@ const clientesFiltrados = clientes
       coincideEstado = saldo < 0;
     }
 
-    return coincideBusqueda && coincideEstado;
+    const planCliente = c.planNombre || c.plan || "";
+    const coincidePlan =
+      filtroPlan === "todos" || planCliente === filtroPlan;
+
+    return coincideBusqueda && coincideEstado && coincidePlan;
   })
   .sort((a, b) => {
     const aActivo = (a.estado || "activo") !== "suspendido";
@@ -456,6 +619,45 @@ const emitirCargoMasivo = async () => {
         </div>
       </div>
 
+      <div style={dashboardGrid}>
+        <div style={dashboardCard}>
+          <strong>Total clientes</strong>
+          <span>{resumenDashboard.totalClientes}</span>
+        </div>
+
+        <div style={dashboardCard}>
+          <strong>Activos</strong>
+          <span>{resumenDashboard.activos}</span>
+        </div>
+
+        <div style={dashboardCard}>
+          <strong>Suspendidos</strong>
+          <span>{resumenDashboard.suspendidos}</span>
+        </div>
+
+        <div style={dashboardCard}>
+          <strong>En prueba</strong>
+          <span>{resumenDashboard.enPrueba}</span>
+        </div>
+
+        <div style={dashboardCard}>
+          <strong>Con deuda</strong>
+          <span>{resumenDashboard.conDeuda}</span>
+        </div>
+
+        <div style={dashboardCard}>
+          <strong>Saldo pendiente</strong>
+          <span>{formatearMoneda(resumenDashboard.saldoPendiente)}</span>
+        </div>
+
+        <div style={dashboardCard}>
+          <strong>Pagos registrados</strong>
+          <span>{resumenDashboard.pagosRegistrados}</span>
+        </div>
+      </div>
+
+
+
       <div style={card}>
         <h2 style={{ marginTop: 0 }}>Clientes SaaS</h2>
           <div style={filtrosBar}>
@@ -478,6 +680,18 @@ const emitirCargoMasivo = async () => {
               <option value="suspendido">Suspendidos</option>
               <option value="inactivo">Inactivos</option>
             </select>
+            <select
+              value={filtroPlan}
+              onChange={(e) => setFiltroPlan(e.target.value)}
+              style={selectFiltro}
+            >
+              <option value="todos">Todos los planes</option>
+              {planesDisponibles.map((plan) => (
+                <option key={plan} value={plan}>
+                  {plan}
+                </option>
+              ))}
+            </select>
 </div>
 
         {loading ? (
@@ -492,10 +706,11 @@ const emitirCargoMasivo = async () => {
                 <th style={th}>Empresa</th>
                 <th style={th}>Estado</th>
                 <th style={th}>Plan</th>
-                <th style={th}>País</th>
-                <th style={th}>Cobro</th>
                 <th style={th}>Mantenimiento</th>
                 <th style={th}>Saldo</th>
+                <th style={th}>Pagos</th>
+                <th style={th}>Pedidos 30 días</th>
+                <th style={th}>Último uso</th>
                 <th style={th}>Último pago</th>
                 <th style={th}>Vencimiento</th>
                 <th style={th}>Acciones</th>
@@ -524,115 +739,136 @@ const emitirCargoMasivo = async () => {
                   </td>
                     <td style={td}>{c.planNombre || c.plan || "-"}</td>
 
-                    <td style={td}>{c.pais || "-"}</td>
-
-                    <td style={td}>
-                      {c.metodoCobro === "mercadopago"
-                        ? "Mercado Pago"
-                        : c.metodoCobro === "stripe"
-                        ? "Stripe"
-                        : c.metodoCobro === "paypal"
-                        ? "PayPal"
-                        : "Manual"}
-                    </td>
-
                     <td style={td}>
                       {formatearMoneda(c.planPrecio || c.mantenimientoMensual || 0)}
                     </td>
 
-                  <td style={td}>
-                    <span
-                      style={{
-                        fontWeight: 700,
-                        color:
-                          Number(c.saldoCuentaCorriente || 0) > 0
-                            ? "#dc2626"
-                            : Number(c.saldoCuentaCorriente || 0) < 0
-                            ? "#16a34a"
-                            : "#111827",
-                      }}
-                    >
-                      {Number(c.saldoCuentaCorriente || 0) > 0
-                        ? `Debe ${formatearMoneda(c.saldoCuentaCorriente)}`
-                        : Number(c.saldoCuentaCorriente || 0) < 0
-                        ? `A favor ${formatearMoneda(Math.abs(Number(c.saldoCuentaCorriente || 0)))}`
-                        : formatearMoneda(0)}
-                    </span>
-                  </td>
+                    <td style={td}>
+                      <span
+                        style={{
+                          fontWeight: 700,
+                          color:
+                            Number(c.saldoCuentaCorriente || 0) > 0
+                              ? "#dc2626"
+                              : Number(c.saldoCuentaCorriente || 0) < 0
+                              ? "#16a34a"
+                              : "#111827",
+                        }}
+                      >
+                        {Number(c.saldoCuentaCorriente || 0) > 0
+                          ? `Debe ${formatearMoneda(c.saldoCuentaCorriente)}`
+                          : Number(c.saldoCuentaCorriente || 0) < 0
+                          ? `A favor ${formatearMoneda(
+                              Math.abs(Number(c.saldoCuentaCorriente || 0))
+                            )}`
+                          : formatearMoneda(0)}
+                      </span>
+                    </td>
 
-                  <td style={td}>{formatearFecha(c.ultimoPago)}</td>
-                  <td style={td}>
-                    {formatearFecha(c.fechaVencimiento || c.fechaProximoCargo)}
-                  </td>
-                  <td style={td}>
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                        <button
-                          onClick={() => abrirEditarCliente(c)}
-                          style={btnEditar}
-                        >
-                          Editar
-                        </button>
+                    <td style={td}>{pagosPorCliente[c.id]?.cantidadPagos || 0}</td>
 
-                        <button
-                          onClick={() => {
-                            setClienteUsuarios(c);
-                          }}
-                          style={btnGestionar}
-                        >
-                          Usuarios
-                        </button>
+                    <td style={td}>{usoClientes[c.id]?.pedidosUltimos30 || 0}</td>
 
-                        <button
-                          onClick={async () => {
-                            setClienteCuentaCorriente(c);
+                    <td style={td}>{formatearFecha(usoClientes[c.id]?.ultimoUso)}</td>
 
-                            const pagos = await obtenerPagosSaas(c.id);
-                            setPagosCliente(pagos);
-                          }}
-                          style={btnGestionar}
-                        >
-                          Cta. Cte.
-                        </button>
+                    <td style={td}>
+                      {formatearFecha(pagosPorCliente[c.id]?.ultimoPago || c.ultimoPago)}
+                    </td>
 
-                        <button
-                          onClick={async () => {
-                          const nuevoEstado =
-                            (c.estado || "activo") === "activo"
-                              ? "suspendido"
-                              : "activo";
+                    <td style={td}>
+                      {formatearFecha(c.fechaVencimiento || c.fechaProximoCargo)}
+                    </td>
 
-                          await updateDoc(doc(db, "clientes-saas", c.id), {
-                            estado: nuevoEstado,
-                            suspendidoManual: nuevoEstado === "suspendido",
-                            suspendidoPorSistema: false,
-                            motivoSuspension: nuevoEstado === "suspendido" ? "manual" : "",
-                            updatedAt: serverTimestamp(),
-                          });
+                    <td style={{ ...td, position: "relative" }}>
+                      <button
+                        type="button"
+                        style={btnMenuCliente}
+                        onClick={() =>
+                          setMenuClienteAbierto(
+                            menuClienteAbierto === c.id ? null : c.id
+                          )
+                        }
+                      >
+                        ⋮
+                      </button>
 
-                            await updateDoc(doc(db, "clientes-saas", c.id), {
-                              estado: nuevoEstado,
-                              updatedAt: serverTimestamp(),
-                            });
+                      {menuClienteAbierto === c.id && (
+                        <div style={dropdownCliente}>
+                          <button
+                            type="button"
+                            style={dropdownItemCliente}
+                            onClick={() => {
+                              abrirEditarCliente(c);
+                              setMenuClienteAbierto(null);
+                            }}
+                          >
+                            Editar cliente
+                          </button>
 
-                            await cargarClientes();
-                          }}
-                          style={{
-                            ...btnEditar,
-                            background:
-                              (c.estado || "activo") === "activo"
-                                ? "#dc2626"
-                                : "#16a34a",
-                          }}
-                        >
-                          {(c.estado || "activo") === "activo"
-                            ? "Suspender"
-                            : "Activar"}
-                        </button>
-                      </div>
-                     
-                    </div>
-                  </td>
+                          <button
+                            type="button"
+                            style={dropdownItemCliente}
+                            onClick={() => {
+                              setClienteUsuarios(c);
+                              setMenuClienteAbierto(null);
+                            }}
+                          >
+                            Usuarios
+                          </button>
+
+                          <button
+                            type="button"
+                            style={dropdownItemCliente}
+                            onClick={async () => {
+                              setClienteCuentaCorriente(c);
+                              const pagos = await obtenerPagosSaas(c.id);
+                              setPagosCliente(pagos);
+                              setMenuClienteAbierto(null);
+                            }}
+                          >
+                            Cuenta corriente
+                          </button>
+
+                          <div style={dropdownDivider} />
+
+                          <button
+                            type="button"
+                            style={{
+                              ...dropdownItemCliente,
+                              color:
+                                (c.estado || "activo") === "activo"
+                                  ? "#dc2626"
+                                  : "#16a34a",
+                              fontWeight: 700,
+                            }}
+                            onClick={async () => {
+                              const nuevoEstado =
+                                (c.estado || "activo") === "activo"
+                                  ? "suspendido"
+                                  : "activo";
+
+                              await updateDoc(doc(db, "clientes-saas", c.id), {
+                                estado: nuevoEstado,
+                                suspendidoManual: nuevoEstado === "suspendido",
+                                suspendidoPorSistema: false,
+                                motivoSuspension:
+                                  nuevoEstado === "suspendido" ? "manual" : "",
+                                updatedAt: serverTimestamp(),
+                              });
+
+                              await cargarClientes();
+                              await cargarMovimientosSaas();
+                              await cargarUsoClientes();
+                              setMenuClienteAbierto(null);
+                            }}
+                          >
+                            {(c.estado || "activo") === "activo"
+                              ? "Suspender manualmente"
+                              : "Reactivar"}
+                          </button>
+                        </div>
+                      )}
+                    </td>
                 </tr>
               ))}
 
@@ -1014,9 +1250,8 @@ const emitirCargoMasivo = async () => {
                       textDecoration: p.anulado ? "line-through" : "none",
                     }}
                   >
-                    <td style={td}>{p.fechaPago || "-"}</td>
+                    <td style={td}>{formatearFecha(p.fechaPago)}</td>
                     <td style={td}>{p.periodoFacturado || "-"}</td>
-                    <td style={td}>{p.fechaPago || "-"}</td>
                     <td style={td}>{p.tipoMovimiento || "pago"}</td>
                     <td style={td}>{p.concepto || "-"}</td>
                     <td style={td}>{p.medioPago || "-"}</td>
@@ -1497,6 +1732,64 @@ const emitirCargoMasivo = async () => {
     </div>
   );
 }
+
+const dashboardGrid = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+  gap: 14,
+  marginBottom: 20,
+};
+
+const dashboardCard = {
+  background: "#fff",
+  borderRadius: 14,
+  padding: 16,
+  boxShadow: "0 4px 18px rgba(0,0,0,0.06)",
+  border: "1px solid #e5e7eb",
+  display: "flex",
+  flexDirection: "column",
+  gap: 8,
+};
+
+const btnMenuCliente = {
+  width: 34,
+  height: 34,
+  borderRadius: 8,
+  border: "1px solid #d1d5db",
+  background: "#fff",
+  cursor: "pointer",
+  fontSize: 20,
+  lineHeight: "20px",
+};
+
+const dropdownCliente = {
+  position: "absolute",
+  right: 10,
+  top: 36,
+  width: 210,
+  background: "#fff",
+  border: "1px solid #e5e7eb",
+  borderRadius: 10,
+  boxShadow: "0 12px 28px rgba(0,0,0,0.16)",
+  zIndex: 99999,
+  overflow: "hidden",
+};
+
+const dropdownItemCliente = {
+  width: "100%",
+  border: "none",
+  background: "#fff",
+  padding: "10px 12px",
+  textAlign: "left",
+  cursor: "pointer",
+  fontSize: 14,
+};
+
+const dropdownDivider = {
+  height: 1,
+  background: "#e5e7eb",
+  margin: "4px 0",
+};
 
 const topbar = {
   display: "flex",

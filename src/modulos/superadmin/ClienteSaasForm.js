@@ -10,12 +10,14 @@ export default function ClienteSaasForm({
 const [formData, setFormData] = useState({
   nombre: "",
   estado: "activo",
+  email: "",
+  telefono: "",
 
 
 
   plan: "instalacion",
-  planNombre: "Inicial",
-  planPrecio: 20000,
+  planNombre: "Mensual",
+  planPrecio: 24000,
   moneda: "ARS",
 
   pais: "Argentina",
@@ -25,6 +27,9 @@ const [formData, setFormData] = useState({
   mantenimientoMensual: 20000,
 
   fechaAlta: "",
+
+  fechaProximoCargo: "",
+  fechaVencimiento: "",
   
   
   
@@ -45,12 +50,14 @@ const [formData, setFormData] = useState({
       setFormData({
         nombre: clienteEditando.nombre || "",
         estado: clienteEditando.estado || "activo",
+        email: clienteEditando.email || "",
+        telefono: clienteEditando.telefono || "",
 
 
 
         plan: clienteEditando.plan || "instalacion",
-        planNombre: clienteEditando.planNombre || clienteEditando.plan || "Inicial",
-        planPrecio: clienteEditando.planPrecio || clienteEditando.mantenimientoMensual || 20000,
+        planNombre: clienteEditando.planNombre || clienteEditando.plan || "Mensual",
+        planPrecio: clienteEditando.planPrecio || clienteEditando.mantenimientoMensual || 24000,
         moneda: clienteEditando.moneda || "ARS",
 
         pais: clienteEditando.pais || "Argentina",
@@ -60,6 +67,8 @@ const [formData, setFormData] = useState({
         mantenimientoMensual: clienteEditando.mantenimientoMensual || 20000,
 
         fechaAlta: clienteEditando.fechaAlta || "",
+        fechaProximoCargo: clienteEditando.fechaProximoCargo || "",
+        fechaVencimiento: clienteEditando.fechaVencimiento || "",
         
         
 
@@ -132,10 +141,22 @@ const [formData, setFormData] = useState({
             [name]: nuevoValor,
         };
 
+        if (name === "planNombre" && value === "Prueba gratis 7 días") {
+          nuevoForm.planPrecio = 0;
+          nuevoForm.mantenimientoMensual = 0;
+          nuevoForm.estadoSuscripcion = "prueba";
+        }
+
         if (name === "fechaAlta") {
-          const proximoCargo = sumarUnMes(value);
-          nuevoForm.fechaProximoCargo = proximoCargo;
-          nuevoForm.fechaVencimiento = sumarDias(proximoCargo, 7);
+          if (nuevoForm.planNombre === "Prueba gratis 7 días") {
+            nuevoForm.fechaProximoCargo = sumarDias(value, 7);
+            nuevoForm.fechaVencimiento = sumarDias(value, 7);
+            nuevoForm.estadoSuscripcion = "prueba";
+          } else {
+            const proximoCargo = sumarUnMes(value);
+            nuevoForm.fechaProximoCargo = proximoCargo;
+            nuevoForm.fechaVencimiento = sumarDias(proximoCargo, 7);
+          }
         }
 
         return nuevoForm;
@@ -149,15 +170,27 @@ const [formData, setFormData] = useState({
     try {
       setLoading(true);
 
+      const esPruebaGratis = formData.planNombre === "Prueba gratis 7 días";
+
+      const fechaProximoCargo = esPruebaGratis
+        ? sumarDias(formData.fechaAlta, 7)
+        : sumarUnMes(formData.fechaAlta);
+
+      const fechaVencimiento = esPruebaGratis
+        ? sumarDias(formData.fechaAlta, 7)
+        : sumarDias(sumarUnMes(formData.fechaAlta), 7);
+
       const dataAGuardar = {
         ...formData,
 
         // compatibilidad con código viejo
         plan: formData.planNombre,
         mantenimientoMensual: Number(formData.planPrecio || 0),
-        fechaProximoCargo: sumarUnMes(formData.fechaAlta),
-        fechaVencimiento: sumarDias(sumarUnMes(formData.fechaAlta), 7),
+        planPrecio: esPruebaGratis ? 0 : Number(formData.planPrecio || 0),
+        fechaProximoCargo,
+        fechaVencimiento,
         estado: formData.estado,
+        estadoSuscripcion: esPruebaGratis ? "prueba" : formData.estadoSuscripcion,
       };
 
       if (clienteEditando?.id) {
@@ -192,6 +225,28 @@ const [formData, setFormData] = useState({
           style={input}
         />
       </div>
+      <div style={campo}>
+        <label style={label}>Email de contacto</label>
+        <input
+          name="email"
+          type="email"
+          placeholder="cliente@email.com"
+          value={formData.email}
+          onChange={handleChange}
+          style={input}
+        />
+      </div>
+
+      <div style={campo}>
+        <label style={label}>Teléfono / WhatsApp</label>
+        <input
+          name="telefono"
+          placeholder="+54 9 ..."
+          value={formData.telefono}
+          onChange={handleChange}
+          style={input}
+        />
+      </div>
 
       <div style={campo}>
         <label style={label}>Estado del cliente</label>
@@ -215,9 +270,10 @@ const [formData, setFormData] = useState({
           onChange={handleChange}
           style={input}
         >
-          <option value="Inicial">Inicial</option>
+        
+          <option value="Prueba gratis 7 días">Prueba gratis 7 días</option>
           <option value="Mensual">Mensual</option>
-          <option value="Premium">Premium</option>
+          <option value="Anual">Anual</option>
           <option value="Personalizado">Personalizado</option>
         </select>
       </div>
