@@ -51,8 +51,14 @@ await addDoc(collection(db, "saas_pagos"), {
 
 await recalcularEstadoCuentaCliente(clienteSaas.id);
 
-  const proximoVencimiento =
-    concepto === "mensualidad" ? sumarUnMes(fechaPago) : clienteSaas.proximoVencimiento || "";
+if (tipoMovimiento === "pago") {
+  await updateDoc(doc(db, "clientes-saas", clienteSaas.id), {
+    ultimoPago: fechaPago,
+    ultimoPagoMonto: Number(monto || 0),
+    ultimoPagoMedio: medioPago || "",
+    updatedAt: serverTimestamp(),
+  });
+}
 
 
 }

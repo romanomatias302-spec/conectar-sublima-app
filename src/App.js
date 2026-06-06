@@ -34,6 +34,7 @@ export default function App() {
   const [perfil, setPerfil] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [mensajeBloqueo, setMensajeBloqueo] = useState("");
+  const [errorConexionPerfil, setErrorConexionPerfil] = useState(false);
 
   const [vista, setVista] = useState("inicio");
   const [clienteSeleccionado, setClienteSeleccionado] = useState(null);
@@ -109,15 +110,18 @@ const nuevosProductosPedidoParaVenta =
     useEffect(() => {
       const unsub = onAuthStateChanged(auth, async (user) => {
         try {
-          if (!user) {
-            setUsuario(null);
-            setPerfil(null);
-            setMensajeBloqueo("");
-            setAuthLoading(false);
-            return;
-          }
+      if (!user) {
+        setUsuario(null);
+        setPerfil(null);
+        setMensajeBloqueo("");
+        setErrorConexionPerfil(false);
+        setAuthLoading(false);
+        return;
+      }
 
           setUsuario(user);
+
+          setErrorConexionPerfil(false);
 
           const ref = doc(db, "usuarios", user.uid);
           const snap = await getDoc(ref);
@@ -235,13 +239,17 @@ const nuevosProductosPedidoParaVenta =
           }
 
           setMensajeBloqueo("");
-        } catch (error) {
-          console.error("Error al cargar perfil:", error);
-          setPerfil(null);
-          setMensajeBloqueo("");
-        } finally {
-          setAuthLoading(false);
-        }
+          } catch (error) {
+            console.error("Error al cargar perfil:", error);
+
+            setMensajeBloqueo("");
+            setErrorConexionPerfil(true);
+
+            // No borrar usuario ni perfil ante errores de conexión.
+            // Si había un perfil cargado, mantenemos la app viva.
+          } finally {
+            setAuthLoading(false);
+          }
       });
 
       return () => unsub();
@@ -435,15 +443,34 @@ irAVista("venta-detalle", {
       return <div style={{ padding: 30 }}>Cargando perfil...</div>;
     }
 
-    if (!perfil) {
-      return (
-        <div style={{ padding: 30 }}>
-          <h2>Usuario sin perfil</h2>
-          <p>No existe un perfil en Firestore para este usuario.</p>
-          <button onClick={() => signOut(auth)}>Cerrar sesión</button>
-        </div>
-      );
-    }
+if (!perfil && errorConexionPerfil) {
+  return (
+    <div style={{ padding: 30 }}>
+      <h2>Reconectando...</h2>
+      <p>No pudimos cargar tu perfil por un problema de conexión.</p>
+      <p>Verificá internet y recargá la página.</p>
+      <button onClick={() => window.location.reload()}>
+        Reintentar
+      </button>
+      <button
+        onClick={() => signOut(auth)}
+        style={{ marginLeft: 10 }}
+      >
+        Cerrar sesión
+      </button>
+    </div>
+  );
+}
+
+if (!perfil) {
+  return (
+    <div style={{ padding: 30 }}>
+      <h2>Usuario sin perfil</h2>
+      <p>No existe un perfil en Firestore para este usuario.</p>
+      <button onClick={() => signOut(auth)}>Cerrar sesión</button>
+    </div>
+  );
+}
 
     if (mensajeBloqueo) {
       console.log("SE ESTÁ MOSTRANDO BLOQUEO:", mensajeBloqueo);

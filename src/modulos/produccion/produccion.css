@@ -2455,3 +2455,1255 @@ transition:none !important;
   font-weight: 800;
   cursor: pointer;
 }
+
+/* =========================
+   PRODUCCIÓN CARD COLORS + MENU
+   ========================= */
+
+.produccion-card {
+  position: relative;
+}
+
+.produccion-card.color-blanco {
+  background: #ffffff;
+  color: #1f2937;
+}
+
+.produccion-card.color-amarillo {
+  background: #fff4cc;
+  color: #3f3200;
+}
+
+.produccion-card.color-verde {
+  background: #e7f6ec;
+  color: #12351a;
+}
+
+.produccion-card.color-azul {
+  background: #eaf2ff;
+  color: #102a56;
+}
+
+.produccion-card.color-rojo {
+  background: #fdeeee;
+  color: #5f1414;
+}
+
+.produccion-card.color-violeta {
+  background: #f3ecff;
+  color: #30175f;
+}
+
+.produccion-card.color-amarillo .produccion-card-cliente,
+.produccion-card.color-verde .produccion-card-cliente,
+.produccion-card.color-azul .produccion-card-cliente,
+.produccion-card.color-rojo .produccion-card-cliente,
+.produccion-card.color-violeta .produccion-card-cliente,
+.produccion-card.color-amarillo .produccion-card-fecha,
+.produccion-card.color-verde .produccion-card-fecha,
+.produccion-card.color-azul .produccion-card-fecha,
+.produccion-card.color-rojo .produccion-card-fecha,
+.produccion-card.color-violeta .produccion-card-fecha {
+  color: inherit !important;
+}
+
+.produccion-card-menu-btn {
+  border: none;
+  background: rgba(15, 23, 42, 0.08);
+  color: inherit;
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.produccion-card-menu {
+  position: absolute;
+  top: 42px;
+  right: 10px;
+  width: 190px;
+  background: #ffffff;
+  color: #1f2937;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(0,0,0,.18);
+  padding: 8px;
+  z-index: 9999;
+}
+
+.produccion-card-menu-title {
+  font-size: 11px;
+  font-weight: 800;
+  color: #64748b;
+  margin: 6px 4px;
+  text-transform: uppercase;
+}
+
+.produccion-card-menu button {
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: #1f2937;
+  text-align: left;
+  padding: 7px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.produccion-card-menu button:hover {
+  background: #f1f5f9;
+}
+
+.produccion-card-color-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+  padding: 4px;
+}
+
+.produccion-card-color-dot {
+  width: 22px !important;
+  height: 22px !important;
+  min-width: 22px !important;
+  border-radius: 999px !important;
+  border: 1px solid rgba(15,23,42,.18) !important;
+  padding: 0 !important;
+}
+
+.produccion-card-color-dot.color-blanco {
+  background: #ffffff !important;
+}
+
+.produccion-card-color-dot.color-amarillo {
+  background: #fff4cc !important;
+}
+
+.produccion-card-color-dot.color-verde {
+  background: #e7f6ec !important;
+}
+
+.produccion-card-color-dot.color-azul {
+  background: #eaf2ff !important;
+}
+
+.produccion-card-color-dot.color-rojo {
+  background: #fdeeee !important;
+}
+
+.produccion-card-color-dot.color-violeta {
+  background: #f3ecff !important;
+}
+
+.produccion-card-usuario-desktop {
+  font-size: 11px;
+  font-weight: 700;
+  color: inherit;
+  opacity: 0.75;
+}
+
+@media (max-width: 768px) {
+  .produccion-card-usuario-desktop {
+    display: none !important;
+  }
+
+  .produccion-card-menu {
+    right: 8px;
+    top: 38px;
+  }
+}
+
+/* =========================
+   PRODUCCIÓN CARD MENU MEJORADO
+   ========================= */
+
+.produccion-card-menu {
+  max-height: 260px;
+  overflow: hidden;
+}
+
+.produccion-card-menu-option {
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: #1f2937;
+  text-align: left;
+  padding: 9px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.produccion-card-menu-option:hover {
+  background: #f1f5f9;
+}
+
+.produccion-card-menu-back {
+  width: auto !important;
+  font-size: 12px !important;
+  font-weight: 800 !important;
+  color: #0a74da !important;
+  margin-bottom: 4px;
+}
+
+.produccion-card-column-list {
+  max-height: 150px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.produccion-card-menu-success {
+  background: #dcfce7;
+  color: #166534;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 8px 10px;
+  border-radius: 8px;
+  margin-bottom: 6px;
+}
+
+.produccion-card-color-dot.color-amarillo {
+  background: #f5cd47 !important;
+}
+
+.produccion-card-color-dot.color-verde {
+  background: #4bce97 !important;
+}
+
+.produccion-card-color-dot.color-azul {
+  background: #579dff !important;
+}
+
+.produccion-card-color-dot.color-rojo {
+  background: #f87168 !important;
+}
+
+.produccion-card-color-dot.color-violeta {
+  background: #9f8fef !important;
+}
+
+.produccion-card-color-dot.color-naranja {
+  background: #fea362 !important;
+}
+
+.produccion-modal-header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.produccion-modal-header h3 {
+  margin: 0;
+}
+
+.produccion-modal-menu-btn {
+  border: none;
+  background: #eef1f6;
+  color: #1f2937;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  cursor: pointer;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.produccion-modal-menu {
+  position: absolute;
+  top: 40px;
+  right: 0;
+  width: 220px;
+  background: #fff;
+  color: #1f2937;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(0,0,0,.18);
+  padding: 8px;
+  z-index: 9999;
+}
+
+.produccion-card-column-list {
+  max-height: 150px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.produccion-card-color-dot.activo {
+  outline: 3px solid #111827;
+  outline-offset: 2px;
+}
+
+.produccion-card.color-amarillo,
+.produccion-card-color-dot.color-amarillo {
+  background: #f5cd47 !important;
+}
+
+.produccion-card.color-verde,
+.produccion-card-color-dot.color-verde {
+  background: #4bce97 !important;
+}
+
+.produccion-card.color-azul,
+.produccion-card-color-dot.color-azul {
+  background: #579dff !important;
+}
+
+.produccion-card.color-rojo,
+.produccion-card-color-dot.color-rojo {
+  background: #f87168 !important;
+}
+
+.produccion-card.color-violeta,
+.produccion-card-color-dot.color-violeta {
+  background: #9f8fef !important;
+}
+
+/* =========================
+   PRODUCCIÓN CARD COLOR CONTRASTE
+   ========================= */
+
+.produccion-card.color-azul,
+.produccion-card.color-violeta {
+  color: #ffffff !important;
+}
+
+.produccion-card.color-azul .produccion-card-cliente,
+.produccion-card.color-azul .produccion-card-fecha,
+.produccion-card.color-azul .produccion-card-usuario-desktop,
+.produccion-card.color-violeta .produccion-card-cliente,
+.produccion-card.color-violeta .produccion-card-fecha,
+.produccion-card.color-violeta .produccion-card-usuario-desktop {
+  color: #ffffff !important;
+  text-shadow: 0 1px 2px rgba(0,0,0,.35);
+}
+
+.produccion-card.color-azul .produccion-card-tiempo,
+.produccion-card.color-violeta .produccion-card-tiempo {
+  background: rgba(255,255,255,.22) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255,255,255,.28);
+  text-shadow: 0 1px 2px rgba(0,0,0,.25);
+}
+
+.produccion-card.color-amarillo .produccion-card-tiempo,
+.produccion-card.color-verde .produccion-card-tiempo,
+.produccion-card.color-rojo .produccion-card-tiempo {
+  background: rgba(255,255,255,.38) !important;
+  color: #172b4d !important;
+  border: 1px solid rgba(0,0,0,.08);
+}
+
+.produccion-card.color-azul .produccion-card-link,
+.produccion-card.color-violeta .produccion-card-link {
+  color: #ffffff !important;
+  text-shadow: 0 1px 2px rgba(0,0,0,.35);
+}
+
+.produccion-card.color-amarillo .produccion-card-link,
+.produccion-card.color-verde .produccion-card-link,
+.produccion-card.color-rojo .produccion-card-link {
+  color: #172b4d !important;
+}
+
+/* Centrar bien los 3 puntitos del modal */
+.produccion-modal-menu-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 !important;
+  line-height: 1 !important;
+}
+
+.produccion-modal-menu-btn::before {
+  content: "";
+}
+.produccion-card-usuario-abajo {
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+  opacity: .78;
+  margin-top: 2px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.produccion-card.color-azul .produccion-card-usuario-abajo,
+.produccion-card.color-violeta .produccion-card-usuario-abajo {
+  color: #ffffff !important;
+  text-shadow: 0 1px 2px rgba(0,0,0,.35);
+}
+
+@media (max-width: 768px) {
+  .produccion-card-usuario-abajo {
+    display: none !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .produccion-page-header-actions,
+  .produccion-busqueda-wrapper {
+    display: none !important;
+  }
+
+  .produccion-page-header {
+    gap: 6px !important;
+  }
+
+  .produccion-page-header-top {
+    margin-bottom: 0 !important;
+  }
+
+  .produccion-board-wrapper {
+    height: calc(100vh - 132px) !important;
+    max-height: calc(100vh - 132px) !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .produccion-board-wrapper {
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch !important;
+    touch-action: pan-x !important;
+  }
+
+  .produccion-board {
+    touch-action: pan-x !important;
+    min-width: max-content !important;
+  }
+
+  .produccion-column {
+    touch-action: pan-x !important;
+  }
+
+  .produccion-column-body {
+    touch-action: pan-y pan-x !important;
+  }
+
+  .produccion-card {
+    touch-action: pan-x pan-y !important;
+  }
+
+  .produccion-card-clickable,
+  .produccion-card-layout,
+  .produccion-card-main,
+  .produccion-card-side {
+    touch-action: pan-x pan-y !important;
+  }
+
+  .produccion-card-drag-handle {
+    touch-action: none !important;
+  }
+}
+
+.produccion-card-usuario-abajo {
+  color: inherit !important;
+}
+
+.produccion-card.color-amarillo .produccion-card-usuario-abajo,
+.produccion-card.color-verde .produccion-card-usuario-abajo,
+.produccion-card.color-rojo .produccion-card-usuario-abajo {
+  color: #172b4d !important;
+}
+
+.produccion-card.color-azul .produccion-card-usuario-abajo,
+.produccion-card.color-violeta .produccion-card-usuario-abajo {
+  color: #ffffff !important;
+}
+
+@media (max-width: 768px) {
+  .produccion-titulo-row .btn-produccion-secundario {
+    display: none !important;
+  }
+}
+
+/* =========================
+   PRODUCCIÓN NUEVO PEDIDO RESALTADO
+   ========================= */
+
+.produccion-card.nuevo-pedido-resaltado {
+  animation: produccionNuevoPedidoGlow 2.6s ease;
+}
+
+@keyframes produccionNuevoPedidoGlow {
+  0% {
+    box-shadow: 0 0 0 0 rgba(0, 174, 239, 0);
+    transform: scale(1);
+  }
+
+  18% {
+    box-shadow: 0 0 0 5px rgba(0, 174, 239, 0.32), 0 12px 28px rgba(0,0,0,.18);
+    transform: scale(1.015);
+  }
+
+  65% {
+    box-shadow: 0 0 0 5px rgba(0, 174, 239, 0.20), 0 8px 22px rgba(0,0,0,.14);
+  }
+
+  100% {
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    transform: scale(1);
+  }
+}
+
+@media (max-width: 768px) {
+  .produccion-titulo-row .btn-produccion-secundario {
+    display: none !important;
+  }
+}
+
+/* =========================
+   PRODUCCIÓN BOTONES - ESTÉTICA ZALFRO
+   ========================= */
+
+.btn-produccion-primario {
+  background: #00aeef !important;
+  color: #ffffff !important;
+  border: 1px solid #00aeef !important;
+  border-radius: 10px !important;
+  padding: 8px 12px !important;
+  font-size: 13px !important;
+  font-weight: 800 !important;
+}
+
+.btn-produccion-primario:hover {
+  background: #0096d1 !important;
+  border-color: #0096d1 !important;
+}
+
+.btn-produccion-secundario {
+  background: #e6f7fd !important;
+  color: #007bb2 !important;
+  border: 1px solid #b8ecfb !important;
+  border-radius: 10px !important;
+  padding: 8px 12px !important;
+  font-size: 13px !important;
+  font-weight: 800 !important;
+}
+
+.btn-produccion-secundario:hover {
+  background: #d3f2fb !important;
+}
+
+.produccion-card-link {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: fit-content !important;
+  min-height: 26px !important;
+  padding: 5px 10px !important;
+  border-radius: 8px !important;
+  background: rgba(0, 174, 239, 0.12) !important;
+  color: #007bb2 !important;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  text-decoration: none !important;
+}
+
+.produccion-card-link:hover {
+  background: rgba(0, 174, 239, 0.2) !important;
+}
+
+.produccion-card.color-azul .produccion-card-link,
+.produccion-card.color-violeta .produccion-card-link {
+  background: rgba(255,255,255,.22) !important;
+  color: #ffffff !important;
+}
+
+/* =========================
+   DRAG HANDLE CONTRASTE
+   ========================= */
+
+.produccion-card-drag-handle {
+  font-weight: 900 !important;
+  color: rgba(20,20,20,.55) !important;
+
+  background: rgba(0,0,0,.06) !important;
+  border-radius: 6px !important;
+
+  padding: 2px 4px !important;
+
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* Tarjetas oscuras */
+
+.produccion-card.color-azul .produccion-card-drag-handle,
+.produccion-card.color-violeta .produccion-card-drag-handle {
+  color: rgba(255,255,255,.85) !important;
+
+  background: rgba(255,255,255,.18) !important;
+
+  text-shadow: 0 1px 2px rgba(0,0,0,.35);
+}
+
+/* Tarjetas claras */
+
+.produccion-card.color-amarillo .produccion-card-drag-handle,
+.produccion-card.color-verde .produccion-card-drag-handle,
+.produccion-card.color-rojo .produccion-card-drag-handle,
+.produccion-card.color-blanco .produccion-card-drag-handle {
+  color: rgba(0,0,0,.60) !important;
+
+  background: rgba(0,0,0,.06) !important;
+}
+
+/* =========================
+   ALERTA FECHA ENTREGA
+   ========================= */
+
+.produccion-card-fecha.fecha-vencida,
+.produccion-card-mobile-fecha.fecha-vencida {
+  color: #b31717 !important;
+  background: rgba(220, 38, 38, 0.12) !important;
+  border: 1px solid rgba(220, 38, 38, 0.22);
+  border-radius: 7px;
+  padding: 3px 6px;
+  width: fit-content;
+  font-weight: 800 !important;
+}
+
+.produccion-card-fecha.fecha-proxima,
+.produccion-card-mobile-fecha.fecha-proxima {
+  color: #b31717 !important;
+  background: rgba(245, 158, 11, 0.15) !important;
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  border-radius: 7px;
+  padding: 3px 6px;
+  width: fit-content;
+  font-weight: 800 !important;
+}
+
+.produccion-card.color-azul .produccion-card-fecha.fecha-vencida,
+.produccion-card.color-violeta .produccion-card-fecha.fecha-vencida {
+  background: rgba(255,255,255,.22) !important;
+  color: #ffffff !important;
+  border-color: rgba(255,255,255,.35);
+}
+
+.produccion-card.color-azul .produccion-card-fecha.fecha-proxima,
+.produccion-card.color-violeta .produccion-card-fecha.fecha-proxima {
+  background: rgba(255,255,255,.22) !important;
+  color: #ffffff !important;
+  border-color: rgba(255,255,255,.35);
+}
+
+/* =========================
+   FECHA ENTREGA - ALERTA SIMPLE
+   sin pastilla, igual en todos los colores
+   ========================= */
+
+.produccion-card-fecha.fecha-vencida,
+.produccion-card-mobile-fecha.fecha-vencida {
+  color: #b31717 !important;
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  font-weight: 900 !important;
+  text-shadow: none !important;
+}
+
+.produccion-card-fecha.fecha-proxima,
+.produccion-card-mobile-fecha.fecha-proxima {
+  color: #b31717 !important;
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  font-weight: 800 !important;
+  text-shadow: none !important;
+}
+
+/* Fuerza que azul/violeta no conviertan la fecha en blanca */
+.produccion-card.color-azul .produccion-card-fecha.fecha-vencida,
+.produccion-card.color-violeta .produccion-card-fecha.fecha-vencida,
+.produccion-card.color-azul .produccion-card-mobile-fecha.fecha-vencida,
+.produccion-card.color-violeta .produccion-card-mobile-fecha.fecha-vencida {
+  color: #b31717 !important;
+  text-shadow: none !important;
+}
+
+.produccion-card.color-azul .produccion-card-fecha.fecha-proxima,
+.produccion-card.color-violeta .produccion-card-fecha.fecha-proxima,
+.produccion-card.color-azul .produccion-card-mobile-fecha.fecha-proxima,
+.produccion-card.color-violeta .produccion-card-mobile-fecha.fecha-proxima {
+  color: #b31717 !important;
+  text-shadow: none !important;
+}
+
+/* =========================
+   FECHAS PRIORIDAD OPERATIVA
+   ========================= */
+
+.produccion-card .produccion-card-fecha.fecha-vencida,
+.produccion-card .produccion-card-mobile-fecha.fecha-vencida {
+  color: #b31717 !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+  font-weight: 800 !important;
+}
+
+.produccion-card .produccion-card-fecha.fecha-proxima,
+.produccion-card .produccion-card-mobile-fecha.fecha-proxima {
+  color: #b31717 !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+  font-weight: 800 !important;
+}
+
+/* Mata cualquier pastilla heredada */
+
+.produccion-card .produccion-card-fecha.fecha-vencida::before,
+.produccion-card .produccion-card-fecha.fecha-proxima::before,
+.produccion-card .produccion-card-mobile-fecha.fecha-vencida::before,
+.produccion-card .produccion-card-mobile-fecha.fecha-proxima::before {
+  display: none !important;
+}
+
+/* =========================
+   FECHA OPERATIVA GLOBAL
+   ========================= */
+
+.produccion-card .produccion-card-fecha.fecha-vencida,
+.produccion-card .produccion-card-mobile-fecha.fecha-vencida {
+  color: #b31717 !important;
+  font-weight: 800 !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+}
+
+.produccion-card .produccion-card-fecha.fecha-proxima,
+.produccion-card .produccion-card-mobile-fecha.fecha-proxima {
+  color: #b31717 !important;
+  font-weight: 800 !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+}
+
+/* =========================
+   FIX FINAL - SACAR PASTILLA FECHA AZUL/VIOLETA
+   ========================= */
+
+.produccion-card.color-azul .produccion-card-fecha.fecha-vencida,
+.produccion-card.color-violeta .produccion-card-fecha.fecha-vencida,
+.produccion-card.color-azul .produccion-card-fecha.fecha-proxima,
+.produccion-card.color-violeta .produccion-card-fecha.fecha-proxima,
+.produccion-card.color-azul .produccion-card-mobile-fecha.fecha-vencida,
+.produccion-card.color-violeta .produccion-card-mobile-fecha.fecha-vencida,
+.produccion-card.color-azul .produccion-card-mobile-fecha.fecha-proxima,
+.produccion-card.color-violeta .produccion-card-mobile-fecha.fecha-proxima {
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+  width: auto !important;
+}
+
+/* =========================
+   PRODUCCIÓN COLUMNAS - MENÚ Y ORDEN MANUAL
+   ========================= */
+
+.produccion-column-title {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  gap: 5px !important;
+}
+
+.produccion-column-orden-badge {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  background: rgba(0, 174, 239, 0.12);
+  color: #007bb2;
+  border: 1px solid rgba(0, 174, 239, 0.22);
+  border-radius: 999px;
+  padding: 3px 7px;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.produccion-column.orden-manual-activo {
+  border-top-color: #00aeef !important;
+  box-shadow: inset 3px 0 0 rgba(0, 174, 239, 0.65);
+}
+
+.produccion-columna-menu-wrap {
+  position: relative;
+}
+
+.produccion-columna-menu-trigger {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 !important;
+  font-size: 18px !important;
+  font-weight: 900 !important;
+  line-height: 1 !important;
+}
+
+.produccion-columna-menu {
+  position: absolute;
+  top: 30px;
+  right: 0;
+  width: 190px;
+  background: #ffffff;
+  color: #1f2937;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(0,0,0,.18);
+  padding: 8px;
+  z-index: 9999;
+}
+
+.produccion-columna-menu button {
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: #1f2937;
+  text-align: left;
+  padding: 8px 9px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.produccion-columna-menu button:hover {
+  background: #f1f5f9;
+}
+
+.produccion-columna-menu button:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+.produccion-columna-menu button.danger {
+  color: #dc2626;
+}
+
+.produccion-columna-menu button.danger:hover {
+  background: #fee2e2;
+}
+/* =========================
+   PRODUCCIÓN COLUMN HEADER ICONS
+   ========================= */
+
+.produccion-columna-btn-icon,
+.produccion-columna-menu-trigger {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  color: #00aeef !important;
+  background: #e6f7fd !important;
+  border: 1px solid #b8ecfb !important;
+  width: 26px !important;
+  height: 26px !important;
+  min-width: 26px !important;
+  padding: 0 !important;
+  border-radius: 8px !important;
+  line-height: 1 !important;
+}
+
+.produccion-columna-btn-icon svg,
+.produccion-columna-menu-trigger svg {
+  display: block;
+  flex-shrink: 0;
+}
+
+.produccion-columna-btn-icon:hover,
+.produccion-columna-menu-trigger:hover {
+  background: #d3f2fb !important;
+}
+
+/* =========================
+   MENÚ COLUMNA - FIX VISUAL
+   ========================= */
+
+.produccion-columna-menu {
+  font-family: inherit !important;
+  font-size: 13px !important;
+  font-weight: 400 !important;
+  min-width: 210px !important;
+  max-width: 240px !important;
+  z-index: 99999 !important;
+}
+
+.produccion-columna-menu button {
+  font-family: inherit !important;
+  font-size: 13px !important;
+  font-weight: 400 !important;
+  line-height: 1.25 !important;
+}
+
+/* Evita que el menú se corte dentro de la columna */
+.produccion-column,
+.produccion-column-header,
+.produccion-column-toolbar,
+.produccion-column-actions {
+  overflow: visible !important;
+}
+
+/* Si el menú está en la primera columna, que abra hacia adentro del tablero */
+.produccion-column:first-child .produccion-columna-menu {
+  left: 0 !important;
+  right: auto !important;
+}
+
+/* =========================
+   FIX Z-INDEX MENÚ COLUMNA
+   ========================= */
+
+.produccion-column-header {
+  z-index: 5000 !important;
+}
+
+.produccion-columna-menu-wrap {
+  position: relative !important;
+  z-index: 100000 !important;
+}
+
+.produccion-columna-menu {
+  z-index: 100001 !important;
+}
+
+.produccion-column:has(.produccion-columna-menu) {
+  z-index: 90000 !important;
+}
+
+.produccion-column:has(.produccion-columna-menu) .produccion-card-cover img:hover {
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* =========================
+   ORDEN MANUAL - TARJETAS
+   ========================= */
+
+.produccion-card-orden-manual {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: rgba(0, 174, 239, 0.12);
+  color: #007bb2;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.produccion-card.color-azul .produccion-card-orden-manual,
+.produccion-card.color-violeta .produccion-card-orden-manual,
+.produccion-card.color-rojo .produccion-card-orden-manual {
+  background: rgba(255,255,255,.22);
+  color: #ffffff;
+}
+
+/* =========================
+   MOBILE - MENÚ COLUMNA SIN CORTE
+   ========================= */
+
+@media (max-width: 768px) {
+  .produccion-column:has(.produccion-columna-menu) {
+    overflow: visible !important;
+    z-index: 99999 !important;
+  }
+
+  .produccion-column-header:has(.produccion-columna-menu),
+  .produccion-column-toolbar:has(.produccion-columna-menu),
+  .produccion-column-actions:has(.produccion-columna-menu),
+  .produccion-columna-menu-wrap {
+    overflow: visible !important;
+    z-index: 100000 !important;
+  }
+
+  .produccion-columna-menu {
+    position: fixed !important;
+    top: 170px !important;
+    left: 50% !important;
+    right: auto !important;
+    transform: translateX(-50%) !important;
+    width: min(260px, calc(100vw - 32px)) !important;
+    max-width: calc(100vw - 32px) !important;
+    z-index: 100001 !important;
+  }
+}
+
+/* =========================
+   MOBILE - MENÚ COLUMNA PRIMERA COLUMNA
+   ========================= */
+
+@media (max-width: 768px) {
+  .produccion-column:first-child .produccion-columna-menu {
+    left: 16px !important;
+    right: auto !important;
+    transform: none !important;
+  }
+
+  .produccion-column:first-child .produccion-columna-menu {
+    max-width: calc(100vw - 32px) !important;
+  }
+}
+
+/* =========================
+   FIX MODAL / ENCABEZADOS COLUMNAS
+   ========================= */
+
+.produccion-modal-overlay {
+  z-index: 200000 !important;
+}
+
+.produccion-modal {
+  position: relative !important;
+  z-index: 200001 !important;
+}
+
+body:has(.produccion-modal-overlay) .produccion-column-header {
+  z-index: 1 !important;
+}
+
+body:has(.produccion-modal-overlay) .produccion-columna-menu {
+  display: none !important;
+}
+
+/* =========================
+   COLUMNAS CONTRAÍDAS - LIMPIO
+   ========================= */
+
+.produccion-column.contraida {
+  min-width: 44px !important;
+  max-width: 44px !important;
+  padding: 8px 6px !important;
+}
+
+.produccion-column.contraida .produccion-column-header {
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+.produccion-column.contraida .produccion-column-title {
+  writing-mode: vertical-rl !important;
+  transform: rotate(180deg) !important;
+  font-size: 10px !important;
+  line-height: 1.1 !important;
+  max-height: 150px !important;
+  max-width: 28px !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  text-align: center !important;
+}
+
+.produccion-column.contraida .produccion-column-count {
+  font-size: 11px !important;
+  font-weight: 800 !important;
+}
+
+.produccion-column.contraida .produccion-column-actions {
+  justify-content: center !important;
+}
+
+@media (max-width: 768px) {
+  .produccion-column.contraida {
+    min-width: 38px !important;
+    max-width: 38px !important;
+    padding: 8px 5px !important;
+  }
+
+  .produccion-column.contraida .produccion-column-title {
+    max-height: 120px !important;
+    font-size: 9px !important;
+  }
+
+  .produccion-column.contraida .produccion-columna-menu-wrap {
+    display: none !important;
+  }
+}
+
+/* =========================
+   FIX PREVIEW IMAGEN SOBRE MODAL
+   ========================= */
+
+.produccion-imagen-preview-overlay {
+  z-index: 300000 !important;
+}
+
+.produccion-imagen-preview-modal {
+  position: relative !important;
+  z-index: 300001 !important;
+}
+
+.produccion-modal-overlay:has(.produccion-imagen-preview-overlay) {
+  z-index: 299999 !important;
+}
+
+/* =========================
+   COLUMNA CONTRAÍDA - AJUSTE FINAL
+   ========================= */
+
+.produccion-column.contraida {
+  min-width: 48px !important;
+  max-width: 48px !important;
+  padding: 8px 5px !important;
+}
+
+.produccion-column.contraida .produccion-column-header {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 8px !important;
+  padding-bottom: 0 !important;
+}
+
+.produccion-column.contraida .produccion-column-toolbar {
+  order: 1 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 6px !important;
+  width: 100% !important;
+}
+
+.produccion-column.contraida .produccion-column-header-main {
+  order: 2 !important;
+  width: 100% !important;
+  display: flex !important;
+  justify-content: center !important;
+}
+
+.produccion-column.contraida .produccion-column-actions {
+  display: flex !important;
+  justify-content: center !important;
+  width: 100% !important;
+}
+
+.produccion-column.contraida .produccion-column-count {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 24px !important;
+  height: 22px !important;
+  border-radius: 999px !important;
+  background: #e6f7fd !important;
+  color: #007bb2 !important;
+  font-size: 11px !important;
+  font-weight: 900 !important;
+  margin: 0 !important;
+}
+
+.produccion-column.contraida .produccion-column-title {
+  writing-mode: vertical-rl !important;
+  transform: rotate(180deg) !important;
+  font-size: 13px !important;
+  font-weight: 800 !important;
+  line-height: 1.15 !important;
+  max-height: 180px !important;
+  max-width: 34px !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  text-align: center !important;
+}
+
+@media (max-width: 768px) {
+  .produccion-column.contraida {
+    min-width: 46px !important;
+    max-width: 46px !important;
+  }
+
+  .produccion-column.contraida .produccion-column-title {
+    font-size: 10px !important;
+    max-height: 150px !important;
+  }
+}
+
+/* =========================
+   MOBILE - MENÚ LATERAL SOBRE PRODUCCIÓN
+   ========================= */
+
+@media (max-width: 768px) {
+  .mobile-menu-panel,
+  .mobile-sidebar,
+  .sidebar-mobile,
+  .mobile-drawer,
+  .menu-mobile {
+    z-index: 400000 !important;
+  }
+
+  body:has(.mobile-menu-panel),
+  body:has(.mobile-sidebar),
+  body:has(.sidebar-mobile),
+  body:has(.mobile-drawer),
+  body:has(.menu-mobile) {
+    overflow: hidden !important;
+  }
+
+  body:has(.mobile-menu-panel) .produccion-column-header,
+  body:has(.mobile-sidebar) .produccion-column-header,
+  body:has(.sidebar-mobile) .produccion-column-header,
+  body:has(.mobile-drawer) .produccion-column-header,
+  body:has(.menu-mobile) .produccion-column-header {
+    z-index: 1 !important;
+  }
+}
+
+/* =========================
+   CARD - VER PEDIDO Y USUARIO
+   ========================= */
+
+.produccion-card-link {
+  white-space: nowrap !important;
+  width: fit-content !important;
+  min-width: 82px !important;
+  max-width: 100% !important;
+  padding-left: 10px !important;
+  padding-right: 10px !important;
+}
+
+.produccion-card-usuario-abajo {
+  display: block !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: unset !important;
+  line-height: 1.25 !important;
+  word-break: break-word !important;
+}
+
+@media (max-width: 768px) {
+  .produccion-card-link {
+    white-space: nowrap !important;
+    width: fit-content !important;
+    min-width: 82px !important;
+  }
+}

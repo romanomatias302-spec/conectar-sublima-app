@@ -1,5 +1,34 @@
-import { useDraggable } from "@dnd-kit/core";
+import { useState } from "react";
+import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
+
+function obtenerEstadoFechaEntrega(pedido) {
+  if (!pedido?.fechaEntrega) return "";
+
+  if (
+    pedido.produccionFinalizada === true ||
+    pedido.estado === "Terminado" ||
+    pedido.estadoProduccion === "finalizado"
+  ) {
+    return "";
+  }
+
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+
+  const entrega = new Date(`${pedido.fechaEntrega}T00:00:00`);
+
+  if (Number.isNaN(entrega.getTime())) return "";
+
+  const diferenciaDias = Math.ceil(
+    (entrega.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24)
+  );
+
+  if (diferenciaDias < 0) return "vencida";
+  if (diferenciaDias <= 2) return "proxima";
+
+  return "";
+}
 
 function colorMarcaStyles(color) {
   switch (color) {
@@ -59,9 +88,26 @@ export default function ProduccionCard({
   ahoraTick = Date.now(),
   puedeMoverPedidos = true,
   puedeEditarDetalleManual = true,
+  columnas = [],
+  onMoverPedido = () => {},
+  onCambiarColorTarjeta = () => {},
+  resaltadaNuevoPedido = false,
+  ordenManualActivo = false,
+  indiceOrdenManual = null,
 }) {
   const id = pedido.firebaseId || pedido.id;
+  const dropId = `pedido-drop-${id}`;
   const esMobile = window.innerWidth <= 768;
+
+
+const coloresTarjeta = [
+  { id: "", nombre: "Blanco" },
+  { id: "amarillo", nombre: "Amarillo" },
+  { id: "verde", nombre: "Verde" },
+  { id: "azul", nombre: "Azul" },
+  { id: "rojo", nombre: "Rojo" },
+  { id: "violeta", nombre: "Violeta" },
+];
 
 const {
   attributes,
@@ -75,12 +121,22 @@ const {
     disabled: pedido.produccionFinalizada === true || !puedeMoverPedidos,
   });
 
+  const { setNodeRef: setDroppableNodeRef } = useDroppable({
+  id: dropId,
+  data: {
+    tipo: "tarjeta",
+    pedidoId: id,
+    columnaId: pedido.columnaProduccionId,
+  },
+});
+
   const style = {
     transform: CSS.Translate.toString(transform),
     opacity: isDragging ? 0.6 : 1,
   };
 
 const etiquetasPedido = obtenerEtiquetasPedido(pedido);
+const estadoFechaEntrega = obtenerEstadoFechaEntrega(pedido);
 
   const tiempoEtapa = formatearTiempoEnEtapa(
     pedido.produccionActualizadoAt || pedido.ultimaAccionProduccionAt,
@@ -88,6 +144,17 @@ const etiquetasPedido = obtenerEtiquetasPedido(pedido);
   );
 
   const ultimoUsuario = pedido.ultimaAccionProduccionPorNombre || "";
+const usuarioVisible =
+  pedido.usuarioNombre ||
+  pedido.creadoPorNombre ||
+  pedido.creadoPorEmail ||
+  pedido.usuario ||
+  pedido.vendedor ||
+  pedido.vendedorNombre ||
+  pedido.creadoPor ||
+  pedido.ultimaAccionProduccionPorNombre ||
+  pedido.ultimaAccionProduccionPorEmail ||
+  "";
   const usuarioAsignado =
     pedido.produccionAsignadoNombre ||
     pedido.produccionAsignadoEmail ||
@@ -105,9 +172,12 @@ const etiquetasPedido = obtenerEtiquetasPedido(pedido);
 
   return (
     <div
-      ref={setNodeRef}
+      ref={(node) => {
+        setNodeRef(node);
+        setDroppableNodeRef(node);
+      }}
       style={style}
-      className={`produccion-card ${isDragging ? "dragging" : ""} ${pedido.__animandoSalida ? "finalizando" : ""}`}
+      className={`produccion-card color-${pedido.produccionColorTarjeta || "blanco"} ${isDragging ? "dragging" : ""} ${pedido.__animandoSalida ? "finalizando" : ""} ${resaltadaNuevoPedido ? "nuevo-pedido-resaltado" : ""}`}
       {...(
         !esMobile && pedido.produccionFinalizada !== true && puedeMoverPedidos
           ? listeners
@@ -142,7 +212,14 @@ const etiquetasPedido = obtenerEtiquetasPedido(pedido);
         }
         onClick={(e) => e.stopPropagation()}
       >
-        ⋮⋮
+        <svg width="16" height="20" viewBox="0 0 16 20" fill="none">
+          <circle cx="5" cy="4" r="1" fill="currentColor" />
+          <circle cx="11" cy="4" r="1" fill="currentColor" />
+          <circle cx="5" cy="10" r="1" fill="currentColor" />
+          <circle cx="11" cy="10" r="1" fill="currentColor" />
+          <circle cx="5" cy="16" r="1" fill="currentColor" />
+          <circle cx="11" cy="16" r="1" fill="currentColor" />
+        </svg>
       </button>
 
       <div
@@ -156,24 +233,22 @@ const etiquetasPedido = obtenerEtiquetasPedido(pedido);
           </div>
         )}
         <div className="produccion-card-top-row">
+          {ordenManualActivo && indiceOrdenManual && (
+            <div className="produccion-card-orden-manual">
+              #{indiceOrdenManual}
+            </div>
+          )}
           <div className="produccion-card-numero">
             {pedido.id || pedido.numeroPedido || pedido.numero || "Sin número"}
           </div>
 
-          {puedeEditarDetalleManual && (
-            <button
-              type="button"
-              className="produccion-card-mini-btn"
-              onClick={(e) => {
-                e.stopPropagation();
-                onEditarDetalleManual(pedido);
-              }}
-              title="Editar detalle manual"
-            >
-              ✎
-            </button>
-          )}
+
+
+
+          
         </div>
+
+       
 
         <div className="produccion-card-layout">
           <div className="produccion-card-main">
@@ -182,7 +257,7 @@ const etiquetasPedido = obtenerEtiquetasPedido(pedido);
                 {pedido.cliente || pedido.clienteNombre || pedido.nombreCliente || "Cliente sin nombre"}
               </div>
 
-              <div className="produccion-card-fecha">
+              <div className={`produccion-card-fecha ${estadoFechaEntrega ? `fecha-${estadoFechaEntrega}` : ""}`}>
                 Entrega: {pedido.fechaEntrega || "-"}
               </div>
             </div>
@@ -197,7 +272,7 @@ const etiquetasPedido = obtenerEtiquetasPedido(pedido);
               </span>
             </div>
 
-            <div className="produccion-card-mobile-fecha">
+            <div className={`produccion-card-mobile-fecha ${estadoFechaEntrega ? `fecha-${estadoFechaEntrega}` : ""}`}>
               Entrega: {pedido.fechaEntrega || "-"}
             </div>
 
@@ -213,6 +288,11 @@ const etiquetasPedido = obtenerEtiquetasPedido(pedido);
             >
               Ver pedido
             </button>
+            {usuarioVisible && (
+              <div className="produccion-card-usuario-abajo">
+                Usuario: {usuarioVisible}
+              </div>
+            )}
           </div>
 
           {tieneDetalleManual && (

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { collection, getDocs, query, where, doc, updateDoc, writeBatch } from "firebase/firestore";
 import { db } from "../../firebase";
 import {
   asegurarColumnasBaseProduccion,
@@ -25,6 +25,7 @@ import {
 } from "../../firebase/produccionPedidos";
 import { agruparPedidosPorColumna } from "./produccionUtils";
 import ProduccionBoard from "./ProduccionBoard";
+import PedidoFormModal from "../pedidos/PedidoFormModal";
 import {
   escucharEtiquetasProduccion,
   crearEtiquetaProduccion,
@@ -91,6 +92,10 @@ export default function ProduccionPage({ perfil, onVerPedido = () => {} }) {
   
 
  const [pedidoEditandoDetalle, setPedidoEditandoDetalle] = useState(null);
+ const [menuDetalleAbierto, setMenuDetalleAbierto] = useState(false);
+const [vistaMenuDetalle, setVistaMenuDetalle] = useState("principal");
+const [mensajeMenuDetalle, setMensajeMenuDetalle] = useState("");
+const [colorTarjetaManual, setColorTarjetaManual] = useState("");
  const [notaManual, setNotaManual] = useState("");
  const [metrosManual, setMetrosManual] = useState("");
  const [etiquetasProduccion, setEtiquetasProduccion] = useState([]);
@@ -109,6 +114,8 @@ const [colorManualTexto, setColorManualTexto] = useState("");
  const [loadingHistorialProduccion, setLoadingHistorialProduccion] = useState(false);
 
  const [mostrarHistorialGeneral, setMostrarHistorialGeneral] = useState(false);
+ const [mostrarNuevoPedidoProduccion, setMostrarNuevoPedidoProduccion] = useState(false);
+const [pedidoNuevoResaltadoId, setPedidoNuevoResaltadoId] = useState(null);
 
 
  const [usuariosProduccion, setUsuariosProduccion] = useState([]);
@@ -427,9 +434,26 @@ const pedidosFiltradosPorBusqueda = filtrarPedidosPorBusqueda(
   const columnaFinal = columnas.find((c) => c.esFinal);
   if (!columnaFinal) {
     const agrupadoOrdenado = {};
+
     Object.keys(agrupadoBase).forEach((colId) => {
-      agrupadoOrdenado[colId] = ordenarTarjetas(agrupadoBase[colId] || [], ordenTarjetas);
+      const columna = columnas.find((c) => c.id === colId);
+      const ordenManualActivo =
+        columna?.ordenManualActivo === true || columna?.tipoOrden === "manual";
+
+      if (ordenManualActivo) {
+        agrupadoOrdenado[colId] = [...(agrupadoBase[colId] || [])].sort((a, b) => {
+          const ordenA = Number(a.produccionSortOrder ?? 999999);
+          const ordenB = Number(b.produccionSortOrder ?? 999999);
+
+          if (ordenA !== ordenB) return ordenA - ordenB;
+
+          return String(a.id || "").localeCompare(String(b.id || ""));
+        });
+      } else {
+        agrupadoOrdenado[colId] = ordenarTarjetas(agrupadoBase[colId] || [], ordenTarjetas);
+      }
     });
+
     return agrupadoOrdenado;
   }
 
@@ -478,8 +502,24 @@ const animadosFiltradosPorBusqueda = filtrarPedidosPorBusqueda(
   });
 
   const agrupadoOrdenado = {};
+
   Object.keys(agrupadoBase).forEach((colId) => {
-    agrupadoOrdenado[colId] = ordenarTarjetas(agrupadoBase[colId] || [], ordenTarjetas);
+    const columna = columnas.find((c) => c.id === colId);
+    const ordenManualActivo =
+      columna?.ordenManualActivo === true || columna?.tipoOrden === "manual";
+
+    if (ordenManualActivo) {
+      agrupadoOrdenado[colId] = [...(agrupadoBase[colId] || [])].sort((a, b) => {
+        const ordenA = Number(a.produccionSortOrder ?? 999999);
+        const ordenB = Number(b.produccionSortOrder ?? 999999);
+
+        if (ordenA !== ordenB) return ordenA - ordenB;
+
+        return String(a.id || "").localeCompare(String(b.id || ""));
+      });
+    } else {
+      agrupadoOrdenado[colId] = ordenarTarjetas(agrupadoBase[colId] || [], ordenTarjetas);
+    }
   });
 
   return agrupadoOrdenado;
@@ -542,6 +582,21 @@ const animadosFiltradosPorBusqueda = filtrarPedidosPorBusqueda(
 
       const pedidosPrevios = [...pedidos];
 
+    const destinoTieneOrdenManual =
+      columnaDestino?.ordenManualActivo === true ||
+      columnaDestino?.tipoOrden === "manual";
+
+    const ultimoOrdenDestino = Math.max(
+      0,
+      ...pedidos
+        .filter((p) => p.columnaProduccionId === columnaDestinoId)
+        .map((p) => Number(p.produccionSortOrder || 0))
+    );
+
+    const produccionSortOrderNuevo = destinoTieneOrdenManual
+      ? ultimoOrdenDestino + 1000
+      : null;  
+
     setPedidos((prev) =>
       prev.map((p) =>
         (p.firebaseId || p.id) === pedidoId
@@ -552,6 +607,7 @@ const animadosFiltradosPorBusqueda = filtrarPedidosPorBusqueda(
               estadoProduccion: estadoProduccionNuevo,
               estado: estadoGeneralNuevo,
               produccionFinalizada: produccionFinalizadaNueva,
+              produccionSortOrder: produccionSortOrderNuevo ?? p.produccionSortOrder ?? null,
             }
           : p
       )
@@ -597,6 +653,12 @@ const animadosFiltradosPorBusqueda = filtrarPedidosPorBusqueda(
           nombre: perfil?.nombre || perfil?.email || "Usuario",
         },
       });
+
+      if (destinoTieneOrdenManual && produccionSortOrderNuevo !== null) {
+        await updateDoc(doc(db, "pedidos", pedidoId), {
+          produccionSortOrder: produccionSortOrderNuevo,
+        });
+      }
     } catch (error) {
       console.error("Error moviendo pedido en producción:", error);
       setPedidos(pedidosPrevios);
@@ -634,6 +696,23 @@ async function manejarCrearColumna() {
     console.error("Error creando columna de producción:", error);
   } finally {
     setGuardandoColumna(false);
+  }
+}
+
+async function manejarToggleOrdenManualColumna(columna) {
+  try {
+    if (!puedeGestionarColumnas) return;
+    if (!columna?.id) return;
+
+    const nuevoActivo = !columna.ordenManualActivo;
+
+    await actualizarColumnaProduccion(columna.id, {
+      ordenManualActivo: nuevoActivo,
+      tipoOrden: nuevoActivo ? "manual" : "fecha",
+      updatedAt: new Date(),
+    });
+  } catch (error) {
+    console.error("Error cambiando orden manual de columna:", error);
   }
 }
 
@@ -721,6 +800,10 @@ function toggleColumnaContraida(columnaId) {
     if (!puedeHacerEnProduccion("editarDetalle")) return;
 
     setPedidoEditandoDetalle(pedido);
+    setMenuDetalleAbierto(false);
+    setVistaMenuDetalle("principal");
+    setMensajeMenuDetalle("");
+    setColorTarjetaManual(pedido?.produccionColorTarjeta || "");
     setNotaManual(pedido?.produccionNotaCorta || "");
     setMetrosManual(
       pedido?.produccionMetros === "" || pedido?.produccionMetros == null
@@ -803,6 +886,10 @@ function cerrarDetalleManual() {
   setLoadingHistorialProduccion(false);
   setArchivosProduccion([]);
   setSubiendoArchivoProduccion(false);
+  setMenuDetalleAbierto(false);
+  setVistaMenuDetalle("principal");
+  setMensajeMenuDetalle("");
+  setColorTarjetaManual("");
 }
 
 async function manejarSubirArchivosProduccion(e) {
@@ -1057,6 +1144,117 @@ async function manejarEliminarEtiquetaProduccion(etiqueta) {
   });
 }
 
+ async function manejarCambiarColorTarjeta(pedidoId, color) {
+  try {
+    if (!pedidoId) return;
+
+    setColorTarjetaManual(color || "");
+
+    setPedidos((prev) =>
+      prev.map((p) =>
+        (p.firebaseId || p.id) === pedidoId
+          ? { ...p, produccionColorTarjeta: color || "" }
+          : p
+      )
+    );
+
+    await updateDoc(doc(db, "pedidos", pedidoId), {
+      produccionColorTarjeta: color || "",
+    });
+
+    setMensajeMenuDetalle("Color actualizado");
+  } catch (error) {
+    console.error("Error cambiando color de tarjeta:", error);
+    setMensajeMenuDetalle("No se pudo cambiar el color");
+  }
+}
+
+function manejarPedidoCreadoDesdeProduccion(pedidoCreado) {
+  const pedidoId = pedidoCreado?.firebaseId || pedidoCreado?.id;
+
+  if (pedidoId) {
+    setPedidoNuevoResaltadoId(pedidoId);
+
+    setTimeout(() => {
+      setPedidoNuevoResaltadoId(null);
+    }, 2600);
+  }
+
+  setMostrarNuevoPedidoProduccion(false);
+}
+
+async function manejarReordenManualPedido({ pedidoId, pedidoObjetivoId, columnaId }) {
+  try {
+    if (!puedeHacerEnProduccion("mover")) return;
+    if (!pedidoId || !pedidoObjetivoId || !columnaId) return;
+    if (pedidoId === pedidoObjetivoId) return;
+
+    const columna = columnas.find((c) => c.id === columnaId);
+    const ordenManualActivo =
+      columna?.ordenManualActivo === true || columna?.tipoOrden === "manual";
+
+    if (!ordenManualActivo) return;
+
+    const pedidosColumna = pedidos
+      .filter((p) => p.columnaProduccionId === columnaId)
+      .sort((a, b) => {
+        const ordenA = Number(a.produccionSortOrder ?? 999999);
+        const ordenB = Number(b.produccionSortOrder ?? 999999);
+
+        if (ordenA !== ordenB) return ordenA - ordenB;
+
+        return String(a.id || "").localeCompare(String(b.id || ""));
+      });
+
+    const indexActual = pedidosColumna.findIndex(
+      (p) => (p.firebaseId || p.id) === pedidoId
+    );
+
+    const indexObjetivo = pedidosColumna.findIndex(
+      (p) => (p.firebaseId || p.id) === pedidoObjetivoId
+    );
+
+    if (indexActual === -1 || indexObjetivo === -1) return;
+
+    const copia = [...pedidosColumna];
+    const [movido] = copia.splice(indexActual, 1);
+    copia.splice(indexObjetivo, 0, movido);
+
+    const batch = writeBatch(db);
+
+    copia.forEach((pedido, index) => {
+      const idDoc = pedido.firebaseId || pedido.id;
+      if (!idDoc) return;
+
+      const nuevoOrden = (index + 1) * 1000;
+
+      batch.update(doc(db, "pedidos", idDoc), {
+        produccionSortOrder: nuevoOrden,
+      });
+    });
+
+    setPedidos((prev) =>
+      prev.map((pedido) => {
+        const idPedido = pedido.firebaseId || pedido.id;
+        const nuevoIndex = copia.findIndex(
+          (p) => (p.firebaseId || p.id) === idPedido
+        );
+
+        if (nuevoIndex === -1) return pedido;
+
+        return {
+          ...pedido,
+          produccionSortOrder: (nuevoIndex + 1) * 1000,
+        };
+      })
+    );
+
+    await batch.commit();
+  } catch (error) {
+    console.error("Error reordenando pedido manualmente:", error);
+  }
+}
+
   return (
     <div className="produccion-page">
       <div className="produccion-page-header">
@@ -1071,6 +1269,15 @@ async function manejarEliminarEtiquetaProduccion(etiqueta) {
               >
                 Historial
               </button>
+              {puedeHacer(perfil, "pedidos", "crear") && (
+                <button
+                  type="button"
+                  className="btn-produccion-primario"
+                  onClick={() => setMostrarNuevoPedidoProduccion(true)}
+                >
+                  Crear Pedido
+                </button>
+              )}
             </div>
 
             <div className="produccion-page-header-actions">
@@ -1127,7 +1334,7 @@ async function manejarEliminarEtiquetaProduccion(etiqueta) {
                         className="btn-produccion-secundario"
                         onClick={() => setMostrarNuevaColumna((prev) => !prev)}
                     >
-                        + Columna
+                        Crear Columna
                     </button>
                     )}
             </div>
@@ -1178,6 +1385,8 @@ async function manejarEliminarEtiquetaProduccion(etiqueta) {
   columnas={columnas}
   pedidosPorColumna={pedidosPorColumna}
   onMoverPedido={manejarMoverPedido}
+  onReordenarPedidoManual={manejarReordenManualPedido}
+  onCambiarColorTarjeta={manejarCambiarColorTarjeta}
   onVerPedido={onVerPedido}
   onEditarColumna={manejarEditarColumna}
   onEliminarColumna={manejarEliminarColumna}
@@ -1192,11 +1401,21 @@ async function manejarEliminarEtiquetaProduccion(etiqueta) {
   onEditarDetalleManual={abrirDetalleManual}
   puedeGestionarColumnas={puedeGestionarColumnas}
   onMoverColumna={manejarMoverColumna}
+  onToggleOrdenManualColumna={manejarToggleOrdenManualColumna}
   ahoraTick={ahoraTick}
   puedeMoverPedidos={puedeHacerEnProduccion("mover")}
   puedeEditarDetalleManual={puedeHacerEnProduccion("editarDetalle")}
+  pedidoNuevoResaltadoId={pedidoNuevoResaltadoId}
 />
 </div>
+
+{mostrarNuevoPedidoProduccion && (
+  <PedidoFormModal
+    perfil={perfil}
+    onClose={() => setMostrarNuevoPedidoProduccion(false)}
+    onPedidoCreado={manejarPedidoCreadoDesdeProduccion}
+  />
+)}
 
 {pedidoEditandoDetalle && puedeHacerEnProduccion("editarDetalle") && (
   <div className="produccion-modal-overlay" onClick={cerrarDetalleManual}>
@@ -1204,7 +1423,134 @@ async function manejarEliminarEtiquetaProduccion(etiqueta) {
       className="produccion-modal"
       onClick={(e) => e.stopPropagation()}
     >
-      <h3>Detalle manual de producción</h3>
+      <div className="produccion-modal-header">
+        <h3>Detalle manual de producción</h3>
+
+        <button
+          type="button"
+          className="produccion-modal-menu-btn"
+          onClick={(e) => {
+            e.stopPropagation();
+            setMenuDetalleAbierto((prev) => !prev);
+            setVistaMenuDetalle("principal");
+            setMensajeMenuDetalle("");
+          }}
+        >
+          ⋯
+        </button>
+
+        {menuDetalleAbierto && (
+          <div
+            className="produccion-modal-menu"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {mensajeMenuDetalle && (
+              <div className="produccion-card-menu-success">
+                {mensajeMenuDetalle}
+              </div>
+            )}
+
+            {vistaMenuDetalle === "principal" && (
+              <>
+                <button
+                  type="button"
+                  className="produccion-card-menu-option"
+                  onClick={() => setVistaMenuDetalle("color")}
+                >
+                  Cambiar color
+                </button>
+
+                <button
+                  type="button"
+                  className="produccion-card-menu-option"
+                  onClick={() => setVistaMenuDetalle("mover")}
+                >
+                  Mover
+                </button>
+              </>
+            )}
+
+            {vistaMenuDetalle === "color" && (
+              <>
+                <button
+                  type="button"
+                  className="produccion-card-menu-back"
+                  onClick={() => setVistaMenuDetalle("principal")}
+                >
+                  ← Volver
+                </button>
+
+                <div className="produccion-card-menu-title">Cambiar color</div>
+
+                <div className="produccion-card-color-grid">
+                  {[
+                    { id: "", nombre: "Blanco" },
+                    { id: "amarillo", nombre: "Amarillo" },
+                    { id: "verde", nombre: "Verde" },
+                    { id: "azul", nombre: "Azul" },
+                    { id: "rojo", nombre: "Rojo" },
+                    { id: "violeta", nombre: "Violeta" },
+                  ].map((color) => (
+                    <button
+                      key={color.id || "blanco"}
+                      type="button"
+                      className={`produccion-card-color-dot color-${color.id || "blanco"} ${
+                        colorTarjetaManual === color.id ? "activo" : ""
+                      }`}
+                      onClick={() => {
+                        manejarCambiarColorTarjeta(
+                          pedidoEditandoDetalle.firebaseId,
+                          color.id
+                        );
+                      }}
+                      title={color.nombre}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
+
+            {vistaMenuDetalle === "mover" && (
+              <>
+                <button
+                  type="button"
+                  className="produccion-card-menu-back"
+                  onClick={() => setVistaMenuDetalle("principal")}
+                >
+                  ← Volver
+                </button>
+
+                <div className="produccion-card-menu-title">Mover a columna</div>
+
+                <div className="produccion-card-column-list">
+                  {columnas.map((columna) => (
+                    <button
+                      key={columna.id}
+                      type="button"
+                      onClick={async () => {
+                        await manejarMoverPedido(
+                          pedidoEditandoDetalle.firebaseId,
+                          columna.id
+                        );
+
+                        setMensajeMenuDetalle("Se movió exitosamente");
+
+                        setTimeout(() => {
+                          setMenuDetalleAbierto(false);
+                          setVistaMenuDetalle("principal");
+                          setMensajeMenuDetalle("");
+                        }, 900);
+                      }}
+                    >
+                      {columna.nombre || "Columna"}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
 
       <div className="produccion-modal-section">
       <h4>Notas internas</h4>
@@ -1667,7 +2013,10 @@ async function manejarEliminarEtiquetaProduccion(etiqueta) {
       >
         <div
           className="produccion-modal"
-          onClick={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            setMenuDetalleAbierto(false);
+          }}
         >
           <h3>Historial de producción</h3>
 

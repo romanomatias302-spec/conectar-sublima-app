@@ -14,6 +14,8 @@ export default function ProduccionBoard({
   columnas,
   pedidosPorColumna,
   onMoverPedido,
+  onReordenarPedidoManual,
+  onCambiarColorTarjeta,
   onVerPedido,
   onEditarColumna,
   onEliminarColumna,
@@ -28,9 +30,11 @@ export default function ProduccionBoard({
   onEditarDetalleManual,
   puedeGestionarColumnas,
   onMoverColumna,
+  onToggleOrdenManualColumna,
   ahoraTick,
   puedeMoverPedidos = true,
   puedeEditarDetalleManual = true,
+  pedidoNuevoResaltadoId = null,
 }) {
 
 const [columnaResaltadaId, setColumnaResaltadaId] = useState(null);
@@ -97,12 +101,42 @@ function manejarDragMove(event) {
 
     if (!active || !over) return;
 
-    const pedidoId = active.id;
-    const columnaDestinoId = over.data?.current?.columnaId || over.id;
+const pedidoId = active.id;
+const overData = over.data?.current || {};
 
-    if (!pedidoId || !columnaDestinoId) return;
+const columnaDestinoId = overData.columnaId || over.id;
+const pedidoObjetivoId = overData.pedidoId || null;
 
-    onMoverPedido?.(pedidoId, columnaDestinoId);
+if (!pedidoId || !columnaDestinoId) return;
+
+const columnaDestino = columnas.find((c) => c.id === columnaDestinoId);
+const ordenManualActivo =
+  columnaDestino?.ordenManualActivo === true ||
+  columnaDestino?.tipoOrden === "manual";
+
+const pedidoActual = Object.values(pedidosPorColumna)
+  .flat()
+  .find((p) => (p.firebaseId || p.id) === pedidoId);
+
+const mismaColumna = pedidoActual?.columnaProduccionId === columnaDestinoId;
+
+if (ordenManualActivo && mismaColumna && pedidoObjetivoId) {
+  onReordenarPedidoManual?.({
+    pedidoId,
+    pedidoObjetivoId,
+    columnaId: columnaDestinoId,
+  });
+
+  setColumnaResaltadaId(columnaDestinoId);
+
+  setTimeout(() => {
+    setColumnaResaltadaId(null);
+  }, 1200);
+
+  return;
+}
+
+onMoverPedido?.(pedidoId, columnaDestinoId);
     setColumnaResaltadaId(columnaDestinoId);
 
     setTimeout(() => {
@@ -144,6 +178,12 @@ function manejarDragMove(event) {
             <ProduccionColumn
               key={columna.id}
               columna={columna}
+              columnas={columnas}
+              onMoverPedido={onMoverPedido}
+              ordenManualActivo={
+                columna.ordenManualActivo === true || columna.tipoOrden === "manual"
+              }
+              onCambiarColorTarjeta={onCambiarColorTarjeta}
               pedidos={pedidosPorColumna[columna.id] || []}
               onVerPedido={onVerPedido}
               onEditarColumna={onEditarColumna}
@@ -159,12 +199,14 @@ function manejarDragMove(event) {
               onEditarDetalleManual={onEditarDetalleManual}
               puedeGestionarColumnas={puedeGestionarColumnas}
               onMoverColumna={onMoverColumna}
+              onToggleOrdenManualColumna={onToggleOrdenManualColumna}
               puedeMoverIzquierda={puedeMoverIzquierda}
               puedeMoverDerecha={puedeMoverDerecha}
               ahoraTick={ahoraTick}
               puedeMoverPedidos={puedeMoverPedidos}
               puedeEditarDetalleManual={puedeEditarDetalleManual}
               resaltada={columnaResaltadaId === columna.id}
+              pedidoNuevoResaltadoId={pedidoNuevoResaltadoId}
             />
           );
         })}

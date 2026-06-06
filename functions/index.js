@@ -403,6 +403,14 @@ exports.crearPreferenciaMercadoPago = onRequest(
   },
   async (req, res) => {
     try {
+      res.set("Access-Control-Allow-Origin", "*");
+      res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+      res.set("Access-Control-Allow-Headers", "Content-Type");
+
+      if (req.method === "OPTIONS") {
+        res.status(204).send("");
+        return;
+      }
       if (req.method !== "POST") {
         res.status(405).json({
           error: "Método no permitido",
@@ -443,7 +451,7 @@ exports.crearPreferenciaMercadoPago = onRequest(
           },
         ],
         payer: {
-          email: cliente.email || "",
+          
           name: cliente.nombre || "",
         },
         external_reference: `${clienteSaasId}|${periodoFacturado}`,
@@ -452,11 +460,13 @@ exports.crearPreferenciaMercadoPago = onRequest(
           periodoFacturado,
         },
         back_urls: {
-          success: "https://zalfro.com/pago-exitoso",
-          failure: "https://zalfro.com/pago-fallido",
-          pending: "https://zalfro.com/pago-pendiente",
+          success: "https://app.zalfro.com",
+          failure: "https://app.zalfro.com",
+          pending: "https://app.zalfro.com",
         },
         auto_return: "approved",
+        notification_url:
+        "https://us-central1-conectarsublimados-7881e.cloudfunctions.net/webhookMercadoPagoSaas",
       };
 
       const mpResponse = await fetch(
@@ -491,6 +501,129 @@ exports.crearPreferenciaMercadoPago = onRequest(
       console.error(error);
       res.status(500).json({
         error: error.message || "Error creando preferencia Mercado Pago",
+      });
+    }
+  }
+);
+
+exports.webhookMercadoPagoSaas = onRequest(
+  {
+    secrets: [MP_ACCESS_TOKEN_TEST],
+  },
+  async (req, res) => {
+    try {
+      const paymentId =
+        req.query["data.id"] ||
+        req.query.id ||
+        req.body?.data?.id ||
+        req.body?.id;
+
+      if (!paymentId) {
+        res.status(200).json({ ok: true, mensaje: "Sin paymentId" });
+        return;
+      }
+
+      const mpResponse = await fetch(
+        `https://api.mercadopago.com/v1/payments/${paymentId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${MP_ACCESS_TOKEN_TEST.value()}`,
+          },
+        }
+      );
+
+      const pago = await mpResponse.json();
+
+      if (!mpResponse.ok) {
+        console.error("Error consultando pago MP:", pago);
+        res.status(200).json({ ok: false });
+        return;
+      }
+
+      if (pago.status !== "approved") {
+        res.status(200).json({
+          ok: true,
+          status: pago.status,
+        });
+        return;
+      }
+
+      const externalReference = pago.external_reference || "";
+      const [clienteSaasId, periodoFacturado] = externalReference.split("|");
+
+      if (!clienteSaasId || !periodoFacturado) {
+        res.status(200).json({
+          ok: false,
+          mensaje: "external_reference inválida",
+        });
+        return;
+      }
+
+      const pagoExistenteSnap = await db
+        .collection("saas_pagos")
+        .where("clienteSaasId", "==", clienteSaasId)
+        .where("tipoMovimiento", "==", "pago")
+        .where("periodoFacturado", "==", periodoFacturado)
+        .where("mercadoPagoPaymentId", "==", String(paymentId))
+        .limit(1)
+        .get();
+
+      if (!pagoExistenteSnap.empty) {
+        res.status(200).json({
+          ok: true,
+          mensaje: "Pago ya registrado",
+        });
+        return;
+      }
+
+      const clienteSnap = await db
+        .collection("clientes-saas")
+        .doc(clienteSaasId)
+        .get();
+
+      const cliente = clienteSnap.exists ? clienteSnap.data() : {};
+
+      const monto = Number(pago.transaction_amount || 0);
+      const fechaPago = pago.date_approved
+        ? pago.date_approved.slice(0, 10)
+        : fechaISO(new Date());
+
+      await db.collection("saas_pagos").add({
+        clienteSaasId,
+        clienteNombre: cliente.nombre || "",
+        tipoMovimiento: "pago",
+        monto,
+        fechaPago,
+        medioPago: "mercadopago",
+        concepto: "mensualidad",
+        periodoFacturado,
+        observacion: `Pago Mercado Pago - paymentId ${paymentId}`,
+        mercadoPagoPaymentId: String(paymentId),
+        origen: "mercadopago",
+        anulado: false,
+        estado: "activo",
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      await db.collection("clientes-saas").doc(clienteSaasId).update({
+        ultimoPago: fechaPago,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      await recalcularEstadoCuentaCliente(clienteSaasId);
+
+      res.status(200).json({
+        ok: true,
+        clienteSaasId,
+        periodoFacturado,
+        monto,
+      });
+    } catch (error) {
+      console.error("Error webhook Mercado Pago:", error);
+      res.status(200).json({
+        ok: false,
+        error: error.message,
       });
     }
   }

@@ -201,6 +201,11 @@ export default function PedidoFormModal({ onClose, onPedidoCreado, pedido, perfi
         estado: formData.estado,
         clienteId: perfil?.clienteId || "",
 
+        creadoPorUid: perfil?.uid || perfil?.firebaseUid || "",
+        creadoPorNombre: perfil?.nombre || perfil?.displayName || perfil?.email || "",
+        creadoPorEmail: perfil?.email || "",
+        usuarioNombre: perfil?.nombre || perfil?.displayName || perfil?.email || "",
+
         // ✅ campos resumen para escalabilidad futura
         cantidadItems: 0,
         totalUnidades: 0,

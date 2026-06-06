@@ -36,6 +36,7 @@ export default function Configuracion({ modoOscuro, setModoOscuro, perfil, onAct
   const [mensajeMoneda, setMensajeMoneda] = useState("");
 
   const [periodosCuenta, setPeriodosCuenta] = useState([]);
+  const [periodoPagando, setPeriodoPagando] = useState(null);
   const URL_CREAR_PREFERENCIA_MP =
   "https://us-central1-conectarsublimados-7881e.cloudfunctions.net/crearPreferenciaMercadoPago";
 
@@ -242,33 +243,40 @@ const tdCuenta = {
 
 const pagarPeriodoMercadoPago = async (periodo) => {
   try {
-    const response = await fetch(
-      URL_CREAR_PREFERENCIA_MP,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          clienteSaasId: perfil.clienteId,
-          periodoFacturado: periodo.periodo,
-          monto: periodo.saldo,
-        }),
-      }
-    );
+    if (!periodo?.periodo || Number(periodo?.saldo || 0) <= 0) {
+      alert("Este período no tiene saldo pendiente.");
+      return;
+    }
+
+    if (periodoPagando === periodo.periodo) return;
+
+    setPeriodoPagando(periodo.periodo);
+
+    const response = await fetch(URL_CREAR_PREFERENCIA_MP, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        clienteSaasId: perfil.clienteId,
+        periodoFacturado: periodo.periodo,
+        monto: Number(periodo.saldo || 0),
+      }),
+    });
 
     const data = await response.json();
 
-const urlPago = data.sandbox_init_point || data.init_point;
+    const urlPago = data.sandbox_init_point || data.init_point;
 
-if (!urlPago) {
-  throw new Error("No se recibió URL de pago");
-}
+    if (!urlPago) {
+      throw new Error("No se recibió URL de pago");
+    }
 
-window.location.href = urlPago;
+    window.location.href = urlPago;
   } catch (error) {
     console.error(error);
     alert("No se pudo iniciar el pago.");
+    setPeriodoPagando(null);
   }
 };
 
@@ -560,7 +568,13 @@ window.location.href = urlPago;
                           {p.saldo > 0 ? (
                         <button
                           className="btn-primary"
+                          disabled={periodoPagando === p.periodo}
                           onClick={() => {
+                            if (Number(p.saldo || 0) <= 0) {
+                              alert("Este período ya está pagado.");
+                              return;
+                            }
+
                             if (cuentaSaas.metodoCobro === "mercadopago") {
                               pagarPeriodoMercadoPago(p);
                               return;
@@ -574,7 +588,9 @@ window.location.href = urlPago;
                             );
                           }}
                         >
-                          {cuentaSaas.metodoCobro === "mercadopago"
+                          {periodoPagando === p.periodo
+                            ? "Procesando..."
+                            : cuentaSaas.metodoCobro === "mercadopago"
                             ? "Pagar con Mercado Pago"
                             : "Informar pago"}
                         </button>

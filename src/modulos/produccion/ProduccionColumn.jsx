@@ -1,8 +1,10 @@
+import { useEffect, useRef, useState } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import ProduccionCard from "./ProduccionCard";
 
 export default function ProduccionColumn({
   columna,
+  columnas = [],
   pedidos = [],
   onVerPedido,
   onEditarColumna,
@@ -16,14 +18,19 @@ export default function ProduccionColumn({
   estaContraida = false,
   onToggleContraer,
   onEditarDetalleManual,
+  onMoverPedido,
+  onCambiarColorTarjeta,
   puedeGestionarColumnas = false,
   onMoverColumna,
+  onToggleOrdenManualColumna,
   puedeMoverIzquierda = false,
   puedeMoverDerecha = false,
   ahoraTick,
   puedeMoverPedidos = true,
   puedeEditarDetalleManual = true,
   resaltada = false,
+  pedidoNuevoResaltadoId = null,
+
 }) {
   const { setNodeRef } = useDroppable({
     id: columna.id,
@@ -35,11 +42,39 @@ export default function ProduccionColumn({
 
   const esEditando = columnaEditandoId === columna.id;
   const sePuedeEliminar = !columna.esInicial && !columna.esFinal;
+  const [menuColumnaAbierto, setMenuColumnaAbierto] = useState(false);
+  const menuColumnaRef = useRef(null);
+
+  const ordenManualActivo =
+    columna.ordenManualActivo === true || columna.tipoOrden === "manual";
+
+useEffect(() => {
+  function cerrarMenuColumna(e) {
+    if (!menuColumnaRef.current) return;
+    if (!menuColumnaRef.current.contains(e.target)) {
+      setMenuColumnaAbierto(false);
+    }
+  }
+
+  function cerrarPorScroll() {
+    setMenuColumnaAbierto(false);
+  }
+
+  document.addEventListener("mousedown", cerrarMenuColumna);
+  document.addEventListener("touchstart", cerrarMenuColumna);
+  window.addEventListener("scroll", cerrarPorScroll, true);
+
+  return () => {
+    document.removeEventListener("mousedown", cerrarMenuColumna);
+    document.removeEventListener("touchstart", cerrarMenuColumna);
+    window.removeEventListener("scroll", cerrarPorScroll, true);
+  };
+}, []);
 
   return (
     <div
       ref={setNodeRef}
-      className={`produccion-column ${estaContraida ? "contraida" : ""} ${resaltada ? "drop-confirmado" : ""}`}
+      className={`produccion-column ${estaContraida ? "contraida" : ""} ${resaltada ? "drop-confirmado" : ""} ${ordenManualActivo ? "orden-manual-activo" : ""}`}
       style={{
         background: "#f6f7f9",
         borderColor: "#d9dee8",
@@ -64,9 +99,15 @@ export default function ProduccionColumn({
               </button>
             </div>
           ) : (
-            <div className="produccion-column-title" title={columna.nombre}>
-              {columna.nombre}
-            </div>
+          <div className="produccion-column-title" title={columna.nombre}>
+            <span>{columna.nombre}</span>
+
+            {ordenManualActivo && (
+              <span className="produccion-column-orden-badge">
+                Orden manual
+              </span>
+            )}
+          </div>
           )}
         </div>
 
@@ -75,57 +116,116 @@ export default function ProduccionColumn({
 
           {!esEditando && (
             <div className="produccion-column-actions">
-              <button
-                className="produccion-columna-btn"
-                onClick={onToggleContraer}
-                title={estaContraida ? "Expandir columna" : "Contraer columna"}
-              >
-                {estaContraida ? "⟫" : "⟪"}
-              </button>
+            <button
+              className="produccion-columna-btn produccion-columna-btn-icon"
+              onClick={onToggleContraer}
+              title={estaContraida ? "Expandir columna" : "Contraer columna"}
+            >
+              {estaContraida ? (
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                  <path
+                    d="M9 6L15 12L9 18"
+                    stroke="currentColor"
+                    strokeWidth="2.4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              ) : (
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                  <path
+                    d="M15 6L9 12L15 18"
+                    stroke="currentColor"
+                    strokeWidth="2.4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              )}
+            </button>
 
               {!estaContraida && puedeGestionarColumnas && (
-                <>
-                  {!columna.esInicial && !columna.esFinal && (
-                    <>
-                      <button
-                        className="produccion-columna-btn"
-                        onClick={() => onMoverColumna?.(columna, "izquierda")}
-                        disabled={!puedeMoverIzquierda}
-                        title="Mover columna a la izquierda"
-                      >
-                        ←
-                      </button>
-
-                      <button
-                        className="produccion-columna-btn"
-                        onClick={() => onMoverColumna?.(columna, "derecha")}
-                        disabled={!puedeMoverDerecha}
-                        title="Mover columna a la derecha"
-                      >
-                        →
-                      </button>
-                    </>
-                  )}
-
+                <div className="produccion-columna-menu-wrap" ref={menuColumnaRef}>
                   <button
-                    className="produccion-columna-btn"
-                    onClick={() => onEditarColumna?.(columna)}
-                    title="Editar nombre"
+                    type="button"
+                    className="produccion-columna-btn produccion-columna-menu-trigger"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setMenuColumnaAbierto((prev) => !prev);
+                    }}
+                    title="Opciones de columna"
                   >
-                    ✎
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                      <circle cx="12" cy="5" r="2" fill="currentColor" />
+                      <circle cx="12" cy="12" r="2" fill="currentColor" />
+                      <circle cx="12" cy="19" r="2" fill="currentColor" />
+                    </svg>
                   </button>
 
-                  {sePuedeEliminar && (
-                    <button
-                      className="produccion-columna-btn eliminar"
-                      onClick={() => onEliminarColumna?.(columna)}
-                      disabled={eliminandoColumnaId === columna.id}
-                      title="Eliminar columna"
-                    >
-                      {eliminandoColumnaId === columna.id ? "..." : "×"}
-                    </button>
+                  {menuColumnaAbierto && (
+                    <div className="produccion-columna-menu">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onToggleOrdenManualColumna?.(columna);
+                          setMenuColumnaAbierto(false);
+                        }}
+                      >
+                        {ordenManualActivo ? "Desactivar orden manual" : "Activar orden manual"}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onEditarColumna?.(columna);
+                          setMenuColumnaAbierto(false);
+                        }}
+                      >
+                        Renombrar columna
+                      </button>
+
+                      {!columna.esInicial && !columna.esFinal && (
+                        <>
+                          <button
+                            type="button"
+                            disabled={!puedeMoverIzquierda}
+                            onClick={() => {
+                              onMoverColumna?.(columna, "izquierda");
+                              setMenuColumnaAbierto(false);
+                            }}
+                          >
+                            Mover a la izquierda
+                          </button>
+
+                          <button
+                            type="button"
+                            disabled={!puedeMoverDerecha}
+                            onClick={() => {
+                              onMoverColumna?.(columna, "derecha");
+                              setMenuColumnaAbierto(false);
+                            }}
+                          >
+                            Mover a la derecha
+                          </button>
+                        </>
+                      )}
+
+                      {sePuedeEliminar && (
+                        <button
+                          type="button"
+                          className="danger"
+                          disabled={eliminandoColumnaId === columna.id}
+                          onClick={() => {
+                            onEliminarColumna?.(columna);
+                            setMenuColumnaAbierto(false);
+                          }}
+                        >
+                          {eliminandoColumnaId === columna.id ? "Eliminando..." : "Eliminar columna"}
+                        </button>
+                      )}
+                    </div>
                   )}
-                </>
+                </div>
               )}
             </div>
           )}
@@ -134,16 +234,27 @@ export default function ProduccionColumn({
 
       <div className="produccion-column-body">
         {!estaContraida &&
-          pedidos.map((pedido) => (
-            <ProduccionCard
-              key={pedido.firebaseId || pedido.id}
-              pedido={pedido}
-              onVerPedido={onVerPedido}
-              onEditarDetalleManual={onEditarDetalleManual}
-              ahoraTick={ahoraTick}
-              puedeMoverPedidos={puedeMoverPedidos}
-              puedeEditarDetalleManual={puedeEditarDetalleManual}
-            />
+          pedidos.map((pedido, index) => (
+        <ProduccionCard
+          key={pedido.firebaseId || pedido.id}
+          pedido={pedido}
+          columnas={columnas}
+          onVerPedido={onVerPedido}
+          onEditarDetalleManual={onEditarDetalleManual}
+          onMoverPedido={onMoverPedido}
+          ordenManualActivo={
+            columna.ordenManualActivo === true || columna.tipoOrden === "manual"
+          }
+          indiceOrdenManual={index + 1}
+          onCambiarColorTarjeta={onCambiarColorTarjeta}
+          ahoraTick={ahoraTick}
+          puedeMoverPedidos={puedeMoverPedidos}
+          puedeEditarDetalleManual={puedeEditarDetalleManual}
+          resaltadaNuevoPedido={
+            pedidoNuevoResaltadoId &&
+            (pedido.firebaseId || pedido.id) === pedidoNuevoResaltadoId
+          }
+        />
           ))}
       </div>
     </div>
