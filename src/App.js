@@ -36,7 +36,9 @@ export default function App() {
   const [mensajeBloqueo, setMensajeBloqueo] = useState("");
   const [errorConexionPerfil, setErrorConexionPerfil] = useState(false);
 
-  const [vista, setVista] = useState("inicio");
+  const [vista, setVista] = useState(() => {
+    return localStorage.getItem("vistaActual") || "inicio";
+  });
   const [clienteSeleccionado, setClienteSeleccionado] = useState(null);
   const [pedidoSeleccionado, setPedidoSeleccionado] = useState(null);
   const [sidebarExpandido, setSidebarExpandido] = useState(() => {
@@ -48,6 +50,9 @@ export default function App() {
 
 
   const [origenVista, setOrigenVista] = useState(null);
+  useEffect(() => {
+    localStorage.setItem("vistaActual", vista);
+  }, [vista]);
 
   const esRutaActivacion = window.location.pathname === "/activar-cuenta";
 
@@ -74,7 +79,7 @@ const nuevosProductosPedidoParaVenta =
   setVentaSeleccionada(nuevaVenta);
   setOrigenVista(nuevoOrigen);
   setProductosPedidoParaVenta(nuevosProductosPedidoParaVenta);
-
+  localStorage.setItem("vistaActual", nuevaVista);
 
   if (esRutaActivacion) return;
 
@@ -134,6 +139,7 @@ const nuevosProductosPedidoParaVenta =
           }
 
           const dataPerfil = snap.data();
+
           console.log("PERFIL LOGIN:", dataPerfil);
 
           let monedaTenant = "ARS";
