@@ -44,6 +44,7 @@ export default function ProduccionColumn({
   const esEditando = columnaEditandoId === columna.id;
   const sePuedeEliminar = !columna.esInicial && !columna.esFinal;
   const [menuColumnaAbierto, setMenuColumnaAbierto] = useState(false);
+  const [menuColumnaPos, setMenuColumnaPos] = useState({ top: 0, left: 0 });
   const menuColumnaRef = useRef(null);
 
   const ordenManualActivo =
@@ -152,6 +153,32 @@ useEffect(() => {
                     className="produccion-columna-btn produccion-columna-menu-trigger"
                     onClick={(e) => {
                       e.stopPropagation();
+
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const anchoMenu = 230;
+                  const margen = 12;
+
+                    let left = rect.left;
+
+                    const estaMuyPegadoALaIzquierda = rect.left < 170;
+
+                    if (estaMuyPegadoALaIzquierda) {
+                      left = 58;
+                    }
+
+                    if (left + anchoMenu > window.innerWidth - margen) {
+                      left = window.innerWidth - anchoMenu - margen;
+                    }
+
+                    if (left < margen) {
+                      left = margen;
+                    }
+
+                  setMenuColumnaPos({
+                    top: rect.bottom + 8,
+                    left,
+                  });
+
                       setMenuColumnaAbierto((prev) => !prev);
                     }}
                     title="Opciones de columna"
@@ -164,7 +191,13 @@ useEffect(() => {
                   </button>
 
                   {menuColumnaAbierto && (
-                    <div className="produccion-columna-menu">
+                    <div
+                      className="produccion-columna-menu"
+                      style={{
+                        top: menuColumnaPos.top,
+                        left: menuColumnaPos.left,
+                      }}
+                    >
                   {puedeGestionarOrdenManual && (
                     <button
                       type="button"

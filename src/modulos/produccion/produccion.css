@@ -3369,11 +3369,7 @@ transition:none !important;
   overflow: visible !important;
 }
 
-/* Si el menú está en la primera columna, que abra hacia adentro del tablero */
-.produccion-column:first-child .produccion-columna-menu {
-  left: 0 !important;
-  right: auto !important;
-}
+
 
 /* =========================
    FIX Z-INDEX MENÚ COLUMNA
@@ -3457,21 +3453,7 @@ transition:none !important;
   }
 }
 
-/* =========================
-   MOBILE - MENÚ COLUMNA PRIMERA COLUMNA
-   ========================= */
 
-@media (max-width: 768px) {
-  .produccion-column:first-child .produccion-columna-menu {
-    left: 16px !important;
-    right: auto !important;
-    transform: none !important;
-  }
-
-  .produccion-column:first-child .produccion-columna-menu {
-    max-width: calc(100vw - 32px) !important;
-  }
-}
 
 /* =========================
    FIX MODAL / ENCABEZADOS COLUMNAS
@@ -3706,4 +3688,34 @@ body:has(.produccion-modal-overlay) .produccion-columna-menu {
     width: fit-content !important;
     min-width: 82px !important;
   }
+}
+
+/* =========================
+   MENÚ COLUMNA FIX DEFINITIVO
+   ========================= */
+
+.produccion-columna-menu {
+  position: fixed !important;
+  width: 230px !important;
+  max-width: calc(100vw - 24px) !important;
+  background: #ffffff !important;
+  color: #1f2937 !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 12px !important;
+  box-shadow: 0 14px 36px rgba(0,0,0,.22) !important;
+  padding: 8px !important;
+  z-index: 600000 !important;
+  overflow: visible !important;
+}
+
+.produccion-columna-menu button {
+  font-family: inherit !important;
+  font-size: 13px !important;
+  font-weight: 400 !important;
+  line-height: 1.25 !important;
+}
+
+/* FIX primera columna - no pisar posición calculada por React */
+.produccion-column:first-child .produccion-columna-menu {
+  right: auto !important;
 }

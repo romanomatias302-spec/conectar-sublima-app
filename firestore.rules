@@ -298,13 +298,17 @@ service cloud.firestore {
         );
     }
 
-    function canManageProduccionColumnas(clienteId) {
-      return isSuperAdmin()
-        || (
-          tenantUserBase(clienteId)
-          && isAdmin()
-        );
-    }
+function canGestionarColumnasProduccion(clienteId) {
+  return canModulo(clienteId, "produccion", "gestionarColumnas");
+}
+
+function canGestionarOrdenManualProduccion(clienteId) {
+  return canModulo(clienteId, "produccion", "ordenManual");
+}
+
+function canManageProduccionColumnas(clienteId) {
+  return canGestionarColumnasProduccion(clienteId);
+}
 
     function canReadVentas(clienteId) {
       return canModulo(clienteId, "ventas", "ver");

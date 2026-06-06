@@ -1110,8 +1110,9 @@ async function manejarEliminarEtiquetaProduccion(etiqueta) {
   }
 }
 
-  const puedeGestionarColumnas = puedeHacerEnProduccion("gestionarColumnas");
+const puedeGestionarColumnas = puedeHacerEnProduccion("gestionarColumnas");
 const puedeGestionarOrdenManual = puedeHacerEnProduccion("ordenManual");
+const puedeCambiarColorTarjeta = puedeHacerEnProduccion("cambiarColorTarjeta");
 
   async function manejarMoverColumna(columna, direccion) {
     try {
@@ -1147,6 +1148,7 @@ const puedeGestionarOrdenManual = puedeHacerEnProduccion("ordenManual");
 
  async function manejarCambiarColorTarjeta(pedidoId, color) {
   try {
+    if (!puedeCambiarColorTarjeta) return;
     if (!pedidoId) return;
 
     setColorTarjetaManual(color || "");
@@ -1387,6 +1389,7 @@ async function manejarReordenManualPedido({ pedidoId, pedidoObjetivoId, columnaI
   pedidosPorColumna={pedidosPorColumna}
   onMoverPedido={manejarMoverPedido}
   puedeGestionarOrdenManual={puedeGestionarOrdenManual}
+  puedeCambiarColorTarjeta={puedeCambiarColorTarjeta}
   onReordenarPedidoManual={manejarReordenManualPedido}
   onCambiarColorTarjeta={manejarCambiarColorTarjeta}
   onVerPedido={onVerPedido}
@@ -1454,13 +1457,15 @@ async function manejarReordenManualPedido({ pedidoId, pedidoObjetivoId, columnaI
 
             {vistaMenuDetalle === "principal" && (
               <>
-                <button
-                  type="button"
-                  className="produccion-card-menu-option"
-                  onClick={() => setVistaMenuDetalle("color")}
-                >
-                  Cambiar color
-                </button>
+            {puedeCambiarColorTarjeta && (
+              <button
+                type="button"
+                className="produccion-card-menu-option"
+                onClick={() => setVistaMenuDetalle("color")}
+              >
+                Cambiar color
+              </button>
+            )}
 
                 <button
                   type="button"
