@@ -41,13 +41,17 @@ const PERMISOS_DEFAULT_USUARIO = {
     eliminar: false,
   },
 
-  produccion: {
-    ver: true,
-    mover: true,
-    editarDetalle: true,
-    asignarUsuario: false,
-    verSoloAsignados: false,
-  },
+produccion: {
+  ver: true,
+  mover: true,
+  editarDetalle: true,
+  asignarUsuario: false,
+  verSoloAsignados: false,
+
+  gestionarColumnas: false,
+  ordenManual: false,
+  cambiarColorTarjeta: false,
+},
 
   ventas: {
     ver: false,
@@ -109,9 +113,25 @@ const MODULOS_PERMISOS = [
     { key: "mover", label: "Mover tarjetas" },
     { key: "editarDetalle", label: "Editar detalle" },
     { key: "asignarUsuario", label: "Asignar usuario" },
+
     {
       key: "verSoloAsignados",
       label: "Ver solo pedidos asignados",
+    },
+
+    {
+      key: "gestionarColumnas",
+      label: "Gestionar columnas",
+    },
+
+    {
+      key: "ordenManual",
+      label: "Configurar orden manual",
+    },
+
+    {
+      key: "cambiarColorTarjeta",
+      label: "Cambiar color de tarjetas",
     },
   ],
 },
@@ -331,11 +351,12 @@ export default function ConfiguracionUsuarios({ perfil }) {
           style={{
             display: "flex",
             justifyContent: "space-between",
-            alignItems: "center",
+            alignItems: "flex-start",
             gap: "12px",
             flexWrap: "wrap",
           }}
         >
+         
           <div>
             <h3 style={{ margin: 0 }}>Usuarios activos</h3>
             <p style={{ margin: "6px 0 0", color: "#666" }}>
@@ -570,7 +591,7 @@ export default function ConfiguracionUsuarios({ perfil }) {
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
+                gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
                 gap: "14px",
               }}
             >
@@ -594,19 +615,38 @@ export default function ConfiguracionUsuarios({ perfil }) {
                       <label
                         key={accion.key}
                         style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "10px",
+                          display: "grid",
+                          gridTemplateColumns: "20px minmax(0, 1fr)",
+                          alignItems: "start",
+                          columnGap: "10px",
                           cursor: "pointer",
                           fontSize: "14px",
+                          lineHeight: "1.25",
+                          width: "100%",
                         }}
                       >
                         <input
                           type="checkbox"
                           checked={!!permisosEditando?.[modulo.key]?.[accion.key]}
                           onChange={() => togglePermiso(modulo.key, accion.key)}
+                          style={{
+                            marginTop: "2px",
+                            marginLeft: 0,
+                            flexShrink: 0,
+                          }}
                         />
-                        <span>{accion.label}</span>
+
+                        <span
+                          style={{
+                            display: "block",
+                            minWidth: 0,
+                            whiteSpace: "normal",
+                            wordBreak: "normal",
+                            overflowWrap: "break-word",
+                          }}
+                        >
+                          {accion.label}
+                        </span>
                       </label>
                     ))}
                   </div>

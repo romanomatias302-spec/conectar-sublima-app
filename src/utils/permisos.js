@@ -15,13 +15,16 @@ export const PERMISOS_DEFAULT = {
     eliminar: false,
   },
 
-  produccion: {
-    ver: true,
-    mover: true,
-    editarDetalle: true,
-    asignarUsuario: false,
-    verSoloAsignados: false,
-  },
+produccion: {
+  ver: true,
+  mover: true,
+  editarDetalle: true,
+  asignarUsuario: false,
+  verSoloAsignados: false,
+
+  gestionarColumnas: false,
+  ordenManual: false,
+},
 
   ventas: {
     ver: false,

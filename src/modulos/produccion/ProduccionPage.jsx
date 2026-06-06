@@ -701,7 +701,7 @@ async function manejarCrearColumna() {
 
 async function manejarToggleOrdenManualColumna(columna) {
   try {
-    if (!puedeGestionarColumnas) return;
+    if (!puedeGestionarOrdenManual) return;
     if (!columna?.id) return;
 
     const nuevoActivo = !columna.ordenManualActivo;
@@ -1110,7 +1110,8 @@ async function manejarEliminarEtiquetaProduccion(etiqueta) {
   }
 }
 
-  const puedeGestionarColumnas = perfil?.rol === "admin";
+  const puedeGestionarColumnas = puedeHacerEnProduccion("gestionarColumnas");
+const puedeGestionarOrdenManual = puedeHacerEnProduccion("ordenManual");
 
   async function manejarMoverColumna(columna, direccion) {
     try {
@@ -1385,6 +1386,7 @@ async function manejarReordenManualPedido({ pedidoId, pedidoObjetivoId, columnaI
   columnas={columnas}
   pedidosPorColumna={pedidosPorColumna}
   onMoverPedido={manejarMoverPedido}
+  puedeGestionarOrdenManual={puedeGestionarOrdenManual}
   onReordenarPedidoManual={manejarReordenManualPedido}
   onCambiarColorTarjeta={manejarCambiarColorTarjeta}
   onVerPedido={onVerPedido}

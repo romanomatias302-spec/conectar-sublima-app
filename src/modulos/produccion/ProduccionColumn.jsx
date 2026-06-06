@@ -30,6 +30,7 @@ export default function ProduccionColumn({
   puedeEditarDetalleManual = true,
   resaltada = false,
   pedidoNuevoResaltadoId = null,
+  puedeGestionarOrdenManual = false,
 
 }) {
   const { setNodeRef } = useDroppable({
@@ -164,15 +165,17 @@ useEffect(() => {
 
                   {menuColumnaAbierto && (
                     <div className="produccion-columna-menu">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          onToggleOrdenManualColumna?.(columna);
-                          setMenuColumnaAbierto(false);
-                        }}
-                      >
-                        {ordenManualActivo ? "Desactivar orden manual" : "Activar orden manual"}
-                      </button>
+                  {puedeGestionarOrdenManual && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onToggleOrdenManualColumna?.(columna);
+                        setMenuColumnaAbierto(false);
+                      }}
+                    >
+                      {ordenManualActivo ? "Desactivar orden manual" : "Activar orden manual"}
+                    </button>
+                  )}
 
                       <button
                         type="button"

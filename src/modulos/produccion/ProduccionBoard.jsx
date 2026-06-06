@@ -35,6 +35,7 @@ export default function ProduccionBoard({
   puedeMoverPedidos = true,
   puedeEditarDetalleManual = true,
   pedidoNuevoResaltadoId = null,
+  puedeGestionarOrdenManual = false,
 }) {
 
 const [columnaResaltadaId, setColumnaResaltadaId] = useState(null);
@@ -207,6 +208,7 @@ onMoverPedido?.(pedidoId, columnaDestinoId);
               puedeEditarDetalleManual={puedeEditarDetalleManual}
               resaltada={columnaResaltadaId === columna.id}
               pedidoNuevoResaltadoId={pedidoNuevoResaltadoId}
+              puedeGestionarOrdenManual={puedeGestionarOrdenManual}
             />
           );
         })}
