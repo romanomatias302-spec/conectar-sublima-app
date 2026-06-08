@@ -72,6 +72,14 @@ export default function PedidoFormModal({ onClose, onPedidoCreado, pedido, perfi
     fetchClientes();
   }, [perfil]);
 
+  useEffect(() => {
+    document.body.classList.add("pedido-modal-abierto");
+
+    return () => {
+      document.body.classList.remove("pedido-modal-abierto");
+    };
+  }, []);
+
   // 🔹 Si estamos editando, precargar datos
   useEffect(() => {
     if (pedido) {
@@ -121,8 +129,10 @@ export default function PedidoFormModal({ onClose, onPedidoCreado, pedido, perfi
   };
 
   // 🔹 Guardar (crear o actualizar)
-  const guardarPedido = async () => {
-    if (loading) return;
+const guardarPedido = async () => {
+  if (loading || exito) return;
+
+  let guardadoCorrecto = false;
 
     if (!pedido && !puedeCrearPedidos) {
       setError("No tenés permisos para crear pedidos.");
@@ -167,6 +177,7 @@ export default function PedidoFormModal({ onClose, onPedidoCreado, pedido, perfi
           clienteId: pedido.clienteId || perfil?.clienteId || "",
         };
 
+        guardadoCorrecto = true;
         setExito(true);
 
         setTimeout(() => {
@@ -230,7 +241,9 @@ export default function PedidoFormModal({ onClose, onPedidoCreado, pedido, perfi
       const docRef = await addDoc(pedidosRef, nuevoPedidoData);
 
       // ✅ Mostrar mensaje de éxito antes de redirigir
+      guardadoCorrecto = true;
       setExito(true);
+
       setTimeout(() => {
         if (onPedidoCreado) {
           onPedidoCreado({
@@ -243,9 +256,11 @@ export default function PedidoFormModal({ onClose, onPedidoCreado, pedido, perfi
     } catch (err) {
       console.error("Error al guardar pedido:", err);
       setError("Hubo un problema al guardar el pedido.");
-    } finally {
-      setLoading(false);
-    }
+      } finally {
+        if (!guardadoCorrecto) {
+          setLoading(false);
+        }
+      }
   };
 
   return (
@@ -312,13 +327,17 @@ export default function PedidoFormModal({ onClose, onPedidoCreado, pedido, perfi
         </select>
 
         <div className="modal-buttons">
-          <button className="cancelar" onClick={onClose}>
+          <button
+            className="cancelar"
+            onClick={onClose}
+            disabled={loading || exito}
+          >
             Cancelar
           </button>
           <button
             type="button"
             onClick={guardarPedido}
-            disabled={loading || soloLectura}
+            disabled={loading || exito || soloLectura}
           >
             {loading
               ? "Guardando..."

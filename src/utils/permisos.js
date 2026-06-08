@@ -1,12 +1,15 @@
 export const PERMISOS_DEFAULT = {
-  inicio: { ver: true },
+inicio: {
+  ver: true,
 
-  clientes: {
-    ver: false,
-    crear: false,
-    editar: false,
-    eliminar: false,
-  },
+  verPedidos: true,
+  verClientes: true,
+  verIngresos: true,
+  verProduccion: true,
+  verAtrasados: true,
+  verGrafico: true,
+  verCuelloBotella: true,
+},
 
   pedidos: {
     ver: true,

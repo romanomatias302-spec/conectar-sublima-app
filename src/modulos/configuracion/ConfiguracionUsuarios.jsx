@@ -25,6 +25,14 @@ function formatearFecha(fecha) {
 const PERMISOS_DEFAULT_USUARIO = {
   inicio: {
     ver: true,
+
+    verPedidos: true,
+    verClientes: true,
+    verIngresos: true,
+    verProduccion: true,
+    verAtrasados: true,
+    verGrafico: true,
+    verCuelloBotella: true,
   },
 
   clientes: {
@@ -80,11 +88,22 @@ produccion: {
 };
 
 const MODULOS_PERMISOS = [
-  {
-    key: "inicio",
-    label: "Inicio",
-    acciones: [{ key: "ver", label: "Ver módulo" }],
-  },
+{
+  key: "inicio",
+  label: "Inicio",
+  acciones: [
+    { key: "ver", label: "Ver módulo" },
+
+    { key: "verPedidos", label: "Ver KPI Pedidos" },
+    { key: "verClientes", label: "Ver KPI Clientes" },
+    { key: "verIngresos", label: "Ver KPI Ingresos" },
+    { key: "verProduccion", label: "Ver KPI Producción" },
+    { key: "verAtrasados", label: "Ver KPI Atrasados" },
+
+    { key: "verGrafico", label: "Ver gráfico semanal" },
+    { key: "verCuelloBotella", label: "Ver cuello de botella" },
+  ],
+},
   {
     key: "clientes",
     label: "Clientes",

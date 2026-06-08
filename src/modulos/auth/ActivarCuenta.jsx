@@ -12,8 +12,35 @@ import {
   obtenerInvitacionPorToken,
 } from "../../firebase/invitacionesUsuarios";
 import "./Login.css";
+import logoZalfro from "../../assets/logo-zalfro.png";
+
+
+    function ActivarLayout({ children }) {
+      return (
+        <div className="login-page">
+          <div className="login-shell">
+            <div className="login-panel">
+              <img src={logoZalfro} alt="Zalfro" className="login-brand-img" />
+              {children}
+            </div>
+
+            <div className="login-visual">
+              <div className="login-visual-overlay">
+                <h2>Tu negocio,<br />bajo control.</h2>
+                <p>
+                  Activá tu cuenta para empezar a gestionar pedidos, producción,
+                  clientes y ventas desde un solo lugar.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    } 
 
 export default function ActivarCuenta() {
+ 
+
   const [token, setToken] = useState("");
   const [invitacion, setInvitacion] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -83,6 +110,8 @@ export default function ActivarCuenta() {
     verificar();
   }, [token]);
 
+
+
   async function handleSubmit(e) {
     e.preventDefault();
     setError("");
@@ -143,7 +172,16 @@ export default function ActivarCuenta() {
         createdAt: serverTimestamp(),
         invitacionId: invitacion.id,
         permisos: {
-          inicio: { ver: true },
+          inicio: {
+            ver: true,
+            verPedidos: true,
+            verClientes: false,
+            verIngresos: false,
+            verProduccion: true,
+            verAtrasados: true,
+            verGrafico: true,
+            verCuelloBotella: true,
+          },
           clientes: { ver: false, crear: false, editar: false, eliminar: false },
           pedidos: { ver: true, crear: false, editar: false, eliminar: false },
           produccion: {
@@ -193,48 +231,41 @@ export default function ActivarCuenta() {
 
   if (loading) {
     return (
-      <div className="login-page">
-        <div className="login-card">
+      <ActivarLayout>
           <h1>Activar cuenta</h1>
           <p>Validando invitación...</p>
-        </div>
-      </div>
+      </ActivarLayout>
     );
   }
 
   if (error && !invitacion) {
     return (
-      <div className="login-page">
-        <div className="login-card">
+      <ActivarLayout>
           <h1>Activar cuenta</h1>
           <div className="login-error">{error}</div>
 
           <p style={{ marginTop: "12px", fontSize: "13px", color: "#666" }}>
             Token leído: {token || "(vacío)"}
           </p>
-        </div>
-      </div>
+       </ActivarLayout>
     );
   }
 
-  if (mensaje) {
-    return (
-      <div className="login-page">
-        <div className="login-card">
-          <h1>Cuenta activada</h1>
-          <p>{mensaje}</p>
-          <a href="/" style={{ marginTop: "12px", display: "inline-block" }}>
-            Ir al inicio
-          </a>
-        </div>
-      </div>
-    );
-  }
-
+if (mensaje) {
   return (
-    <div className="login-page">
-      <div className="login-card">
-        <h1>Activar cuenta</h1>
+    <ActivarLayout>
+      <h1>Cuenta activada</h1>
+      <p>{mensaje}</p>
+      <a href="/" style={{ marginTop: "12px", display: "inline-block" }}>
+        Ir al inicio
+      </a>
+    </ActivarLayout>
+  );
+}
+
+return (
+  <ActivarLayout>
+    <h1>Activar cuenta</h1>
         <p>Completá tus datos para ingresar al sistema.</p>
 
         <form onSubmit={handleSubmit} className="login-form">
@@ -275,11 +306,10 @@ export default function ActivarCuenta() {
 
           {error && <div className="login-error">{error}</div>}
 
-          <button type="submit" disabled={guardando}>
+          <button type="submit" disabled={guardando} className="login-submit-btn">
             {guardando ? "Activando..." : "Activar cuenta"}
           </button>
         </form>
-      </div>
-    </div>
-  );
+    </ActivarLayout>
+    );
 }

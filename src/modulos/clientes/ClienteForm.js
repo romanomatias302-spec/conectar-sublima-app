@@ -8,6 +8,7 @@ import {
   query,
   where,
   limit,
+  serverTimestamp,
 } from "firebase/firestore";
 import { db } from "../../firebase";
 import { puedeHacer } from "../../utils/permisos";
@@ -95,6 +96,7 @@ export default function ClienteForm({ cliente, onVolver, onCancelar, onGuardar, 
         ...formData,
         dni: formData.dni.toString(),
         clienteId: perfil?.clienteId || "",
+        updatedAt: serverTimestamp(),
       };
         console.log("DATOS A GUARDAR CLIENTE:", datosAGuardar);
 
@@ -110,7 +112,10 @@ export default function ClienteForm({ cliente, onVolver, onCancelar, onGuardar, 
           ...datosAGuardar,
         };
       } else {
-        const docRef = await addDoc(collection(db, "clientes"), datosAGuardar);
+        const docRef = await addDoc(collection(db, "clientes"), {
+          ...datosAGuardar,
+          createdAt: serverTimestamp(),
+        });
 
         clienteGuardado = {
           firebaseId: docRef.id,

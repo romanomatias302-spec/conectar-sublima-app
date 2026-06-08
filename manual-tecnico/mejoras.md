@@ -18,8 +18,6 @@
 
 - al habilitar el swich de zona de impresion, si queremos que la imagen aparezca en el form a mostrar en pedidos, debemos entrar y guardar. mejorar eso. Deberia cargar todo a penas habilitamos
 
-- agregar seccion de suscripcion, desde ahi el admin podra ver sus ultimos movimiento y proximos vencimientos, tambien opcion de pagar y gestionar sus suscripciones
-
 - Poner orden manual de los swich para que aparezcan en ese orden en el formulario
 
 - futura integracion por render, opcion PRO para planes mas grande
@@ -30,9 +28,6 @@
 
 ## vista dueño saas
 
-- resolver fechas y pagos como sera el sistema de vencimientos etc.
-- integrar pago automatizada, cada usuario deberia poder pagar desde su perfil
-- definir planes
 - armar un menu con los modulos correspondientes para la gestion de nuestros clientes
 
 ## futuros modulos
@@ -58,3 +53,4 @@ listo
 cuando se crea una columna nueva se resetean los tiempo, mejorar eso
 
 - al soltar tarjeta mejorar experiencia
+- columnas automatizadas, reglas entrada y salida, creacion de tandas etc.

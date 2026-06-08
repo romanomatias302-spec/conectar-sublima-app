@@ -2071,29 +2071,17 @@ body.dark-mode .produccion-etiqueta-actions button:last-child {
   gap: 8px;
 }
 
-.produccion-busqueda-input {
-  width: 180px; /* antes 150 */
-  min-width: 180px;
-  margin-left: -50px;
-}
+
 
 .produccion-select-orden {
   min-width: 150px;
 }
 
-.produccion-busqueda-input {
-  min-width: 120px;
-  width: 150px;
-}
 
-.produccion-busqueda-wrapper{
-  margin-left:-90px;
-}
 
-.produccion-busqueda-input{
-  width:180px;
-  min-width:180px;
-}
+
+
+
 
 @media (max-width: 768px) {
   .produccion-page-header-actions {
@@ -3719,3 +3707,30 @@ body:has(.produccion-modal-overlay) .produccion-columna-menu {
 .produccion-column:first-child .produccion-columna-menu {
   right: auto !important;
 }
+
+
+
+/* =========================
+   PRODUCCIÓN HEADER - FIX NO INVASIVO
+   ========================= */
+
+.produccion-busqueda-input {
+  margin-left: 0 !important;
+}
+
+/* Pantallas medianas: achicamos buscador */
+@media (min-width: 769px) and (max-width: 1280px) {
+  .produccion-busqueda-input {
+    width: 130px !important;
+    min-width: 130px !important;
+    max-width: 130px !important;
+  }
+}
+
+/* Pantallas chicas de escritorio: ocultamos buscador para no romper header */
+@media (min-width: 769px) and (max-width: 1080px) {
+  .produccion-busqueda-input {
+    display: none !important;
+  }
+}
+

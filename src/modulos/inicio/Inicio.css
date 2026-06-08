@@ -197,3 +197,327 @@ body.dark-mode .icon {
 .modulo span {
   font-weight: 600;
 }
+
+/* =========================
+   DASHBOARD INICIO ZALFRO
+   ========================= */
+
+.inicio-dashboard-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 18px;
+}
+
+.inicio-hero-card {
+  grid-column: 1 / -1;
+  min-height: 170px;
+  border-radius: 28px;
+  padding: 30px;
+  color: white;
+  background:
+    radial-gradient(circle at 82% 28%, rgba(0, 174, 239, 0.42), transparent 28%),
+    linear-gradient(135deg, #071827 0%, #0b2b42 52%, #0096d1 140%);
+  box-shadow: 0 26px 60px rgba(0, 174, 239, 0.18);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  overflow: hidden;
+  position: relative;
+}
+
+.inicio-hero-card::after {
+  content: "";
+  position: absolute;
+  inset: auto -90px -120px auto;
+  width: 280px;
+  height: 280px;
+  border-radius: 999px;
+  background: rgba(0, 174, 239, 0.28);
+  filter: blur(12px);
+}
+
+.inicio-eyebrow {
+  display: inline-flex;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #b9f3ff;
+  font-size: 12px;
+  font-weight: 800;
+  margin-bottom: 14px;
+}
+
+.inicio-hero-card h2 {
+  margin: 0;
+  font-size: 34px;
+  letter-spacing: -0.04em;
+}
+
+.inicio-hero-card p {
+  margin: 10px 0 0;
+  max-width: 540px;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 15px;
+}
+
+.inicio-hero-glow {
+  width: 96px;
+  height: 96px;
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.1);
+  display: grid;
+  place-items: center;
+  box-shadow:
+    inset 0 0 24px rgba(255, 255, 255, 0.12),
+    0 0 35px rgba(0, 174, 239, 0.55);
+  z-index: 1;
+}
+
+.inicio-hero-glow svg {
+  font-size: 42px;
+  color: #55ddff;
+}
+
+.inicio-kpis {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(140px, 1fr));
+  gap: 14px;
+}
+
+.inicio-kpi-card {
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid #e6eef7;
+  border-radius: 22px;
+  padding: 18px;
+  min-height: 130px;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.06);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.inicio-kpi-icon {
+  color: #00aeef;
+  font-size: 20px;
+}
+
+.inicio-kpi-card span {
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.inicio-kpi-card strong {
+  color: #0f172a;
+  font-size: 30px;
+  letter-spacing: -0.04em;
+}
+
+.inicio-kpi-alerta {
+  border-color: #fecaca;
+  background: linear-gradient(180deg, #fff, #fff7f7);
+}
+
+.inicio-kpi-alerta .inicio-kpi-icon,
+.inicio-kpi-alerta strong {
+  color: #dc2626;
+}
+
+.inicio-panel {
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid #e6eef7;
+  border-radius: 26px;
+  padding: 22px;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.06);
+}
+
+.inicio-panel-chart {
+  min-height: 300px;
+}
+
+.inicio-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.inicio-panel-header h3 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 18px;
+}
+
+.inicio-panel-header p {
+  margin: 4px 0 0;
+  color: #64748b;
+  font-size: 13px;
+}
+
+
+
+.inicio-chart-labels {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 8px;
+  padding: 10px 18px 0;
+  color: #94a3b8;
+  font-size: 12px;
+  text-align: center;
+}
+
+.inicio-production-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.inicio-production-row {
+  display: flex;
+  justify-content: space-between;
+  color: #334155;
+  font-size: 14px;
+}
+
+.inicio-production-row strong {
+  color: #0f172a;
+}
+
+.inicio-progress {
+  height: 10px;
+  border-radius: 999px;
+  background: #eaf3f8;
+  overflow: hidden;
+}
+
+.inicio-progress div {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #00aeef, #007bbd);
+  box-shadow: 0 0 14px rgba(0, 174, 239, 0.34);
+}
+
+.inicio-panel-danger {
+  border-color: #fecaca;
+  background:
+    radial-gradient(circle at 88% 10%, rgba(220, 38, 38, 0.12), transparent 30%),
+    #ffffff;
+}
+
+.inicio-overdue-number {
+  font-size: 36px;
+  font-weight: 900;
+  color: #dc2626;
+  letter-spacing: -0.05em;
+}
+
+.inicio-overdue-date {
+  display: inline-flex;
+  margin-top: 10px;
+  color: #991b1b;
+  background: #fee2e2;
+  padding: 7px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+@media (max-width: 1180px) {
+  .inicio-kpis {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .inicio-dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .inicio-container {
+    padding: 14px;
+    padding-bottom: 96px;
+  }
+
+  .inicio-hero-card {
+    padding: 22px;
+    border-radius: 22px;
+    min-height: 150px;
+  }
+
+  .inicio-hero-card h2 {
+    font-size: 26px;
+  }
+
+  .inicio-hero-glow {
+    display: none;
+  }
+
+  .inicio-kpis {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .inicio-kpi-card {
+    min-height: 115px;
+    padding: 15px;
+  }
+
+  .inicio-kpi-card strong {
+    font-size: 25px;
+  }
+
+  .inicio-panel {
+    border-radius: 22px;
+    padding: 18px;
+  }
+}
+
+.inicio-line-chart {
+  height: 210px;
+  padding: 12px 10px 0;
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at 82% 18%, rgba(0, 174, 239, 0.16), transparent 34%),
+    linear-gradient(180deg, rgba(0, 174, 239, 0.07), rgba(255, 255, 255, 0));
+  overflow: hidden;
+}
+
+.inicio-line-chart svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.inicio-chart-grid-line {
+  stroke: rgba(148, 163, 184, 0.22);
+  stroke-width: 1;
+  fill: none;
+}
+
+.inicio-chart-area {
+  fill: url(#inicioChartFill);
+}
+
+.inicio-chart-line {
+  fill: none;
+  stroke: url(#inicioChartLine);
+  stroke-width: 5;
+  stroke-linecap: round;
+  filter: drop-shadow(0 8px 14px rgba(0, 174, 239, 0.22));
+}
+
+.inicio-chart-point {
+  fill: #ffffff;
+  stroke: #00aeef;
+  stroke-width: 4;
+  filter: drop-shadow(0 4px 8px rgba(0, 174, 239, 0.25));
+}
+
+.inicio-hero-card h2 {
+  color: #ffffff !important;
+}
+
+.inicio-hero-card p {
+  color: rgba(255, 255, 255, 0.82) !important;
+}
