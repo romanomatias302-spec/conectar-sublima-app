@@ -133,10 +133,10 @@ const MODULOS_PERMISOS = [
     { key: "editarDetalle", label: "Editar detalle" },
     { key: "asignarUsuario", label: "Asignar usuario" },
 
-    {
-      key: "verSoloAsignados",
-      label: "Ver solo pedidos asignados",
-    },
+{
+  key: "verSoloAsignados",
+  label: "Ver solo pedidos asignados ⚠️",
+},
 
     {
       key: "gestionarColumnas",
@@ -326,15 +326,26 @@ export default function ConfiguracionUsuarios({ perfil }) {
     setPermisosEditando(PERMISOS_DEFAULT_USUARIO);
   }
 
-  function togglePermiso(modulo, accion) {
-    setPermisosEditando((prev) => ({
-      ...prev,
-      [modulo]: {
-        ...(prev[modulo] || {}),
-        [accion]: !prev?.[modulo]?.[accion],
-      },
-    }));
+function togglePermiso(modulo, accion) {
+  const valorActual = !!permisosEditando?.[modulo]?.[accion];
+  const nuevoValor = !valorActual;
+
+  if (modulo === "produccion" && accion === "verSoloAsignados" && nuevoValor) {
+    const confirmar = window.confirm(
+      "Atención: si activás esta opción, el usuario solo verá los pedidos que tenga asignados.\n\nSi no tiene pedidos asignados, verá el tablero de producción vacío.\n\n¿Querés activar este permiso?"
+    );
+
+    if (!confirmar) return;
   }
+
+  setPermisosEditando((prev) => ({
+    ...prev,
+    [modulo]: {
+      ...(prev[modulo] || {}),
+      [accion]: nuevoValor,
+    },
+  }));
+}
 
   async function guardarPermisosUsuario() {
     try {

@@ -171,7 +171,11 @@ service cloud.firestore {
     }
 
     function canReadClientes(clienteId) {
-      return canModulo(clienteId, "clientes", "ver");
+      return canModulo(clienteId, "clientes", "ver")
+        || (
+          tenantUserBase(clienteId)
+          && permisoModuloAccion("inicio", "verClientes")
+        );
     }
 
     function canCreateClientes(clienteId) {
@@ -192,8 +196,12 @@ service cloud.firestore {
           tenantUserBase(clienteId)
           && (
             isAdmin()
-            || permisoModuloAccion("pedidos", "ver")
-            || permisoModuloAccion("produccion", "ver")
+              || permisoModuloAccion("pedidos", "ver")
+              || permisoModuloAccion("produccion", "ver")
+              || permisoModuloAccion("inicio", "verPedidos")
+              || permisoModuloAccion("inicio", "verProduccion")
+              || permisoModuloAccion("inicio", "verAtrasados")
+              || permisoModuloAccion("inicio", "verGrafico")
           )
         );
     }
@@ -222,21 +230,22 @@ service cloud.firestore {
       return canModulo(clienteId, "produccion", "asignarUsuario");
     }
 
-  function canUpdatePedidoProduccion(clienteId) {
-    return canMoverProduccion(clienteId)
-      && onlyChangesAllowed([
-        "columnaProduccionId",
-        "progresoProduccion",
-        "estadoProduccion",
-        "produccionFinalizada",
-        "estado",
-        "produccionActualizadoAt",
-        "updatedAt",
-        "ultimaAccionProduccionPor",
-        "ultimaAccionProduccionPorNombre",
-        "ultimaAccionProduccionAt"
-      ]);
-  }
+function canUpdatePedidoProduccion(clienteId) {
+  return canMoverProduccion(clienteId)
+    && onlyChangesAllowed([
+      "columnaProduccionId",
+      "progresoProduccion",
+      "estadoProduccion",
+      "produccionFinalizada",
+      "estado",
+      "produccionActualizadoAt",
+      "updatedAt",
+      "ultimaAccionProduccionPor",
+      "ultimaAccionProduccionPorNombre",
+      "ultimaAccionProduccionAt",
+      "produccionSortOrder"
+    ]);
+}
 
     function canUpdatePedidoDetalleProduccion(clienteId) {
       return canEditarDetalleProduccion(clienteId)
@@ -272,6 +281,20 @@ service cloud.firestore {
         ]);
     }
 
+    function canUpdatePedidoColorTarjeta(clienteId) {
+      return canModulo(clienteId, "produccion", "cambiarColorTarjeta")
+        && onlyChangesAllowed([
+          "produccionColorTarjeta"
+        ]);
+    }
+
+    function canUpdatePedidoOrdenManual(clienteId) {
+      return canMoverProduccion(clienteId)
+        && onlyChangesAllowed([
+          "produccionSortOrder"
+        ]);
+    }
+
     function canUpdatePedidos(clienteId) {
       return isSuperAdmin()
         || (
@@ -282,6 +305,8 @@ service cloud.firestore {
             || canUpdatePedidoProduccion(clienteId)
             || canUpdatePedidoDetalleProduccion(clienteId)
             || canUpdatePedidoAsignacion(clienteId)
+            || canUpdatePedidoColorTarjeta(clienteId)
+            || canUpdatePedidoOrdenManual(clienteId)
           )
         );
     }
@@ -310,9 +335,13 @@ function canManageProduccionColumnas(clienteId) {
   return canGestionarColumnasProduccion(clienteId);
 }
 
-    function canReadVentas(clienteId) {
-      return canModulo(clienteId, "ventas", "ver");
-    }
+function canReadVentas(clienteId) {
+  return canModulo(clienteId, "ventas", "ver")
+    || (
+      tenantUserBase(clienteId)
+      && permisoModuloAccion("inicio", "verIngresos")
+    );
+}
 
     function canCreateVentas(clienteId) {
       return canModulo(clienteId, "ventas", "crear");
@@ -704,16 +733,27 @@ function canManageProduccionColumnas(clienteId) {
     // =========================
     // produccion_columnas
     // =========================
-    match /produccion_columnas/{columnaId} {
-      allow read: if canReadProduccionColumnas(resource.data.clienteId);
+      match /produccion_columnas/{columnaId} {
+        allow read: if canReadProduccionColumnas(resource.data.clienteId);
 
-      allow create: if canManageProduccionColumnas(request.resource.data.clienteId);
+        allow create: if canManageProduccionColumnas(request.resource.data.clienteId);
 
-      allow update: if canManageProduccionColumnas(resource.data.clienteId)
-        && request.resource.data.clienteId == resource.data.clienteId;
+        allow update: if (
+            canManageProduccionColumnas(resource.data.clienteId)
+            && request.resource.data.clienteId == resource.data.clienteId
+          )
+          || (
+            canGestionarOrdenManualProduccion(resource.data.clienteId)
+            && request.resource.data.clienteId == resource.data.clienteId
+            && onlyChangesAllowed([
+              "ordenManualActivo",
+              "tipoOrden",
+              "updatedAt"
+            ])
+          );
 
-      allow delete: if canManageProduccionColumnas(resource.data.clienteId);
-    }
+        allow delete: if canManageProduccionColumnas(resource.data.clienteId);
+      }
     
     
     // =========================
