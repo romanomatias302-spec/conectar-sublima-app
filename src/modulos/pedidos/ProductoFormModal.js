@@ -323,6 +323,8 @@ const modoSoloLecturaReal = !modoEdicionLocal && soloVer;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.producto]);
 
+
+
   // =========================
   // 🔹 Calcular total talles
   // =========================
@@ -333,6 +335,18 @@ const modoSoloLecturaReal = !modoEdicionLocal && soloVer;
     );
     setTotalTalles(total);
   }, [formData.talles]);
+
+  useEffect(() => {
+  const limpiarPrintProducto = () => {
+    document.body.classList.remove("printing-producto");
+  };
+
+  window.addEventListener("afterprint", limpiarPrintProducto);
+
+  return () => {
+    window.removeEventListener("afterprint", limpiarPrintProducto);
+  };
+}, []);
 
   // =========================
   // 🔹 Handlers
@@ -886,6 +900,16 @@ const imagenPortada = imagenesConContenido.find((img) =>
                       className="pfm-static-imagen-preview"
                     />
 
+                    <div className="pfm-static-imagen-actions">
+                      <a href={url} target="_blank" rel="noreferrer">
+                        Ver
+                      </a>
+
+                      <a href={url} download>
+                        Descargar
+                      </a>
+                    </div>
+
                     <div className="pfm-static-imagen-meta">
                       {portada ? (
                         <span className="pfm-static-imagen-badge">Portada</span>
@@ -1244,6 +1268,27 @@ const countZonas = (z) => {
                 : "Editar Producto"
               : "Agregar Producto"}
           </h2>
+
+          {modoVistaEstatica && (
+            <button
+              type="button"
+              className="pfm-print-btn"
+              onClick={() => {
+                const producto =
+                  (formData.productoNombre || "Producto")
+                    .replace(/[\\/:*?"<>|]/g, "")
+                    .trim();
+
+                document.title = `Producto - ${producto}`;
+                document.body.classList.add("printing-producto");
+
+                window.print();
+              }}
+            >
+              Imprimir producto
+            </button>
+          )}    
+
           <button className="pfm-close" onClick={onClose} type="button" title="Cerrar">
             ✕
           </button>

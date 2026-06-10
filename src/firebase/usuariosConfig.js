@@ -39,3 +39,9 @@ export async function actualizarPermisosUsuario(uid, permisos) {
     permisos,
   });
 }
+
+export async function actualizarDatosUsuario(uid, datos) {
+  if (!uid) throw new Error("Falta uid");
+
+  await updateDoc(doc(db, USUARIOS_COLLECTION, uid), datos);
+}

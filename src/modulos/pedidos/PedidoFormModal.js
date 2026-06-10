@@ -327,6 +327,7 @@ const guardarPedido = async () => {
         </select>
 
         <div className="modal-buttons">
+         
           <button
             className="cancelar"
             onClick={onClose}

@@ -1334,3 +1334,196 @@ body.dark-mode .pfm-ref-img{
     margin-bottom: 6px;
   }
 }
+
+.pfm-print-btn {
+  background: #111827;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+
+  .pfm-modal,
+  .pfm-modal * {
+    visibility: visible !important;
+  }
+
+  .pfm-overlay {
+    position: static !important;
+    background: #fff !important;
+    padding: 0 !important;
+  }
+
+  .pfm-modal {
+    position: static !important;
+    width: 100% !important;
+    max-height: none !important;
+    overflow: visible !important;
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+  }
+
+  .pfm-close,
+  .pfm-print-btn,
+  .pfm-actions {
+    display: none !important;
+  }
+
+  .pfm-static-imagen-card.is-portada {
+    grid-column: span 2;
+  }
+
+  .pfm-static-imagen-card.is-portada .pfm-static-imagen-preview {
+    aspect-ratio: 1.4 / 1;
+    object-fit: contain;
+  }
+
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+}
+
+.pfm-static-imagen-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  margin-top: 6px;
+}
+
+.pfm-static-imagen-actions a {
+  font-size: 11px;
+  font-weight: 800;
+  text-decoration: none;
+  color: #0369a1;
+  background: #e0f2fe;
+  padding: 4px 7px;
+  border-radius: 999px;
+}
+
+@media print {
+  .pfm-static-imagen-actions {
+    display: none !important;
+  }
+}
+
+@media print {
+ @media print {
+  body.printing-producto .pedido-detalle > *:not(.pfm-overlay) {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  body.printing-producto .pfm-overlay,
+  body.printing-producto .pfm-overlay *,
+  body.printing-producto .pfm-modal,
+  body.printing-producto .pfm-modal * {
+    visibility: visible !important;
+  }
+
+  body.printing-producto .pfm-overlay {
+    display: block !important;
+    position: static !important;
+    background: #fff !important;
+    padding: 0 !important;
+  }
+
+  body.printing-producto .pfm-modal {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    max-height: none !important;
+    overflow: visible !important;
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+  }
+}
+
+  body.printing-producto .pfm-static {
+    gap: 8px !important;
+  }
+
+  body.printing-producto .pfm-static-hero {
+    padding: 10px 12px !important;
+    border-radius: 10px !important;
+  }
+
+  body.printing-producto .pfm-static-producto {
+    font-size: 18px !important;
+  }
+
+  body.printing-producto .pfm-static-card {
+    padding: 9px 11px !important;
+    border-radius: 10px !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+  }
+
+  body.printing-producto .pfm-static-card-title {
+    font-size: 12px !important;
+    margin-bottom: 5px !important;
+  }
+
+  body.printing-producto .pfm-static-card-text,
+  body.printing-producto .pfm-static-table-value,
+  body.printing-producto .pfm-static-zona-text,
+  body.printing-producto .pfm-static-talle-detail {
+    font-size: 11px !important;
+    line-height: 1.25 !important;
+  }
+
+  body.printing-producto .pfm-static-zonas-layout {
+    grid-template-columns: 210px 1fr !important;
+    gap: 10px !important;
+  }
+
+  body.printing-producto .pfm-ref-img {
+    max-height: 180px !important;
+    transform: scale(0.7);
+    transform-origin: top center;
+  }
+
+  body.printing-producto .pfm-ref-card {
+    padding: 8px !important;
+  }
+
+  body.printing-producto .pfm-ref-sub {
+    font-size: 10px !important;
+    line-height: 1.2 !important;
+    margin-top: 4px !important;
+  }
+
+  body.printing-producto .pfm-static-imagenes-grid {
+    gap: 6px !important;
+    grid-template-columns: repeat(auto-fill, minmax(85px, 1fr)) !important;
+  }
+
+  body.printing-producto .pfm-static-imagen-card {
+    padding: 5px !important;
+    border-radius: 8px !important;
+  }
+
+  body.printing-producto .pfm-static-imagen-card.is-portada {
+    grid-column: span 2;
+  }
+
+  body.printing-producto .pfm-static-talles-grid,
+  body.printing-producto .pfm-static-zonas-grid {
+    gap: 6px !important;
+  }
+
+  body.printing-producto .pfm-static-talle-chip,
+  body.printing-producto .pfm-static-zona-item {
+    padding: 7px 8px !important;
+    border-radius: 9px !important;
+  }
+}

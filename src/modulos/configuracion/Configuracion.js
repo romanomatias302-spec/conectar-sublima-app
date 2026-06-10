@@ -42,6 +42,11 @@ export default function Configuracion({ modoOscuro, setModoOscuro, perfil, onAct
 
   const MONEDAS_CONFIG = {
     ARS: { moneda: "ARS", localeMoneda: "es-AR", label: "ARS - Peso argentino" },
+      COP: {
+      moneda: "COP",
+      localeMoneda: "es-CO",
+      label: "COP - Peso colombiano"
+    },
     PEN: { moneda: "PEN", localeMoneda: "es-PE", label: "PEN - Sol peruano" },
     CLP: { moneda: "CLP", localeMoneda: "es-CL", label: "CLP - Peso chileno" },
     MXN: { moneda: "MXN", localeMoneda: "es-MX", label: "MXN - Peso mexicano" },

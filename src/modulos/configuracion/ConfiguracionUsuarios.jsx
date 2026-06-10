@@ -7,6 +7,7 @@ import {
 import {
   obtenerUsuariosPorCliente,
   actualizarPermisosUsuario,
+  actualizarDatosUsuario,
 } from "../../firebase/usuariosConfig";
 
 function formatearFecha(fecha) {
@@ -225,6 +226,10 @@ export default function ConfiguracionUsuarios({ perfil }) {
   const [usuarioEditandoPermisos, setUsuarioEditandoPermisos] = useState(null);
   const [permisosEditando, setPermisosEditando] = useState(PERMISOS_DEFAULT_USUARIO);
   const [guardandoPermisos, setGuardandoPermisos] = useState(false);
+  const [usuarioEditandoDatos, setUsuarioEditandoDatos] = useState(null);
+  const [nombreEditando, setNombreEditando] = useState("");
+  const [guardandoDatosUsuario, setGuardandoDatosUsuario] = useState(false);
+  const [busquedaUsuario, setBusquedaUsuario] = useState("");
 
   const puedeInvitar = perfil?.rol === "admin";
 
@@ -326,6 +331,61 @@ export default function ConfiguracionUsuarios({ perfil }) {
     setPermisosEditando(PERMISOS_DEFAULT_USUARIO);
   }
 
+  function abrirEditorDatosUsuario(usuario) {
+  setUsuarioEditandoDatos(usuario);
+  setNombreEditando(usuario.nombre || "");
+}
+
+function cerrarEditorDatosUsuario() {
+  setUsuarioEditandoDatos(null);
+  setNombreEditando("");
+}
+
+async function guardarDatosUsuario() {
+  try {
+    if (!usuarioEditandoDatos?.uid) return;
+
+    setGuardandoDatosUsuario(true);
+    setMensaje("");
+
+    await actualizarDatosUsuario(usuarioEditandoDatos.uid, {
+      nombre: nombreEditando.trim(),
+    });
+
+    setMensaje("Usuario actualizado correctamente.");
+    cerrarEditorDatosUsuario();
+    await cargarTodo();
+  } catch (error) {
+    console.error("Error actualizando usuario:", error);
+    setMensaje("No se pudo actualizar el usuario.");
+  } finally {
+    setGuardandoDatosUsuario(false);
+  }
+}
+
+async function cambiarEstadoUsuario(usuario, activo) {
+  try {
+    if (!usuario?.uid) return;
+
+    const texto = activo ? "reactivar" : "anular";
+    const confirmar = window.confirm(`¿Querés ${texto} este usuario?`);
+
+    if (!confirmar) return;
+
+    setMensaje("");
+
+    await actualizarDatosUsuario(usuario.uid, {
+      activo,
+    });
+
+    setMensaje(activo ? "Usuario reactivado." : "Usuario anulado.");
+    await cargarTodo();
+  } catch (error) {
+    console.error("Error cambiando estado de usuario:", error);
+    setMensaje("No se pudo cambiar el estado del usuario.");
+  }
+}
+
 function togglePermiso(modulo, accion) {
   const valorActual = !!permisosEditando?.[modulo]?.[accion];
   const nuevoValor = !valorActual;
@@ -375,74 +435,8 @@ function togglePermiso(modulo, accion) {
   }
 
   return (
+    
     <div style={{ display: "grid", gap: "24px" }}>
-      <div className="container-secundaria">
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "flex-start",
-            gap: "12px",
-            flexWrap: "wrap",
-          }}
-        >
-         
-          <div>
-            <h3 style={{ margin: 0 }}>Usuarios activos</h3>
-            <p style={{ margin: "6px 0 0", color: "#666" }}>
-              Usuarios del equipo que ya activaron su cuenta.
-            </p>
-          </div>
-
-          {puedeInvitar && (
-            <button
-              className="btn btn-primary"
-              onClick={() => setMostrarFormulario((prev) => !prev)}
-            >
-              {mostrarFormulario ? "Cerrar" : "Invitar usuario"}
-            </button>
-          )}
-        </div>
-
-        <div style={{ marginTop: "18px", display: "grid", gap: "10px" }}>
-          {usuarios.length === 0 ? (
-            <p style={{ margin: 0, color: "#666" }}>
-              Todavía no hay usuarios activos.
-            </p>
-          ) : (
-            usuarios.map((usuario) => (
-              <div
-                key={usuario.uid}
-                style={{
-                  border: "1px solid #e5e7eb",
-                  borderRadius: "12px",
-                  padding: "12px 14px",
-                  display: "grid",
-                  gap: "6px",
-                  background: "#fff",
-                }}
-              >
-                <strong>{usuario.nombre || "Sin nombre"}</strong>
-                <div>{usuario.email || "-"}</div>
-                <div style={{ color: "#666", fontSize: "14px" }}>
-                  Rol: {usuario.rol || "usuario"}
-                </div>
-
-                {usuario.rol !== "admin" && usuario.rol !== "superadmin" && (
-                  <div style={{ marginTop: "6px" }}>
-                    <button
-                      className="btn"
-                      onClick={() => abrirEditorPermisos(usuario)}
-                    >
-                      Editar permisos
-                    </button>
-                  </div>
-                )}
-              </div>
-            ))
-          )}
-        </div>
-      </div>
 
       {puedeInvitar && mostrarFormulario && (
         <div className="container-secundaria">
@@ -502,98 +496,336 @@ function togglePermiso(modulo, accion) {
       )}
 
       <div className="container-secundaria">
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "flex-start",
+            gap: "12px",
+            flexWrap: "wrap",
+          }}
+        >
+          <div>
+            <h3 style={{ margin: 0 }}>Nueva invitación</h3>
+            <p style={{ margin: "6px 0 0", color: "#666" }}>
+              Invitá nuevos usuarios para que activen su cuenta.
+            </p>
+
+          {puedeInvitar && (
+            <button
+              className="btn btn-primary"
+              onClick={() => setMostrarFormulario((prev) => !prev)}
+            >
+              {mostrarFormulario ? "Cerrar" : "Invitar usuario"}
+            </button>
+          )}
+          </div>
+
+
+        </div>
+
+                     <div className="container-secundaria">
+
         <h3 style={{ marginTop: 0 }}>Invitaciones pendientes</h3>
 
+
+
         {mensaje && (
+
           <p style={{ color: "#64748b", marginTop: 0 }}>{mensaje}</p>
+
         )}
 
+
+
         <div style={{ display: "grid", gap: "10px" }}>
+
           {invitacionesPendientes.length === 0 ? (
+
             <p style={{ margin: 0, color: "#666" }}>
+
               No hay invitaciones pendientes.
+
             </p>
+
           ) : (
+
             invitacionesPendientes.map((inv) => {
+
               const link = `${window.location.origin}/activar-cuenta?token=${inv.token}`;
 
+
+
               return (
+
                 <div
+
                   key={inv.id}
+
                   style={{
+
                     border: "1px solid #e5e7eb",
+
                     borderRadius: "12px",
+
                     padding: "12px 14px",
+
                     display: "grid",
+
                     gap: "6px",
+
                     background: "#fff",
+
                   }}
+
                 >
+
                   <strong>{inv.nombre}</strong>
+
                   <div>{inv.email}</div>
+
                   <div style={{ color: "#666", fontSize: "14px" }}>
+
                     Rol: {inv.rol || "usuario"}
+
                   </div>
+
                   <div style={{ color: "#666", fontSize: "13px" }}>
+
                     Creada: {formatearFecha(inv.createdAt)}
+
                   </div>
+
                   <div style={{ color: "#666", fontSize: "13px" }}>
+
                     Vence: {formatearFecha(inv.expiraAt)}
+
                   </div>
 
+
+
                   <div
+
                     style={{
+
                       marginTop: "8px",
+
                       padding: "8px 10px",
+
                       background: "#f8fafc",
+
                       border: "1px solid #e5e7eb",
+
                       borderRadius: "8px",
+
                       fontSize: "12px",
+
                       color: "#334155",
+
                       wordBreak: "break-all",
+
                     }}
+
                   >
+
                     {link}
+
                   </div>
+
+
 
                   <div
+
                     style={{
+
                       display: "flex",
+
                       gap: "8px",
+
                       flexWrap: "wrap",
+
                       marginTop: "8px",
+
                     }}
+
                   >
+
+                    <button
+
+                      className="btn"
+
+                      onClick={async () => {
+
+                        try {
+
+                          await navigator.clipboard.writeText(link);
+
+                          setMensaje("Link copiado al portapapeles.");
+
+                        } catch {
+
+                          setMensaje(`Copiá manualmente este link: ${link}`);
+
+                        }
+
+                      }}
+
+                    >
+
+                      Copiar link
+
+                    </button>
+
+
+
+                    <button
+
+                      className="btn"
+
+                      onClick={() => manejarCancelarInvitacion(inv.id)}
+
+                      disabled={cancelandoId === inv.id}
+
+                    >
+
+                      {cancelandoId === inv.id
+
+                        ? "Cancelando..."
+
+                        : "Cancelar invitación"}
+
+                    </button>
+
+                  </div>
+
+                </div>
+
+              );
+
+            })
+
+          )}
+
+        </div>
+
+      </div>   
+
+      </div>
+      <div className="container-secundaria">
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "flex-start",
+            gap: "12px",
+            flexWrap: "wrap",
+          }}
+        >
+         
+          <div>
+            <h3 style={{ margin: 0 }}>Usuarios activos</h3>
+            <p style={{ margin: "6px 0 0", color: "#666" }}>
+              Usuarios del equipo que ya activaron su cuenta.
+            </p>
+          </div>
+
+
+        </div>
+
+        <div style={{ marginBottom: "16px" }}>
+          <input
+            type="text"
+            placeholder="Buscar usuario..."
+            value={busquedaUsuario}
+            onChange={(e) => setBusquedaUsuario(e.target.value)}
+            style={{
+              width: "100%",
+              padding: "10px 12px",
+              border: "1px solid #d1d5db",
+              borderRadius: "8px",
+            }}
+          />
+        </div>
+
+        <div style={{ marginTop: "18px", display: "grid", gap: "10px" }}>
+          {usuarios.length === 0 ? (
+            <p style={{ margin: 0, color: "#666" }}>
+              Todavía no hay usuarios activos.
+            </p>
+          ) : (
+            [...usuarios]
+              .filter((usuario) => {
+                const texto = busquedaUsuario.toLowerCase();
+
+                return (
+                  (usuario.nombre || "")
+                    .toLowerCase()
+                    .includes(texto) ||
+                  (usuario.email || "")
+                    .toLowerCase()
+                    .includes(texto)
+                );
+              })
+              .sort((a, b) => {
+                if (a.activo === false && b.activo !== false) return 1;
+                if (a.activo !== false && b.activo === false) return -1;
+                return (a.nombre || a.email || "").localeCompare(b.nombre || b.email || "");
+              })
+              .map((usuario) => (
+              <div
+                key={usuario.uid}
+                style={{
+                  border: "1px solid #e5e7eb",
+                  borderRadius: "12px",
+                  padding: "12px 14px",
+                  display: "grid",
+                  gap: "6px",
+                  background: usuario.activo === false ? "#f1f5f9" : "#fff",
+                  opacity: usuario.activo === false ? 0.65 : 1,
+                }}
+              >
+                <strong>{usuario.nombre || "Sin nombre"}</strong>
+                <div>{usuario.email || "-"}</div>
+                <div style={{ color: "#666", fontSize: "14px" }}>
+                  Rol: {usuario.rol || "usuario"}
+                </div>
+
+                {usuario.rol !== "admin" && usuario.rol !== "superadmin" && (
+                  <div style={{ marginTop: "6px" }}>
                     <button
                       className="btn"
-                      onClick={async () => {
-                        try {
-                          await navigator.clipboard.writeText(link);
-                          setMensaje("Link copiado al portapapeles.");
-                        } catch {
-                          setMensaje(`Copiá manualmente este link: ${link}`);
-                        }
-                      }}
+                      onClick={() => abrirEditorPermisos(usuario)}
                     >
-                      Copiar link
+                      Editar permisos
+                    </button>
+                    <button
+                      className="btn"
+                      onClick={() => abrirEditorDatosUsuario(usuario)}
+                      style={{ marginLeft: "8px" }}
+                    >
+                      Editar nombre
                     </button>
 
                     <button
                       className="btn"
-                      onClick={() => manejarCancelarInvitacion(inv.id)}
-                      disabled={cancelandoId === inv.id}
+                      onClick={() => cambiarEstadoUsuario(usuario, usuario.activo === false)}
+                      style={{ marginLeft: "8px" }}
                     >
-                      {cancelandoId === inv.id
-                        ? "Cancelando..."
-                        : "Cancelar invitación"}
+                      {usuario.activo === false ? "Reactivar" : "Anular"}
                     </button>
                   </div>
-                </div>
-              );
-            })
+                )}
+              </div>
+            ))
           )}
         </div>
       </div>
+
+
+
+
+
+
 
       {usuarioEditandoPermisos && (
         <div className="produccion-modal-overlay" onClick={cerrarEditorPermisos}>
@@ -701,6 +933,47 @@ function togglePermiso(modulo, accion) {
                 disabled={guardandoPermisos}
               >
                 {guardandoPermisos ? "Guardando..." : "Guardar permisos"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {usuarioEditandoDatos && (
+        <div className="produccion-modal-overlay" onClick={cerrarEditorDatosUsuario}>
+          <div
+            className="produccion-modal"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "min(520px, 92vw)",
+              padding: "24px",
+              borderRadius: "18px",
+            }}
+          >
+            <h3 style={{ marginTop: 0 }}>Editar usuario</h3>
+
+            <label>Nombre</label>
+            <input
+              type="text"
+              value={nombreEditando}
+              onChange={(e) => setNombreEditando(e.target.value)}
+              placeholder="Nombre del usuario"
+            />
+
+            <div className="produccion-modal-actions" style={{ marginTop: "22px" }}>
+              <button
+                className="btn-produccion-cancelar"
+                onClick={cerrarEditorDatosUsuario}
+              >
+                Cancelar
+              </button>
+
+              <button
+                className="btn-produccion-primario"
+                onClick={guardarDatosUsuario}
+                disabled={guardandoDatosUsuario}
+              >
+                {guardandoDatosUsuario ? "Guardando..." : "Guardar"}
               </button>
             </div>
           </div>

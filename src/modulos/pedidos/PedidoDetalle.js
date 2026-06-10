@@ -14,8 +14,8 @@ import {
   getDocs,
   deleteDoc,
   doc,
-  getDoc,
   setDoc,
+  onSnapshot,
 } from "firebase/firestore";
 
 
@@ -59,7 +59,37 @@ useEffect(() => {
 }, [pedido]);
 
 useEffect(() => {
-  cargarConfiguracionColumnas();
+  if (!perfil?.clienteId) return;
+
+  const ref = doc(
+    db,
+    `clientes-saas/${perfil.clienteId}/configuracion`,
+    "pedidos_detalle"
+  );
+
+  const unsubscribe = onSnapshot(
+    ref,
+    (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+
+        if (data?.columnas) {
+          setColumnasDetalle(
+            normalizarColumnasDetallePedido(data.columnas)
+          );
+        } else {
+          setColumnasDetalle(getColumnasDetallePedidoDefault());
+        }
+      } else {
+        setColumnasDetalle(getColumnasDetallePedidoDefault());
+      }
+    },
+    (error) => {
+      console.error("Error escuchando columnas detalle:", error);
+    }
+  );
+
+  return () => unsubscribe();
 }, [perfil?.clienteId]);
 
 useEffect(() => {
@@ -72,6 +102,20 @@ useEffect(() => {
 
   return () => {
     window.removeEventListener("resize", controlarMobile);
+  };
+}, []);
+
+useEffect(() => {
+  const tituloOriginal = document.title;
+
+  const restaurarTitulo = () => {
+    document.title = tituloOriginal;
+  };
+
+  window.addEventListener("afterprint", restaurarTitulo);
+
+  return () => {
+    window.removeEventListener("afterprint", restaurarTitulo);
   };
 }, []);
 
@@ -307,38 +351,18 @@ case "tallesResumen": {
 
   const columnasVisibles = columnasDetalle.filter((col) => col.visible);
 
-  const cargarConfiguracionColumnas = async () => {
-  try {
-    if (!perfil?.clienteId) return;
 
-    const ref = doc(
-      db,
-      `clientes-saas/${perfil.clienteId}/configuracion`,
-      "pedidos_detalle"
-    );
-
-    const snap = await getDoc(ref);
-
-    if (snap.exists()) {
-      const data = snap.data();
-      if (data?.columnas) {
-        setColumnasDetalle(normalizarColumnasDetallePedido(data.columnas));
-      } else {
-        setColumnasDetalle(getColumnasDetallePedidoDefault());
-      }
-    } else {
-      setColumnasDetalle(getColumnasDetallePedidoDefault());
-    }
-  } catch (error) {
-    console.error("Error cargando configuración de columnas:", error);
-  }
-};
   
+
+if (!pedido) {
+  return null;
+}
   
 
   return (
-    <div className="pedido-detalle">
-      <h1>Detalles del Pedido #{pedido.id}</h1>
+      <div className="pedido-detalle">
+    <h1>Detalles del Pedido #{pedido.id}</h1>
+
 
       {/* 🔹 Contenedor gris claro para datos del pedido */}
       {/* 🔹 Header del pedido (theme-aware) */}
@@ -451,6 +475,53 @@ case "tallesResumen": {
         )}
       </div>
 
+          <div className="pedido-print-area">
+            <h2>Productos del pedido</h2>
+
+            <table className="pedido-print-table">
+              <thead>
+                <tr>
+                  {columnasVisibles
+                    .filter((col) => col.key !== "acciones" && col.key !== "imagenesResumen")
+                    .map((col) => (
+                      <th key={col.key}>{col.label}</th>
+                    ))}
+                </tr>
+              </thead>
+
+              <tbody>
+                {productos.map((p) => (
+                  <tr key={p.id}>
+                    {columnasVisibles
+                      .filter((col) => col.key !== "acciones" && col.key !== "imagenesResumen")
+                      .map((col) => (
+                        <td key={col.key}>
+                          {col.key === "producto" && (p.productoNombre || p.producto || "-")}
+                          {col.key === "color" && (p.color || "-")}
+                          {col.key === "detalle" && (p.detalle || "-")}
+                          {col.key === "observaciones" && obtenerObservaciones(p)}
+                          {col.key === "zonasResumen" && resumirZonas(p)}
+                          {col.key === "tallesResumen" &&
+                            (resumirTalles(p).length
+                              ? resumirTalles(p)
+                                  .map((t) => `${t.talle}: ${t.qty}${t.detalle ? ` (${t.detalle})` : ""}`)
+                                  .join(" | ")
+                              : "-")}
+                          {col.key === "detallesCosturaResumen" &&
+                            (resumirDetallesCostura(p).length
+                              ? resumirDetallesCostura(p)
+                                  .map((d) => `${d.nombre}: ${d.valor}`)
+                                  .join(" | ")
+                              : "-")}
+                          {col.key === "cantidad" && (p.totalTalles || p.cantidad || "-")}
+                        </td>
+                      ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
       {/* 🔹 Acciones principales */}
       <div className="acciones-detalle">
         {puedeEditarPedidos && (
@@ -468,6 +539,29 @@ case "tallesResumen": {
             Configurar columnas
           </button>
         )}
+
+        <button
+          className="btn-imprimir-pedido"
+          type="button"
+          onClick={() => {
+            const cliente =
+              pedido?.cliente
+                ?.replace(/[\\/:*?"<>|]/g, "")
+                ?.trim() || "Cliente";
+
+            const numeroPedido =
+              pedido?.id ||
+              pedido?.numeroPedido ||
+              pedido?.visibleId ||
+              "Pedido";
+
+            document.title = `Pedido ${numeroPedido} - ${cliente}`;
+
+            window.print();
+          }}
+        >
+          Imprimir Detalle
+        </button>
 
         <button className="btn-volver" onClick={onVolver}>
           Volver
@@ -580,6 +674,7 @@ case "tallesResumen": {
 {!esMobile && (
   <>
     {/* 🔹 Tabla de productos */}
+    <div className="tabla-productos-scroll">
     <table className="tabla-productos tabla-productos-desktop">
         <thead>
           <tr>
@@ -622,6 +717,7 @@ case "tallesResumen": {
           ))}
         </tbody>
       </table>
+      </div>
         </>
 )}
 
@@ -673,6 +769,8 @@ case "tallesResumen": {
           }
         }}
       />
+    
     </div>
+
   );
 }
