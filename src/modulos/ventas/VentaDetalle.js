@@ -1,11 +1,13 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  collection,
-  getDocs,
-  query,
-  where,
-  orderBy,
-  limit,
+collection,
+getDocs,
+query,
+where,
+orderBy,
+limit,
+doc,
+getDoc,
 } from "firebase/firestore";
 import { db } from "../../firebase";
 import {
@@ -29,6 +31,10 @@ export default function VentaDetalle({ perfil, ventaId, onVolver, onVerPedido })
   const [items, setItems] = useState([]);
   const [pagos, setPagos] = useState([]);
   const [pedidos, setPedidos] = useState([]);
+  const [configNegocio, setConfigNegocio] = useState({
+  nombreVisible: "",
+  logoUrl: "",
+});
 
   const [pedidoRefId, setPedidoRefId] = useState("");
   const [guardandoPedido, setGuardandoPedido] = useState(false);
@@ -117,10 +123,31 @@ const puedeAnularVentas =
     }
   };
 
+  const cargarConfigNegocio = async () => {
+  try {
+    if (!perfil?.clienteId || perfil?.rol === "superadmin") return;
+
+    const ref = doc(db, "clientes-saas", perfil.clienteId);
+    const snap = await getDoc(ref);
+
+    if (!snap.exists()) return;
+
+    const data = snap.data();
+
+    setConfigNegocio({
+      nombreVisible: data.nombreVisible || data.nombre || "",
+      logoUrl: data.logoUrl || "",
+    });
+  } catch (err) {
+    console.error("Error cargando configuración del negocio:", err);
+  }
+};
+
   useEffect(() => {
     if (!ventaId) return;
     cargarVentaCompleta();
     cargarPedidos();
+    cargarConfigNegocio();
   }, [ventaId, perfil]);
 
   const pedidoSeleccionado = useMemo(
@@ -324,8 +351,24 @@ const puedeAnularVentas =
     );
   }
 
+  
+
   return (
     <div className="ventas-page">
+      <div className="factura-negocio-print">
+        {configNegocio.logoUrl && (
+          <img
+            src={configNegocio.logoUrl}
+            alt="Logo negocio"
+            className="factura-negocio-logo"
+          />
+        )}
+
+        <div>
+          <h2>{configNegocio.nombreVisible || "Comprobante de venta"}</h2>
+          
+        </div>
+      </div>
       <div className="ventas-topbar">
         <div>
           <h1>Venta #{venta.numeroVenta}</h1>
@@ -350,9 +393,28 @@ const puedeAnularVentas =
           </div>
         </div>
 
-        <button className="btn btn-secondary" onClick={onVolver}>
-          Volver
-        </button>
+    <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+      <button
+        className="btn btn-primary"
+        type="button"
+        onClick={() => {
+          const cliente = (venta?.clienteNombre || "Cliente")
+            .replace(/[\\/:*?"<>|]/g, "")
+            .trim();
+
+          const numeroVenta = venta?.numeroVenta || "Factura";
+
+          document.title = `Factura ${numeroVenta} - ${cliente}`;
+          window.print();
+        }}
+      >
+        Imprimir factura
+      </button>
+
+      <button className="btn btn-secondary" onClick={onVolver}>
+        Volver
+      </button>
+    </div>
       </div>
 
       {error && <div className="ventas-alert ventas-alert-error">{error}</div>}
@@ -366,19 +428,28 @@ const puedeAnularVentas =
 
       <div className="ventas-layout">
         <section className="ventas-main-column">
-          <div className="ventas-top-editable ventas-mt-sm">
-            <div className="ventas-top-editable-item">
+          <div className="ventas-top-editable ventas-mt-sm factura-info-grid">
+            <div className="ventas-top-editable-item factura-info-item">
               <span>Fecha</span>
               <strong>{venta.fechaVenta || "-"}</strong>
             </div>
 
-            <div className="ventas-top-editable-item">
+            <div className="ventas-top-editable-item factura-info-item">
               <span>Cliente</span>
               <strong>{venta.clienteNombre || "-"}</strong>
             </div>
 
-            <div className="ventas-top-editable-item ventas-top-editable-pedido">
+            <div className="ventas-top-editable-item ventas-top-editable-pedido factura-info-item">
               <span>Pedido asociado</span>
+              <strong className="factura-pedido-print">
+                {venta.pedidoVisibleId
+                  ? `#${venta.pedidoVisibleId}`
+                  : pedidoSeleccionado?.id
+                  ? `#${pedidoSeleccionado.id}`
+                  : venta.pedidoRefId
+                  ? "Pedido asociado"
+                  : "-"}
+              </strong>
               <div className="ventas-top-editable-pedido-row">
                 <select
                   value={pedidoRefId}

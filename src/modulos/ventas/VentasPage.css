@@ -911,3 +911,343 @@ justify-content:flex-end;
 gap:10px;
 margin-top:20px;
 }
+
+.factura-pedido-print {
+  display: none;
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 10mm;
+  }
+
+  body * {
+    visibility: hidden !important;
+  }
+
+  .ventas-page,
+  .ventas-page * {
+    visibility: visible !important;
+  }
+
+  .ventas-page {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    background: #fff !important;
+    padding: 0 !important;
+    font-size: 12.5px !important;
+  }
+
+  .ventas-topbar {
+    margin-bottom: 6px !important;
+  }
+
+  .ventas-topbar h1 {
+    font-size: 18px !important;
+    margin: 0 0 3px 0 !important;
+  }
+
+  .ventas-topbar button,
+  .ventas-alert,
+  .ventas-subpanel,
+  .ventas-top-editable-pedido-row,
+  .ventas-table th:last-child,
+  .ventas-table td:last-child,
+  input,
+  select,
+  button {
+    display: none !important;
+  }
+
+  .factura-pedido-print {
+    display: block !important;
+  }
+
+  .ventas-layout {
+    display: block !important;
+  }
+
+  .ventas-main-column {
+    display: block !important;
+  }
+
+  .ventas-top-editable,
+  .factura-info-grid {
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 6px !important;
+    margin: 4px 0 8px 0 !important;
+    padding: 0 !important;
+  }
+
+  .ventas-top-editable-item,
+  .factura-info-item {
+    padding: 6px 8px !important;
+    border: 1px solid #d8dee8 !important;
+    border-radius: 6px !important;
+    background: #fff !important;
+    box-shadow: none !important;
+  }
+
+  .ventas-top-editable-item span {
+    font-size: 9px !important;
+    color: #555 !important;
+  }
+
+  .ventas-top-editable-item strong {
+    font-size: 11px !important;
+  }
+
+  .ventas-main-column .ventas-card {
+    box-shadow: none !important;
+    border: 1px solid #d8dee8 !important;
+    border-radius: 7px !important;
+    padding: 8px !important;
+    margin-bottom: 8px !important;
+  }
+
+  .ventas-card-header {
+    margin-bottom: 5px !important;
+  }
+
+  .ventas-card-header h2 {
+    font-size: 13px !important;
+    margin: 0 !important;
+  }
+
+  .ventas-table {
+    width: 100% !important;
+    font-size: 11px !important;
+  }
+
+  .ventas-table th,
+  .ventas-table td {
+    padding: 4px 5px !important;
+    border-bottom: 1px solid #e5e7eb !important;
+  }
+
+  .ventas-table th {
+    font-size: 9px !important;
+    background: #f3f4f6 !important;
+    color: #111 !important;
+  }
+
+  .ventas-estado-badge,
+  .ventas-saldo-badge {
+    padding: 2px 6px !important;
+    font-size: 9px !important;
+  }
+.ventas-card-sticky-wrap {
+  width: 100% !important;
+  display: flex !important;
+  justify-content: flex-end !important;
+  margin-top: 8px !important;
+  padding: 0 !important;
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+.ventas-card-sticky {
+  width: 230px !important;
+  max-width: 230px !important;
+  min-width: 230px !important;
+  flex: none !important;
+  position: static !important;
+  margin: 0 !important;
+  padding: 8px 10px !important;
+  border: 1px solid #d8dee8 !important;
+  border-radius: 7px !important;
+  background: #fff !important;
+  box-shadow: none !important;
+}
+
+  .ventas-resumen {
+    gap: 3px !important;
+  }
+
+.ventas-resumen-row {
+  display: grid !important;
+  grid-template-columns: 70px auto !important;
+  gap: 4px !important;
+    align-items: center !important;
+    font-size: 11.5px !important;
+    line-height: 1.18 !important;
+  }
+
+  .ventas-resumen-row span:first-child {
+    white-space: nowrap !important;
+  }
+
+  .ventas-resumen-row strong,
+  .ventas-resumen-row span:last-child {
+    text-align: right !important;
+    white-space: nowrap !important;
+    justify-self: end !important;
+  }
+
+  .ventas-total {
+    font-size: 13px !important;
+    border-top: 1px solid #d8dee8 !important;
+    padding-top: 4px !important;
+    margin-top: 3px !important;
+  }
+    .factura-negocio-print {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    margin-bottom: 8px !important;
+    border-bottom: 1px solid #d8dee8 !important;
+    padding-bottom: 8px !important;
+  }
+
+  .factura-negocio-logo {
+    width: 38px !important;
+    height: 38px !important;
+    object-fit: contain !important;
+    border-radius: 6px !important;
+  }
+
+  .factura-negocio-print h2 {
+    font-size: 15px !important;
+    margin: 0 !important;
+  }
+
+  .factura-negocio-print p {
+    font-size: 10px !important;
+    margin: 2px 0 0 !important;
+    color: #555 !important;
+  }
+  .ventas-resumen-row span:first-child {
+  font-size: 9px !important;
+}
+
+  .ventas-resumen-row span:last-child,
+  .ventas-resumen-row strong {
+    font-size: 9px !important;
+  }
+  .ventas-resumen-row:nth-last-child(1),
+  .ventas-resumen-row:nth-last-child(2) {
+    display: none !important;
+  }
+
+}
+
+.factura-negocio-print {
+  display: none;
+}
+
+/* AJUSTES VENTAS - UI COMPACTA */
+
+.ventas-top-editable-item {
+  min-height: auto;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+.ventas-top-editable-item strong {
+  line-height: 1.2;
+}
+
+.ventas-grid-top .ventas-field:first-child input[type="date"] {
+  min-width: 135px;
+}
+
+.ventas-field-cliente {
+  max-width: 720px;
+}
+
+
+
+.ventas-top-editable-pedido-row select,
+.ventas-top-editable-pedido-row input {
+  min-width: 0;
+  width: 100%;
+}
+
+@media (max-width: 768px) {
+  .ventas-grid-top {
+    grid-template-columns: 120px 1fr !important;
+  }
+
+  .ventas-grid-top .ventas-field:first-child {
+    max-width: 120px;
+  }
+
+  .ventas-grid-top .ventas-field:first-child input[type="date"] {
+    min-width: 120px;
+    width: 120px;
+    font-size: 11px;
+    padding: 0 6px;
+  }
+
+  .ventas-field-cliente {
+    max-width: 100%;
+  }
+
+
+
+  .ventas-top-editable-pedido-row button {
+    width: 100%;
+  }
+}
+
+/* DETALLE VENTA - PEDIDO ASOCIADO ORDENADO */
+
+.ventas-top-editable {
+  grid-template-columns: 160px 1fr minmax(420px, 1.4fr);
+  align-items: stretch;
+}
+
+.ventas-top-editable-item {
+  min-width: 0;
+}
+
+.ventas-top-editable-pedido {
+  min-width: 420px;
+}
+
+.ventas-top-editable-pedido-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+}
+
+.ventas-top-editable-pedido-row select {
+  width: 100%;
+  min-width: 0;
+}
+
+.ventas-top-editable-pedido-row button {
+  width: auto;
+  min-width: 88px;
+  white-space: nowrap;
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
+@media (max-width: 1100px) {
+  .ventas-top-editable {
+    grid-template-columns: 1fr;
+  }
+
+  .ventas-top-editable-pedido {
+    min-width: 0;
+  }
+
+  .ventas-top-editable-pedido-row {
+    grid-template-columns: 1fr;
+  }
+
+  .ventas-top-editable-pedido-row select,
+  .ventas-top-editable-pedido-row button {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
