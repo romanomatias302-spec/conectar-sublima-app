@@ -57,13 +57,9 @@ export default function VentasPage({
   const [pedidos, setPedidos] = useState([]);
   
 
-const [busquedaCliente, setBusquedaCliente] = useState("");
-const [mostrarDropdownCliente, setMostrarDropdownCliente] = useState(false);
-const [clienteRefId, setClienteRefId] = useState("");
-
-const [busquedaPedido, setBusquedaPedido] = useState("");
-const [mostrarDropdownPedido, setMostrarDropdownPedido] = useState(false);
-const [pedidoRefId, setPedidoRefId] = useState("");
+  const [busquedaCliente, setBusquedaCliente] = useState("");
+  const [clienteRefId, setClienteRefId] = useState("");
+  const [pedidoRefId, setPedidoRefId] = useState("");
 
   const [fechaVenta, setFechaVenta] = useState(new Date().toISOString().split("T")[0]);
   const [items, setItems] = useState([itemVacio()]);
@@ -180,24 +176,6 @@ useEffect(() => {
     });
   }, [clientes, busquedaCliente]);
 
-  const pedidosFiltrados = useMemo(() => {
-  const texto = (busquedaPedido || "").trim().toLowerCase();
-
-  if (!texto) return pedidos;
-
-  return pedidos.filter((p) => {
-    const numero = (p.id || "").toString().toLowerCase();
-    const cliente = (p.cliente || p.clienteNombre || "").toLowerCase();
-    const fecha = (p.fechaPedido || p.fechaEntrega || "").toLowerCase();
-
-    return (
-      numero.includes(texto) ||
-      cliente.includes(texto) ||
-      fecha.includes(texto)
-    );
-  });
-}, [pedidos, busquedaPedido]);
-
   const clienteSeleccionado = useMemo(
     () => clientes.find((c) => c.firebaseId === clienteRefId) || null,
     [clientes, clienteRefId]
@@ -279,11 +257,7 @@ const total = useMemo(
 
   const resetearFormulario = () => {
     setBusquedaCliente("");
-    setMostrarDropdownCliente(false);
     setClienteRefId("");
-
-    setBusquedaPedido("");
-    setMostrarDropdownPedido(false);
     setPedidoRefId("");
     setFechaVenta(new Date().toISOString().split("T")[0]);
     setItems([itemVacio()]);
@@ -307,24 +281,8 @@ const total = useMemo(
 
   setClienteRapido(clienteRapidoInicial);
   setMostrarClienteRapido(false);
-  setMostrarDropdownCliente(false);
   setError("");
 };
-
-  const usarPedidoEnVenta = (pedido) => {
-    if (!pedido?.firebaseId) return;
-
-    setPedidoRefId(pedido.firebaseId);
-
-    setBusquedaPedido(
-      `#${pedido.id || "-"} - ${
-        pedido.cliente || pedido.clienteNombre || "Sin cliente"
-      } - ${pedido.fechaPedido || pedido.fechaEntrega || "-"}`
-    );
-
-    setMostrarDropdownPedido(false);
-    setError("");
-  };
 
 const guardarClienteRapido = async () => {
   try {
@@ -682,36 +640,37 @@ if (cliente) {
             <div className="ventas-field ventas-field-cliente">
               <label>Seleccionar cliente</label>
               <div className="ventas-cliente-inline">
-                <div className="ventas-cliente-buscador">
                 <input
+                  list="clientes-sugeridos"
                   placeholder="Escribí para buscar cliente..."
                   value={busquedaCliente}
-                  onFocus={() => setMostrarDropdownCliente(true)}
-                  onBlur={() => {
-                    setTimeout(() => setMostrarDropdownCliente(false), 180);
-                  }}
                   onChange={(e) => {
-                    setBusquedaCliente(e.target.value);
-                    setClienteRefId("");
-                    setMostrarDropdownCliente(true);
+                    const valor = e.target.value;
+                    setBusquedaCliente(valor);
+
+                    const clienteEncontrado = clientes.find((c) => {
+                      const textoOpcion = `${c.nombre || ""}${c.dni ? ` - ${c.dni}` : ""}`;
+                      return textoOpcion === valor;
+                    });
+
+                    if (clienteEncontrado) {
+                      setClienteRefId(clienteEncontrado.firebaseId);
+                    }
+                    else {
+                      setClienteRefId("");
+                    }
                   }}
                   disabled={!puedeCrearVentas}
                 />
 
-                {mostrarDropdownCliente && !clienteRefId && (
-                    <div className="ventas-dropdown">
-                      {clientesFiltrados.slice(0, 8).map((c) => (
-                        <button
-                          key={c.firebaseId}
-                          type="button"
-                          onClick={() => usarClienteExistenteEnVenta(c)}
-                        >
-                          {c.nombre} {c.dni ? `- ${c.dni}` : ""}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                <datalist id="clientes-sugeridos">
+                  {clientesFiltrados.map((c) => (
+                    <option
+                      key={c.firebaseId}
+                      value={`${c.nombre || ""}${c.dni ? ` - ${c.dni}` : ""}`}
+                    />
+                  ))}
+                </datalist>
 
                   {puedeCrearClientes && (
                     <button
@@ -776,49 +735,18 @@ if (cliente) {
           <div className="ventas-grid ventas-grid-pedido ventas-mt">
             <div className="ventas-field ventas-pedido-field">
               <label>Asociar pedido (opcional)</label>
-
-              <div className="ventas-pedido-buscador">
-                <input
-                  value={busquedaPedido}
-                  placeholder="Sin pedido asociado / buscar pedido..."
-                  onFocus={() => setMostrarDropdownPedido(true)}
-                  onBlur={() => {
-                    setTimeout(() => setMostrarDropdownPedido(false), 180);
-                  }}
-                  onChange={(e) => {
-                    setBusquedaPedido(e.target.value);
-                    setPedidoRefId("");
-                    setMostrarDropdownPedido(true);
-                  }}
-                  disabled={!puedeCrearVentas}
-                />
-
-                {mostrarDropdownPedido && (
-                  <div className="ventas-dropdown">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPedidoRefId("");
-                        setBusquedaPedido("");
-                        setMostrarDropdownPedido(false);
-                      }}
-                    >
-                      Sin pedido asociado
-                    </button>
-
-                    {pedidosFiltrados.slice(0, 8).map((p) => (
-                      <button
-                        key={p.firebaseId}
-                        type="button"
-                        onClick={() => usarPedidoEnVenta(p)}
-                      >
-                        #{p.id || "-"} - {p.cliente || p.clienteNombre || "Sin cliente"} -{" "}
-                        {p.fechaPedido || p.fechaEntrega || "-"}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <select
+                value={pedidoRefId}
+                onChange={(e) => setPedidoRefId(e.target.value)}
+                disabled={!puedeCrearVentas}
+              >
+                <option value="">Sin pedido asociado</option>
+                {pedidos.map((p) => (
+                  <option key={p.firebaseId} value={p.firebaseId}>
+                    #{p.id} - {p.cliente} - {p.fechaPedido}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="ventas-field">
