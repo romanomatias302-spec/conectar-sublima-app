@@ -977,7 +977,7 @@ margin-top:20px;
   .ventas-top-editable,
   .factura-info-grid {
     display: grid !important;
-    grid-template-columns: repeat(3, 1fr) !important;
+    grid-template-columns: repeat(4, 1fr) !important;
     gap: 6px !important;
     margin: 4px 0 8px 0 !important;
     padding: 0 !important;
@@ -1198,7 +1198,7 @@ margin-top:20px;
 /* DETALLE VENTA - PEDIDO ASOCIADO ORDENADO */
 
 .ventas-top-editable {
-  grid-template-columns: 160px 1fr minmax(420px, 1.4fr);
+  grid-template-columns: 150px 1fr 1fr minmax(420px, 1.4fr);
   align-items: stretch;
 }
 
@@ -1251,3 +1251,101 @@ margin-top:20px;
   }
 }
 
+@media (max-width: 1400px) {
+  .ventas-top-editable {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px;
+  }
+
+  .ventas-top-editable-pedido {
+    grid-column: 1 / -1;
+  }
+
+  .ventas-top-editable-item {
+    padding: 8px;
+  }
+
+  .ventas-top-editable-item strong {
+    font-size: 12px;
+    word-break: break-word;
+  }
+}
+
+.ventas-cliente-buscador,
+.ventas-pedido-buscador {
+  position: relative;
+  width: 100%;
+}
+
+.ventas-cliente-buscador input,
+.ventas-pedido-buscador input {
+  width: 100%;
+}
+
+.ventas-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  width: 100%;
+  max-height: 220px;
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid #dbe3eb;
+  border-radius: 10px;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.14);
+  z-index: 100;
+}
+
+.ventas-dropdown button {
+  width: 100%;
+  display: block;
+  text-align: left;
+  padding: 9px 12px;
+  border: none;
+  background: #fff;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.ventas-dropdown button:hover {
+  background: #eef7ff;
+}
+
+.ventas-post-creada {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.ventas-post-creada-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 768px) {
+  .ventas-post-creada {
+    align-items: stretch;
+  }
+
+  .ventas-post-creada-actions {
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .ventas-post-creada-actions button {
+    width: 100%;
+  }
+}
+
+.ventas-pedido-buscador-detalle {
+  width: 100%;
+  min-width: 0;
+}
+
+.ventas-top-editable-pedido-row .ventas-pedido-buscador-detalle input {
+  width: 100%;
+  min-width: 0;
+}

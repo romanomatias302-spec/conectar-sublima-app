@@ -14,6 +14,7 @@ import { crearVenta } from "../../firebase/ventas";
 import { formatearMoneda, obtenerConfigMonedaDesdePerfil } from "../../utils/moneda";
 import "./VentasPage.css";
 import { puedeHacer } from "../../utils/permisos";
+import { obtenerUsuariosPorCliente } from "../../firebase/usuariosConfig";
 
 const itemVacio = () => ({
   descripcion: "",
@@ -56,10 +57,16 @@ export default function VentasPage({
   const [clientes, setClientes] = useState([]);
   const [pedidos, setPedidos] = useState([]);
   
+  const [usuarios, setUsuarios] = useState([]);
+const [vendedorUid, setVendedorUid] = useState("");
 
-  const [busquedaCliente, setBusquedaCliente] = useState("");
-  const [clienteRefId, setClienteRefId] = useState("");
-  const [pedidoRefId, setPedidoRefId] = useState("");
+const [busquedaCliente, setBusquedaCliente] = useState("");
+const [mostrarDropdownCliente, setMostrarDropdownCliente] = useState(false);
+const [clienteRefId, setClienteRefId] = useState("");
+
+const [busquedaPedido, setBusquedaPedido] = useState("");
+const [mostrarDropdownPedido, setMostrarDropdownPedido] = useState(false);
+const [pedidoRefId, setPedidoRefId] = useState("");
 
   const [fechaVenta, setFechaVenta] = useState(new Date().toISOString().split("T")[0]);
   const [items, setItems] = useState([itemVacio()]);
@@ -75,6 +82,7 @@ export default function VentasPage({
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
   const [exito, setExito] = useState("");
+  const [ventaCreada, setVentaCreada] = useState(null);
   const [mostrarImportarPedido, setMostrarImportarPedido] =
   useState(false);
 
@@ -109,10 +117,11 @@ const [pedidoImportado, setPedidoImportado] =
               limit(50)
             );
 
-      const [snapClientes, snapPedidos] = await Promise.all([
-        getDocs(qClientes),
-        getDocs(qPedidos),
-      ]);
+const [snapClientes, snapPedidos, usuariosCliente] = await Promise.all([
+  getDocs(qClientes),
+  getDocs(qPedidos),
+  obtenerUsuariosPorCliente(perfil.clienteId),
+]);
 
       setClientes(
         snapClientes.docs.map((d) => ({
@@ -127,6 +136,8 @@ const [pedidoImportado, setPedidoImportado] =
           ...d.data(),
         }))
       );
+      setUsuarios(usuariosCliente);
+
     } catch (err) {
       console.error("Error cargando datos de ventas:", err);
     }
@@ -176,6 +187,23 @@ useEffect(() => {
     });
   }, [clientes, busquedaCliente]);
 
+  const pedidosFiltrados = useMemo(() => {
+  const texto = (busquedaPedido || "").trim().toLowerCase();
+  if (!texto) return pedidos;
+
+  return pedidos.filter((p) => {
+    const numero = String(p.id || "").toLowerCase();
+    const cliente = String(p.cliente || p.clienteNombre || "").toLowerCase();
+    const fecha = String(p.fechaPedido || p.fechaEntrega || "").toLowerCase();
+
+    return (
+      numero.includes(texto) ||
+      cliente.includes(texto) ||
+      fecha.includes(texto)
+    );
+  });
+}, [pedidos, busquedaPedido]);
+
   const clienteSeleccionado = useMemo(
     () => clientes.find((c) => c.firebaseId === clienteRefId) || null,
     [clientes, clienteRefId]
@@ -185,6 +213,11 @@ useEffect(() => {
     () => pedidos.find((p) => p.firebaseId === pedidoRefId) || null,
     [pedidos, pedidoRefId]
   );
+
+  const vendedorSeleccionado = useMemo(
+  () => usuarios.find((u) => u.uid === vendedorUid) || null,
+  [usuarios, vendedorUid]
+);
 
 const itemsNormalizados = useMemo(
   () =>
@@ -259,6 +292,9 @@ const total = useMemo(
     setBusquedaCliente("");
     setClienteRefId("");
     setPedidoRefId("");
+    setMostrarDropdownCliente(false);
+    setBusquedaPedido("");
+    setMostrarDropdownPedido(false);
     setFechaVenta(new Date().toISOString().split("T")[0]);
     setItems([itemVacio()]);
     setDescuento(0);
@@ -266,6 +302,9 @@ const total = useMemo(
     setObservaciones("");
     setMostrarClienteRapido(false);
     setClienteRapido(clienteRapidoInicial);
+    setVendedorUid("");
+
+    
   };
 
   const usarClienteExistenteEnVenta = (clienteExistente) => {
@@ -281,7 +320,20 @@ const total = useMemo(
 
   setClienteRapido(clienteRapidoInicial);
   setMostrarClienteRapido(false);
+  setMostrarDropdownCliente(false);
   setError("");
+};
+
+const usarPedidoEnVenta = (pedido) => {
+  if (!pedido?.firebaseId) return;
+
+  setPedidoRefId(pedido.firebaseId);
+  setBusquedaPedido(
+    `#${pedido.id || "-"} - ${
+      pedido.cliente || pedido.clienteNombre || "Sin cliente"
+    } - ${pedido.fechaPedido || pedido.fechaEntrega || "-"}`
+  );
+  setMostrarDropdownPedido(false);
 };
 
 const guardarClienteRapido = async () => {
@@ -465,6 +517,13 @@ if (cliente) {
 }
 
   setPedidoRefId(pedidoInicial?.firebaseId || "");
+  setBusquedaPedido(
+    pedidoInicial
+      ? `#${pedidoInicial.id || "-"} - ${
+          pedidoInicial.cliente || pedidoInicial.clienteNombre || "Sin cliente"
+        } - ${pedidoInicial.fechaPedido || pedidoInicial.fechaEntrega || "-"}`
+      : ""
+  );
 
   setItems(convertirProductosPedidoAVenta(productosPedido));
 
@@ -500,22 +559,25 @@ if (cliente) {
         return;
       }
 
-      await crearVenta({
+      const nuevaVenta = await crearVenta({
         perfil,
         cliente,
         fechaVenta,
         items: itemsValidos,
         descuento: Number(descuentoMonto || 0),
         pedidoAsociado: pedidoSeleccionado || null,
+        vendedor: vendedorSeleccionado,
         pagosIniciales: pagosIniciales.map((pago) => ({
           monto: Number(pago.monto || 0),
           medioPago: pago.medioPago || "efectivo",
           fechaPago: fechaVenta,
           observacion: Number(pago.monto || 0) > 0 ? "Pago inicial" : "",
+          
         })),
         observaciones,
       });
 
+      setVentaCreada(nuevaVenta);
       setExito("Venta guardada con éxito.");
       resetearFormulario();
       
@@ -539,6 +601,40 @@ if (cliente) {
 
       {error && <div className="ventas-alert ventas-alert-error">{error}</div>}
       {exito && <div className="ventas-alert ventas-alert-ok">{exito}</div>}
+      {ventaCreada && (
+        <div className="ventas-alert ventas-alert-ok ventas-post-creada">
+          <span>
+            Venta #{ventaCreada.numeroVenta || ""} guardada correctamente.
+          </span>
+
+          <div className="ventas-post-creada-actions">
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => {
+                localStorage.setItem("ventaDetalleId", ventaCreada.firebaseId);
+                localStorage.setItem("vistaActual", "venta-detalle");
+                window.location.reload();
+              }}
+            >
+              Ver / imprimir factura
+            </button>
+
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => {
+                  setVentaCreada(null);
+                  setExito("");
+                  setError("");
+                  resetearFormulario();
+                }}
+              >
+                Crear otra venta
+              </button>
+          </div>
+        </div>
+      )}
 
       {mostrarImportarPedido && (
         <div className="ventas-importar-overlay">
@@ -640,37 +736,36 @@ if (cliente) {
             <div className="ventas-field ventas-field-cliente">
               <label>Seleccionar cliente</label>
               <div className="ventas-cliente-inline">
+              <div className="ventas-cliente-buscador">
                 <input
-                  list="clientes-sugeridos"
                   placeholder="Escribí para buscar cliente..."
                   value={busquedaCliente}
+                  onFocus={() => setMostrarDropdownCliente(true)}
+                  onBlur={() => {
+                    setTimeout(() => setMostrarDropdownCliente(false), 180);
+                  }}
                   onChange={(e) => {
-                    const valor = e.target.value;
-                    setBusquedaCliente(valor);
-
-                    const clienteEncontrado = clientes.find((c) => {
-                      const textoOpcion = `${c.nombre || ""}${c.dni ? ` - ${c.dni}` : ""}`;
-                      return textoOpcion === valor;
-                    });
-
-                    if (clienteEncontrado) {
-                      setClienteRefId(clienteEncontrado.firebaseId);
-                    }
-                    else {
-                      setClienteRefId("");
-                    }
+                    setBusquedaCliente(e.target.value);
+                    setClienteRefId("");
+                    setMostrarDropdownCliente(true);
                   }}
                   disabled={!puedeCrearVentas}
                 />
 
-                <datalist id="clientes-sugeridos">
-                  {clientesFiltrados.map((c) => (
-                    <option
-                      key={c.firebaseId}
-                      value={`${c.nombre || ""}${c.dni ? ` - ${c.dni}` : ""}`}
-                    />
-                  ))}
-                </datalist>
+                {mostrarDropdownCliente && !clienteRefId && (
+                  <div className="ventas-dropdown">
+                    {clientesFiltrados.slice(0, 8).map((c) => (
+                      <button
+                        key={c.firebaseId}
+                        type="button"
+                        onClick={() => usarClienteExistenteEnVenta(c)}
+                      >
+                        {c.nombre || "Sin nombre"} {c.dni ? `- ${c.dni}` : ""}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
 
                   {puedeCrearClientes && (
                     <button
@@ -735,18 +830,48 @@ if (cliente) {
           <div className="ventas-grid ventas-grid-pedido ventas-mt">
             <div className="ventas-field ventas-pedido-field">
               <label>Asociar pedido (opcional)</label>
-              <select
-                value={pedidoRefId}
-                onChange={(e) => setPedidoRefId(e.target.value)}
-                disabled={!puedeCrearVentas}
-              >
-                <option value="">Sin pedido asociado</option>
-                {pedidos.map((p) => (
-                  <option key={p.firebaseId} value={p.firebaseId}>
-                    #{p.id} - {p.cliente} - {p.fechaPedido}
-                  </option>
-                ))}
-              </select>
+                <div className="ventas-pedido-buscador">
+                  <input
+                    value={busquedaPedido}
+                    placeholder="Sin pedido asociado / buscar pedido..."
+                    onFocus={() => setMostrarDropdownPedido(true)}
+                    onBlur={() => {
+                      setTimeout(() => setMostrarDropdownPedido(false), 180);
+                    }}
+                    onChange={(e) => {
+                      setBusquedaPedido(e.target.value);
+                      setPedidoRefId("");
+                      setMostrarDropdownPedido(true);
+                    }}
+                    disabled={!puedeCrearVentas}
+                  />
+
+                  {mostrarDropdownPedido && (
+                    <div className="ventas-dropdown">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPedidoRefId("");
+                          setBusquedaPedido("");
+                          setMostrarDropdownPedido(false);
+                        }}
+                      >
+                        Sin pedido asociado
+                      </button>
+
+                      {pedidosFiltrados.slice(0, 8).map((p) => (
+                        <button
+                          key={p.firebaseId}
+                          type="button"
+                          onClick={() => usarPedidoEnVenta(p)}
+                        >
+                          #{p.id || "-"} - {p.cliente || p.clienteNombre || "Sin cliente"} -{" "}
+                          {p.fechaPedido || p.fechaEntrega || "-"}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
             </div>
 
             <div className="ventas-field">
@@ -757,6 +882,24 @@ if (cliente) {
                 placeholder="Detalle extra de la venta..."
                 disabled={!puedeCrearVentas}
               />
+            </div>
+          </div>
+
+          <div className="ventas-grid ventas-grid-pedido ventas-mt">
+            <div className="ventas-field">
+              <label>Vendedor opcional</label>
+              <select
+                value={vendedorUid}
+                onChange={(e) => setVendedorUid(e.target.value)}
+                disabled={!puedeCrearVentas}
+              >
+                <option value="">Sin vendedor asignado</option>
+                {usuarios.map((u) => (
+                  <option key={u.uid} value={u.uid}>
+                    {u.nombre || u.email || "Usuario sin nombre"}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 

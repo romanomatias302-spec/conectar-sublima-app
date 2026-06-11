@@ -93,6 +93,7 @@ export async function crearVenta({
   precioUnitario = 0,
   descuento = 0,
   pedidoAsociado = null,
+  vendedor = null,
   pagosIniciales = [],
   observaciones = "",
 }) {
@@ -149,6 +150,9 @@ export async function crearVenta({
     clienteRefId: cliente.firebaseId,
     clienteNombre: cliente.nombre || "",
     clienteDNI: cliente.dni || "",
+    vendedorUid: vendedor?.uid || "",
+    vendedorNombre: vendedor?.nombre || "",
+    vendedorEmail: vendedor?.email || "",
 
     origenVenta: pedidoAsociado ? "pedido" : "manual",
     pedidoRefId: pedidoAsociado?.firebaseId || "",
