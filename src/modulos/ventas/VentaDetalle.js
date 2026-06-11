@@ -51,6 +51,9 @@ export default function VentaDetalle({ perfil, ventaId, onVolver, onVerPedido })
   const [guardandoPago, setGuardandoPago] = useState(false);
   const [anulandoVenta, setAnulandoVenta] = useState(false);
 
+  const [busquedaPedido, setBusquedaPedido] = useState("");
+  const [mostrarDropdownPedido, setMostrarDropdownPedido] = useState(false);
+
   const [error, setError] = useState("");
   const [exito, setExito] = useState("");
 
@@ -127,6 +130,49 @@ const puedeAnularVentas =
     () => pedidos.find((p) => p.firebaseId === pedidoRefId) || null,
     [pedidos, pedidoRefId]
   );
+
+  const pedidosFiltrados = useMemo(() => {
+    const texto = (busquedaPedido || "").trim().toLowerCase();
+
+    if (!texto) return pedidos;
+
+    return pedidos.filter((p) => {
+      const numero = (p.id || "").toString().toLowerCase();
+      const cliente = (p.cliente || p.clienteNombre || "").toLowerCase();
+      const fecha = (p.fechaPedido || p.fechaEntrega || "").toLowerCase();
+
+      return (
+        numero.includes(texto) ||
+        cliente.includes(texto) ||
+        fecha.includes(texto)
+      );
+    });
+  }, [pedidos, busquedaPedido]);
+
+  const seleccionarPedidoAsociado = (pedido) => {
+    setPedidoRefId(pedido.firebaseId);
+    setBusquedaPedido(
+      `#${pedido.id || "-"} - ${
+        pedido.cliente || pedido.clienteNombre || "Sin cliente"
+      } - ${pedido.fechaPedido || pedido.fechaEntrega || "-"}`
+    );
+    setMostrarDropdownPedido(false);
+  };
+
+
+  useEffect(() => {
+    if (!pedidoRefId) {
+      setBusquedaPedido("");
+      return;
+    }
+
+    const pedido = pedidos.find((p) => p.firebaseId === pedidoRefId);
+
+    if (pedido) {
+      setBusquedaPedido(`#${pedido.id} - ${pedido.cliente} - ${pedido.fechaPedido}`);
+    }
+  }, [pedidoRefId, pedidos]);
+
   const ventaAnulada = (venta?.estadoVenta || "activa") === "anulada";
 
     const anularItem = async (item) => {
@@ -304,6 +350,20 @@ const puedeAnularVentas =
     }
   };
 
+      if (!ventaId) {
+      return (
+        <div className="ventas-page">
+          <div className="ventas-card">
+            <p>No se encontró la venta seleccionada.</p>
+
+            <button className="btn btn-secondary" onClick={onVolver}>
+              Volver al listado
+            </button>
+          </div>
+        </div>
+      );
+    }
+
     if (!puedeVerVentas) {
     return (
       <div className="ventas-page">
@@ -350,9 +410,28 @@ const puedeAnularVentas =
           </div>
         </div>
 
-        <button className="btn btn-secondary" onClick={onVolver}>
-          Volver
-        </button>
+            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+              <button
+                className="btn btn-primary"
+                type="button"
+                onClick={() => {
+                  const cliente = (venta?.clienteNombre || "Cliente")
+                    .replace(/[\\/:*?"<>|]/g, "")
+                    .trim();
+
+                  const numeroVenta = venta?.numeroVenta || "Factura";
+
+                  document.title = `Factura ${numeroVenta} - ${cliente}`;
+                  window.print();
+                }}
+              >
+                Imprimir factura
+              </button>
+
+              <button className="btn btn-secondary" onClick={onVolver}>
+                Volver
+              </button>
+            </div>
       </div>
 
       {error && <div className="ventas-alert ventas-alert-error">{error}</div>}
@@ -366,32 +445,62 @@ const puedeAnularVentas =
 
       <div className="ventas-layout">
         <section className="ventas-main-column">
-          <div className="ventas-top-editable ventas-mt-sm">
-            <div className="ventas-top-editable-item">
+          <div className="ventas-top-editable ventas-mt-sm factura-info-grid">
+            <div className="ventas-top-editable-item factura-info-item">
               <span>Fecha</span>
               <strong>{venta.fechaVenta || "-"}</strong>
             </div>
 
-            <div className="ventas-top-editable-item">
+            <div className="ventas-top-editable-item factura-info-item">
               <span>Cliente</span>
               <strong>{venta.clienteNombre || "-"}</strong>
             </div>
 
-            <div className="ventas-top-editable-item ventas-top-editable-pedido">
-              <span>Pedido asociado</span>
-              <div className="ventas-top-editable-pedido-row">
-                <select
-                  value={pedidoRefId}
-                  onChange={(e) => setPedidoRefId(e.target.value)}
-                  disabled={ventaAnulada || !puedeEditarVentas}
-                >
-                  <option value="">Sin pedido asociado</option>
-                  {pedidos.map((p) => (
-                    <option key={p.firebaseId} value={p.firebaseId}>
-                      #{p.id} - {p.cliente} - {p.fechaPedido}
-                    </option>
-                  ))}
-                </select>
+              <div className="ventas-top-editable-item ventas-top-editable-pedido factura-info-item">
+                <span>Pedido asociado</span>
+
+                <strong className="factura-pedido-print">
+                  {venta.pedidoVisibleId
+                    ? `#${venta.pedidoVisibleId}`
+                    : pedidoSeleccionado?.id
+                    ? `#${pedidoSeleccionado.id}`
+                    : venta.pedidoRefId
+                    ? "Pedido asociado"
+                    : "-"}
+                </strong>
+
+                <div className="ventas-top-editable-pedido-row">
+                  <div className="ventas-pedido-buscador">
+                <input
+                  value={busquedaPedido}
+                  placeholder="Buscar pedido por número, cliente o fecha..."
+                  disabled={ventaAnulada || !puedeEditarVentas || !!venta?.pedidoRefId}
+                  onFocus={() => setMostrarDropdownPedido(true)}
+                  onBlur={() => {
+                    setTimeout(() => setMostrarDropdownPedido(false), 180);
+                  }}
+                  onChange={(e) => {
+                    setBusquedaPedido(e.target.value);
+                    setPedidoRefId("");
+                    setMostrarDropdownPedido(true);
+                  }}
+                />
+
+                {mostrarDropdownPedido && !venta?.pedidoRefId && (
+                  <div className="ventas-dropdown">
+                    {pedidosFiltrados.slice(0, 8).map((p) => (
+                      <button
+                        key={p.firebaseId}
+                        type="button"
+                        onClick={() => seleccionarPedidoAsociado(p)}
+                      >
+                        #{p.id || "-"} - {p.cliente || p.clienteNombre || "Sin cliente"} -{" "}
+                        {p.fechaPedido || p.fechaEntrega || "-"}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
 
                 <button
                   className="btn btn-primary"
