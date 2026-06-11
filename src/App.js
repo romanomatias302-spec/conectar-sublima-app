@@ -54,6 +54,31 @@ export default function App() {
     localStorage.setItem("vistaActual", vista);
   }, [vista]);
 
+  useEffect(() => {
+  const recuperarVentaDetalle = async () => {
+    try {
+      if (vista !== "venta-detalle") return;
+      if (ventaSeleccionada?.firebaseId) return;
+
+      const ventaIdGuardada = localStorage.getItem("ventaDetalleId");
+
+      if (!ventaIdGuardada) {
+        irAVista("ventas-listado");
+        return;
+      }
+
+      const venta = await obtenerVentaPorId(ventaIdGuardada);
+
+      setVentaSeleccionada(venta);
+    } catch (error) {
+      console.error("Error recuperando venta tras refresh:", error);
+      irAVista("ventas-listado");
+    }
+  };
+
+  recuperarVentaDetalle();
+}, [vista, ventaSeleccionada]);
+
   const esRutaActivacion = window.location.pathname === "/activar-cuenta";
 
 const puedeHacer = (modulo, accion = "ver") => {
@@ -80,6 +105,14 @@ const nuevosProductosPedidoParaVenta =
   setOrigenVista(nuevoOrigen);
   setProductosPedidoParaVenta(nuevosProductosPedidoParaVenta);
   localStorage.setItem("vistaActual", nuevaVista);
+
+  if (nuevaVenta?.firebaseId) {
+  localStorage.setItem("ventaDetalleId", nuevaVenta.firebaseId);
+}
+
+if (nuevaVista !== "venta-detalle") {
+  localStorage.removeItem("ventaDetalleId");
+}
 
   if (esRutaActivacion) return;
 
