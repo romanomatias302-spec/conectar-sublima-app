@@ -79,6 +79,36 @@ export default function App() {
   recuperarVentaDetalle();
 }, [vista, ventaSeleccionada]);
 
+useEffect(() => {
+  const recuperarPedidoDetalle = async () => {
+    try {
+      if (vista !== "detallePedido") return;
+      if (pedidoSeleccionado?.firebaseId) return;
+
+      const pedidoIdGuardado = localStorage.getItem("pedidoDetalleId");
+
+      if (!pedidoIdGuardado) {
+        irAVista("pedidos");
+        return;
+      }
+
+      const pedido = await obtenerPedidoPorId(pedidoIdGuardado);
+
+      if (!pedido) {
+        irAVista("pedidos");
+        return;
+      }
+
+      setPedidoSeleccionado(pedido);
+    } catch (error) {
+      console.error("Error recuperando pedido tras refresh:", error);
+      irAVista("pedidos");
+    }
+  };
+
+  recuperarPedidoDetalle();
+}, [vista, pedidoSeleccionado]);
+
   const esRutaActivacion = window.location.pathname === "/activar-cuenta";
 
 const puedeHacer = (modulo, accion = "ver") => {
@@ -106,12 +136,20 @@ const nuevosProductosPedidoParaVenta =
   setProductosPedidoParaVenta(nuevosProductosPedidoParaVenta);
   localStorage.setItem("vistaActual", nuevaVista);
 
-  if (nuevaVenta?.firebaseId) {
+if (nuevaVenta?.firebaseId) {
   localStorage.setItem("ventaDetalleId", nuevaVenta.firebaseId);
 }
 
 if (nuevaVista !== "venta-detalle") {
   localStorage.removeItem("ventaDetalleId");
+}
+
+if (nuevoPedido?.firebaseId) {
+  localStorage.setItem("pedidoDetalleId", nuevoPedido.firebaseId);
+}
+
+if (nuevaVista !== "detallePedido") {
+  localStorage.removeItem("pedidoDetalleId");
 }
 
   if (esRutaActivacion) return;
@@ -386,7 +424,19 @@ if (nuevaVista !== "venta-detalle") {
     }
   };
 
+const obtenerPedidoPorId = async (pedidoId) => {
+  if (!pedidoId) return null;
 
+  const pedidoRef = doc(db, "pedidos", pedidoId);
+  const pedidoSnap = await getDoc(pedidoRef);
+
+  if (!pedidoSnap.exists()) return null;
+
+  return {
+    firebaseId: pedidoSnap.id,
+    ...pedidoSnap.data(),
+  };
+};
 
 const abrirVentaDesdePedido = async (ventaId) => {
   try {

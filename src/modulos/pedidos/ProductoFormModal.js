@@ -44,6 +44,7 @@ const [formData, setFormData] = useState({
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [tipoAreaConfig, setTipoAreaConfig] = useState(""); // multiple | unica | personalizada
+  const [imagenPreview, setImagenPreview] = useState(null);
 
 
 
@@ -549,6 +550,17 @@ const marcarImagenComoPortada = (index) => {
   }));
 };
 
+const verImagenEnModal = (url) => {
+  if (!url) return;
+  setImagenPreview(url);
+};
+
+const descargarImagen = (url) => {
+  if (!url) return;
+
+  window.open(url, "_blank", "noopener,noreferrer");
+};
+
   // =========================
   // 🔹 Guardar
   // =========================
@@ -889,26 +901,43 @@ const imagenPortada = imagenesConContenido.find((img) =>
                 const portada = !!normalizada?.portada;
                 const tipo = normalizada?.tipo || "link";
 
-                return (
-                  <div
-                    key={`${url}-${index}`}
-                    className={`pfm-static-imagen-card ${portada ? "is-portada" : ""}`}
-                  >
-                    <img
-                      src={url}
-                      alt={`imagen-${index}`}
-                      className="pfm-static-imagen-preview"
-                    />
+                  return (
+                    <div
+                      key={`${url}-${index}`}
+                      className={`pfm-static-imagen-card ${portada ? "is-portada" : ""}`}
+                    >
 
-                    <div className="pfm-static-imagen-actions">
-                      <a href={url} target="_blank" rel="noreferrer">
-                        Ver
-                      </a>
 
-                      <a href={url} download>
-                        Descargar
-                      </a>
-                    </div>
+                      <img
+                        src={url}
+                        alt={`imagen-${index}`}
+                        className="pfm-static-imagen-preview"
+                      />
+
+                  <div className="pfm-static-imagen-actions">
+                    <button
+                      type="button"
+                      className="pfm-static-img-action-btn"
+                      onClick={() => verImagenEnModal(url)}
+                      title="Ver imagen"
+                    >
+                      Ver
+                    </button>
+
+                    <button
+                      type="button"
+                      className="pfm-static-img-action-btn"
+                      onClick={() =>
+                        descargarImagen(
+                          url,
+                          normalizada?.nombre || `producto-imagen-${index + 1}.png`
+                        )
+                      }
+                      title="Descargar imagen"
+                    >
+                      Desc.
+                    </button>
+                  </div>
 
                     <div className="pfm-static-imagen-meta">
                       {portada ? (
@@ -1510,6 +1539,31 @@ const countZonas = (z) => {
           )}
         </div>
       </div>
+      {imagenPreview && (
+        <div
+          className="pfm-image-preview-overlay"
+          onMouseDown={() => setImagenPreview(null)}
+        >
+          <div
+            className="pfm-image-preview-modal"
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="pfm-image-preview-close"
+              onClick={() => setImagenPreview(null)}
+            >
+              ✕
+            </button>
+
+            <img
+              src={imagenPreview}
+              alt="Vista ampliada"
+              className="pfm-image-preview-img"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
