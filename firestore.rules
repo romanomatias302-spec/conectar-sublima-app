@@ -170,13 +170,18 @@ service cloud.firestore {
       return changedKeys().hasOnly(allowedKeys);
     }
 
-    function canReadClientes(clienteId) {
-      return canModulo(clienteId, "clientes", "ver")
-        || (
-          tenantUserBase(clienteId)
-          && permisoModuloAccion("inicio", "verClientes")
-        );
-    }
+function canReadClientes(clienteId) {
+  return canModulo(clienteId, "clientes", "ver")
+    || (
+      tenantUserBase(clienteId)
+      && (
+        permisoModuloAccion("inicio", "verClientes")
+        || permisoModuloAccion("ventas", "crear")
+        || permisoModuloAccion("ventas", "editar")
+        || permisoModuloAccion("ventas", "ver")
+      )
+    );
+}
 
     function canCreateClientes(clienteId) {
       return canModulo(clienteId, "clientes", "crear");
@@ -190,21 +195,24 @@ service cloud.firestore {
       return canModulo(clienteId, "clientes", "eliminar");
     }
 
-    function canReadPedidos(clienteId) {
-      return isSuperAdmin()
-        || (
-          tenantUserBase(clienteId)
-          && (
-            isAdmin()
-              || permisoModuloAccion("pedidos", "ver")
-              || permisoModuloAccion("produccion", "ver")
-              || permisoModuloAccion("inicio", "verPedidos")
-              || permisoModuloAccion("inicio", "verProduccion")
-              || permisoModuloAccion("inicio", "verAtrasados")
-              || permisoModuloAccion("inicio", "verGrafico")
-          )
-        );
-    }
+function canReadPedidos(clienteId) {
+  return isSuperAdmin()
+    || (
+      tenantUserBase(clienteId)
+      && (
+        isAdmin()
+          || permisoModuloAccion("pedidos", "ver")
+          || permisoModuloAccion("produccion", "ver")
+          || permisoModuloAccion("ventas", "crear")
+          || permisoModuloAccion("ventas", "editar")
+          || permisoModuloAccion("ventas", "ver")
+          || permisoModuloAccion("inicio", "verPedidos")
+          || permisoModuloAccion("inicio", "verProduccion")
+          || permisoModuloAccion("inicio", "verAtrasados")
+          || permisoModuloAccion("inicio", "verGrafico")
+      )
+    );
+}
 
     function canCreatePedidos(clienteId) {
       return canModulo(clienteId, "pedidos", "crear");
@@ -464,7 +472,12 @@ function canReadVentas(clienteId) {
         isActiveUser()
         && resource.data.clienteId == profile().clienteId
         && tenantIsActiveById(profile().clienteId)
-        && permisoModuloAccion("produccion", "asignarUsuario")
+        && (
+          permisoModuloAccion("produccion", "asignarUsuario")
+          || permisoModuloAccion("ventas", "crear")
+          || permisoModuloAccion("ventas", "editar")
+          || permisoModuloAccion("ventas", "ver")
+        )
       );
 
       allow create: if isSuperAdmin()

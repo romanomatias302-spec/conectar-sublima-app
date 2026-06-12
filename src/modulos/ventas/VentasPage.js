@@ -117,26 +117,32 @@ const [pedidoImportado, setPedidoImportado] =
               limit(50)
             );
 
-const [snapClientes, snapPedidos, usuariosCliente] = await Promise.all([
-  getDocs(qClientes),
-  getDocs(qPedidos),
-  obtenerUsuariosPorCliente(perfil.clienteId),
-]);
+  const [snapClientes, snapPedidos] = await Promise.all([
+    getDocs(qClientes),
+    getDocs(qPedidos),
+  ]);
 
-      setClientes(
-        snapClientes.docs.map((d) => ({
-          firebaseId: d.id,
-          ...d.data(),
-        }))
-      );
+  setClientes(
+    snapClientes.docs.map((d) => ({
+      firebaseId: d.id,
+      ...d.data(),
+    }))
+  );
 
-      setPedidos(
-        snapPedidos.docs.map((d) => ({
-          firebaseId: d.id,
-          ...d.data(),
-        }))
-      );
-      setUsuarios(usuariosCliente);
+  setPedidos(
+    snapPedidos.docs.map((d) => ({
+      firebaseId: d.id,
+      ...d.data(),
+    }))
+  );
+
+  try {
+    const usuariosCliente = await obtenerUsuariosPorCliente(perfil.clienteId);
+    setUsuarios(usuariosCliente);
+  } catch (errorUsuarios) {
+    console.warn("No se pudieron cargar vendedores:", errorUsuarios);
+    setUsuarios([]);
+  }
 
     } catch (err) {
       console.error("Error cargando datos de ventas:", err);
@@ -432,12 +438,7 @@ const guardarClienteRapido = async () => {
     };
 
 const importarPedidoComoVenta = () => {
-  console.log("========== IMPORTAR PEDIDO COMO VENTA ==========");
-console.log("pedidoInicial:", pedidoInicial);
-console.log("productosPedido:", productosPedido);
-console.log("clientes:", clientes);
-console.log("clienteRefId actual antes:", clienteRefId);
-console.log("busquedaCliente actual antes:", busquedaCliente);
+
   const clientePedidoNombre = (
     pedidoInicial?.clienteNombre ||
     pedidoInicial?.cliente ||
@@ -486,9 +487,7 @@ const cliente =
     );
   });
 
-console.log("clientePedidoNombre:", clientePedidoNombre);
-console.log("clientePedidoDni:", clientePedidoDni);
-console.log("cliente encontrado:", cliente);
+
 
 if (cliente) {
   const textoCliente = `${cliente.nombre || ""}${

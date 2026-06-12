@@ -34,6 +34,8 @@ export default function PedidoDetalle({
   const [mostrarConfigColumnas, setMostrarConfigColumnas] = useState(false);
   const [esMobile, setEsMobile] = useState(window.innerWidth <= 768);
   const [productosAbiertos, setProductosAbiertos] = useState({});
+  const [abriendoVentaId, setAbriendoVentaId] = useState(null);
+  const [imagenPreviewTabla, setImagenPreviewTabla] = useState(null);
 
   const esAdmin = perfil?.rol === "admin" || perfil?.rol === "superadmin";
   const puedeEditarPedidos = puedeHacer(perfil, "pedidos", "editar");
@@ -313,23 +315,30 @@ case "tallesResumen": {
 
         if (!portadaUrl) return "-";
 
-        return (
-          <div className="detalle-imagen-portada-wrap">
-            <img
-              src={portadaUrl}
-              alt="Portada"
-              className="detalle-imagen-portada-thumb"
-            />
-
-            <div className="detalle-imagen-portada-preview detalle-imagen-portada-preview-left">
+          return (
+            <div className="detalle-imagen-portada-wrap">
               <img
                 src={portadaUrl}
-                alt="Vista previa"
-                className="detalle-imagen-portada-preview-img"
+                alt="Portada"
+                className="detalle-imagen-portada-thumb"
+                onMouseEnter={(e) =>
+                  setImagenPreviewTabla({
+                    url: portadaUrl,
+                    x: e.clientX,
+                    y: e.clientY,
+                  })
+                }
+                onMouseMove={(e) =>
+                  setImagenPreviewTabla({
+                    url: portadaUrl,
+                    x: e.clientX,
+                    y: e.clientY,
+                  })
+                }
+                onMouseLeave={() => setImagenPreviewTabla(null)}
               />
             </div>
-          </div>
-        );
+          );
       }
 
       case "cantidad":
@@ -441,7 +450,17 @@ if (!pedido) {
         {pedido?.ventaRefId && (pedido?.ventaEstado || "activa") === "activa" && (
           <button
             type="button"
-            onClick={() => onVerVenta && onVerVenta(pedido.ventaRefId)}
+            disabled={abriendoVentaId === pedido.ventaRefId}
+            onClick={async () => {
+              if (!onVerVenta || !pedido.ventaRefId) return;
+
+              try {
+                setAbriendoVentaId(pedido.ventaRefId);
+                await onVerVenta(pedido.ventaRefId);
+              } finally {
+                setAbriendoVentaId(null);
+              }
+            }}
             style={{
               background: "rgba(25, 135, 84, 0.10)",
               color: "#146c43",
@@ -449,10 +468,13 @@ if (!pedido) {
               borderRadius: "10px",
               fontWeight: 700,
               border: "none",
-              cursor: "pointer",
+              cursor: abriendoVentaId === pedido.ventaRefId ? "wait" : "pointer",
+              opacity: abriendoVentaId === pedido.ventaRefId ? 0.7 : 1,
             }}
           >
-            Ver factura #{pedido?.ventaVisibleId || "-"}
+            {abriendoVentaId === pedido.ventaRefId
+              ? "Abriendo..."
+              : `Ver factura #${pedido?.ventaVisibleId || "-"}`}
           </button>
         )}
 
@@ -740,6 +762,22 @@ if (!pedido) {
           soloVer={soloVer}
           perfil={perfil}
         />
+      )}
+
+      {imagenPreviewTabla && (
+        <div
+          className="detalle-imagen-preview-fixed"
+          style={{
+            left: imagenPreviewTabla.x - 260,
+            top: imagenPreviewTabla.y - 110,
+          }}
+        >
+          <img
+            src={imagenPreviewTabla.url}
+            alt="Vista previa"
+            className="detalle-imagen-preview-fixed-img"
+          />
+        </div>
       )}
 
       <ColumnasDetallePedidoModal

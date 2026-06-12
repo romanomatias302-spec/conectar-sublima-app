@@ -1208,3 +1208,22 @@ padding-bottom:14px;
   top: 0;
   z-index: 11;
 }
+
+.detalle-imagen-preview-fixed {
+  position: fixed;
+  width: 240px;
+  z-index: 99999;
+  background: #ffffff;
+  border: 1px solid #dbe3ec;
+  border-radius: 12px;
+  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.22);
+  padding: 8px;
+  pointer-events: none;
+}
+
+.detalle-imagen-preview-fixed-img {
+  width: 100%;
+  max-height: 280px;
+  object-fit: contain;
+  display: block;
+}
