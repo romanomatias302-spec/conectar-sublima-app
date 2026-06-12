@@ -266,6 +266,8 @@ case "tallesResumen": {
 
   if (!talles.length) return "-";
 
+
+
   return (
     <div className="detalle-talles-resumen">
       {talles.map((item, index) => (
@@ -506,7 +508,9 @@ if (!pedido) {
                   {columnasVisibles
                     .filter((col) => col.key !== "acciones" && col.key !== "imagenesResumen")
                     .map((col) => (
-                      <th key={col.key}>{col.label}</th>
+                      <th key={col.key} className={`pedido-print-col-${col.key}`}>
+                        {col.label}
+                      </th>
                     ))}
                 </tr>
               </thead>
@@ -517,24 +521,44 @@ if (!pedido) {
                     {columnasVisibles
                       .filter((col) => col.key !== "acciones" && col.key !== "imagenesResumen")
                       .map((col) => (
-                        <td key={col.key}>
+                        <td key={col.key} className={`pedido-print-col-${col.key}`}>
                           {col.key === "producto" && (p.productoNombre || p.producto || "-")}
                           {col.key === "color" && (p.color || "-")}
                           {col.key === "detalle" && (p.detalle || "-")}
                           {col.key === "observaciones" && obtenerObservaciones(p)}
                           {col.key === "zonasResumen" && resumirZonas(p)}
                           {col.key === "tallesResumen" &&
-                            (resumirTalles(p).length
-                              ? resumirTalles(p)
-                                  .map((t) => `${t.talle}: ${t.qty}${t.detalle ? ` (${t.detalle})` : ""}`)
-                                  .join(" | ")
-                              : "-")}
+                            (resumirTalles(p).length ? (
+                              <div
+                                className={`pedido-print-talles-list ${
+                                  resumirTalles(p).length > 10
+                                    ? "pedido-print-talles-list-2cols"
+                                    : ""
+                                }`}
+                              >
+                                {resumirTalles(p).map((t, index) => (
+                                  <div key={`${t.talle}-${index}`} className="pedido-print-talle-item">
+                                    <strong>{t.talle}:</strong> {t.qty}
+                                    {t.detalle ? <span> — {t.detalle}</span> : null}
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              "-"
+                            ))}
+
                           {col.key === "detallesCosturaResumen" &&
-                            (resumirDetallesCostura(p).length
-                              ? resumirDetallesCostura(p)
-                                  .map((d) => `${d.nombre}: ${d.valor}`)
-                                  .join(" | ")
-                              : "-")}
+                            (resumirDetallesCostura(p).length ? (
+                              <div className="pedido-print-costura-list">
+                                {resumirDetallesCostura(p).map((d, index) => (
+                                  <div key={`${d.nombre}-${index}`} className="pedido-print-costura-item">
+                                    <strong>{d.nombre}:</strong> {d.valor}
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              "-"
+                            ))}
                           {col.key === "cantidad" && (p.totalTalles || p.cantidad || "-")}
                         </td>
                       ))}
@@ -562,28 +586,28 @@ if (!pedido) {
           </button>
         )}
 
-        <button
-          className="btn-imprimir-pedido"
-          type="button"
-          onClick={() => {
-            const cliente =
-              pedido?.cliente
-                ?.replace(/[\\/:*?"<>|]/g, "")
-                ?.trim() || "Cliente";
+      <button
+        className="btn-imprimir-pedido"
+        type="button"
+        onClick={() => {
+          const cliente =
+            pedido?.cliente
+              ?.replace(/[\\/:*?"<>|]/g, "")
+              ?.trim() || "Cliente";
 
-            const numeroPedido =
-              pedido?.id ||
-              pedido?.numeroPedido ||
-              pedido?.visibleId ||
-              "Pedido";
+          const numeroPedido =
+            pedido?.id ||
+            pedido?.numeroPedido ||
+            pedido?.visibleId ||
+            "Pedido";
 
-            document.title = `Pedido ${numeroPedido} - ${cliente}`;
+          document.title = `Pedido ${numeroPedido} - ${cliente}`;
 
-            window.print();
-          }}
-        >
-          Imprimir Detalle
-        </button>
+          window.print();
+        }}
+      >
+        Imprimir Detalle
+      </button>
 
         <button className="btn-volver" onClick={onVolver}>
           Volver
@@ -753,6 +777,7 @@ if (!pedido) {
       {mostrarModal && (
         <ProductoFormModal
           pedidoId={pedido.firebaseId}
+          pedido={pedido}
           productoEditando={productoEditando}
           onClose={() => {
             setMostrarModal(false);

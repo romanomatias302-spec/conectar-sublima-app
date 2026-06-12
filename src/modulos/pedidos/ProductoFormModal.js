@@ -16,6 +16,7 @@ import { puedeHacer } from "../../utils/permisos";
 
 export default function ProductoFormModal({
   pedidoId,
+  pedido,
   productoEditando,
   onClose,
   onProductoGuardado,
@@ -45,6 +46,7 @@ const [formData, setFormData] = useState({
   const [loading, setLoading] = useState(false);
   const [tipoAreaConfig, setTipoAreaConfig] = useState(""); // multiple | unica | personalizada
   const [imagenPreview, setImagenPreview] = useState(null);
+  
 
 
 
@@ -67,6 +69,7 @@ const [formData, setFormData] = useState({
 
   const [modoEdicionLocal, setModoEdicionLocal] = useState(!soloVer);
   const [mostrarReferenciaZonas, setMostrarReferenciaZonas] = useState(false);
+  const [configNegocio, setConfigNegocio] = useState(null);
 
 
   const puedeEditarPedidos = puedeHacer(perfil, "pedidos", "editar");
@@ -348,6 +351,25 @@ const modoSoloLecturaReal = !modoEdicionLocal && soloVer;
     window.removeEventListener("afterprint", limpiarPrintProducto);
   };
 }, []);
+
+useEffect(() => {
+  const cargarConfigNegocio = async () => {
+    try {
+      if (!perfil?.clienteId) return;
+
+      const ref = doc(db, "clientes-saas", perfil.clienteId);
+      const snap = await getDoc(ref);
+
+      if (snap.exists()) {
+        setConfigNegocio(snap.data());
+      }
+    } catch (error) {
+      console.error("Error cargando configuración del negocio:", error);
+    }
+  };
+
+  cargarConfigNegocio();
+}, [perfil?.clienteId]);
 
   // =========================
   // 🔹 Handlers
@@ -968,26 +990,50 @@ const imagenPortada = imagenesConContenido.find((img) =>
       .map((campo) => renderCampoEstatico(campo))
       .filter(Boolean);
 
-    return (
-      <div className="pfm-static">
-        <div className="pfm-static-hero">
-          <div>
-            <div className="pfm-static-eyebrow pfm-static-eyebrow-strong">
-              Detalle del producto
-            </div>
-            <div className="pfm-static-producto pfm-static-producto-soft">
-              {productoTitulo}
-            </div>
+const logoNegocio = configNegocio?.logoUrl || "";
+
+  const nombreNegocio =
+    configNegocio?.nombreVisible ||
+    configNegocio?.nombre ||
+    "";
+
+return (
+  <div className="pfm-static">
+    <div className="pfm-print-header">
+      {logoNegocio ? (
+        <img
+          src={logoNegocio}
+          alt="Logo del negocio"
+          className="pfm-print-logo"
+        />
+      ) : null}
+
+      <div className="pfm-print-header-info">
+        {nombreNegocio ? <strong>{nombreNegocio}</strong> : null}
+        <span>Pedido #{pedido?.id || pedido?.numeroPedido || "-"}</span>
+        <span>Cliente: {pedido?.cliente || "-"}</span>
+      </div>
+    </div>
+
+    <div className="pfm-static-main-grid">
+      <div className="pfm-static-hero">
+        <div>
+          <div className="pfm-static-eyebrow pfm-static-eyebrow-strong">
+            Detalle del producto
+          </div>
+          <div className="pfm-static-producto pfm-static-producto-soft">
+            {productoTitulo}
           </div>
         </div>
+      </div>
 
-        {formData.detalle ? (
-          <div className="pfm-static-card">
-            <div className="pfm-static-card-title">Detalle general</div>
-            <div className="pfm-static-card-text">{formData.detalle}</div>
-          </div>
-        ) : null}
-
+      {formData.detalle ? (
+        <div className="pfm-static-card">
+          <div className="pfm-static-card-title">Detalle general</div>
+          <div className="pfm-static-card-text">{formData.detalle}</div>
+        </div>
+      ) : null}
+    </div>
         {bloquesDinamicos}
 
         {!formData.detalle && bloquesDinamicos.length === 0 ? (

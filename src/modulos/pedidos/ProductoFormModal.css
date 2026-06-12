@@ -1387,7 +1387,7 @@ body.dark-mode .pfm-ref-img{
   }
 
   @page {
-    size: A4;
+   
     margin: 12mm;
   }
 }
@@ -1690,4 +1690,112 @@ body.dark-mode .pfm-ref-img{
 .pfm-static-imagen-badge {
   font-size: 10px !important;
   padding: 3px 7px !important;
+}
+
+@media print {
+  body.printing-producto .pfm-static-card,
+  body.printing-producto .pfm-static-talle-chip,
+  body.printing-producto .pfm-static-zona-item,
+  body.printing-producto .pfm-static-table-row {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  body.printing-producto .pfm-static-talles-grid {
+    break-inside: auto !important;
+    page-break-inside: auto !important;
+  }
+
+  body.printing-producto .pfm-static-talle-chip {
+    min-height: 42px !important;
+  }
+
+body.printing-producto .pfm-static-talle-name {
+  font-size: 14px !important;
+}
+
+body.printing-producto .pfm-static-talle-qty {
+  font-size: 14px !important;
+  padding: 5px 9px !important;
+}
+
+body.printing-producto .pfm-static-talle-detail {
+  font-size: 14px !important;
+  line-height: 1.4 !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+body.printing-producto .pfm-static-talle-chip {
+  min-height: 48px !important;
+  padding: 9px 10px !important;
+}
+}
+
+.pfm-print-header {
+  display: none;
+}
+
+.pfm-static-main-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  align-items: stretch;
+}
+
+@media (max-width: 768px) {
+  .pfm-static-main-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media print {
+  body.printing-producto .pfm-print-header {
+    display: flex !important;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 0 10px !important;
+    margin-bottom: 8px !important;
+    border-bottom: 1px solid #d1d5db !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  body.printing-producto .pfm-print-logo {
+    width: 54px !important;
+    height: 54px !important;
+    object-fit: contain !important;
+  }
+
+  body.printing-producto .pfm-print-header-info {
+    display: grid !important;
+    gap: 2px !important;
+    font-size: 12px !important;
+    color: #111 !important;
+  }
+
+  body.printing-producto .pfm-print-header-info strong {
+    font-size: 15px !important;
+  }
+
+  body.printing-producto .pfm-static-main-grid {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+  body.printing-producto .pfm-static-talle-top {
+  display: grid !important;
+  grid-template-columns: 1fr auto !important;
+  gap: 8px !important;
+}
+
+body.printing-producto .pfm-static-talle-detail {
+  display: block !important;
+  width: 100% !important;
+  max-width: none !important;
+  white-space: normal !important;
+  word-break: break-word !important;
+  overflow-wrap: anywhere !important;
+}
 }

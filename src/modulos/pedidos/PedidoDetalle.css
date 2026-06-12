@@ -378,34 +378,10 @@ body.dark-mode .tabla-productos tbody tr:nth-child(even):hover td {
   display: block;
 }
 
-.detalle-imagen-portada-preview {
-  position: absolute;
-  top: 0;
-  display: none;
-  z-index: 9999;
-  background: #fff;
-  border: 1px solid #dbe3ec;
-  border-radius: 10px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
-  padding: 8px;
-  width: 240px;
-}
-
-.detalle-imagen-portada-preview-left {
-  right: calc(100% + 10px);
-}
-
-.detalle-imagen-portada-wrap:hover .detalle-imagen-portada-preview {
-  display: block;
-}
-
+.detalle-imagen-portada-preview,
+.detalle-imagen-portada-preview-left,
 .detalle-imagen-portada-preview-img {
-  width: 220px;
-  max-width: 220px;
-  max-height: 220px;
-  object-fit: contain;
-  display: block;
-  border-radius: 6px;
+  display: none !important;
 }
 
 .tabla-productos {
@@ -1024,10 +1000,9 @@ padding-bottom:14px;
     display: none !important;
   }
 
-  @page {
-    size: A4;
-    margin: 12mm;
-  }
+@page {
+  margin: 10mm;
+}
 
   .pedido-detalle h1 {
     font-size: 20px !important;
@@ -1083,16 +1058,11 @@ padding-bottom:14px;
 }
 
 @media print {
-  .tabla-productos-desktop,
-  .tabla-productos,
-  .tabla-productos thead,
-  .tabla-productos tbody,
-  .tabla-productos tr,
-  .tabla-productos th,
-  .tabla-productos td {
-    display: revert !important;
-    visibility: visible !important;
-  }
+.tabla-productos-desktop,
+.tabla-productos {
+  display: none !important;
+  visibility: hidden !important;
+}
 
   .tabla-productos {
     margin-top: 12px !important;
@@ -1138,11 +1108,11 @@ padding-bottom:14px;
 }
 
 @media print {
-  .pedido-print-area {
-    display: block !important;
-    visibility: visible !important;
-    margin-top: 16px !important;
-  }
+.pedido-print-area {
+  display: block !important;
+  visibility: visible !important;
+  margin-top: 12px !important;
+}
 
   .pedido-print-area * {
     visibility: visible !important;
@@ -1182,6 +1152,28 @@ padding-bottom:14px;
     display: none !important;
   }
 }
+@media print {
+  .tabla-productos-scroll,
+  .tabla-productos-scroll *,
+  .tabla-productos-desktop,
+  .tabla-productos-desktop *,
+  .productos-mobile-list,
+  .productos-mobile-list * {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  .pedido-print-area,
+  .pedido-print-area * {
+    display: revert !important;
+    visibility: visible !important;
+  }
+
+  .pedido-print-area {
+    display: block !important;
+    margin-top: 12px !important;
+  }
+}
 }
 
 .tabla-productos-scroll {
@@ -1212,6 +1204,7 @@ padding-bottom:14px;
 .detalle-imagen-preview-fixed {
   position: fixed;
   width: 240px;
+  max-width: 240px;
   z-index: 99999;
   background: #ffffff;
   border: 1px solid #dbe3ec;
@@ -1226,4 +1219,128 @@ padding-bottom:14px;
   max-height: 280px;
   object-fit: contain;
   display: block;
+  border-radius: 8px;
+  background: #fff;
+}
+
+/**/
+
+@media print {
+  .pedido-print-table {
+    table-layout: fixed !important;
+    width: 100% !important;
+  }
+
+  .pedido-print-table th:nth-child(1),
+  .pedido-print-table td:nth-child(1) {
+    width: 13% !important; /* Producto */
+  }
+
+  .pedido-print-table th:nth-child(2),
+  .pedido-print-table td:nth-child(2) {
+    width: 16% !important; /* Observaciones */
+  }
+
+  .pedido-print-table th:nth-child(3),
+  .pedido-print-table td:nth-child(3) {
+    width: 31% !important; /* Talles */
+  }
+
+  .pedido-print-table th:nth-child(4),
+  .pedido-print-table td:nth-child(4) {
+    width: 22% !important; /* Costura */
+  }
+
+  .pedido-print-table th:nth-child(5),
+  .pedido-print-table td:nth-child(5) {
+    width: 13% !important; /* Detalle */
+  }
+
+  .pedido-print-table th:nth-child(6),
+  .pedido-print-table td:nth-child(6) {
+    width: 5% !important; /* Cantidad */
+    text-align: center !important;
+  }
+
+  .pedido-print-table th,
+  .pedido-print-table td {
+    font-size: 10.5px !important;
+    line-height: 1.35 !important;
+    padding: 6px !important;
+    vertical-align: top !important;
+  }
+}
+
+@media print {
+  .pedido-print-talles-list,
+  .pedido-print-costura-list {
+    display: grid !important;
+    gap: 3px !important;
+    font-size: 11px !important;
+    line-height: 1.35 !important;
+  }
+  .pedido-print-talles-list-2cols {
+  grid-template-columns: 1fr 1fr !important;
+  column-gap: 12px !important;
+}
+
+  .pedido-print-talle-item,
+  .pedido-print-costura-item {
+    display: block !important;
+    white-space: normal !important;
+    word-break: break-word !important;
+    overflow-wrap: anywhere !important;
+  }
+
+  .pedido-print-talle-item strong,
+  .pedido-print-costura-item strong {
+    font-weight: 800 !important;
+  }
+}
+
+@media print {
+  .pedido-print-table {
+    table-layout: fixed !important;
+    width: 100% !important;
+  }
+
+  .pedido-print-table th,
+  .pedido-print-table td {
+    font-size: 9.5px !important;
+    line-height: 1.28 !important;
+    padding: 5px !important;
+  }
+
+  .pedido-print-col-producto {
+    width: 11% !important;
+  }
+
+  .pedido-print-col-color {
+    width: 7% !important;
+  }
+
+  .pedido-print-col-observaciones {
+    width: 13% !important;
+  }
+
+  .pedido-print-col-zonasResumen {
+    width: 15% !important;
+  }
+
+  .pedido-print-col-tallesResumen {
+    width: 26% !important;
+  }
+
+  .pedido-print-col-detallesCosturaResumen {
+    width: 17% !important;
+  }
+
+  .pedido-print-col-detalle {
+    width: 8% !important;
+  }
+
+  .pedido-print-col-cantidad {
+    width: 3% !important;
+    text-align: center !important;
+  }
 }

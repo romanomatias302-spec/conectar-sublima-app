@@ -918,7 +918,7 @@ margin-top:20px;
 
 @media print {
   @page {
-    size: A4;
+   
     margin: 10mm;
   }
 
