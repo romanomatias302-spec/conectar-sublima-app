@@ -145,15 +145,8 @@ const estadoFechaEntrega = obtenerEstadoFechaEntrega(pedido);
 
   const ultimoUsuario = pedido.ultimaAccionProduccionPorNombre || "";
 const usuarioVisible =
-  pedido.usuarioNombre ||
-  pedido.creadoPorNombre ||
-  pedido.creadoPorEmail ||
-  pedido.usuario ||
-  pedido.vendedor ||
-  pedido.vendedorNombre ||
-  pedido.creadoPor ||
-  pedido.ultimaAccionProduccionPorNombre ||
-  pedido.ultimaAccionProduccionPorEmail ||
+  pedido.produccionAsignadoNombre ||
+  pedido.produccionAsignadoEmail ||
   "";
   const usuarioAsignado =
     pedido.produccionAsignadoNombre ||
