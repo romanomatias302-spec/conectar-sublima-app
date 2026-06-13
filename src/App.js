@@ -18,6 +18,7 @@ import "./App.css";
 import VentasList from "./modulos/ventas/VentasList";
 import VentaFormModal from "./modulos/ventas/VentaFormModal";
 import VentasPage from "./modulos/ventas/VentasPage";
+import CotizacionesPage from "./modulos/ventas/CotizacionesPage";
 import MovimientosList from "./modulos/movimientos/MovimientosList";
 import VentaDetalle from "./modulos/ventas/VentaDetalle";
 import { obtenerVentaPorId } from "./firebase/ventas";
@@ -385,6 +386,7 @@ if (nuevaVista !== "detallePedido") {
         "ventas-crear": "ventas",
         "ventas-listado": "ventas",
         "venta-detalle": "ventas",
+        "cotizaciones-crear": "ventas",
         movimientos: "informes",
         caja: "caja",
         configuracion: "configuracion",
@@ -698,6 +700,10 @@ if (!perfil) {
             pedidoInicial={pedidoSeleccionado}
             productosPedido={productosPedidoParaVenta}
           />
+        )}
+
+        {vista === "cotizaciones-crear" && (
+          <CotizacionesPage perfil={perfil} />
         )}
 
         {vista === "ventas-listado" && (

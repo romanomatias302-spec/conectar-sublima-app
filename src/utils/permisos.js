@@ -29,12 +29,18 @@ produccion: {
   ordenManual: false,
 },
 
-  ventas: {
+   ventas: {
     ver: false,
     crear: false,
     editar: false,
     anular: false,
     listado: false,
+
+    cotizaciones: false,
+    crearCotizacion: false,
+    editarCotizacion: false,
+    convertirCotizacion: false,
+    anularCotizacion: false,
   },
 
   caja: {

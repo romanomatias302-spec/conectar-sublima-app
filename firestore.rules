@@ -446,6 +446,32 @@ function canReadVentas(clienteId) {
         );
     }
 
+        function canTouchUltimoNumeroCotizacion(clienteId) {
+      return isSuperAdmin()
+        || (
+          tenantUserBase(clienteId)
+          && (
+            isAdmin()
+            || permisoModuloAccion("ventas", "crearCotizacion")
+          )
+        );
+    }
+
+    function canReadCotizaciones(clienteId) {
+      return canModulo(clienteId, "ventas", "cotizaciones")
+        || canModulo(clienteId, "ventas", "ver");
+    }
+
+    function canCreateCotizaciones(clienteId) {
+      return canModulo(clienteId, "ventas", "crearCotizacion");
+    }
+
+    function canUpdateCotizaciones(clienteId) {
+      return canModulo(clienteId, "ventas", "editarCotizacion")
+        || canModulo(clienteId, "ventas", "convertirCotizacion")
+        || canModulo(clienteId, "ventas", "anularCotizacion");
+    }
+
     function canTouchUltimoNumeroPedido(clienteId) {
       return isSuperAdmin()
         || (
@@ -540,6 +566,13 @@ function canReadVentas(clienteId) {
           canTouchUltimoNumeroPedido(clienteId)
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             "ultimoNumeroPedido",
+            "updatedAt"
+          ])
+        )
+        || (
+          canTouchUltimoNumeroCotizacion(clienteId)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            "ultimoNumeroCotizacion",
             "updatedAt"
           ])
         );
@@ -835,6 +868,41 @@ function canReadVentas(clienteId) {
 
       allow delete: if false;
     }
+
+
+        // =========================
+    // cotizaciones
+    // =========================
+    match /cotizaciones/{cotizacionId} {
+      allow read: if canReadCotizaciones(resource.data.clienteId);
+
+      allow create: if canCreateCotizaciones(request.resource.data.clienteId);
+
+      allow update: if canUpdateCotizaciones(resource.data.clienteId)
+        && request.resource.data.clienteId == resource.data.clienteId;
+
+      allow delete: if false;
+
+      match /items/{itemId} {
+        allow read: if canReadCotizaciones(
+          get(/databases/$(database)/documents/cotizaciones/$(cotizacionId)).data.clienteId
+        );
+
+        allow create: if canCreateCotizaciones(
+          get(/databases/$(database)/documents/cotizaciones/$(cotizacionId)).data.clienteId
+        )
+        && request.resource.data.clienteId ==
+          get(/databases/$(database)/documents/cotizaciones/$(cotizacionId)).data.clienteId;
+
+        allow update: if canUpdateCotizaciones(
+          get(/databases/$(database)/documents/cotizaciones/$(cotizacionId)).data.clienteId
+        )
+        && request.resource.data.clienteId ==
+          get(/databases/$(database)/documents/cotizaciones/$(cotizacionId)).data.clienteId;
+
+        allow delete: if false;
+      }
+    }
     
     // =========================
     // historial_produccion - collectionGroup informes
@@ -854,6 +922,8 @@ function canReadVentas(clienteId) {
 
       allow write: if false;
     }
+
+
     
     
     // =========================

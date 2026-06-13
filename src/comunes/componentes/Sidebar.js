@@ -48,6 +48,9 @@ export default function Sidebar({
 const puedeVerListadoVentas =
   puedeHacer(perfil, "ventas", "listado");
 
+  const puedeCrearCotizaciones =
+  puedeHacer(perfil, "ventas", "crearCotizacion");
+
   return (
     <div className={`sidebar ${expandido ? "expandido" : "colapsado"}`}>
       <div className="sidebar-header">
@@ -132,6 +135,15 @@ const puedeVerListadoVentas =
                   onClick={() => onSelect("ventas-listado")}
                 >
                   Listado de ventas
+                </div>
+              )}
+
+              {puedeCrearCotizaciones && (
+                <div
+                  className="sidebar-subitem"
+                  onClick={() => onSelect("cotizaciones-crear")}
+                >
+                  Cotizaciones
                 </div>
               )}
               </div>

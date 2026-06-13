@@ -1349,3 +1349,59 @@ margin-top:20px;
   width: 100%;
   min-width: 0;
 }
+
+.cotizacion-modal {
+  width: 980px;
+  max-width: 96%;
+  max-height: 92vh;
+  overflow-y: auto;
+}
+
+@media (max-width: 768px) {
+  .cotizacion-modal {
+    width: 100%;
+    max-width: 100%;
+    max-height: 100vh;
+    height: 100vh;
+    border-radius: 0;
+    padding-bottom: 90px;
+  }
+
+  .cotizacion-modal .ventas-grid-top {
+    grid-template-columns: 1fr !important;
+  }
+
+  .cotizacion-modal .ventas-table {
+    min-width: 620px;
+  }
+}
+
+.cotizacion-header-negocio {
+  align-items: center;
+}
+
+.cotizacion-negocio-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.cotizacion-logo {
+  width: 54px;
+  height: 54px;
+  object-fit: contain;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+}
+
+.cotizacion-negocio-info h2 {
+  margin: 0;
+}
+
+.cotizacion-negocio-info p {
+  margin: 2px 0 0;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 600;
+}
