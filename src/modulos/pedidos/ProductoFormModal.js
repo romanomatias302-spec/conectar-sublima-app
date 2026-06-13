@@ -38,6 +38,8 @@ const [formData, setFormData] = useState({
 });
 
   const [productosDisponibles, setProductosDisponibles] = useState([]);
+  const [busquedaProducto, setBusquedaProducto] = useState("");
+const [mostrarProductosDropdown, setMostrarProductosDropdown] = useState(false);
   const [loadingProductos, setLoadingProductos] = useState(true);
   const [switchesActivos, setSwitchesActivos] = useState({});
   const [camposOrden, setCamposOrden] = useState([]);
@@ -103,6 +105,26 @@ const modoSoloLecturaReal = !modoEdicionLocal && soloVer;
   const getProductoNombreById = (id) => {
     const p = productosDisponibles.find((x) => x.id === id);
     return p?.nombre || "";
+  };
+
+  const productosFiltrados = productosDisponibles.filter((p) => {
+    const texto = busquedaProducto.trim().toLowerCase();
+    if (!texto) return true;
+    return (p.nombre || "").toLowerCase().includes(texto);
+  });
+
+  const seleccionarProductoBuscado = (producto) => {
+    if (!producto?.id) return;
+
+    setBusquedaProducto(producto.nombre || "");
+    setMostrarProductosDropdown(false);
+
+    handleChange({
+      target: {
+        name: "producto",
+        value: producto.id,
+      },
+    });
   };
 
   // ✅ Inferir tipoArea desde zonas si falta o viene mal
@@ -1380,30 +1402,61 @@ const countZonas = (z) => {
             <div className="pfm-top-grid">
               <div className="pfm-top-left">
                 {/* Producto */}
-                <div className="pfm-field">
-                  <div className="pfm-label">Producto</div>
-                  <select
-                    className="pfm-control"
-                    name="producto"
-                    value={loadingProductos ? "" : formData.producto}
-                    onChange={handleChange}
-                    disabled={loadingProductos || soloVer}
-                  >
-                    <option value="">
-                      {loadingProductos ? "Cargando productos..." : "Seleccionar producto..."}
-                    </option>
-                    {productosDisponibles.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.nombre}
-                      </option>
-                    ))}
-                  </select>
-                  {!loadingProductos && productosDisponibles.length === 0 && (
-                    <div className="pfm-empty" style={{ marginTop: "8px" }}>
-                      No hay productos configurados disponibles.
-                    </div>
-                  )}
-                </div>
+              <div className="pfm-field pfm-producto-search-wrap">
+                <div className="pfm-label">Producto</div>
+
+                <input
+                  type="text"
+                  className="pfm-control"
+                  placeholder={
+                    loadingProductos
+                      ? "Cargando productos..."
+                      : "Escribí para buscar producto..."
+                  }
+                  value={
+                    busquedaProducto ||
+                    formData.productoNombre ||
+                    getProductoNombreById(formData.producto) ||
+                    ""
+                  }
+                  disabled={loadingProductos || soloVer}
+                  onFocus={() => setMostrarProductosDropdown(true)}
+                  onChange={(e) => {
+                    setBusquedaProducto(e.target.value);
+                    setMostrarProductosDropdown(true);
+                  }}
+                />
+
+                {mostrarProductosDropdown && !loadingProductos && !soloVer && (
+                  <div className="pfm-producto-search-dropdown">
+                    {productosFiltrados.length > 0 ? (
+                      productosFiltrados.map((p) => (
+                        <button
+                          key={p.id}
+                          type="button"
+                          className="pfm-producto-search-option"
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            seleccionarProductoBuscado(p);
+                          }}
+                        >
+                          {p.nombre}
+                        </button>
+                      ))
+                    ) : (
+                      <div className="pfm-producto-search-empty">
+                        No hay productos que coincidan.
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {!loadingProductos && productosDisponibles.length === 0 && (
+                  <div className="pfm-empty" style={{ marginTop: "8px" }}>
+                    No hay productos configurados disponibles.
+                  </div>
+                )}
+              </div>
 
                 {/* Detalle general */}
                 <div className="pfm-field">

@@ -1799,3 +1799,57 @@ body.printing-producto .pfm-static-talle-detail {
   overflow-wrap: anywhere !important;
 }
 }
+
+.pfm-producto-search-wrap {
+  position: relative;
+}
+
+.pfm-producto-search-dropdown {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 5000;
+  max-height: 240px;
+  overflow-y: auto;
+  background: #ffffff;
+  border: 1px solid #dbe3ec;
+  border-radius: 12px;
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.18);
+  padding: 6px;
+}
+
+.pfm-producto-search-option {
+  width: 100%;
+  border: none;
+  background: transparent;
+  text-align: left;
+  padding: 9px 10px;
+  border-radius: 9px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #0f172a;
+}
+
+.pfm-producto-search-option:hover {
+  background: #eef6ff;
+}
+
+.pfm-producto-search-empty {
+  padding: 10px;
+  font-size: 13px;
+  color: #64748b;
+}
+
+body.dark-mode .pfm-producto-search-dropdown {
+  background: #1f1f1f;
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+body.dark-mode .pfm-producto-search-option {
+  color: #e5e7eb;
+}
+
+body.dark-mode .pfm-producto-search-option:hover {
+  background: rgba(45, 161, 255, 0.16);
+}
