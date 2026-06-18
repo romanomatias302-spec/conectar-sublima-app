@@ -68,6 +68,13 @@ produccion: {
     editar: false,
     anular: false,
     listado: false,
+
+    cotizaciones: false,
+    crearCotizacion: false,
+    editarCotizacion: false,
+    anularCotizacion: false,
+    otorgarDescuentoCotizacion: false,
+    convertirCotizacion: false,
   },
 
   caja: {
@@ -161,9 +168,16 @@ const MODULOS_PERMISOS = [
   acciones: [
     { key: "ver", label: "Ver módulo" },
     { key: "crear", label: "Crear venta" },
-    { key: "listado", label: "Ver listado" },
-    { key: "editar", label: "Editar" },
+    { key: "listado", label: "Ver listado ventas" },
+    { key: "editar", label: "Editar venta" },
     { key: "anular", label: "Anular venta" },
+
+    { key: "cotizaciones", label: "Ver cotizaciones" },
+    { key: "crearCotizacion", label: "Crear cotización" },
+    { key: "editarCotizacion", label: "Editar cotización" },
+    { key: "anularCotizacion", label: "Anular cotización" },
+    { key: "otorgarDescuentoCotizacion", label: "Otorgar descuento en cotización" },
+    { key: "convertirCotizacion", label: "Convertir cotización a venta" },
   ],
 },
 

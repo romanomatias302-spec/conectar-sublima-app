@@ -179,6 +179,8 @@ function canReadClientes(clienteId) {
         || permisoModuloAccion("ventas", "crear")
         || permisoModuloAccion("ventas", "editar")
         || permisoModuloAccion("ventas", "ver")
+        || permisoModuloAccion("ventas", "cotizaciones")
+        || permisoModuloAccion("ventas", "crearCotizacion")
       )
     );
 }
@@ -458,8 +460,7 @@ function canReadVentas(clienteId) {
     }
 
     function canReadCotizaciones(clienteId) {
-      return canModulo(clienteId, "ventas", "cotizaciones")
-        || canModulo(clienteId, "ventas", "ver");
+      return canModulo(clienteId, "ventas", "cotizaciones");
     }
 
     function canCreateCotizaciones(clienteId) {
@@ -569,13 +570,19 @@ function canReadVentas(clienteId) {
             "updatedAt"
           ])
         )
-        || (
-          canTouchUltimoNumeroCotizacion(clienteId)
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            "ultimoNumeroCotizacion",
-            "updatedAt"
-          ])
-        );
+      || (
+        signedIn()
+        && isActiveUser()
+        && clienteId == profile().clienteId
+        && (
+          isAdmin()
+          || permisoModuloAccion("ventas", "crearCotizacion")
+        )
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          "ultimoNumeroCotizacion",
+          "updatedAt"
+        ])
+      );
 
       allow create, delete: if isSuperAdmin();
     }

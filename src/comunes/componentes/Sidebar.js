@@ -51,6 +51,9 @@ const puedeVerListadoVentas =
   const puedeCrearCotizaciones =
   puedeHacer(perfil, "ventas", "crearCotizacion");
 
+  const puedeVerCotizaciones =
+  puedeHacer(perfil, "ventas", "cotizaciones");
+
   return (
     <div className={`sidebar ${expandido ? "expandido" : "colapsado"}`}>
       <div className="sidebar-header">
@@ -95,7 +98,7 @@ const puedeVerListadoVentas =
           </li>
         )}
 
-        {(puedeCrearVentas || puedeVerListadoVentas) && (
+        {(puedeCrearVentas || puedeVerListadoVentas || puedeVerCotizaciones) && (
           <li className="menu-group">
             <div
               className="menu-item-with-arrow"
@@ -138,7 +141,7 @@ const puedeVerListadoVentas =
                 </div>
               )}
 
-              {puedeCrearCotizaciones && (
+              {puedeVerCotizaciones && (
                 <div
                   className="sidebar-subitem"
                   onClick={() => onSelect("cotizaciones-crear")}

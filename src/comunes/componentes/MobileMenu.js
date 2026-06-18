@@ -67,6 +67,8 @@ const puedeVerListadoVentas =
   puedeHacer(perfil, "ventas", "listado");
   const puedeCrearCotizaciones =
   puedeHacer(perfil, "ventas", "crearCotizacion");
+const puedeVerCotizaciones =
+  puedeHacer(perfil, "ventas", "cotizaciones");  
 const puedeVerCaja = puedeHacer(perfil, "caja", "ver");
 const puedeVerInformes = puedeHacer(perfil, "informes", "ver");
 
@@ -228,7 +230,7 @@ const puedeVerInformes = puedeHacer(perfil, "informes", "ver");
             </button>
           )}
 
-          {(puedeCrearVentas || puedeVerListadoVentas) && (
+          {(puedeCrearVentas || puedeVerListadoVentas || puedeVerCotizaciones) && (
             <>
               {puedeCrearVentas && (
                 <button
@@ -250,7 +252,7 @@ const puedeVerInformes = puedeHacer(perfil, "informes", "ver");
                   Listado ventas
                 </button>
               )}
-              {puedeCrearCotizaciones && (
+              {puedeVerCotizaciones && (
                 <button onClick={() => irA("cotizaciones-crear")}>
                   <CreditCard size={18} />
                   Cotizaciones

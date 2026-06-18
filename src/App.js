@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { onAuthStateChanged, signOut } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, onSnapshot } from "firebase/firestore";
 import { auth, db } from "./firebase";
 import Login from "./modulos/auth/Login";
 import ActivarCuenta from "./modulos/auth/ActivarCuenta";
@@ -207,25 +207,34 @@ if (nuevaVista !== "detallePedido") {
     localStorage.setItem("modoOscuro", modoOscuro);
   }, [modoOscuro]);
 
-    useEffect(() => {
-      const unsub = onAuthStateChanged(auth, async (user) => {
+useEffect(() => {
+  let unsubscribePerfil = null;
+
+  const unsubAuth = onAuthStateChanged(auth, (user) => {
+    if (unsubscribePerfil) {
+      unsubscribePerfil();
+      unsubscribePerfil = null;
+    }
+
+    if (!user) {
+      setUsuario(null);
+      setPerfil(null);
+      setMensajeBloqueo("");
+      setErrorConexionPerfil(false);
+      setAuthLoading(false);
+      return;
+    }
+
+    setUsuario(user);
+    setAuthLoading(true);
+    setErrorConexionPerfil(false);
+
+    const ref = doc(db, "usuarios", user.uid);
+
+    unsubscribePerfil = onSnapshot(
+      ref,
+      async (snap) => {
         try {
-      if (!user) {
-        setUsuario(null);
-        setPerfil(null);
-        setMensajeBloqueo("");
-        setErrorConexionPerfil(false);
-        setAuthLoading(false);
-        return;
-      }
-
-          setUsuario(user);
-
-          setErrorConexionPerfil(false);
-
-          const ref = doc(db, "usuarios", user.uid);
-          const snap = await getDoc(ref);
-
           if (!snap.exists()) {
             setPerfil(null);
             setMensajeBloqueo("");
@@ -235,20 +244,22 @@ if (nuevaVista !== "detallePedido") {
 
           const dataPerfil = snap.data();
 
-          console.log("PERFIL LOGIN:", dataPerfil);
+          if (dataPerfil.activo !== true) {
+            setPerfil(null);
+            setMensajeBloqueo("Tu usuario está suspendido. Contactá al administrador.");
+            setAuthLoading(false);
+            return;
+          }
 
           let monedaTenant = "ARS";
           let localeMonedaTenant = "es-AR";
 
-          if (dataPerfil.rol === "admin" && dataPerfil.clienteId) {
+          if (dataPerfil.clienteId && dataPerfil.rol !== "superadmin") {
             const clienteSaasRef = doc(db, "clientes-saas", dataPerfil.clienteId);
             const clienteSaasSnap = await getDoc(clienteSaasRef);
 
-            console.log("clienteId del perfil:", dataPerfil.clienteId);
-            console.log("¿Existe clientes-saas?", clienteSaasSnap.exists());
-
             if (!clienteSaasSnap.exists()) {
-              console.log("NO EXISTE clientes-saas para:", dataPerfil.clienteId);
+              setPerfil(null);
               setMensajeBloqueo("No se encontró la empresa asociada a tu cuenta.");
               setAuthLoading(false);
               return;
@@ -259,102 +270,49 @@ if (nuevaVista !== "detallePedido") {
             monedaTenant = clienteSaasData?.moneda || "ARS";
             localeMonedaTenant = clienteSaasData?.localeMoneda || "es-AR";
 
-            const estadoRaw = clienteSaasData?.estado;
             const estadoCliente =
-              typeof estadoRaw === "string"
-                ? estadoRaw.trim().toLowerCase()
+              typeof clienteSaasData?.estado === "string"
+                ? clienteSaasData.estado.trim().toLowerCase()
                 : "";
 
-            console.log("ESTADO RAW:", JSON.stringify(estadoRaw), typeof estadoRaw);
-            console.log("ESTADO NORMALIZADO:", JSON.stringify(estadoCliente));
-
             if (["suspendido", "bloqueado", "inactivo"].includes(estadoCliente)) {
-              console.log("BLOQUEADO POR ESTADO");
+              setPerfil(null);
               setMensajeBloqueo("Tu cuenta se encuentra suspendida. Contactá al administrador.");
               setAuthLoading(false);
               return;
             }
-
-            console.log("CLIENTE HABILITADO PARA ENTRAR");
           }
 
-            setPerfil({
-              uid: user.uid,
-              firebaseUid: user.uid,
-              ...dataPerfil,
-              moneda: monedaTenant,
-              localeMoneda: localeMonedaTenant,
-            });
+          setPerfil({
+            uid: user.uid,
+            firebaseUid: user.uid,
+            ...dataPerfil,
+            moneda: monedaTenant,
+            localeMoneda: localeMonedaTenant,
+          });
 
           setMensajeBloqueo("");
+          setErrorConexionPerfil(false);
+          setAuthLoading(false);
+        } catch (error) {
+          console.error("Error escuchando perfil:", error);
+          setErrorConexionPerfil(true);
+          setAuthLoading(false);
+        }
+      },
+      (error) => {
+        console.error("Error listener perfil:", error);
+        setErrorConexionPerfil(true);
+        setAuthLoading(false);
+      }
+    );
+  });
 
-          // 🔒 bloqueo por usuario inactivo
-          if (dataPerfil.activo !== true) {
-            setMensajeBloqueo("Tu usuario está suspendido. Contactá al administrador.");
-            setAuthLoading(false);
-            return;
-          }
-
-          
-
-          // 🔒 bloqueo por cliente SaaS suspendido
-          if (dataPerfil.rol === "admin" && dataPerfil.clienteId) {
-            console.log("clienteId del perfil:", dataPerfil.clienteId);
-
-            const clienteSaasRef = doc(db, "clientes-saas", dataPerfil.clienteId);
-            const clienteSaasSnap = await getDoc(clienteSaasRef);
-
-            console.log("¿Existe clientes-saas?", clienteSaasSnap.exists());
-
-            if (!clienteSaasSnap.exists()) {
-              console.log("NO EXISTE clientes-saas para:", dataPerfil.clienteId);
-              setMensajeBloqueo("No se encontró la empresa asociada a tu cuenta.");
-              setAuthLoading(false);
-              return;
-            }
-
-            const clienteSaasData = clienteSaasSnap.data();
-            const monedaTenant = clienteSaasData?.moneda || "ARS";
-            const localeMonedaTenant = clienteSaasData?.localeMoneda || "es-AR";
-
-            const estadoRaw = clienteSaasData?.estado;
-            const estadoCliente =
-              typeof estadoRaw === "string"
-                ? estadoRaw.trim().toLowerCase()
-                : "";
-
-            console.log("ESTADO RAW:", JSON.stringify(estadoRaw), typeof estadoRaw);
-            console.log("ESTADO NORMALIZADO:", JSON.stringify(estadoCliente));
-
-            // solo bloquear si el estado dice explícitamente suspendido/bloqueado/inactivo
-            if (["suspendido", "bloqueado", "inactivo"].includes(estadoCliente)) {
-              console.log("BLOQUEADO POR ESTADO");
-              setMensajeBloqueo("Tu cuenta se encuentra suspendida. Contactá al administrador.");
-              setAuthLoading(false);
-              return;
-            }
-
-            console.log("CLIENTE HABILITADO PARA ENTRAR");
-
-            
-          }
-
-          setMensajeBloqueo("");
-          } catch (error) {
-            console.error("Error al cargar perfil:", error);
-
-            setMensajeBloqueo("");
-            setErrorConexionPerfil(true);
-
-            // No borrar usuario ni perfil ante errores de conexión.
-            // Si había un perfil cargado, mantenemos la app viva.
-          } finally {
-            setAuthLoading(false);
-          }
-      });
-
-      return () => unsub();
-    }, []);
+  return () => {
+    if (unsubscribePerfil) unsubscribePerfil();
+    unsubAuth();
+  };
+}, []);
 
     useEffect(() => {
       if (esRutaActivacion) return;
