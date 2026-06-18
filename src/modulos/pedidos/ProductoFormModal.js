@@ -1065,8 +1065,8 @@ return (
     );
   };
 
-  const renderCampo = (campo) => {
-    if (!switchesActivos[campo]) return null;
+const renderCampo = (campo) => {
+  if (campo !== "cantidad" && !switchesActivos[campo]) return null;
 
     switch (campo) {
       case "color":
@@ -1214,13 +1214,37 @@ const countZonas = (z) => {
         );
       }
 
+      case "cantidad":
+        return (
+          <div className="pfm-field">
+            <div className="pfm-label">Cantidad</div>
+
+          <input
+            className="pfm-control pfm-control-sin-spinner"
+            type="text"
+            inputMode="numeric"
+            name="cantidad"
+            value={formData.cantidad === 0 ? "" : formData.cantidad}
+            onChange={(e) => {
+              const valor = e.target.value.replace(/\D/g, "");
+
+              setFormData((prev) => ({
+                ...prev,
+                cantidad: valor,
+              }));
+            }}
+            placeholder="0"
+          />
+          </div>
+        );
+
       case "talles": {
         const talles = resolveTallesToRender();
         return (
           <div className="pfm-field">
             <div className="pfm-label">Talles disponibles</div>
 
-            <div className="pfm-talles">
+            <div className={`pfm-talles ${!switchesActivos.detallesTalle ? "pfm-talles-solo-cantidad" : ""}`}>
               {talles.map((t) => (
                 <div key={t} className="pfm-talle-row">
                   <div className="pfm-talle-name">{t}</div>
@@ -1233,13 +1257,15 @@ const countZonas = (z) => {
                     onChange={(e) => handleTalleChange(t, e.target.value)}
                   />
 
-                  <input
-                    className="pfm-control pfm-control-detail"
-                    type="text"
-                    placeholder="Detalle por talle..."
-                    value={formData.detallePorTalle?.[t] ?? ""}
-                    onChange={(e) => handleDetalleTalleChange(t, e.target.value)}
-                  />
+                  {switchesActivos.detallesTalle && (
+                    <input
+                      className="pfm-control pfm-control-detail"
+                      type="text"
+                      placeholder="Detalle por talle..."
+                      value={formData.detallePorTalle?.[t] ?? ""}
+                      onChange={(e) => handleDetalleTalleChange(t, e.target.value)}
+                    />
+                  )}
                 </div>
               ))}
             </div>
@@ -1580,14 +1606,25 @@ const countZonas = (z) => {
 
             
             {/* Campos dinámicos */}
-            {Object.values(switchesActivos).some((v) => v) ? (
+            {formData.producto ? (
               <>
                 <div className="pfm-dynamic">
-                  {camposOrden.map((campo) => (
-                    <React.Fragment key={campo}>
-                      {campo === "imagenes" ? null : renderCampo(campo)}
+                  {!switchesActivos.talles && (
+                    <React.Fragment key="cantidad">
+                      {renderCampo("cantidad")}
                     </React.Fragment>
-                  ))}
+                  )}
+
+                  {camposOrden.map((campo) => {
+                    if (campo === "imagenes") return null;
+                    if (campo === "talles" && !switchesActivos.talles) return null;
+
+                    return (
+                      <React.Fragment key={campo}>
+                        {renderCampo(campo)}
+                      </React.Fragment>
+                    );
+                  })}
                 </div>
 
                 {switchesActivos.zonas && mostrarReferenciaZonas ? (
@@ -1598,9 +1635,7 @@ const countZonas = (z) => {
               </>
             ) : (
               <div className="pfm-empty">
-                ⚙️ Este producto no tiene campos configurados.
-                <br />
-                Editalo desde <strong>Configuración de Productos</strong>.
+                Seleccioná un producto para cargar sus campos.
               </div>
             )}
           </>

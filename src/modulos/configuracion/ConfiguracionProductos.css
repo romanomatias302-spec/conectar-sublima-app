@@ -51,7 +51,7 @@
 .switch-acciones {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 11px;
 }
 
 /* ⚙️ Icono de configuración */
@@ -1980,3 +1980,72 @@ body.dark-mode .cancelar {
   color: #dc2626;
   font-weight: 600;
 }
+
+.btn-switch-orden {
+  width: 24px;
+  height: 24px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+}
+
+.btn-switch-orden:hover:not(:disabled) {
+  background: #e0f2fe;
+  color: #0284c7;
+  border-color: #7dd3fc;
+}
+
+.btn-switch-orden:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.btn-mini-eliminar {
+  opacity: 1 !important;
+  visibility: visible !important;
+  color: #dc2626 !important;
+  background: #fee2e2 !important;
+  border: 1px solid #fecaca !important;
+}
+
+.btn-mini-eliminar:hover {
+  background: #dc2626 !important;
+  color: #ffffff !important;
+}
+
+.btn-switch-orden svg {
+  display: block !important;
+  width: 12px !important;
+  height: 12px !important;
+  min-width: 12px !important;
+  color: #64748b !important;
+  fill: #64748b !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+.btn-switch-orden:hover:not(:disabled) svg {
+  color: #0284c7 !important;
+  fill: #0284c7 !important;
+}
+
+.switch-orden-group {
+  display: flex;
+  align-items: center;
+  gap: 0px; /* o 0px si las querés casi pegadas */
+}
+
+.switch-orden-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+}
+
+.switch-orden-group .btn-switch-orden + .btn-switch-orden {
+  margin-left: -3px;
+}
+

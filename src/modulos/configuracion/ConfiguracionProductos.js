@@ -11,6 +11,7 @@ import {
   getDoc,
   query,
   where,
+  serverTimestamp,
 } from "firebase/firestore";
 import { FaTrashAlt, FaCog, FaPlus } from "react-icons/fa";
 import "./ConfiguracionProductos.css";
@@ -21,6 +22,7 @@ export default function ConfiguracionProductos({ perfil }) {
   const [productos, setProductos] = useState([]);
   const [mostrarOnboarding, setMostrarOnboarding] = useState(false);
   const [productoSeleccionado, setProductoSeleccionado] = useState(null);
+  const [busquedaProducto, setBusquedaProducto] = useState("");
 
   const limpiarProductosDuplicados = async () => {
   if (!perfil?.clienteId) return;
@@ -147,7 +149,7 @@ const cargarProductos = async () => {
             atributosExtra: false,
           },
           zonas: {
-            General: ["Zona única de impresión"],
+            General: ["Zona única"],
           },
         },
       ];
@@ -169,6 +171,76 @@ const cargarProductos = async () => {
   useEffect(() => {
     cargarProductos();
   }, [perfil]);
+
+  const renombrarProducto = async (producto) => {
+  const nombreActual = producto?.nombre || "";
+  const nuevoNombre = prompt("Nuevo nombre del producto:", nombreActual);
+
+  if (nuevoNombre === null) return;
+
+  const nombreLimpio = nuevoNombre.trim();
+
+  if (!nombreLimpio) {
+    alert("El nombre no puede estar vacío.");
+    return;
+  }
+
+  const yaExiste = productos.some(
+    (p) =>
+      p.id !== producto.id &&
+      (p.nombre || "").trim().toLowerCase() === nombreLimpio.toLowerCase()
+  );
+
+  if (yaExiste) {
+    alert("Ya existe un producto con ese nombre.");
+    return;
+  }
+
+  await updateDoc(doc(db, "productosBase", producto.id), {
+    nombre: nombreLimpio,
+    updatedAt: serverTimestamp(),
+  });
+
+  cargarProductos();
+};
+
+const duplicarProducto = async (producto) => {
+  if (!producto?.id) return;
+
+  const nombreSugerido = `${producto.nombre || "Producto"} copia`;
+  const nuevoNombre = prompt("Nombre del producto duplicado:", nombreSugerido);
+
+  if (nuevoNombre === null) return;
+
+  const nombreLimpio = nuevoNombre.trim();
+
+  if (!nombreLimpio) {
+    alert("El nombre no puede estar vacío.");
+    return;
+  }
+
+  const yaExiste = productos.some(
+    (p) =>
+      (p.nombre || "").trim().toLowerCase() === nombreLimpio.toLowerCase()
+  );
+
+  if (yaExiste) {
+    alert("Ya existe un producto con ese nombre.");
+    return;
+  }
+
+  const { id, createdAt, updatedAt, ...datosProducto } = producto;
+
+  await addDoc(collection(db, "productosBase"), {
+    ...datosProducto,
+    nombre: nombreLimpio,
+    clienteId: perfil?.clienteId || producto.clienteId || "",
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+
+  cargarProductos();
+};
 
   // 🔹 Eliminar producto
   const eliminarProducto = async (id) => {
@@ -220,6 +292,11 @@ const cargarProductos = async () => {
   // 🩵 Mostrar onboarding solo si es la primera vez
   const mostrarMensajeInicial = mostrarOnboarding;
 
+
+  const productosFiltrados = productos.filter((p) =>
+    (p.nombre || "").toLowerCase().includes(busquedaProducto.trim().toLowerCase())
+  );
+
   return (
     <div className="config-productos">
       {!productoSeleccionado ? (
@@ -236,9 +313,18 @@ const cargarProductos = async () => {
             </div>
           )}
 
-          <button className="btn-nuevo" onClick={crearNuevoProducto}>
-            <FaPlus /> Nuevo producto
-          </button>
+          <div className="productos-toolbar">
+            <input
+              className="productos-buscador"
+              value={busquedaProducto}
+              onChange={(e) => setBusquedaProducto(e.target.value)}
+              placeholder="Buscar producto..."
+            />
+
+            <button className="btn-nuevo" onClick={crearNuevoProducto}>
+              <FaPlus /> Nuevo producto
+            </button>
+          </div>
 
           <table className="tabla-config">
             <thead>
@@ -248,13 +334,15 @@ const cargarProductos = async () => {
               </tr>
             </thead>
             <tbody>
-              {productos.map((p) => (
+              {productosFiltrados.map((p) => (
                 <tr key={p.id}>
                   <td>{p.nombre}</td>
 
                   <td style={{textAlign:"right"}}>
                     <ActionMenu
                       onEditar={() => abrirConfiguracionProducto(p.id)}
+                      onRenombrar={() => renombrarProducto(p)}
+                      onDuplicar={() => duplicarProducto(p)}
                       onEliminar={() => eliminarProducto(p.id)}
                     />
                   </td>

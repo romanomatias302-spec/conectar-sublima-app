@@ -1853,3 +1853,37 @@ body.dark-mode .pfm-producto-search-option {
 body.dark-mode .pfm-producto-search-option:hover {
   background: rgba(45, 161, 255, 0.16);
 }
+
+.pfm-talles-solo-cantidad {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(130px, 1fr));
+  gap: 10px;
+}
+
+.pfm-talles-solo-cantidad .pfm-talle-row {
+  display: grid;
+  grid-template-columns: 1fr 72px;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+}
+
+.pfm-talles-solo-cantidad .pfm-control-detail {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .pfm-talles-solo-cantidad {
+    grid-template-columns: repeat(3, minmax(120px, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .pfm-talles-solo-cantidad {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+
+
+

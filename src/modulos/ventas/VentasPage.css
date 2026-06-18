@@ -472,10 +472,9 @@
 }
 
 .ventas-top-editable-pedido-row {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 8px;
-  align-items: center;
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
 }
 
 .ventas-top-editable-pedido-row select {
@@ -1813,6 +1812,15 @@ margin-top:20px;
   padding: 0 14px !important;
   transform: translateY(-11px);
 }
+
+.ventas-btn-inline {
+  transform: translateY(-11px);
+}
+
+.ventas-top-editable-pedido-row > .btn {
+  transform: translateY(-7px);
+}
+
 
 
 

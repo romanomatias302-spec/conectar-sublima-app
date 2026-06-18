@@ -3,7 +3,7 @@ import React, { useState, useEffect } from "react";
 import { db, storage } from "../../firebase";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { FaCog, FaArrowLeft } from "react-icons/fa";
+import { FaCog, FaArrowLeft, FaArrowUp, FaArrowDown } from "react-icons/fa";
 import "./ConfiguracionProductos.css";
 import ZonasConfigEditor from "./ZonasConfigEditor";
 import TallesConfigEditor from "./TallesConfigEditor";
@@ -176,7 +176,40 @@ if (!producto) return <p>Cargando producto...</p>;
  
 
 
+  const CAMPOS_CONFIG = {
+  talles: "Talles disponibles",
+  detallesTalle: "Detalles por talle (recomendado para camisetas de futbol y egresados)",
+  colores: "Colores del producto",
+  zonas: "Zonas de impresión",
+  imagenes: "Imágenes / Enlaces",
+  detallesCostura: "Detalles de costura",
+  atributosExtra: "Atributos adicionales",
+};
 
+const camposOrdenados = (producto.orden_campos || Object.keys(CAMPOS_CONFIG))
+  .filter((key) => CAMPOS_CONFIG[key]);
+
+const moverCampo = async (index, direccion) => {
+  const nuevoIndex = index + direccion;
+  if (nuevoIndex < 0 || nuevoIndex >= camposOrdenados.length) return;
+
+  const nuevoOrden = [...camposOrdenados];
+  const [movido] = nuevoOrden.splice(index, 1);
+  nuevoOrden.splice(nuevoIndex, 0, movido);
+
+  setProducto((prev) => ({
+    ...prev,
+    orden_campos: nuevoOrden,
+  }));
+
+  try {
+    await updateDoc(doc(db, "productosBase", productoId), {
+      orden_campos: nuevoOrden,
+    });
+  } catch (error) {
+    console.error("Error guardando orden de campos:", error);
+  }
+};
 
 
   // ===================================================
@@ -200,18 +233,34 @@ if (!producto) return <p>Cargando producto...</p>;
 
       {/* 🔹 Lista de switches */}
       <div className="switch-lista">
-        {Object.entries({
-          talles: "Talles disponibles",
-          detallesTalle: "Detalles por talle (recomendado para camisetas de futbol y egresados)",
-          colores: "Colores del producto",
-          zonas: "Zonas de impresión",
-          imagenes: "Imágenes / Enlaces",
-          detallesCostura: "Detalles de costura",
-          atributosExtra: "Atributos adicionales",
-        }).map(([key, label]) => (
+        {camposOrdenados.map((key, index) => {
+          const label = CAMPOS_CONFIG[key];
+
+          return (
           <div key={key} className="switch-fila">
             <span className="switch-label">{label}</span>
             <div className="switch-acciones">
+              <div className="switch-orden-group">
+              <button
+                type="button"
+                className="btn-switch-orden"
+                onClick={() => moverCampo(index, -1)}
+                disabled={index === 0}
+                title="Subir"
+              >
+                <FaArrowUp />
+              </button>
+
+              <button
+                type="button"
+                className="btn-switch-orden"
+                onClick={() => moverCampo(index, 1)}
+                disabled={index === camposOrdenados.length - 1}
+                title="Bajar"
+              >
+                <FaArrowDown />
+              </button>
+                </div>
               <FaCog
                 className="icono-config"
                 title="Configurar"
@@ -227,7 +276,8 @@ if (!producto) return <p>Cargando producto...</p>;
               </label>
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* 🔹 Modal de configuración */}
@@ -332,10 +382,7 @@ if (!producto) return <p>Cargando producto...</p>;
         se mostrará la sección para adjuntar imágenes.
       </p>
 
-      <p className="texto-secundario" style={{ marginBottom: 0 }}>
-        Más adelante se puede usar esta misma base para diferenciar:
-        versión estándar = enlaces manuales / versión premium = subida real a Storage.
-      </p>
+
     </div>
 
     <div className="form-actions">
