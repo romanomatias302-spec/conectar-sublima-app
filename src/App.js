@@ -19,6 +19,7 @@ import VentasList from "./modulos/ventas/VentasList";
 import VentaFormModal from "./modulos/ventas/VentaFormModal";
 import VentasPage from "./modulos/ventas/VentasPage";
 import CotizacionesPage from "./modulos/ventas/CotizacionesPage";
+import CotizacionDetalle from "./modulos/ventas/CotizacionDetalle";
 import MovimientosList from "./modulos/movimientos/MovimientosList";
 import VentaDetalle from "./modulos/ventas/VentaDetalle";
 import { obtenerVentaPorId } from "./firebase/ventas";
@@ -46,7 +47,13 @@ export default function App() {
   return window.innerWidth > 768;
 });
   const [ventaSeleccionada, setVentaSeleccionada] = useState(null);
+  const [cotizacionSeleccionada, setCotizacionSeleccionada] = useState(null);
+  const [cotizacionDetalleId, setCotizacionDetalleId] = useState(() => {
+  return localStorage.getItem("cotizacionDetalleId") || "";
+});
   const [productosPedidoParaVenta, setProductosPedidoParaVenta] = useState([]);
+  const [cotizacionParaVenta, setCotizacionParaVenta] = useState(null);
+  const [itemsCotizacionParaVenta, setItemsCotizacionParaVenta] = useState([]);
   const [mostrarModalVenta, setMostrarModalVenta] = useState(false);
 
 
@@ -123,9 +130,12 @@ const irAVista = (nuevaVista, extra = {}) => {
   const nuevoCliente = extra.cliente ?? null;
   const nuevoPedido = extra.pedido ?? null;
   const nuevaVenta = extra.venta ?? null;
+  const nuevaCotizacion = extra.cotizacion ?? null;
   const nuevoOrigen = extra.origen ?? null;
 const nuevosProductosPedidoParaVenta =
   extra.productosPedido ?? [];
+  const nuevaCotizacionParaVenta = extra.cotizacionParaVenta ?? null;
+const nuevosItemsCotizacionParaVenta = extra.itemsCotizacion ?? [];
 
 
 
@@ -133,8 +143,11 @@ const nuevosProductosPedidoParaVenta =
   setClienteSeleccionado(nuevoCliente);
   setPedidoSeleccionado(nuevoPedido);
   setVentaSeleccionada(nuevaVenta);
+  setCotizacionSeleccionada(nuevaCotizacion);
   setOrigenVista(nuevoOrigen);
   setProductosPedidoParaVenta(nuevosProductosPedidoParaVenta);
+  setCotizacionParaVenta(nuevaCotizacionParaVenta);
+  setItemsCotizacionParaVenta(nuevosItemsCotizacionParaVenta);
   localStorage.setItem("vistaActual", nuevaVista);
 
 if (nuevaVenta?.firebaseId) {
@@ -143,6 +156,15 @@ if (nuevaVenta?.firebaseId) {
 
 if (nuevaVista !== "venta-detalle") {
   localStorage.removeItem("ventaDetalleId");
+}
+if (nuevaCotizacion?.firebaseId) {
+  localStorage.setItem("cotizacionDetalleId", nuevaCotizacion.firebaseId);
+  setCotizacionDetalleId(nuevaCotizacion.firebaseId);
+}
+
+if (nuevaVista !== "cotizacion-detalle") {
+  localStorage.removeItem("cotizacionDetalleId");
+  setCotizacionDetalleId("");
 }
 
 if (nuevoPedido?.firebaseId) {
@@ -156,13 +178,14 @@ if (nuevaVista !== "detallePedido") {
   if (esRutaActivacion) return;
 
   window.history.pushState(
-    {
-      vista: nuevaVista,
-      cliente: nuevoCliente,
-      pedido: nuevoPedido,
-      venta: nuevaVenta,
-      origen: nuevoOrigen,
-    },
+  {
+    vista: nuevaVista,
+    cliente: nuevoCliente,
+    pedido: nuevoPedido,
+    venta: nuevaVenta,
+    cotizacion: nuevaCotizacion,
+    origen: nuevoOrigen,
+  },
     "",
     window.location.pathname
   );
@@ -355,12 +378,23 @@ if (nuevaVista !== "detallePedido") {
           setPedidoSeleccionado(state.pedido ?? null);
           setVentaSeleccionada(state.venta ?? null);
           setOrigenVista(state.origen ?? null);
-        } else {
+          setCotizacionSeleccionada(state.cotizacion ?? null);
+
+          if (state.vista !== "ventas-crear") {
+            setCotizacionParaVenta(null);
+            setItemsCotizacionParaVenta([]);
+          }
+        } 
+        
+        else {
           setVista("inicio");
           setClienteSeleccionado(null);
           setPedidoSeleccionado(null);
           setVentaSeleccionada(null);
           setOrigenVista(null);
+          setCotizacionSeleccionada(null);
+          setCotizacionParaVenta(null);
+          setItemsCotizacionParaVenta([]);
         }
       };
 
@@ -387,6 +421,7 @@ if (nuevaVista !== "detallePedido") {
         "ventas-listado": "ventas",
         "venta-detalle": "ventas",
         "cotizaciones-crear": "ventas",
+        "cotizacion-detalle": "ventas",
         movimientos: "informes",
         caja: "caja",
         configuracion: "configuracion",
@@ -696,15 +731,36 @@ if (!perfil) {
 
         {vista === "ventas-crear" && (
           <VentasPage
-            perfil={perfil}
+             perfil={perfil}
             pedidoInicial={pedidoSeleccionado}
             productosPedido={productosPedidoParaVenta}
+            cotizacionInicial={cotizacionParaVenta}
+            itemsCotizacion={itemsCotizacionParaVenta}
           />
         )}
 
-        {vista === "cotizaciones-crear" && (
-          <CotizacionesPage perfil={perfil} />
-        )}
+       {vista === "cotizaciones-crear" && (
+        <CotizacionesPage
+          perfil={perfil}
+          onVerCotizacion={(cotizacion) =>
+            irAVista("cotizacion-detalle", { cotizacion })
+          }
+        />
+      )}
+
+      {vista === "cotizacion-detalle" && (
+      <CotizacionDetalle
+        perfil={perfil}
+        cotizacionId={cotizacionSeleccionada?.firebaseId || cotizacionDetalleId}
+          onVolver={() => irAVista("cotizaciones-crear")}
+          onPrepararVenta={({ cotizacion, items }) =>
+            irAVista("ventas-crear", {
+              cotizacionParaVenta: cotizacion,
+              itemsCotizacion: items,
+            })
+          }
+        />
+      )}
 
         {vista === "ventas-listado" && (
           <VentasList

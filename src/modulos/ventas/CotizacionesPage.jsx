@@ -16,6 +16,7 @@ import {
 } from "../../firebase/cotizaciones";
 import { formatearMoneda, obtenerConfigMonedaDesdePerfil } from "../../utils/moneda";
 import { puedeHacer } from "../../utils/permisos";
+import { obtenerUsuariosPorCliente } from "../../firebase/usuariosConfig";
 import "./VentasPage.css";
 
 const itemVacio = () => ({
@@ -31,7 +32,7 @@ const clienteRapidoInicial = {
   telefono: "",
 };
 
-export default function CotizacionesPage({ perfil }) {
+export default function CotizacionesPage({ perfil, onVerCotizacion }) {
   const [cotizaciones, setCotizaciones] = useState([]);
   const [ultimoDoc, setUltimoDoc] = useState(null);
   const [hayMas, setHayMas] = useState(true);
@@ -45,6 +46,8 @@ export default function CotizacionesPage({ perfil }) {
   const [modalCrear, setModalCrear] = useState(false);
 
   const [clientes, setClientes] = useState([]);
+  const [usuarios, setUsuarios] = useState([]);
+  const [vendedorUid, setVendedorUid] = useState("");
   const [busquedaCliente, setBusquedaCliente] = useState("");
   const [mostrarDropdownCliente, setMostrarDropdownCliente] = useState(false);
   const [clienteRefId, setClienteRefId] = useState("");
@@ -143,6 +146,18 @@ const [configNegocio, setConfigNegocio] = useState({
     }
   };
 
+  const cargarUsuarios = async () => {
+  try {
+    if (!perfil?.clienteId) return;
+
+    const usuariosCliente = await obtenerUsuariosPorCliente(perfil.clienteId);
+    setUsuarios(usuariosCliente);
+  } catch (err) {
+    console.warn("No se pudieron cargar vendedores:", err);
+    setUsuarios([]);
+  }
+};
+
     const cargarConfigNegocio = async () => {
     try {
       if (!perfil?.clienteId || perfil?.rol === "superadmin") return;
@@ -167,6 +182,7 @@ const [configNegocio, setConfigNegocio] = useState({
     if (!perfil) return;
     cargarCotizaciones();
     cargarClientes();
+    cargarUsuarios();
     cargarConfigNegocio();
   }, [perfil]);
 
@@ -205,6 +221,11 @@ const [configNegocio, setConfigNegocio] = useState({
       );
     });
   }, [clientes, busquedaCliente]);
+
+  const vendedorSeleccionado = useMemo(
+    () => usuarios.find((u) => u.uid === vendedorUid) || null,
+    [usuarios, vendedorUid]
+  );
 
   const clienteSeleccionado = useMemo(
     () => clientes.find((c) => c.firebaseId === clienteRefId) || null,
@@ -259,6 +280,7 @@ const [configNegocio, setConfigNegocio] = useState({
     setNotas("");
     setMostrarClienteRapido(false);
     setClienteRapido(clienteRapidoInicial);
+    setVendedorUid("");
   };
 
   const usarClienteExistente = (clienteExistente) => {
@@ -398,6 +420,7 @@ const [configNegocio, setConfigNegocio] = useState({
         items: itemsValidos,
         descuento: Number(descuentoMonto || 0),
         notas,
+        vendedor: vendedorSeleccionado,
       });
 
       setExito("Cotización guardada con éxito.");
@@ -417,7 +440,7 @@ const [configNegocio, setConfigNegocio] = useState({
       <div className="ventas-topbar">
         <div>
           <h1>Cotizaciones</h1>
-          <p>Presupuestos creados para clientes.</p>
+      
         </div>
 
         <button
@@ -470,7 +493,13 @@ const [configNegocio, setConfigNegocio] = useState({
           <>
             <div className="ventas-mobile-list">
               {cotizacionesFiltradas.map((c) => (
-                <div key={c.firebaseId} className="venta-mobile-card">
+                <div
+                  key={c.firebaseId}
+                  className={`venta-mobile-card ${
+                    c.convertidaAVenta ? "cotizacion-row-convertida" : ""
+                  }`}
+                  onClick={() => onVerCotizacion(c)}
+                >
                   <div className="venta-mobile-top">
                     <div>
                       <strong>Cotización #{c.numeroCotizacion || "-"}</strong>
@@ -505,9 +534,7 @@ const [configNegocio, setConfigNegocio] = useState({
                     </div>
                   </div>
 
-                  <button className="btn btn-primary venta-mobile-btn">
-                    Ver detalle
-                  </button>
+             
                 </div>
               ))}
             </div>
@@ -521,13 +548,19 @@ const [configNegocio, setConfigNegocio] = useState({
                     <th>Cliente</th>
                     <th>Estado</th>
                     <th>Total</th>
-                    <th>Acciones</th>
+                    
                   </tr>
                 </thead>
 
                 <tbody>
                   {cotizacionesFiltradas.map((c) => (
-                    <tr key={c.firebaseId}>
+                  <tr
+                    key={c.firebaseId}
+                    className={`ventas-row-clickable ${
+                      c.convertidaAVenta ? "cotizacion-row-convertida" : ""
+                    }`}
+                    onClick={() => onVerCotizacion(c)}
+                  >
                       <td>#{c.numeroCotizacion || "-"}</td>
                       <td>{c.fechaCotizacion || "-"}</td>
                       <td>{c.clienteNombre || "-"}</td>
@@ -539,17 +572,13 @@ const [configNegocio, setConfigNegocio] = useState({
                           configMoneda.localeMoneda
                         )}
                       </td>
-                      <td>
-                        <button className="btn btn-secondary btn-xs">
-                          Ver
-                        </button>
-                      </td>
+
                     </tr>
                   ))}
 
                   {cotizacionesFiltradas.length === 0 && (
                     <tr>
-                      <td colSpan="6" style={{ textAlign: "center", padding: 16 }}>
+                      <td colSpan="5" style={{ textAlign: "center", padding: 16 }}>
                         No se encontraron cotizaciones.
                       </td>
                     </tr>
@@ -603,65 +632,102 @@ const [configNegocio, setConfigNegocio] = useState({
               </button>
             </div>
 
-            <div className="ventas-grid ventas-grid-top">
-              <div className="ventas-field">
-                <label>Fecha</label>
-                <input type="date" value={fechaCotizacion} disabled />
-              </div>
-              <div className="ventas-field">
-                <label>Validez hasta</label>
-                <input
+            <div className="cotizacion-form-grid">
+              <div className="cotizacion-fechas-row">
+                <div className="ventas-field">
+                  <label>Fecha</label>
+                  <input type="date" value={fechaCotizacion} disabled />
+                </div>
+
+                <div className="ventas-field">
+                  <label>Validez hasta</label>
+                  <input
                     type="date"
                     value={fechaValidez}
                     onChange={(e) => setFechaValidez(e.target.value)}
-                />
-            </div>
-
-              <div className="ventas-field ventas-field-cliente">
-                <label>Seleccionar cliente</label>
-
-                <div className="ventas-cliente-inline">
-                  <div className="ventas-cliente-buscador">
-                    <input
-                      placeholder="Escribí para buscar cliente..."
-                      value={busquedaCliente}
-                      onFocus={() => setMostrarDropdownCliente(true)}
-                      onBlur={() => {
-                        setTimeout(() => setMostrarDropdownCliente(false), 180);
-                      }}
-                      onChange={(e) => {
-                        setBusquedaCliente(e.target.value);
-                        setClienteRefId("");
-                        setMostrarDropdownCliente(true);
-                      }}
-                    />
-
-                    {mostrarDropdownCliente && !clienteRefId && (
-                      <div className="ventas-dropdown">
-                        {clientesFiltrados.slice(0, 8).map((c) => (
-                          <button
-                            key={c.firebaseId}
-                            type="button"
-                            onClick={() => usarClienteExistente(c)}
-                          >
-                            {c.nombre || "Sin nombre"} {c.dni ? `- ${c.dni}` : ""}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {puedeCrearClientes && (
-                    <button
-                      type="button"
-                      className="btn btn-secondary ventas-btn-inline"
-                      onClick={() => setMostrarClienteRapido((prev) => !prev)}
-                    >
-                      {mostrarClienteRapido ? "Cerrar" : "Cliente rápido"}
-                    </button>
-                  )}
+                  />
                 </div>
               </div>
+
+             
+
+          <div className="cotizacion-cliente-vendedor-row">
+
+          <div className="ventas-field ventas-field-cliente">
+            <div className="cotizacion-label-row">
+            <label>Seleccionar cliente</label>
+
+            {puedeCrearClientes && (
+              <button
+                type="button"
+                className="cotizacion-cliente-rapido-link"
+                onClick={() => setMostrarClienteRapido((prev) => !prev)}
+              >
+                {mostrarClienteRapido ? "Cerrar" : "+ Cliente rápido"}
+              </button>
+            )}
+          </div>
+
+            <div className="ventas-cliente-inline">
+              <div className="ventas-cliente-buscador">
+                <input
+                  placeholder="Escribí para buscar cliente..."
+                  value={busquedaCliente}
+                  onFocus={() => setMostrarDropdownCliente(true)}
+                  onBlur={() => {
+                    setTimeout(() => setMostrarDropdownCliente(false), 180);
+                  }}
+                  onChange={(e) => {
+                    setBusquedaCliente(e.target.value);
+                    setClienteRefId("");
+                    setMostrarDropdownCliente(true);
+                  }}
+                />
+
+                {mostrarDropdownCliente && !clienteRefId && (
+                  <div className="ventas-dropdown">
+                    {clientesFiltrados.slice(0, 8).map((c) => (
+                      <button
+                        key={c.firebaseId}
+                        type="button"
+                        onClick={() => usarClienteExistente(c)}
+                      >
+                        {c.nombre || "Sin nombre"}{" "}
+                        {c.dni ? `- ${c.dni}` : ""}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {busquedaCliente.trim() && !clienteRefId && (
+                  <small className="cotizacion-cliente-aviso">
+                    El cliente no existe. Selecciona de la lista o crealo como cliente rápido.
+                  </small>
+                )}
+              </div>
+
+         
+            </div>
+          </div>
+
+          <div className="ventas-field">
+            <label>Vendedor opcional</label>
+
+            <select
+              value={vendedorUid}
+              onChange={(e) => setVendedorUid(e.target.value)}
+            >
+              <option value="">Sin vendedor asignado</option>
+
+              {usuarios.map((u) => (
+                <option key={u.uid} value={u.uid}>
+                  {u.nombre || u.email || "Usuario sin nombre"}
+                </option>
+              ))}
+            </select>
+          </div>
+
+        </div>
             </div>
 
             {mostrarClienteRapido && puedeCrearClientes && (
@@ -683,7 +749,7 @@ const [configNegocio, setConfigNegocio] = useState({
                   </div>
 
                   <div className="ventas-field">
-                    <label>DNI</label>
+                    <label>Documento de identidad</label>
                     <input
                       value={clienteRapido.dni}
                       onChange={(e) =>
@@ -693,6 +759,9 @@ const [configNegocio, setConfigNegocio] = useState({
                         }))
                       }
                     />
+                    <small className="cotizacion-ayuda-discreta">
+                      Podés dejarlo vacío y completarlo más adelante.
+                    </small>
                   </div>
 
                   <div className="ventas-field">
@@ -716,6 +785,7 @@ const [configNegocio, setConfigNegocio] = useState({
                 </div>
               </div>
             )}
+
 
             <div className="ventas-field ventas-mt">
               <label>Notas</label>
@@ -757,23 +827,25 @@ const [configNegocio, setConfigNegocio] = useState({
                       </td>
 
                       <td>
-                        <input
+                       <input
                           type="number"
-                          value={item.cantidad}
+                          value={item.cantidad === 0 ? "" : item.cantidad}
                           onChange={(e) =>
                             actualizarItem(index, "cantidad", e.target.value)
                           }
+                          placeholder="0"
                         />
                       </td>
 
                       <td>
-                        <input
-                          type="number"
-                          value={item.precioUnitario}
-                          onChange={(e) =>
-                            actualizarItem(index, "precioUnitario", e.target.value)
-                          }
-                        />
+                   <input
+                      type="number"
+                      value={item.precioUnitario === 0 ? "" : item.precioUnitario}
+                      onChange={(e) =>
+                        actualizarItem(index, "precioUnitario", e.target.value)
+                      }
+                      placeholder="0"
+                    />
                       </td>
 
                       <td>
@@ -799,8 +871,8 @@ const [configNegocio, setConfigNegocio] = useState({
               </table>
             </div>
 
-            <div className="ventas-card ventas-mt">
-              <div className="ventas-resumen">
+           <div className="ventas-card ventas-mt cotizacion-resumen-card">
+            <div className="ventas-resumen">
                 <div className="ventas-resumen-row">
                   <span>Subtotal</span>
                   <strong>

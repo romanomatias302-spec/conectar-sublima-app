@@ -186,7 +186,7 @@ export default function VentasList({ perfil, onVer = () => {}, onEditar = () => 
     <div className="ventas-page">
       <div className="ventas-topbar">
         <h1>Listado de ventas</h1>
-        <p>Ventas registradas en el sistema</p>
+        
       </div>
 
       <div className="ventas-card">
@@ -335,7 +335,7 @@ export default function VentasList({ perfil, onVer = () => {}, onEditar = () => 
                   <th>Total</th>
                   <th>Pagado</th>
                   <th>Saldo</th>
-                  <th>Acciones</th>
+                 
                 </tr>
               </thead>
 
@@ -346,7 +346,8 @@ export default function VentasList({ perfil, onVer = () => {}, onEditar = () => 
                   return (
                     <tr
                       key={v.firebaseId}
-                      className={ventaAnulada ? "ventas-row-anulada" : ""}
+                      className={`ventas-row-clickable ${ventaAnulada ? "ventas-row-anulada" : ""}`}
+                      onClick={() => onVer(v)}
                     >
                       <td>{v.numeroVenta || "-"}</td>
                       <td>{v.fechaVenta || "-"}</td>
@@ -380,24 +381,14 @@ export default function VentasList({ perfil, onVer = () => {}, onEditar = () => 
                           </span>
                         )}
                       </td>
-                      <td>
-                        <div className="ventas-acciones">
-                          <button
-                            type="button"
-                            className="btn btn-secondary btn-xs"
-                            onClick={() => onVer(v)}
-                          >
-                            Ver
-                          </button>
-                        </div>
-                      </td>
+
                     </tr>
                   );
                 })}
 
                 {ventasFiltradas.length === 0 && (
                   <tr>
-                    <td colSpan="9" style={{ textAlign: "center", padding: "18px" }}>
+                    <td colSpan="8" style={{ textAlign: "center", padding: "18px" }}>
                       No se encontraron ventas.
                     </td>
                   </tr>

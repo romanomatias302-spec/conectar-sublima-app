@@ -15,6 +15,7 @@ import { formatearMoneda, obtenerConfigMonedaDesdePerfil } from "../../utils/mon
 import "./VentasPage.css";
 import { puedeHacer } from "../../utils/permisos";
 import { obtenerUsuariosPorCliente } from "../../firebase/usuariosConfig";
+import { marcarCotizacionConvertida } from "../../firebase/cotizaciones";
 
 const itemVacio = () => ({
   descripcion: "",
@@ -53,6 +54,8 @@ export default function VentasPage({
   perfil,
   pedidoInicial = null,
   productosPedido = [],
+  cotizacionInicial = null,
+  itemsCotizacion = [],
 }) {
   const [clientes, setClientes] = useState([]);
   const [pedidos, setPedidos] = useState([]);
@@ -174,6 +177,48 @@ useEffect(() => {
   pedidoInicial,
   productosPedido,
 ]);
+
+const [cotizacionImportadaId, setCotizacionImportadaId] = useState("");
+
+useEffect(() => {
+  if (!cotizacionInicial || !itemsCotizacion.length || !clientes.length) return;
+  if (cotizacionImportadaId === cotizacionInicial.firebaseId) return;
+
+  const cliente = clientes.find(
+    (c) => c.firebaseId === cotizacionInicial.clienteRefId
+  );
+
+  if (cliente) {
+    usarClienteExistenteEnVenta(cliente);
+  } else {
+    setBusquedaCliente(cotizacionInicial.clienteNombre || "");
+    setError(
+      "No se encontró automáticamente el cliente de la cotización. Seleccionalo manualmente antes de guardar."
+    );
+  }
+
+setItems(itemsCotizacion);
+
+const subtotalCotizacion = itemsCotizacion.reduce(
+  (acc, item) =>
+    acc +
+    Number(item.cantidad || 0) * Number(item.precioUnitario || 0),
+  0
+);
+
+const descuentoCotizacion = Number(cotizacionInicial.descuento || 0);
+
+const descuentoPorcentaje =
+  subtotalCotizacion > 0 && descuentoCotizacion > 0
+    ? (descuentoCotizacion / subtotalCotizacion) * 100
+    : 0;
+
+setDescuento(descuentoPorcentaje);
+
+setVendedorUid(cotizacionInicial.vendedorUid || "");
+setObservaciones(cotizacionInicial.notas || "");
+setCotizacionImportadaId(cotizacionInicial.firebaseId);
+}, [cotizacionInicial, itemsCotizacion, clientes]);
 
   const clientesFiltrados = useMemo(() => {
     const texto = (busquedaCliente || "").trim().toLowerCase();
@@ -576,6 +621,13 @@ if (cliente) {
         observaciones,
       });
 
+      if (cotizacionInicial?.firebaseId) {
+        await marcarCotizacionConvertida({
+          cotizacionId: cotizacionInicial.firebaseId,
+          venta: nuevaVenta,
+        });
+      }
+
       setVentaCreada(nuevaVenta);
       setExito("Venta guardada con éxito.");
       resetearFormulario();
@@ -796,7 +848,7 @@ if (cliente) {
                 </div>
 
                 <div className="ventas-field">
-                  <label>DNI</label>
+                  <label>Documento de identidad</label>
                   <input
                     value={clienteRapido.dni}
                     onChange={(e) =>

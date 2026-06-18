@@ -12,6 +12,7 @@ import {
   startAfter,
   runTransaction,
   serverTimestamp,
+  writeBatch,
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { crearVenta } from "./ventas";
@@ -49,6 +50,7 @@ function normalizarItemsCotizacion(items = []) {
   return Array.isArray(items)
     ? items
         .map((item) => ({
+          firebaseId: item.firebaseId || "",
           descripcion: (item.descripcion || "").trim(),
           cantidad: Number(item.cantidad || 0),
           precioUnitario: Number(item.precioUnitario || 0),
@@ -233,10 +235,12 @@ export async function obtenerItemsDeCotizacion(cotizacionId) {
   const q = query(itemsRef, orderBy("createdAt", "asc"));
   const snapshot = await getDocs(q);
 
-  return snapshot.docs.map((d) => ({
+return snapshot.docs
+  .map((d) => ({
     firebaseId: d.id,
     ...d.data(),
-  }));
+  }))
+  .filter((item) => (item.estadoItem || "activo") === "activo");
 }
 
 export async function convertirCotizacionAVenta({
@@ -305,4 +309,217 @@ export async function anularCotizacion({
     anuladaAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
+
+}
+
+export async function actualizarCotizacion({
+  perfil,
+  cotizacion,
+  fechaValidez = "",
+  items = [],
+  descuento = 0,
+  notas = "",
+  vendedor = null,
+}) {
+  if (!perfil?.clienteId) throw new Error("Perfil inválido.");
+  if (!cotizacion?.firebaseId) throw new Error("Cotización inválida.");
+
+  if (cotizacion.convertidaAVenta) {
+    throw new Error("No se puede editar una cotización convertida a venta.");
+  }
+
+  if ((cotizacion.estadoCotizacion || "") === "anulada") {
+    throw new Error("No se puede editar una cotización anulada.");
+  }
+
+  const itemsNormalizados = normalizarItemsCotizacion(items);
+
+  if (!itemsNormalizados.length) {
+    throw new Error("Debés agregar al menos un ítem válido.");
+  }
+
+  const subtotal = itemsNormalizados.reduce(
+    (acc, item) => acc + Number(item.subtotal || 0),
+    0
+  );
+
+  const total = subtotal - Number(descuento || 0);
+
+  const descripcionResumen =
+    itemsNormalizados.length === 1
+      ? itemsNormalizados[0].descripcion
+      : `${itemsNormalizados.length} ítems`;
+
+  const batch = writeBatch(db);
+
+  const cotizacionRef = doc(db, "cotizaciones", cotizacion.firebaseId);
+
+  batch.update(cotizacionRef, {
+    fechaValidez: fechaValidez || "",
+    descripcion: descripcionResumen,
+    notas: notas || "",
+    cantidad: itemsNormalizados.reduce(
+      (acc, item) => acc + Number(item.cantidad || 0),
+      0
+    ),
+    subtotal,
+    descuento: Number(descuento || 0),
+    total,
+
+    vendedorUid: vendedor?.uid || "",
+    vendedorNombre: vendedor?.nombre || "",
+    vendedorEmail: vendedor?.email || "",
+
+    updatedAt: serverTimestamp(),
+  });
+
+  const itemsActualesSnap = await getDocs(
+    collection(db, "cotizaciones", cotizacion.firebaseId, "items")
+  );
+
+  const itemsActuales = itemsActualesSnap.docs.map((d) => ({
+    firebaseId: d.id,
+    ...d.data(),
+  }));
+
+  const idsQueSiguenActivos = itemsNormalizados
+    .filter((item) => item.firebaseId)
+    .map((item) => item.firebaseId);
+
+  itemsActuales.forEach((itemActual) => {
+    const estaActivo = (itemActual.estadoItem || "activo") === "activo";
+    const sigueEnLaEdicion = idsQueSiguenActivos.includes(itemActual.firebaseId);
+
+    if (estaActivo && !sigueEnLaEdicion) {
+      const itemRef = doc(
+        db,
+        "cotizaciones",
+        cotizacion.firebaseId,
+        "items",
+        itemActual.firebaseId
+      );
+
+      batch.update(itemRef, {
+        estadoItem: "anulado",
+        updatedAt: serverTimestamp(),
+      });
+    }
+  });
+
+  itemsNormalizados.forEach((item) => {
+    if (item.firebaseId) {
+      const itemRef = doc(
+        db,
+        "cotizaciones",
+        cotizacion.firebaseId,
+        "items",
+        item.firebaseId
+      );
+
+      batch.update(itemRef, {
+        descripcion: item.descripcion,
+        cantidad: item.cantidad,
+        precioUnitario: item.precioUnitario,
+        subtotal: item.subtotal,
+        excluirDescuento: item.excluirDescuento === true,
+        estadoItem: "activo",
+        updatedAt: serverTimestamp(),
+      });
+
+      return;
+    }
+
+    const nuevoItemRef = doc(
+      collection(db, "cotizaciones", cotizacion.firebaseId, "items")
+    );
+
+    batch.set(nuevoItemRef, {
+      clienteId: perfil.clienteId,
+      cotizacionRefId: cotizacion.firebaseId,
+      numeroCotizacion: cotizacion.numeroCotizacion,
+      descripcion: item.descripcion,
+      cantidad: item.cantidad,
+      precioUnitario: item.precioUnitario,
+      subtotal: item.subtotal,
+      excluirDescuento: item.excluirDescuento === true,
+      estadoItem: "activo",
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+  });
+
+  await batch.commit();
+}
+
+export async function marcarCotizacionConvertida({
+  cotizacionId,
+  venta,
+}) {
+  if (!cotizacionId) throw new Error("Falta cotización.");
+  if (!venta?.firebaseId) throw new Error("Falta venta creada.");
+
+  await updateDoc(doc(db, "cotizaciones", cotizacionId), {
+    estadoCotizacion: "convertida",
+    convertidaAVenta: true,
+    ventaRefId: venta.firebaseId,
+    ventaVisibleId: venta.numeroVenta || "",
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export async function buscarCotizacionesEnFirestore({
+  perfil,
+  texto = "",
+  pageSize = 50,
+}) {
+  const textoLimpio = String(texto || "").trim();
+
+  if (!textoLimpio) {
+    return [];
+  }
+
+  const cotizacionesRef = collection(db, "cotizaciones");
+
+  let q;
+
+  if (/^\d+$/.test(textoLimpio)) {
+    q =
+      perfil?.rol === "superadmin"
+        ? query(
+            cotizacionesRef,
+            where("numeroCotizacion", "==", textoLimpio),
+            limit(pageSize)
+          )
+        : query(
+            cotizacionesRef,
+            where("clienteId", "==", perfil.clienteId),
+            where("numeroCotizacion", "==", textoLimpio),
+            limit(pageSize)
+          );
+  } else {
+    q =
+      perfil?.rol === "superadmin"
+        ? query(
+            cotizacionesRef,
+            orderBy("clienteNombre"),
+            where("clienteNombre", ">=", textoLimpio),
+            where("clienteNombre", "<=", textoLimpio + "\uf8ff"),
+            limit(pageSize)
+          )
+        : query(
+            cotizacionesRef,
+            where("clienteId", "==", perfil.clienteId),
+            orderBy("clienteNombre"),
+            where("clienteNombre", ">=", textoLimpio),
+            where("clienteNombre", "<=", textoLimpio + "\uf8ff"),
+            limit(pageSize)
+          );
+  }
+
+  const snap = await getDocs(q);
+
+  return snap.docs.map((d) => ({
+    firebaseId: d.id,
+    ...d.data(),
+  }));
 }

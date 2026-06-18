@@ -141,14 +141,14 @@ export default function ClienteForm({ cliente, onVolver, onCancelar, onGuardar, 
 
       <div className="form-grid">
         <div className="form-field">
-          <label>DNI</label>
+          <label>Documento de identidad</label>
           <input
             name="dni"
             placeholder="Ej: 37256489"
             value={formData.dni}
             onChange={handleChange}
             type="text"
-            disabled={!!cliente || soloLectura}
+            disabled={(!!cliente && !!cliente.dni) || soloLectura}
           />
         </div>
 
