@@ -140,3 +140,146 @@ body.pedido-modal-abierto .produccion-columna-btn {
   pointer-events: none !important;
 }
 
+.pedido-cliente-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.btn-cliente-pedido {
+  height: 38px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 8px;
+  background: #0096d1;
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.cliente-mini-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 99999 !important;
+}
+
+.cliente-mini-modal {
+  width: min(420px, 92vw);
+  background: #fff;
+  border-radius: 14px;
+  padding: 18px;
+  box-shadow: 0 12px 30px rgba(0,0,0,0.22);
+}
+.cliente-mini-modal {
+  position: relative;
+  z-index: 100000 !important;
+}
+
+.cliente-mini-modal h3 {
+  margin: 0 0 14px;
+  color: #0096d1;
+}
+
+.cliente-mini-modal input {
+  width: 100%;
+  height: 38px;
+  box-sizing: border-box;
+  margin-bottom: 10px;
+}
+.campo-opcional {
+  font-size: 12px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.btn-cliente-pedido {
+  transform: translateY(-6px);
+}
+
+.pedido-cliente-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: start;
+}
+
+.pedido-cliente-search {
+  position: relative;
+}
+
+.pedido-cliente-search input {
+  width: 100%;
+  height: 38px;
+  box-sizing: border-box;
+}
+
+.pedido-cliente-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 10002;
+  background: #fff;
+  border: 1px solid #dbe3ec;
+  border-radius: 10px;
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.16);
+  max-height: 230px;
+  overflow-y: auto;
+}
+
+.pedido-cliente-dropdown button {
+  width: 100%;
+  border: none;
+  background: #fff;
+  padding: 9px 10px;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pedido-cliente-dropdown button:hover {
+  background: #eef6fa;
+}
+
+.pedido-cliente-dropdown span,
+.pedido-cliente-empty,
+.pedido-cliente-aviso {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.pedido-cliente-empty {
+  padding: 10px;
+}
+
+.btn-cliente-pedido {
+  transform: translateY(0px);
+}
+
+@media (max-width: 768px) {
+  .pedido-cliente-row {
+    grid-template-columns: 1fr;
+  }
+
+  .btn-cliente-pedido {
+    width: 100%;
+    transform: none;
+  }
+}
+
+.modal-overlay {
+  z-index: 99990 !important;
+}
+
+.modal-content {
+  position: relative;
+  z-index: 99991 !important;
+}
+

@@ -20,6 +20,9 @@ import { puedeHacer } from "../../utils/permisos";
 
 export default function PedidoFormModal({ onClose, onPedidoCreado, pedido, perfil }) {
   const [clientes, setClientes] = useState([]);
+  const [busquedaCliente, setBusquedaCliente] = useState("");
+  const [mostrarDropdownCliente, setMostrarDropdownCliente] = useState(false);
+  const [clienteSeleccionadoId, setClienteSeleccionadoId] = useState("");
   const [formData, setFormData] = useState({
     id: "",
     cliente: "",
@@ -31,11 +34,31 @@ export default function PedidoFormModal({ onClose, onPedidoCreado, pedido, perfi
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [exito, setExito] = useState(false); // ✅ nuevo estado para el mensaje de éxito
+  const [mostrarModalCliente, setMostrarModalCliente] = useState(false);
+  const [nuevoCliente, setNuevoCliente] = useState({
+    nombre: "",
+    dni: "",
+    telefono: "",
+    direccion: "",
+    localidad: "",
+    provincia: "",
+    email: "",
+  });
 
   const puedeCrearPedidos = puedeHacer(perfil, "pedidos", "crear");
   const puedeEditarPedidos = puedeHacer(perfil, "pedidos", "editar");
+  const puedeCrearClientes = puedeHacer(perfil, "clientes", "crear");
 
+  const clientesFiltrados = clientes.filter((c) => {
+    const texto = busquedaCliente.trim().toLowerCase();
+    if (!texto) return true;
 
+    return (
+      (c.nombre || "").toLowerCase().includes(texto) ||
+      String(c.dni || "").toLowerCase().includes(texto) ||
+      String(c.telefono || "").toLowerCase().includes(texto)
+    );
+  });
 
   const soloLectura =
     (pedido && !puedeEditarPedidos) || (!pedido && !puedeCrearPedidos);
@@ -81,18 +104,20 @@ export default function PedidoFormModal({ onClose, onPedidoCreado, pedido, perfi
   }, []);
 
   // 🔹 Si estamos editando, precargar datos
-  useEffect(() => {
-    if (pedido) {
-      setFormData({
-        id: pedido.id || "",
-        cliente: pedido.cliente || "",
-        clienteDNI: pedido.clienteDNI || "",
-        fechaPedido: pedido.fechaPedido || "",
-        fechaEntrega: pedido.fechaEntrega || "",
-        estado: pedido.estado || "Pendiente",
-      });
-    }
-  }, [pedido]);
+useEffect(() => {
+  if (pedido) {
+    setFormData({
+      id: pedido.id || "",
+      cliente: pedido.cliente || "",
+      clienteDNI: pedido.clienteDNI || "",
+      fechaPedido: pedido.fechaPedido || "",
+      fechaEntrega: pedido.fechaEntrega || "",
+      estado: pedido.estado || "Pendiente",
+    });
+
+    setBusquedaCliente(pedido.cliente || "");
+  }
+}, [pedido]);
 
   // 🔹 Manejar cambios
   const handleChange = (e) => {
@@ -127,6 +152,75 @@ export default function PedidoFormModal({ onClose, onPedidoCreado, pedido, perfi
 
     return nuevoNumero.toString();
   };
+
+  const crearClienteDesdePedido = async () => {
+  const nombreLimpio = nuevoCliente.nombre.trim();
+
+  if (!nombreLimpio) {
+    setError("El nombre del cliente es obligatorio.");
+    return;
+  }
+
+  if (!perfil?.clienteId && perfil?.rol !== "superadmin") {
+    setError("No se encontró el clienteId del usuario.");
+    return;
+  }
+
+  try {
+    const datosCliente = {
+      ...nuevoCliente,
+      nombre: nombreLimpio,
+      dni: String(nuevoCliente.dni || "").trim(),
+      clienteId: perfil?.clienteId || "",
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    };
+
+    const ref = await addDoc(collection(db, "clientes"), datosCliente);
+
+    const clienteCreado = {
+      id: ref.id,
+      firebaseId: ref.id,
+      ...datosCliente,
+    };
+
+    setClientes((prev) => [...prev, clienteCreado]);
+
+    seleccionarCliente(clienteCreado);
+
+    setNuevoCliente({
+      nombre: "",
+      dni: "",
+      telefono: "",
+      direccion: "",
+      localidad: "",
+      provincia: "",
+      email: "",
+    });
+
+    setMostrarModalCliente(false);
+    setError("");
+  } catch (error) {
+    console.error("Error creando cliente desde pedido:", error);
+    setError("No se pudo crear el cliente.");
+  }
+};
+
+const seleccionarCliente = (cliente) => {
+  if (!cliente) return;
+
+  setFormData((prev) => ({
+    ...prev,
+    cliente: cliente.nombre || "",
+    clienteDNI: cliente.dni || "",
+  }));
+
+  setBusquedaCliente(cliente.nombre || "");
+  setClienteSeleccionadoId(cliente.id || cliente.firebaseId || "");
+  setMostrarDropdownCliente(false);
+};
+
+
 
   // 🔹 Guardar (crear o actualizar)
 const guardarPedido = async () => {
@@ -271,31 +365,83 @@ const guardarPedido = async () => {
         {error && <div className="error">{error}</div>}
         {exito && <div className="success">✅ Pedido guardado con éxito</div>}
 
-        <label>Cliente</label>
-        <select
-          
-          name="cliente"
-          value={formData.cliente}
-          onChange={(e) => {
-            const seleccionado = clientes.find(
-              (c) => c.nombre === e.target.value
-            );
+       
 
-            setFormData({
-              ...formData,
-              cliente: seleccionado ? seleccionado.nombre : "",
-              clienteDNI: seleccionado ? seleccionado.dni : "",
-            });
-          }}
-          disabled={soloLectura}
-        >
-          <option value="">Seleccionar cliente...</option>
-          {clientes.map((c) => (
-            <option key={c.id} value={c.nombre}>
-              {c.nombre}
-            </option>
-          ))}
-        </select>
+        <label>Cliente</label>
+
+        <div className="pedido-cliente-row">
+          <div className="pedido-cliente-search">
+            <input
+              type="text"
+              value={busquedaCliente}
+              placeholder="Escribí para buscar cliente..."
+              onFocus={() => setMostrarDropdownCliente(true)}
+              onBlur={() => {
+                setTimeout(() => setMostrarDropdownCliente(false), 180);
+              }}
+              onChange={(e) => {
+                setBusquedaCliente(e.target.value);
+                setClienteSeleccionadoId("");
+                setFormData((prev) => ({
+                  ...prev,
+                  cliente: "",
+                  clienteDNI: "",
+                }));
+                setMostrarDropdownCliente(true);
+              }}
+              disabled={soloLectura}
+            />
+
+            {mostrarDropdownCliente && !soloLectura && (
+              <div className="pedido-cliente-dropdown">
+                {clientesFiltrados.length > 0 ? (
+                  clientesFiltrados.slice(0, 8).map((c) => (
+                    <button
+                      key={c.id || c.firebaseId}
+                      type="button"
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        seleccionarCliente(c);
+                      }}
+                    >
+                      <strong>{c.nombre || "Sin nombre"}</strong>
+                      <span>
+                        {c.dni ? `Doc: ${c.dni}` : "Sin documento"}
+                        {c.telefono ? ` · Tel: ${c.telefono}` : ""}
+                      </span>
+                    </button>
+                  ))
+                ) : (
+                  <div className="pedido-cliente-empty">
+                    No hay clientes que coincidan.
+                  </div>
+                )}
+              </div>
+            )}
+
+            {busquedaCliente.trim() && !formData.cliente && !soloLectura && (
+              <small className="pedido-cliente-aviso">
+                Selecciona un cliente
+              </small>
+            )}
+          </div>
+
+          {puedeCrearClientes && !soloLectura && (
+            <button
+              type="button"
+              className="btn-cliente-pedido"
+              onClick={() => {
+                setNuevoCliente((prev) => ({
+                  ...prev,
+                  nombre: busquedaCliente || prev.nombre,
+                }));
+                setMostrarModalCliente(true);
+              }}
+            >
+              Crear cliente
+            </button>
+          )}
+        </div>
 
         <label>Fecha de pedido</label>
         <input
@@ -317,14 +463,7 @@ const guardarPedido = async () => {
 
 
 
-        <label>Estado</label>
-        <select name="estado" value={formData.estado} onChange={handleChange} disabled={soloLectura}> 
-          <option value="Pendiente">Pendiente</option>
-          <option value="En proceso">En proceso</option>
-          <option value="Terminado">Terminado</option>
-          <option value="Cancelado">Cancelado</option>
-          
-        </select>
+
 
         <div className="modal-buttons">
          
@@ -347,6 +486,86 @@ const guardarPedido = async () => {
               : "Guardar Pedido"}
           </button>
         </div>
+        {mostrarModalCliente && (
+          <div className="cliente-mini-overlay" onClick={() => setMostrarModalCliente(false)}>
+            <div className="cliente-mini-modal" onClick={(e) => e.stopPropagation()}>
+              <h3>Crear cliente</h3>
+
+              <label>Documento de identidad <span className="campo-opcional">(opcional)</span></label>
+              <input
+                value={nuevoCliente.dni}
+                onChange={(e) =>
+                  setNuevoCliente((prev) => ({ ...prev, dni: e.target.value }))
+                }
+                placeholder="Ej: 37256489"
+              />
+
+              <label>Nombre y Apellido</label>
+              <input
+                value={nuevoCliente.nombre}
+                onChange={(e) =>
+                  setNuevoCliente((prev) => ({ ...prev, nombre: e.target.value }))
+                }
+                placeholder="Nombre del cliente"
+              />
+
+              <label>Teléfono</label>
+              <input
+                value={nuevoCliente.telefono}
+                onChange={(e) =>
+                  setNuevoCliente((prev) => ({ ...prev, telefono: e.target.value }))
+                }
+              />
+
+              <label>Dirección</label>
+              <input
+                value={nuevoCliente.direccion}
+                onChange={(e) =>
+                  setNuevoCliente((prev) => ({ ...prev, direccion: e.target.value }))
+                }
+              />
+
+              <label>Localidad</label>
+              <input
+                value={nuevoCliente.localidad}
+                onChange={(e) =>
+                  setNuevoCliente((prev) => ({ ...prev, localidad: e.target.value }))
+                }
+              />
+
+              <label>Provincia</label>
+              <input
+                value={nuevoCliente.provincia}
+                onChange={(e) =>
+                  setNuevoCliente((prev) => ({ ...prev, provincia: e.target.value }))
+                }
+              />
+
+              <label>Email</label>
+              <input
+                value={nuevoCliente.email}
+                onChange={(e) =>
+                  setNuevoCliente((prev) => ({ ...prev, email: e.target.value }))
+                }
+              />
+
+              <div className="modal-buttons">
+                <button
+                  type="button"
+                  className="cancelar"
+                  onClick={() => setMostrarModalCliente(false)}
+                >
+                  Cancelar
+                </button>
+
+                <button type="button" onClick={crearClienteDesdePedido}>
+                  Crear cliente
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
       </div>
     </div>
   );
