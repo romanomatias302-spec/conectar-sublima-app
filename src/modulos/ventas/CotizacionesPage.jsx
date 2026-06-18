@@ -78,6 +78,8 @@ const [configNegocio, setConfigNegocio] = useState({
   const configMoneda = obtenerConfigMonedaDesdePerfil(perfil);
 
   const puedeCrearCotizacion = puedeHacer(perfil, "ventas", "crearCotizacion");
+  const puedeOtorgarDescuentoCotizacion =
+  puedeHacer(perfil, "ventas", "otorgarDescuentoCotizacion");
   const puedeCrearClientes = puedeHacer(perfil, "clientes", "crear");
 
   const cargarCotizaciones = async () => {
@@ -455,7 +457,9 @@ const cotizacionesFiltradas = useMemo(() => {
         fechaCotizacion,
         fechaValidez,
         items: itemsValidos,
-        descuento: Number(descuentoMonto || 0),
+        descuento: puedeOtorgarDescuentoCotizacion
+        ? Number(descuentoMonto || 0)
+        : 0,
         notas,
         vendedor: vendedorSeleccionado,
       });
@@ -492,36 +496,50 @@ const cotizacionesFiltradas = useMemo(() => {
       {error && <div className="ventas-alert ventas-alert-error">{error}</div>}
       {exito && <div className="ventas-alert ventas-alert-ok">{exito}</div>}
 
-      <div className="ventas-card">
-        <div className="ventas-grid ventas-grid-3">
-          <div className="ventas-field">
-            <label>Buscar cliente / N°</label>
-            <input
-              value={busqueda}
-              onChange={(e) => setBusqueda(e.target.value)}
-              placeholder="Cliente, documento o número..."
-            />
-          </div>
+        <div className="ventas-card">
+          <div className="cotizaciones-filtros-row">
+            <div className="ventas-field">
+              <label>Buscar cliente / N°</label>
+              <input
+                value={busqueda}
+                onChange={(e) => setBusqueda(e.target.value)}
+                placeholder="Cliente, documento o número..."
+              />
+            </div>
 
-          <div className="ventas-field">
-            <label>Desde</label>
-            <input
-              type="date"
-              value={fechaDesde}
-              onChange={(e) => setFechaDesde(e.target.value)}
-            />
-          </div>
+            <div className="ventas-field">
+              <label>Desde</label>
+              <input
+                type="date"
+                value={fechaDesde}
+                onChange={(e) => setFechaDesde(e.target.value)}
+              />
+            </div>
 
-          <div className="ventas-field">
-            <label>Hasta</label>
-            <input
-              type="date"
-              value={fechaHasta}
-              onChange={(e) => setFechaHasta(e.target.value)}
-            />
+            <div className="ventas-field">
+              <label>Hasta</label>
+              <input
+                type="date"
+                value={fechaHasta}
+                onChange={(e) => setFechaHasta(e.target.value)}
+              />
+            </div>
+
+            <div className="ventas-field ventas-field-action">
+              <span className="ventas-action-spacer" />
+              <button
+                className="btn btn-secondary cotizaciones-limpiar-btn"
+                onClick={() => {
+                  setFechaDesde("");
+                  setFechaHasta("");
+                }}
+                disabled={!fechaDesde && !fechaHasta}
+              >
+                Limpiar fechas
+              </button>
+            </div>
           </div>
         </div>
-      </div>
 
       <div className="ventas-card">
         {loading && <p>Cargando cotizaciones...</p>}
@@ -926,8 +944,9 @@ const cotizacionesFiltradas = useMemo(() => {
                   <label>Descuento %</label>
                   <input
                     type="number"
-                    value={descuento}
+                    value={puedeOtorgarDescuentoCotizacion ? descuento : 0}
                     onChange={(e) => setDescuento(e.target.value)}
+                    disabled={!puedeOtorgarDescuentoCotizacion}
                   />
                 </div>
 

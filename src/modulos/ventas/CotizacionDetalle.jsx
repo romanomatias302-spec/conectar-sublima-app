@@ -8,8 +8,11 @@ import {
   actualizarCotizacion,
 } from "../../firebase/cotizaciones";
 import { formatearMoneda, obtenerConfigMonedaDesdePerfil } from "../../utils/moneda";
-import "./VentasPage.css";
 import { obtenerUsuariosPorCliente } from "../../firebase/usuariosConfig";
+import { puedeHacer } from "../../utils/permisos";
+import "./VentasPage.css";
+
+
 
 export default function CotizacionDetalle({
   perfil,
@@ -39,7 +42,12 @@ const [editDescuento, setEditDescuento] = useState(0);
 const [editVendedorUid, setEditVendedorUid] = useState("");
 const [usuarios, setUsuarios] = useState([]);
 
-  const configMoneda = obtenerConfigMonedaDesdePerfil(perfil);
+const configMoneda = obtenerConfigMonedaDesdePerfil(perfil);
+const puedeEditarCotizacion = puedeHacer(perfil, "ventas", "editarCotizacion");
+const puedeAnularCotizacion = puedeHacer(perfil, "ventas", "anularCotizacion");
+const puedeConvertirCotizacion = puedeHacer(perfil, "ventas", "convertirCotizacion");
+const puedeOtorgarDescuentoCotizacion =
+  puedeHacer(perfil, "ventas", "otorgarDescuentoCotizacion");
 
   const cargarDetalle = async () => {
     try {
@@ -140,6 +148,12 @@ const [usuarios, setUsuarios] = useState([]);
 };
 
 const abrirEdicion = () => {
+
+  if (!puedeEditarCotizacion) {
+    setError("No tenés permisos para editar cotizaciones.");
+    return;
+    }
+
   if (!cotizacion) return;
 
   if (cotizacion.convertidaAVenta) {
@@ -261,7 +275,7 @@ const guardarEdicionCotizacion = async () => {
       cotizacion,
       fechaValidez: editFechaValidez,
       items: itemsValidos,
-      descuento: editDescuentoMonto,
+      descuento: puedeOtorgarDescuentoCotizacion ? editDescuentoMonto : 0,
       notas: editNotas,
       vendedor: editVendedorSeleccionado,
     });
@@ -279,6 +293,10 @@ const guardarEdicionCotizacion = async () => {
 
 const handleAnularCotizacion = async () => {
   try {
+    if (!puedeAnularCotizacion) {
+        setError("No tenés permisos para anular cotizaciones.");
+        return;
+        }
     if (!cotizacion) return;
 
     if (cotizacion.convertidaAVenta) {
@@ -323,6 +341,12 @@ const handleAnularCotizacion = async () => {
 };
 
 const handleConvertirAVenta = () => {
+
+    if (!puedeConvertirCotizacion) {
+        setError("No tenés permisos para convertir cotizaciones a venta.");
+        return;
+    }
+
   if (!cotizacion) return;
 
   if (cotizacion.convertidaAVenta) {
@@ -401,28 +425,30 @@ const handleConvertirAVenta = () => {
                     (cotizacion.estadoCotizacion || "") !== "anulada" && (
                     <button
                         onClick={handleConvertirAVenta}
-                        disabled={convirtiendo}
+                        disabled={!puedeConvertirCotizacion || convirtiendo}
                     >
                         {convirtiendo ? "Convirtiendo..." : "Convertir a venta"}
                     </button>
                     )}
 
-                        <button
-                        onClick={abrirEdicion}
-                        disabled={
-                            cotizacion.convertidaAVenta ||
-                            (cotizacion.estadoCotizacion || "") === "anulada"
-                        }
-                        >
-                        Editar
-                        </button>
+                    <button
+                    onClick={abrirEdicion}
+                    disabled={
+                        !puedeEditarCotizacion ||
+                        cotizacion.convertidaAVenta ||
+                        (cotizacion.estadoCotizacion || "") === "anulada"
+                    }
+                    >
+                    Editar
+                    </button>
 
                     <button
                     onClick={handleAnularCotizacion}
                     disabled={
-                        anulando ||
-                        cotizacion.convertidaAVenta ||
-                        (cotizacion.estadoCotizacion || "") === "anulada"
+                    !puedeAnularCotizacion ||
+                    anulando ||
+                    cotizacion.convertidaAVenta ||
+                    (cotizacion.estadoCotizacion || "") === "anulada"
                     }
                     >
                     {anulando ? "Anulando..." : "Anular"}
@@ -733,11 +759,12 @@ const handleConvertirAVenta = () => {
 
                 <div className="ventas-field">
                     <label>Descuento %</label>
-                    <input
+                  <input
                     type="number"
-                    value={editDescuento}
+                    value={puedeOtorgarDescuentoCotizacion ? editDescuento : 0}
                     onChange={(e) => setEditDescuento(e.target.value)}
-                    />
+                    disabled={!puedeOtorgarDescuentoCotizacion}
+                  />
                 </div>
 
                 {Number(editDescuentoMonto || 0) > 0 && (

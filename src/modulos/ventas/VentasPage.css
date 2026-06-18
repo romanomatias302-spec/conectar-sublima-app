@@ -1750,3 +1750,79 @@ margin-top:20px;
 .cotizacion-estado-anulada strong {
   color: #64748b !important;
 }
+
+.cotizaciones-filtros-row {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) 180px 180px auto;
+  gap: 12px;
+  align-items: end;
+}
+
+
+
+@media (max-width: 768px) {
+  .cotizaciones-filtros-row {
+    grid-template-columns: 1fr;
+  }
+
+
+}
+
+.cotizaciones-filtros-row {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) 180px 180px auto;
+  gap: 12px;
+  align-items: stretch;
+}
+
+
+
+
+
+@media (max-width: 768px) {
+  .cotizaciones-filtros-row {
+    grid-template-columns: 1fr;
+  }
+
+  
+
+ 
+}
+
+.ventas-field-action {
+  justify-content: flex-end;
+}
+
+
+
+.cotizaciones-limpiar-btn {
+  height: 38px !important;
+  padding: 0 14px !important;
+}
+
+.ventas-field-action {
+  justify-content: flex-end;
+}
+
+.ventas-action-spacer {
+  display: none;
+}
+
+.cotizaciones-limpiar-btn {
+  height: 38px !important;
+  padding: 0 14px !important;
+  transform: translateY(-11px);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
