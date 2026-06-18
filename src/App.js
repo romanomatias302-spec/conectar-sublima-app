@@ -25,6 +25,7 @@ import VentaDetalle from "./modulos/ventas/VentaDetalle";
 import { obtenerVentaPorId } from "./firebase/ventas";
 import ProduccionPage from "./modulos/produccion/ProduccionPage";
 import CajaPage from "./modulos/caja/CajaPage";
+import GastosPage from "./modulos/gastos/GastosPage";
 import { puedeHacer as puedeHacerPerfil } from "./utils/permisos";
 
 
@@ -382,6 +383,7 @@ useEffect(() => {
         "cotizacion-detalle": "ventas",
         movimientos: "informes",
         caja: "caja",
+        gastos: "gastos",
         configuracion: "configuracion",
       };
 
@@ -765,6 +767,10 @@ if (!perfil) {
               }
             }}
           />
+        )}
+
+        {vista === "gastos" && (
+          <GastosPage perfil={perfil} />
         )}
 
         {vista === "configuracion" && (

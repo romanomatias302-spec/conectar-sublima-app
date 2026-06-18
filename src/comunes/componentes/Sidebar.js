@@ -8,6 +8,7 @@ import {
   FaSignOutAlt,
   FaCashRegister,
   FaExchangeAlt,
+  FaMoneyBillWave,
 } from "react-icons/fa";
 import { signOut } from "firebase/auth";
 import { auth } from "../../firebase";
@@ -158,6 +159,13 @@ const puedeVerListadoVentas =
           <li onClick={() => onSelect("caja")}>
             <FaCashRegister className="icon" />
             {expandido && <span>Caja</span>}
+          </li>
+        )}
+
+        {puede("gastos") && (
+          <li onClick={() => onSelect("gastos")}>
+            <FaMoneyBillWave className="icon" />
+            {expandido && <span>Gastos</span>}
           </li>
         )}
 
