@@ -30,6 +30,70 @@ function obtenerEstadoFechaEntrega(pedido) {
   return "";
 }
 
+function obtenerProgresoEntrega(pedido) {
+  if (!pedido?.fechaEntrega) {
+    return {
+      porcentaje: 0,
+      estado: "sin-fecha",
+      texto: "Sin fecha",
+    };
+  }
+
+  const entrega = new Date(`${pedido.fechaEntrega}T00:00:00`);
+  if (Number.isNaN(entrega.getTime())) {
+    return {
+      porcentaje: 0,
+      estado: "sin-fecha",
+      texto: pedido.fechaEntrega,
+    };
+  }
+
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+
+  const creado = pedido.createdAt?.seconds
+    ? new Date(pedido.createdAt.seconds * 1000)
+    : pedido.fechaCreacion
+    ? new Date(`${pedido.fechaCreacion}T00:00:00`)
+    : null;
+
+  const inicio = creado && !Number.isNaN(creado.getTime()) ? creado : hoy;
+  inicio.setHours(0, 0, 0, 0);
+
+  const totalMs = entrega.getTime() - inicio.getTime();
+  const transcurridoMs = hoy.getTime() - inicio.getTime();
+
+  let porcentaje = 0;
+
+  if (hoy.getTime() > entrega.getTime()) {
+    porcentaje = 100;
+  } else if (totalMs <= 0) {
+    porcentaje = 100;
+  } else {
+    porcentaje = Math.round((transcurridoMs / totalMs) * 100);
+  }
+
+  porcentaje = Math.min(100, Math.max(0, porcentaje));
+
+    if (porcentaje === 0 && pedido.fechaEntrega) {
+      porcentaje = 7;
+    }
+
+  let estado = "verde";
+
+  if (hoy.getTime() > entrega.getTime()) {
+    estado = "rojo";
+  } else if (porcentaje >= 70) {
+    estado = "amarillo";
+  }
+
+  return {
+    porcentaje,
+    estado,
+    texto: pedido.fechaEntrega,
+  };
+}
+
 function colorMarcaStyles(color) {
   switch (color) {
     case "amarillo":
@@ -137,6 +201,7 @@ const {
 
 const etiquetasPedido = obtenerEtiquetasPedido(pedido);
 const estadoFechaEntrega = obtenerEstadoFechaEntrega(pedido);
+const entregaProgreso = obtenerProgresoEntrega(pedido);
 
   const tiempoEtapa = formatearTiempoEnEtapa(
     pedido.produccionActualizadoAt || pedido.ultimaAccionProduccionAt,
@@ -250,8 +315,12 @@ const usuarioVisible =
                 {pedido.cliente || pedido.clienteNombre || pedido.nombreCliente || "Cliente sin nombre"}
               </div>
 
-              <div className={`produccion-card-fecha ${estadoFechaEntrega ? `fecha-${estadoFechaEntrega}` : ""}`}>
-                Entrega: {pedido.fechaEntrega || "-"}
+              <div className={`produccion-card-entrega-progress entrega-${entregaProgreso.estado}`}>
+                <div
+                  className="produccion-card-entrega-progress-fill"
+                  style={{ width: `${entregaProgreso.porcentaje}%` }}
+                />
+                <span>{entregaProgreso.texto}</span>
               </div>
             </div>
 
@@ -265,9 +334,13 @@ const usuarioVisible =
               </span>
             </div>
 
-            <div className={`produccion-card-mobile-fecha ${estadoFechaEntrega ? `fecha-${estadoFechaEntrega}` : ""}`}>
-              Entrega: {pedido.fechaEntrega || "-"}
-            </div>
+              <div className={`produccion-card-entrega-progress produccion-card-entrega-mobile entrega-${entregaProgreso.estado}`}>
+                <div
+                  className="produccion-card-entrega-progress-fill"
+                  style={{ width: `${entregaProgreso.porcentaje}%` }}
+                />
+                <span>{entregaProgreso.texto}</span>
+              </div>
 
 
 

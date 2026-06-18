@@ -10,12 +10,15 @@ import {
 } from "../../utils/detallePedidoColumnas";
 import ColumnasDetallePedidoModal from "./ColumnasDetallePedidoModal";
 import {
-  collection,
-  getDocs,
-  deleteDoc,
-  doc,
-  setDoc,
-  onSnapshot,
+collection,
+getDocs,
+deleteDoc,
+doc,
+setDoc,
+onSnapshot,
+query,
+where,
+limit,
 } from "firebase/firestore";
 
 
@@ -36,6 +39,8 @@ export default function PedidoDetalle({
   const [productosAbiertos, setProductosAbiertos] = useState({});
   const [abriendoVentaId, setAbriendoVentaId] = useState(null);
   const [imagenPreviewTabla, setImagenPreviewTabla] = useState(null);
+  const [clienteDetalle, setClienteDetalle] = useState(null);
+const [mostrandoClienteDetalle, setMostrandoClienteDetalle] = useState(false);
 
   const esAdmin = perfil?.rol === "admin" || perfil?.rol === "superadmin";
   const puedeEditarPedidos = puedeHacer(perfil, "pedidos", "editar");
@@ -244,6 +249,56 @@ return usados.length ? usados : [];
     return usados.length ? usados : [];
   };
 
+  const abrirDetalleCliente = async () => {
+  try {
+    if (!pedido?.cliente || !perfil?.clienteId) return;
+
+    const clientesRef = collection(db, "clientes");
+
+    let q;
+
+    if (pedido?.clienteDNI) {
+      q = query(
+        clientesRef,
+        where("clienteId", "==", perfil.clienteId),
+        where("dni", "==", String(pedido.clienteDNI)),
+        limit(1)
+      );
+    } else {
+      q = query(
+        clientesRef,
+        where("clienteId", "==", perfil.clienteId),
+        where("nombre", "==", pedido.cliente),
+        limit(1)
+      );
+    }
+
+    const snap = await getDocs(q);
+
+    if (!snap.empty) {
+      const d = snap.docs[0];
+      setClienteDetalle({
+        firebaseId: d.id,
+        ...d.data(),
+      });
+    } else {
+      setClienteDetalle({
+        nombre: pedido.cliente || "-",
+        dni: pedido.clienteDNI || "",
+      });
+    }
+
+    setMostrandoClienteDetalle(true);
+  } catch (error) {
+    console.error("Error cargando cliente:", error);
+    setClienteDetalle({
+      nombre: pedido.cliente || "-",
+      dni: pedido.clienteDNI || "",
+    });
+    setMostrandoClienteDetalle(true);
+  }
+};
+
   const renderCeldaProducto = (producto, columnaKey) => {
     switch (columnaKey) {
       case "producto":
@@ -380,7 +435,13 @@ if (!pedido) {
 <div className="pedido-header-bar">
   <div className="pedido-header-item">
     <span className="pedido-header-label">Cliente:</span>
-    <span className="pedido-header-value">{pedido?.cliente || "-"}</span>
+        <button
+      type="button"
+      className="pedido-cliente-link"
+      onClick={abrirDetalleCliente}
+    >
+      {pedido?.cliente || "-"}
+    </button>
   </div>
 
   <div className="pedido-header-item">
@@ -832,7 +893,64 @@ if (!pedido) {
           }
         }}
       />
-    
+     {mostrandoClienteDetalle && (
+      <div
+        className="cliente-detalle-overlay"
+        onClick={() => setMostrandoClienteDetalle(false)}
+      >
+        <div
+          className="cliente-detalle-modal"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="cliente-detalle-header">
+            <h3>Datos del cliente</h3>
+            <button
+              type="button"
+              onClick={() => setMostrandoClienteDetalle(false)}
+            >
+              ✕
+            </button>
+          </div>
+
+          <div className="cliente-detalle-grid">
+            <div>
+              <span>Nombre</span>
+              <strong>{clienteDetalle?.nombre || "-"}</strong>
+            </div>
+
+            <div>
+              <span>Documento</span>
+              <strong>{clienteDetalle?.dni || "-"}</strong>
+            </div>
+
+            <div>
+              <span>Teléfono</span>
+              <strong>{clienteDetalle?.telefono || "-"}</strong>
+            </div>
+
+            <div>
+              <span>Email</span>
+              <strong>{clienteDetalle?.email || "-"}</strong>
+            </div>
+
+            <div>
+              <span>Dirección</span>
+              <strong>{clienteDetalle?.direccion || "-"}</strong>
+            </div>
+
+            <div>
+              <span>Localidad</span>
+              <strong>{clienteDetalle?.localidad || "-"}</strong>
+            </div>
+
+            <div>
+              <span>Provincia</span>
+              <strong>{clienteDetalle?.provincia || "-"}</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
     </div>
 
   );
