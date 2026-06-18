@@ -13,6 +13,7 @@ import { db } from "../../firebase";
 import {
   crearCotizacion,
   obtenerCotizacionesPaginadas,
+  buscarCotizacionesEnFirestore,
 } from "../../firebase/cotizaciones";
 import { formatearMoneda, obtenerConfigMonedaDesdePerfil } from "../../utils/moneda";
 import { puedeHacer } from "../../utils/permisos";
@@ -40,6 +41,7 @@ export default function CotizacionesPage({ perfil, onVerCotizacion }) {
   const [loadingMas, setLoadingMas] = useState(false);
 
   const [busqueda, setBusqueda] = useState("");
+  const [buscandoFirestore, setBuscandoFirestore] = useState(false);
   const [fechaDesde, setFechaDesde] = useState("");
   const [fechaHasta, setFechaHasta] = useState("");
 
@@ -186,24 +188,59 @@ const [configNegocio, setConfigNegocio] = useState({
     cargarConfigNegocio();
   }, [perfil]);
 
-  const cotizacionesFiltradas = useMemo(() => {
-    const texto = (busqueda || "").trim().toLowerCase();
+const cotizacionesFiltradas = useMemo(() => {
+  const texto = (busqueda || "").trim().toLowerCase();
 
-    return cotizaciones.filter((c) => {
-      const coincideTexto =
-        !texto ||
-        String(c.numeroCotizacion || "").toLowerCase().includes(texto) ||
-        String(c.clienteNombre || "").toLowerCase().includes(texto) ||
-        String(c.clienteDNI || "").toLowerCase().includes(texto);
+  return cotizaciones.filter((c) => {
+    const coincideTexto =
+      !texto ||
+      String(c.numeroCotizacion || "").toLowerCase().includes(texto) ||
+      String(c.clienteNombre || "").toLowerCase().includes(texto) ||
+      String(c.clienteDNI || "").toLowerCase().includes(texto);
 
-      const fecha = c.fechaCotizacion || "";
+    const fecha = c.fechaCotizacion || "";
 
-      const coincideDesde = !fechaDesde || fecha >= fechaDesde;
-      const coincideHasta = !fechaHasta || fecha <= fechaHasta;
+    const coincideDesde = !fechaDesde || fecha >= fechaDesde;
+    const coincideHasta = !fechaHasta || fecha <= fechaHasta;
 
-      return coincideTexto && coincideDesde && coincideHasta;
-    });
-  }, [cotizaciones, busqueda, fechaDesde, fechaHasta]);
+    return coincideTexto && coincideDesde && coincideHasta;
+  });
+}, [cotizaciones, busqueda, fechaDesde, fechaHasta]);
+
+  useEffect(() => {
+  const texto = (busqueda || "").trim();
+
+  if (!texto) return;
+
+  if (fechaDesde || fechaHasta) return;
+
+  if (cotizacionesFiltradas.length > 0) return;
+
+  const timer = setTimeout(async () => {
+    try {
+      setBuscandoFirestore(true);
+
+      const resultados = await buscarCotizacionesEnFirestore({
+        perfil,
+        texto,
+        pageSize: 50,
+      });
+
+      setCotizaciones((prev) => {
+        const existentes = new Set(prev.map((c) => c.firebaseId));
+        const nuevos = resultados.filter((c) => !existentes.has(c.firebaseId));
+        return [...prev, ...nuevos];
+      });
+    } catch (err) {
+      console.error("Error buscando cotizaciones:", err);
+      setError("No se pudo buscar la cotización.");
+    } finally {
+      setBuscandoFirestore(false);
+    }
+  }, 350);
+
+  return () => clearTimeout(timer);
+}, [busqueda, fechaDesde, fechaHasta, cotizacionesFiltradas.length, perfil]);
 
   const clientesFiltrados = useMemo(() => {
     const texto = (busquedaCliente || "").trim().toLowerCase();
@@ -462,7 +499,7 @@ const [configNegocio, setConfigNegocio] = useState({
             <input
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
-              placeholder="Cliente, DNI o número..."
+              placeholder="Cliente, documento o número..."
             />
           </div>
 
@@ -488,6 +525,7 @@ const [configNegocio, setConfigNegocio] = useState({
 
       <div className="ventas-card">
         {loading && <p>Cargando cotizaciones...</p>}
+        {buscandoFirestore && <p>Buscando en todas las cotizaciones...</p>}
 
         {!loading && (
           <>
