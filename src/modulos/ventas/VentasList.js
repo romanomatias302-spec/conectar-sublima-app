@@ -10,7 +10,10 @@ import {
   startAfter,
 } from "firebase/firestore";
 import { db } from "../../firebase";
-import { obtenerVentasPaginadas } from "../../firebase/ventas";
+import {
+  obtenerVentasPaginadas,
+  escucharVentasRecientes,
+} from "../../firebase/ventas";
 import "./VentasPage.css";
 import { formatearMoneda, obtenerConfigMonedaDesdePerfil } from "../../utils/moneda";
 
@@ -143,10 +146,29 @@ export default function VentasList({ perfil, onVer = () => {}, onEditar = () => 
 
 
 
-  useEffect(() => {
-    if (!perfil) return;
-    cargarVentasIniciales();
-  }, [perfil]);
+useEffect(() => {
+  if (!perfil) return;
+
+  setLoading(true);
+
+  const unsubscribe = escucharVentasRecientes({
+    perfil,
+    pageSize: PAGE_SIZE,
+    onData: (res) => {
+      setVentas(res.ventas);
+      setVentasFiltradas(res.ventas);
+      setUltimoDoc(res.ultimoDoc);
+      setHayMas(res.hayMas);
+      setLoading(false);
+    },
+    onError: (error) => {
+      console.error("Error escuchando ventas:", error);
+      setLoading(false);
+    },
+  });
+
+  return () => unsubscribe();
+}, [perfil]);
 
   useEffect(() => {
     const texto = normalizarTexto(busqueda);

@@ -11,6 +11,7 @@ import {
   serverTimestamp,
   startAt,
   endAt,
+  onSnapshot,
 } from "firebase/firestore";
 import { db } from "../firebase";
 
@@ -38,6 +39,41 @@ export async function obtenerCajaDelDia({ perfil, fechaCaja = fechaHoyInput() })
 
   const d = snap.docs[0];
   return { firebaseId: d.id, ...d.data() };
+}
+
+export function escucharCajaDelDia({
+  perfil,
+  fechaCaja = fechaHoyInput(),
+  onData,
+  onError,
+}) {
+  if (!perfil?.clienteId) return () => {};
+
+  const q = query(
+    collection(db, "cajas"),
+    where("clienteId", "==", perfil.clienteId),
+    where("fechaCaja", "==", fechaCaja),
+    limit(1)
+  );
+
+  return onSnapshot(
+    q,
+    (snap) => {
+      if (snap.empty) {
+        onData(null);
+        return;
+      }
+
+      const d = snap.docs[0];
+      onData({
+        firebaseId: d.id,
+        ...d.data(),
+      });
+    },
+    (error) => {
+      if (onError) onError(error);
+    }
+  );
 }
 
 export async function obtenerUltimaCajaCerradaAnterior({
@@ -146,6 +182,42 @@ export async function obtenerMovimientosCajaDia({
       const fechaB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0;
       return fechaB - fechaA;
     });
+}
+
+export function escucharMovimientosCajaDia({
+  perfil,
+  fechaCaja = fechaHoyInput(),
+  onData,
+  onError,
+}) {
+  if (!perfil?.clienteId) return () => {};
+
+  const q = query(
+    collection(db, "movimientos"),
+    where("clienteId", "==", perfil.clienteId),
+    where("fecha", "==", fechaCaja)
+  );
+
+  return onSnapshot(
+    q,
+    (snap) => {
+      const lista = snap.docs
+        .map((d) => ({
+          firebaseId: d.id,
+          ...d.data(),
+        }))
+        .sort((a, b) => {
+          const fechaA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0;
+          const fechaB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0;
+          return fechaB - fechaA;
+        });
+
+      onData(lista);
+    },
+    (error) => {
+      if (onError) onError(error);
+    }
+  );
 }
 
 export async function crearMovimientoManualCaja({

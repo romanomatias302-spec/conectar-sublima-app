@@ -361,18 +361,20 @@ function canReadVentas(clienteId) {
       return canModulo(clienteId, "ventas", "editar");
     }
 
-    function canReadMovimientos(clienteId) {
-      return isSuperAdmin()
-        || (
-          tenantUserBase(clienteId)
-          && (
-            isAdmin()
-            || permisoModuloAccion("movimientos","ver")
-            || permisoModuloAccion("ventas","ver")
-            || permisoModuloAccion("caja","ver")
-          )
-        );
-    }
+function canReadMovimientos(clienteId) {
+  return isSuperAdmin()
+    || (
+      tenantUserBase(clienteId)
+      && (
+        isAdmin()
+        || permisoModuloAccion("movimientos","ver")
+        || permisoModuloAccion("informes","ver")
+        || permisoModuloAccion("gastos","ver")
+        || permisoModuloAccion("ventas","ver")
+        || permisoModuloAccion("caja","ver")
+      )
+    );
+}
 
       function canReadCaja(clienteId) {
         return isSuperAdmin()
@@ -420,6 +422,7 @@ function canReadVentas(clienteId) {
             || canCreateCaja(clienteId)
             || canUpdateCaja(clienteId)
             || permisoModuloAccion("caja", "crearMovimiento")
+            || permisoModuloAccion("gastos", "crear")
           )
         );
     }
@@ -482,6 +485,20 @@ function canReadVentas(clienteId) {
             || permisoModuloAccion("pedidos", "crear")
           )
         );
+    }
+
+        function canReadGastos(clienteId) {
+      return canModulo(clienteId, "gastos", "ver")
+        || canModulo(clienteId, "informes", "ver");
+    }
+
+    function canCreateGastos(clienteId) {
+      return canModulo(clienteId, "gastos", "crear");
+    }
+
+    function canUpdateGastos(clienteId) {
+      return canModulo(clienteId, "gastos", "editar")
+        || canModulo(clienteId, "gastos", "anular");
     }
 
     // =========================
@@ -930,7 +947,19 @@ function canReadVentas(clienteId) {
       allow write: if false;
     }
 
+    // =========================
+    // gastos
+    // =========================
+    match /gastos/{gastoId} {
+      allow read: if canReadGastos(resource.data.clienteId);
 
+      allow create: if canCreateGastos(request.resource.data.clienteId);
+
+      allow update: if canUpdateGastos(resource.data.clienteId)
+        && request.resource.data.clienteId == resource.data.clienteId;
+
+      allow delete: if false;
+    }
     
     
     // =========================

@@ -10,6 +10,9 @@ import {
   reabrirCaja,
   obtenerHistorialCajas,
   corregirAperturaCaja,
+  escucharCajaDelDia,
+  escucharMovimientosCajaDia,
+
 } from "../../firebase/cajas";
 import { formatearMoneda, obtenerConfigMonedaDesdePerfil } from "../../utils/moneda";
 import { puedeHacer } from "../../utils/permisos";
@@ -98,10 +101,51 @@ const movimientosFiltrados = useMemo(() => {
     }
   };
 
-  useEffect(() => {
-    if (!perfil) return;
-    cargarCaja();
-  }, [perfil]);
+useEffect(() => {
+  if (!perfil?.clienteId) return;
+
+  setLoading(true);
+
+  obtenerUltimaCajaCerradaAnterior({ perfil, fechaCaja })
+    .then((anterior) => setCajaAnterior(anterior))
+    .catch((err) => {
+      console.error("Error cargando caja anterior:", err);
+    });
+
+  const unsubCaja = escucharCajaDelDia({
+    perfil,
+    fechaCaja,
+    onData: (cajaData) => {
+      setCaja(cajaData);
+      setLoading(false);
+
+      if (!cajaData) {
+        setMovimientos([]);
+      }
+    },
+    onError: (err) => {
+      console.error("Error escuchando caja:", err);
+      setError(err.message || "No se pudo escuchar la caja.");
+      setLoading(false);
+    },
+  });
+
+  const unsubMovimientos = escucharMovimientosCajaDia({
+    perfil,
+    fechaCaja,
+    onData: (movs) => {
+      setMovimientos(movs);
+    },
+    onError: (err) => {
+      console.error("Error escuchando movimientos de caja:", err);
+    },
+  });
+
+  return () => {
+    unsubCaja();
+    unsubMovimientos();
+  };
+}, [perfil?.clienteId, fechaCaja]);
 
   const resumen = useMemo(() => {
     const activos = movimientos.filter(
@@ -189,8 +233,7 @@ const movimientosFiltrados = useMemo(() => {
         cajaAnterior,
       });
 
-      await cargarCaja();
-      setExito("Caja abierta correctamente.");
+    setExito("Caja abierta correctamente.");
     } catch (err) {
       console.error(err);
       setError(err.message || "No se pudo abrir la caja.");
@@ -224,9 +267,7 @@ const movimientosFiltrados = useMemo(() => {
       nuevoSaldoAperturaEfectivo: Number(nuevoValor),
     });
 
-    await cargarCaja();
-
-    setExito("Apertura corregida.");
+setExito("Apertura corregida.");
   } catch (err) {
     setError(err.message);
   } finally {
@@ -252,7 +293,7 @@ const movimientosFiltrados = useMemo(() => {
       setModalMovimiento(false);
       setMontoManual("");
       setDescripcionManual("");
-      await cargarCaja();
+      
       setExito("Movimiento cargado correctamente.");
     } catch (err) {
       console.error(err);
@@ -288,7 +329,7 @@ const movimientosFiltrados = useMemo(() => {
       });
 
       setSaldoCierreReal("");
-      await cargarCaja();
+      
       setExito("Caja cerrada correctamente.");
     } catch (err) {
       console.error(err);
@@ -313,7 +354,7 @@ const movimientosFiltrados = useMemo(() => {
         motivoReapertura: motivo,
       });
 
-      await cargarCaja();
+      
       setExito("Caja reabierta correctamente.");
     } catch (err) {
       console.error(err);

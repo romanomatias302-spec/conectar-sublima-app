@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { collection, getDocs, deleteDoc, doc, query, where } from "firebase/firestore";
+import { collection, deleteDoc, doc, query, where, onSnapshot } from "firebase/firestore";
 import { db } from "../../firebase";
 import "./ClientesList.css";
 import ActionMenu from "../../comunes/componentes/ActionMenu";
@@ -14,44 +14,44 @@ export default function ClientesList({ onNuevo, onEditar, onVer, perfil }) {
   const puedeEditarClientes = puedeHacer(perfil, "clientes", "editar");
   const puedeEliminarClientes = puedeHacer(perfil, "clientes", "eliminar");
 
-  const cargarClientes = async () => {
-    try {
-      if (!perfil) return;
+ const escucharClientes = () => {
+  if (!perfil) return () => {};
 
-      const clientesRef = collection(db, "clientes");
+  const clientesRef = collection(db, "clientes");
 
-      const q =
-        perfil.rol === "superadmin"
-          ? query(clientesRef)
-          : query(
-              clientesRef,
-              where("clienteId", "==", perfil.clienteId)
-            );
+  const q =
+    perfil.rol === "superadmin"
+      ? query(clientesRef)
+      : query(clientesRef, where("clienteId", "==", perfil.clienteId));
 
-      const snapshot = await getDocs(q);
-
+  return onSnapshot(
+    q,
+    (snapshot) => {
       const lista = snapshot.docs.map((docu) => ({
         firebaseId: docu.id,
         ...docu.data(),
       }));
 
       setClientes(lista);
-    } catch (error) {
-      console.error("Error al cargar clientes:", error);
+    },
+    (error) => {
+      console.error("Error escuchando clientes:", error);
     }
-  };
+  );
+};
 
-  useEffect(() => {
-    cargarClientes();
-  }, [perfil]);
+useEffect(() => {
+  const unsubscribe = escucharClientes();
+  return () => unsubscribe();
+}, [perfil]);
 
   const eliminarCliente = async (id) => {
     if (!puedeEliminarClientes) return;
     if (window.confirm("¿Seguro que querés eliminar este cliente?")) {
       try {
         await deleteDoc(doc(db, "clientes", id));
-        // eliminar visualmente el cliente sin recargar todo
-        setClientes((prev) => prev.filter((c) => c.firebaseId !== id));
+    
+        
       } catch (e) {
         console.error("Error al eliminar cliente:", e);
       }

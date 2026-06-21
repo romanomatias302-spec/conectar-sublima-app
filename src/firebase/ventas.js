@@ -12,6 +12,7 @@ import {
   startAfter,
   runTransaction,
   serverTimestamp,
+  onSnapshot,
 } from "firebase/firestore";
 import { db } from "../firebase";
 
@@ -610,4 +611,42 @@ export async function anularVenta({
       updatedAt: serverTimestamp(),
     });
   }
+}
+
+export function escucharVentasRecientes({
+  perfil,
+  pageSize = 100,
+  onData,
+  onError,
+}) {
+  const ventasRef = collection(db, "ventas");
+
+  const q =
+    perfil?.rol === "superadmin"
+      ? query(ventasRef, orderBy("createdAt", "desc"), limit(pageSize))
+      : query(
+          ventasRef,
+          where("clienteId", "==", perfil.clienteId),
+          orderBy("createdAt", "desc"),
+          limit(pageSize)
+        );
+
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      onData({
+        ventas: snapshot.docs.map((d) => ({
+          firebaseId: d.id,
+          ...d.data(),
+        })),
+        ultimoDoc: snapshot.docs.length
+          ? snapshot.docs[snapshot.docs.length - 1]
+          : null,
+        hayMas: snapshot.docs.length === pageSize,
+      });
+    },
+    (error) => {
+      if (onError) onError(error);
+    }
+  );
 }
