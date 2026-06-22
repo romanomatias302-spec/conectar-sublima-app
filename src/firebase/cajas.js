@@ -24,51 +24,111 @@ export function fechaHoyInput() {
   return `${yyyy}-${mm}-${dd}`;
 }
 
-export async function obtenerCajaDelDia({ perfil, fechaCaja = fechaHoyInput() }) {
+const SUCURSAL_PRINCIPAL_ID = "principal";
+
+function normalizarSucursal(sucursal) {
+  const esPrincipal =
+    sucursal?.esPrincipal === true ||
+    sucursal?.codigo === SUCURSAL_PRINCIPAL_ID ||
+    String(sucursal?.firebaseId || "").endsWith("_principal") ||
+    String(sucursal?.id || "").endsWith("_principal");
+
+  return {
+    sucursalId: esPrincipal
+      ? SUCURSAL_PRINCIPAL_ID
+      : sucursal?.firebaseId || sucursal?.id || SUCURSAL_PRINCIPAL_ID,
+    sucursalNombre: sucursal?.nombre || "Sucursal principal",
+  };
+}
+
+function cajaPerteneceASucursal(caja, sucursalId) {
+  const cajaSucursalId = String(caja?.sucursalId || "");
+
+  const cajaEsPrincipal =
+    !cajaSucursalId ||
+    cajaSucursalId === SUCURSAL_PRINCIPAL_ID ||
+    cajaSucursalId.endsWith("_principal");
+
+  if (sucursalId === SUCURSAL_PRINCIPAL_ID) {
+    return cajaEsPrincipal;
+  }
+
+  return cajaSucursalId === sucursalId;
+}
+
+function movimientoPerteneceASucursal(mov, sucursalId) {
+  const movSucursalId = String(mov?.sucursalId || "");
+
+  const movEsPrincipal =
+    !movSucursalId ||
+    movSucursalId === SUCURSAL_PRINCIPAL_ID ||
+    movSucursalId.endsWith("_principal");
+
+  if (sucursalId === SUCURSAL_PRINCIPAL_ID) {
+    return movEsPrincipal;
+  }
+
+  return movSucursalId === sucursalId;
+}
+
+export async function obtenerCajaDelDia({
+  perfil,
+  fechaCaja = fechaHoyInput(),
+  sucursal = null,
+}) {
   if (!perfil?.clienteId) throw new Error("Perfil inválido.");
 
-  const q = query(
-    collection(db, "cajas"),
+  const { sucursalId } = normalizarSucursal(sucursal);
+
+  const filtros = [
     where("clienteId", "==", perfil.clienteId),
     where("fechaCaja", "==", fechaCaja),
-    limit(1)
-  );
+  ];
 
+  if (sucursalId !== SUCURSAL_PRINCIPAL_ID) {
+    filtros.push(where("sucursalId", "==", sucursalId));
+  }
+
+  const q = query(collection(db, "cajas"), ...filtros);
   const snap = await getDocs(q);
-  if (snap.empty) return null;
 
-  const d = snap.docs[0];
-  return { firebaseId: d.id, ...d.data() };
+  const caja = snap.docs
+    .map((d) => ({ firebaseId: d.id, ...d.data() }))
+    .find((c) => cajaPerteneceASucursal(c, sucursalId));
+
+  return caja || null;
 }
 
 export function escucharCajaDelDia({
   perfil,
   fechaCaja = fechaHoyInput(),
+  sucursal = null,
   onData,
   onError,
 }) {
   if (!perfil?.clienteId) return () => {};
 
-  const q = query(
-    collection(db, "cajas"),
+  const { sucursalId } = normalizarSucursal(sucursal);
+
+  const filtros = [
     where("clienteId", "==", perfil.clienteId),
     where("fechaCaja", "==", fechaCaja),
-    limit(1)
-  );
+  ];
+
+  if (sucursalId !== SUCURSAL_PRINCIPAL_ID) {
+    filtros.push(where("sucursalId", "==", sucursalId));
+  }
+
+  const q = query(collection(db, "cajas"), ...filtros);
 
   return onSnapshot(
     q,
     (snap) => {
-      if (snap.empty) {
-        onData(null);
-        return;
-      }
+      const caja = snap.docs
+        .map((d) => ({ firebaseId: d.id, ...d.data() }))
+        .find((c) => cajaPerteneceASucursal(c, sucursalId));
 
-      const d = snap.docs[0];
-      onData({
-        firebaseId: d.id,
-        ...d.data(),
-      });
+      onData(caja || null);
     },
     (error) => {
       if (onError) onError(error);
@@ -109,13 +169,16 @@ export async function obtenerUltimaCajaCerradaAnterior({
 export async function obtenerUltimaCajaAnteriorConSaldo({
   perfil,
   fechaCaja = fechaHoyInput(),
+  sucursal = null,
 }) {
   if (!perfil?.clienteId) throw new Error("Perfil inválido.");
+
+  const { sucursalId } = normalizarSucursal(sucursal);
 
   const qCajas = query(
     collection(db, "cajas"),
     where("clienteId", "==", perfil.clienteId),
-    limit(60)
+    limit(100)
   );
 
   const snapCajas = await getDocs(qCajas);
@@ -125,7 +188,12 @@ export async function obtenerUltimaCajaAnteriorConSaldo({
       firebaseId: d.id,
       ...d.data(),
     }))
-    .filter((caja) => caja.fechaCaja && caja.fechaCaja < fechaCaja)
+    .filter(
+      (caja) =>
+        caja.fechaCaja &&
+        caja.fechaCaja < fechaCaja &&
+        cajaPerteneceASucursal(caja, sucursalId)
+    )
     .sort((a, b) => (a.fechaCaja < b.fechaCaja ? 1 : -1));
 
   const cajaAnterior = cajas[0] || null;
@@ -133,9 +201,9 @@ export async function obtenerUltimaCajaAnteriorConSaldo({
   if (!cajaAnterior) {
     return {
       caja: null,
-      label: "Cierre anterior",
+      label: "Sin cierre anterior",
       saldo: 0,
-      sinCierreAnterior: false,
+      sinCierreAnterior: true,
     };
   }
 
@@ -158,7 +226,11 @@ export async function obtenerUltimaCajaAnteriorConSaldo({
 
   const activos = snapMovimientos.docs
     .map((d) => d.data())
-    .filter((m) => (m.estadoMovimiento || "activo") === "activo");
+    .filter(
+      (m) =>
+        (m.estadoMovimiento || "activo") === "activo" &&
+        movimientoPerteneceASucursal(m, sucursalId)
+    );
 
   const ingresosEfectivo = activos
     .filter((m) => m.tipo === "ingreso" && m.medioPago === "efectivo")
@@ -187,10 +259,18 @@ export async function abrirCaja({
   saldoAperturaEfectivo = 0,
   observacionApertura = "",
   cajaAnterior = null,
+  sucursal = null,
+  saldoReferenciaAnterior = null,
 }) {
   if (!perfil?.clienteId) throw new Error("Perfil inválido.");
 
-  const cajaExistente = await obtenerCajaDelDia({ perfil, fechaCaja });
+  const sucursalData = normalizarSucursal(sucursal);
+
+const cajaExistente = await obtenerCajaDelDia({
+  perfil,
+  fechaCaja,
+  sucursal,
+});
 
   if (cajaExistente?.estado === "abierta") {
     throw new Error("Ya existe una caja abierta para este día.");
@@ -200,7 +280,10 @@ export async function abrirCaja({
     throw new Error("La caja de este día ya fue cerrada.");
   }
 
-  const saldoAnterior = Number(cajaAnterior?.saldoCierreRealEfectivo || 0);
+  const saldoAnterior =
+  saldoReferenciaAnterior !== null
+    ? Number(saldoReferenciaAnterior || 0)
+    : Number(cajaAnterior?.saldoCierreRealEfectivo || 0);
   const apertura = Number(saldoAperturaEfectivo || 0);
   const diferenciaApertura = apertura - saldoAnterior;
 
@@ -208,6 +291,8 @@ export async function abrirCaja({
     clienteId: perfil.clienteId,
     fechaCaja,
     estado: "abierta",
+    sucursalId: sucursalData.sucursalId,
+    sucursalNombre: sucursalData.sucursalNombre,
 
     saldoCierreAnteriorEfectivo: saldoAnterior,
     fechaCajaAnterior: cajaAnterior?.fechaCaja || "",
@@ -236,8 +321,12 @@ export async function abrirCaja({
 export async function obtenerMovimientosCajaDia({
   perfil,
   fechaCaja = fechaHoyInput(),
+  sucursal = null,
+  todasSucursales = false,
 }) {
   if (!perfil?.clienteId) throw new Error("Perfil inválido.");
+
+  const sucursalData = normalizarSucursal(sucursal);
 
   const q = query(
     collection(db, "movimientos"),
@@ -252,6 +341,11 @@ export async function obtenerMovimientosCajaDia({
       firebaseId: d.id,
       ...d.data(),
     }))
+    .filter((m) =>
+      todasSucursales
+        ? true
+        : movimientoPerteneceASucursal(m, sucursalData.sucursalId)
+    )
     .sort((a, b) => {
       const fechaA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0;
       const fechaB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0;
@@ -262,10 +356,12 @@ export async function obtenerMovimientosCajaDia({
 export function escucharMovimientosCajaDia({
   perfil,
   fechaCaja = fechaHoyInput(),
+  sucursal = null,
   onData,
   onError,
 }) {
   if (!perfil?.clienteId) return () => {};
+  const { sucursalId } = normalizarSucursal(sucursal);
 
   const q = query(
     collection(db, "movimientos"),
@@ -281,6 +377,7 @@ export function escucharMovimientosCajaDia({
           firebaseId: d.id,
           ...d.data(),
         }))
+        .filter((m) => movimientoPerteneceASucursal(m, sucursalId))
         .sort((a, b) => {
           const fechaA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0;
           const fechaB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0;
@@ -319,6 +416,8 @@ export async function crearMovimientoManualCaja({
   cajaId: caja.firebaseId,
   fechaCaja: caja.fechaCaja,
   fecha: caja.fechaCaja,
+  sucursalId: caja.sucursalId || SUCURSAL_PRINCIPAL_ID,
+  sucursalNombre: caja.sucursalNombre || "Sucursal principal",
 
   tipo,
   subtipo,
@@ -344,6 +443,8 @@ if (tipo === "egreso") {
   await addDoc(collection(db, "gastos"), {
     clienteId: perfil.clienteId,
     fecha: caja.fechaCaja,
+    sucursalId: caja.sucursalId || SUCURSAL_PRINCIPAL_ID,
+    sucursalNombre: caja.sucursalNombre || "Sucursal principal",
     categoria: "Gasto de caja",
     proveedor: "",
     comprobanteNumero: "",
@@ -386,6 +487,78 @@ if (tipo === "egreso") {
 }
 }
 
+export async function crearCambioTurnoCaja({
+  perfil,
+  caja,
+  efectivoContado,
+  observacion = "",
+}) {
+  if (!perfil?.clienteId) throw new Error("Perfil inválido.");
+  if (!caja?.firebaseId) throw new Error("No hay caja abierta.");
+  if (caja.estado !== "abierta") throw new Error("La caja no está abierta.");
+
+  const movimientos = await obtenerMovimientosCajaDia({
+    perfil,
+    fechaCaja: caja.fechaCaja,
+    sucursal: {
+      firebaseId: caja.sucursalId || SUCURSAL_PRINCIPAL_ID,
+      nombre: caja.sucursalNombre || "Sucursal principal",
+    },
+  });
+
+  const activos = movimientos.filter(
+    (m) => (m.estadoMovimiento || "activo") === "activo"
+  );
+
+  const ingresosEfectivo = activos
+    .filter((m) => m.tipo === "ingreso" && m.medioPago === "efectivo")
+    .reduce((acc, m) => acc + Number(m.monto || 0), 0);
+
+  const egresosEfectivo = activos
+    .filter((m) => m.tipo === "egreso" && m.medioPago === "efectivo")
+    .reduce((acc, m) => acc + Number(m.monto || 0), 0);
+
+  const efectivoEsperado =
+    Number(caja.saldoAperturaEfectivo || 0) + ingresosEfectivo - egresosEfectivo;
+
+  const contado = Number(efectivoContado || 0);
+  const diferencia = contado - efectivoEsperado;
+
+  await addDoc(collection(db, "movimientos"), {
+    clienteId: perfil.clienteId,
+    cajaId: caja.firebaseId,
+    fechaCaja: caja.fechaCaja,
+    fecha: caja.fechaCaja,
+
+    sucursalId: caja.sucursalId || SUCURSAL_PRINCIPAL_ID,
+    sucursalNombre: caja.sucursalNombre || "Sucursal principal",
+
+    tipo: "control",
+    subtipo: "cambio_turno",
+    origen: "caja",
+    origenRefId: caja.firebaseId,
+
+    descripcion: "Cambio de turno",
+    observacion,
+
+    monto: 0,
+    medioPago: "efectivo",
+
+    efectivoEsperado,
+    efectivoContado: contado,
+    diferenciaTurno: diferencia,
+
+    impactaCaja: false,
+    impactaResultado: false,
+    estadoMovimiento: "activo",
+
+    creadoPor: perfil?.email || "",
+    creadoPorNombre: perfil?.nombre || perfil?.email || "",
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+}
+
 export async function cerrarCaja({
   perfil,
   caja,
@@ -396,10 +569,14 @@ export async function cerrarCaja({
   if (!caja?.firebaseId) throw new Error("Caja inválida.");
   if (caja.estado !== "abierta") throw new Error("La caja no está abierta.");
 
-  const movimientos = await obtenerMovimientosCajaDia({
-    perfil,
-    fechaCaja: caja.fechaCaja,
-  });
+const movimientos = await obtenerMovimientosCajaDia({
+  perfil,
+  fechaCaja: caja.fechaCaja,
+  sucursal: {
+    firebaseId: caja.sucursalId || SUCURSAL_PRINCIPAL_ID,
+    nombre: caja.sucursalNombre || "Sucursal principal",
+  },
+});
 
   const activos = movimientos.filter(
     (m) => (m.estadoMovimiento || "activo") === "activo"
@@ -458,10 +635,14 @@ export async function corregirAperturaCaja({
   if (!caja?.firebaseId) throw new Error("Caja inválida.");
   if (caja.estado !== "abierta") throw new Error("La caja debe estar abierta.");
 
-  const movimientos = await obtenerMovimientosCajaDia({
-    perfil,
-    fechaCaja: caja.fechaCaja,
-  });
+const movimientos = await obtenerMovimientosCajaDia({
+  perfil,
+  fechaCaja: caja.fechaCaja,
+  sucursal: {
+    firebaseId: caja.sucursalId || SUCURSAL_PRINCIPAL_ID,
+    nombre: caja.sucursalNombre || "Sucursal principal",
+  },
+});
 
   const activos = movimientos.filter(
     (m) => (m.estadoMovimiento || "activo") === "activo"
@@ -488,10 +669,14 @@ export async function obtenerHistorialCajas({
   limite = 30,
   fechaDesde = "",
   fechaHasta = "",
+  sucursal = null,
+  todasSucursales = false,
 }) {
   if (!perfil?.clienteId) {
     throw new Error("Perfil inválido.");
   }
+
+  const sucursalData = normalizarSucursal(sucursal);
 
   let filtros = [
     where("clienteId", "==", perfil.clienteId),
@@ -506,8 +691,14 @@ export async function obtenerHistorialCajas({
   const q = query(collection(db, "cajas"), ...filtros);
   const snap = await getDocs(q);
 
-  return snap.docs.map((d) => ({
-    firebaseId: d.id,
-    ...d.data(),
-  }));
+  return snap.docs
+    .map((d) => ({
+      firebaseId: d.id,
+      ...d.data(),
+    }))
+    .filter((caja) =>
+      todasSucursales
+        ? true
+        : cajaPerteneceASucursal(caja, sucursalData.sucursalId)
+    );
 }

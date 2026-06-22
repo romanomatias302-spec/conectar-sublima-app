@@ -1,5 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
+  collection,
+  onSnapshot,
+  query,
+  where,
+} from "firebase/firestore";
+import { db } from "../../firebase";
+import {
   cancelarInvitacion,
   crearInvitacionUsuario,
   escucharInvitacionesPorCliente,
@@ -263,6 +270,9 @@ export default function ConfiguracionUsuarios({ perfil }) {
   const [nombreEditando, setNombreEditando] = useState("");
   const [guardandoDatosUsuario, setGuardandoDatosUsuario] = useState(false);
   const [busquedaUsuario, setBusquedaUsuario] = useState("");
+  const [sucursales, setSucursales] = useState([]);
+const [sucursalDefaultEditando, setSucursalDefaultEditando] = useState("principal");
+const [sucursalesPermitidasEditando, setSucursalesPermitidasEditando] = useState(["principal"]);
 
   const puedeInvitar = perfil?.rol === "admin";
 
@@ -290,6 +300,43 @@ export default function ConfiguracionUsuarios({ perfil }) {
   useEffect(() => {
     cargarTodo();
   }, [perfil?.clienteId]);
+
+  useEffect(() => {
+  if (!perfil?.clienteId) return;
+
+  const q = query(
+    collection(db, "sucursales"),
+    where("clienteId", "==", perfil.clienteId)
+  );
+
+  const unsub = onSnapshot(q, (snap) => {
+    const lista = snap.docs
+      .map((d) => {
+        const data = d.data();
+
+        const esPrincipal =
+          data.esPrincipal === true ||
+          data.codigo === "principal" ||
+          String(d.id || "").endsWith("_principal");
+
+        return {
+          firebaseId: esPrincipal ? "principal" : d.id,
+          ...data,
+          esPrincipal,
+        };
+      })
+      .filter((s) => s.activa !== false)
+      .sort((a, b) => {
+        if (a.esPrincipal) return -1;
+        if (b.esPrincipal) return 1;
+        return (a.nombre || "").localeCompare(b.nombre || "");
+      });
+
+    setSucursales(lista);
+  });
+
+  return () => unsub();
+}, [perfil?.clienteId]);
 
   const invitacionesPendientes = useMemo(
     () => invitaciones.filter((i) => i.estado === "pendiente"),
@@ -351,27 +398,76 @@ export default function ConfiguracionUsuarios({ perfil }) {
     }
   }
 
-  function abrirEditorPermisos(usuario) {
-    setUsuarioEditandoPermisos(usuario);
-    setPermisosEditando({
-      ...PERMISOS_DEFAULT_USUARIO,
-      ...(usuario?.permisos || {}),
-    });
-  }
+function abrirEditorPermisos(usuario) {
+  setUsuarioEditandoPermisos(usuario);
+  setPermisosEditando({
+    ...PERMISOS_DEFAULT_USUARIO,
+    ...(usuario?.permisos || {}),
+  });
 
-  function cerrarEditorPermisos() {
-    setUsuarioEditandoPermisos(null);
-    setPermisosEditando(PERMISOS_DEFAULT_USUARIO);
-  }
+  setSucursalDefaultEditando(usuario.sucursalDefaultId || "principal");
+  setSucursalesPermitidasEditando(
+    Array.isArray(usuario.sucursalesPermitidas) &&
+      usuario.sucursalesPermitidas.length
+      ? usuario.sucursalesPermitidas
+      : ["principal"]
+  );
+}
 
-  function abrirEditorDatosUsuario(usuario) {
+function cerrarEditorPermisos() {
+  setUsuarioEditandoPermisos(null);
+  setPermisosEditando(PERMISOS_DEFAULT_USUARIO);
+  setSucursalDefaultEditando("principal");
+  setSucursalesPermitidasEditando(["principal"]);
+}
+
+function abrirEditorDatosUsuario(usuario) {
   setUsuarioEditandoDatos(usuario);
   setNombreEditando(usuario.nombre || "");
+
+  const defaultId = usuario.sucursalDefaultId || "principal";
+  const permitidas = Array.isArray(usuario.sucursalesPermitidas)
+    ? usuario.sucursalesPermitidas
+    : ["principal"];
+
+  setSucursalDefaultEditando(defaultId);
+  setSucursalesPermitidasEditando(permitidas.length ? permitidas : ["principal"]);
 }
 
 function cerrarEditorDatosUsuario() {
   setUsuarioEditandoDatos(null);
   setNombreEditando("");
+  setSucursalDefaultEditando("principal");
+  setSucursalesPermitidasEditando(["principal"]);
+}
+
+function toggleSucursalPermitida(sucursalId) {
+  setSucursalesPermitidasEditando((prev) => {
+    const actual = Array.isArray(prev) ? prev : ["principal"];
+    const yaExiste = actual.includes(sucursalId);
+
+    if (yaExiste) {
+      const nuevaLista = actual.filter((id) => id !== sucursalId);
+
+      if (nuevaLista.length === 0) {
+        return actual;
+      }
+
+      if (sucursalDefaultEditando === sucursalId) {
+        setSucursalDefaultEditando(nuevaLista[0]);
+      }
+
+      return nuevaLista;
+    }
+
+    const nuevaLista = [...actual, sucursalId];
+
+    if (!sucursalDefaultEditando || !actual.includes(sucursalDefaultEditando)) {
+      setSucursalDefaultEditando(sucursalId);
+    }
+
+    return nuevaLista;
+  });
 }
 
 async function guardarDatosUsuario() {
@@ -381,9 +477,17 @@ async function guardarDatosUsuario() {
     setGuardandoDatosUsuario(true);
     setMensaje("");
 
-    await actualizarDatosUsuario(usuarioEditandoDatos.uid, {
-      nombre: nombreEditando.trim(),
-    });
+const permitidasFinal = sucursalesPermitidasEditando.includes(
+  sucursalDefaultEditando
+)
+  ? sucursalesPermitidasEditando
+  : [...sucursalesPermitidasEditando, sucursalDefaultEditando];
+
+await actualizarDatosUsuario(usuarioEditandoDatos.uid, {
+  nombre: nombreEditando.trim(),
+  sucursalDefaultId: sucursalDefaultEditando,
+  sucursalesPermitidas: permitidasFinal,
+});
 
     setMensaje("Usuario actualizado correctamente.");
     cerrarEditorDatosUsuario();
@@ -447,10 +551,21 @@ function togglePermiso(modulo, accion) {
       setGuardandoPermisos(true);
       setMensaje("");
 
-      await actualizarPermisosUsuario(
-        usuarioEditandoPermisos.uid,
-        permisosEditando
-      );
+  const permitidasFinal = sucursalesPermitidasEditando.includes(
+    sucursalDefaultEditando
+  )
+    ? sucursalesPermitidasEditando
+    : [...sucursalesPermitidasEditando, sucursalDefaultEditando];
+
+  await actualizarPermisosUsuario(
+    usuarioEditandoPermisos.uid,
+    permisosEditando
+  );
+
+  await actualizarDatosUsuario(usuarioEditandoPermisos.uid, {
+    sucursalDefaultId: sucursalDefaultEditando,
+    sucursalesPermitidas: permitidasFinal,
+  });
 
       setMensaje("Permisos actualizados correctamente.");
       cerrarEditorPermisos();
@@ -622,6 +737,7 @@ function togglePermiso(modulo, accion) {
                     Rol: {inv.rol || "usuario"}
 
                   </div>
+
 
                   <div style={{ color: "#666", fontSize: "13px" }}>
 
@@ -823,6 +939,24 @@ function togglePermiso(modulo, accion) {
                   Rol: {usuario.rol || "usuario"}
                 </div>
 
+                <div style={{ color: "#666", fontSize: "14px" }}>
+                  Sucursales:{" "}
+                  {(Array.isArray(usuario.sucursalesPermitidas) &&
+                  usuario.sucursalesPermitidas.length
+                    ? usuario.sucursalesPermitidas
+                    : ["principal"]
+                  )
+                    .map((id) => {
+                      const sucursal = sucursales.find((s) => s.firebaseId === id);
+                      const esDefault = id === (usuario.sucursalDefaultId || "principal");
+
+                      return sucursal
+                        ? `${sucursal.nombre}${esDefault ? " (por defecto)" : ""}`
+                        : id;
+                    })
+                    .join(", ")}
+                </div>
+
                 {usuario.rol !== "admin" && usuario.rol !== "superadmin" && (
                   <div style={{ marginTop: "6px" }}>
                     <button
@@ -950,6 +1084,76 @@ function togglePermiso(modulo, accion) {
             </div>
 
             <div
+              style={{
+                marginTop: 18,
+                border: "1px solid #e5e7eb",
+                borderRadius: 16,
+                padding: 16,
+                background: "#fff",
+              }}
+            >
+              <h4 style={{ margin: "0 0 12px", fontSize: 15 }}>
+                Sucursales
+              </h4>
+
+
+
+              <label style={{ marginTop: 12 }}>Sucursales permitidas</label>
+
+              <div style={{ display: "grid", gap: 8 }}>
+                {sucursales.map((s) => {
+                  const esDefault = sucursalDefaultEditando === s.firebaseId;
+
+                  return (
+                    <label
+                      key={s.firebaseId}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        cursor: "pointer",
+                        padding: "8px 10px",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: 10,
+                        background: esDefault ? "#f0faff" : "#fff",
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={sucursalesPermitidasEditando.includes(s.firebaseId)}
+                        onChange={() => toggleSucursalPermitida(s.firebaseId)}
+                        disabled={
+                          sucursalesPermitidasEditando.length === 1 &&
+                          sucursalesPermitidasEditando.includes(s.firebaseId)
+                        }
+                        style={{ width: "auto", margin: 0 }}
+                      />
+
+                      <span style={{ fontWeight: 600 }}>{s.nombre}</span>
+
+                      {esDefault && (
+                        <span
+                          style={{
+                            marginLeft: "auto",
+                            padding: "3px 8px",
+                            borderRadius: 999,
+                            background: "#eaf7ff",
+                            color: "#0096d1",
+                            fontSize: 12,
+                            fontWeight: 700,
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          Por defecto
+                        </span>
+                      )}
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div
               className="produccion-modal-actions"
               style={{ marginTop: "22px" }}
             >
@@ -992,6 +1196,7 @@ function togglePermiso(modulo, accion) {
               onChange={(e) => setNombreEditando(e.target.value)}
               placeholder="Nombre del usuario"
             />
+
 
             <div className="produccion-modal-actions" style={{ marginTop: "22px" }}>
               <button

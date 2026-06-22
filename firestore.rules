@@ -735,6 +735,12 @@ function canReadMovimientos(clienteId) {
           && (
             isAdmin()
             || permisoModuloAccion("configuracion", "ver")
+            || permisoModuloAccion("caja", "ver")
+            || permisoModuloAccion("caja", "abrirCerrar")
+            || permisoModuloAccion("ventas", "ver")
+            || permisoModuloAccion("ventas", "crear")
+            || permisoModuloAccion("pedidos", "ver")
+            || permisoModuloAccion("pedidos", "crear")
           )
         );
 

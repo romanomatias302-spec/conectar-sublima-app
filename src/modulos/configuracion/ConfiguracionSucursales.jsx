@@ -3,6 +3,7 @@ import {
   addDoc,
   collection,
   doc,
+  setDoc,
   onSnapshot,
   query,
   serverTimestamp,
@@ -36,19 +37,23 @@ export default function ConfiguracionSucursales({ perfil }) {
         ...d.data(),
       }));
 
-      if (lista.length === 0) {
-        await addDoc(collection(db, "sucursales"), {
-          clienteId: perfil.clienteId,
-          codigo: SUCURSAL_PRINCIPAL_ID,
-          nombre: "Sucursal principal",
-          direccion: "",
-          activa: true,
-          esPrincipal: true,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        });
-        return;
-      }
+const tienePrincipal = lista.some(
+  (s) => s.esPrincipal === true || s.codigo === SUCURSAL_PRINCIPAL_ID
+);
+
+if (!tienePrincipal) {
+  await setDoc(doc(db, "sucursales", `${perfil.clienteId}_principal`), {
+    clienteId: perfil.clienteId,
+    codigo: SUCURSAL_PRINCIPAL_ID,
+    nombre: "Sucursal principal",
+    direccion: "",
+    activa: true,
+    esPrincipal: true,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+  return;
+}
 
       setSucursales(
         lista.sort((a, b) => {
@@ -245,7 +250,7 @@ const actualizarSucursal = async () => {
                           fontWeight: 700,
                         }}
                       >
-                        Principal / por defecto
+                        Sucursal por defecto
                       </span>
                     )}
                   </td>

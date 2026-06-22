@@ -3,10 +3,12 @@ import {
   abrirCaja,
   cerrarCaja,
   crearMovimientoManualCaja,
+  crearCambioTurnoCaja,
   fechaHoyInput,
   obtenerCajaDelDia,
   obtenerMovimientosCajaDia,
   obtenerUltimaCajaCerradaAnterior,
+  obtenerUltimaCajaAnteriorConSaldo,
   reabrirCaja,
   obtenerHistorialCajas,
   corregirAperturaCaja,
@@ -16,6 +18,8 @@ import {
 } from "../../firebase/cajas";
 import { formatearMoneda, obtenerConfigMonedaDesdePerfil } from "../../utils/moneda";
 import { puedeHacer } from "../../utils/permisos";
+import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { db } from "../../firebase";
 
 function formatearFechaCaja(fechaISO) {
   if (!fechaISO) return "-";
@@ -27,7 +31,14 @@ export default function CajaPage({ perfil, onVerVenta }) {
   const fechaCaja = fechaHoyInput();
 
   const [caja, setCaja] = useState(null);
+  const [sucursales, setSucursales] = useState([]);
+  const [sucursalSeleccionadaId, setSucursalSeleccionadaId] = useState("principal");
   const [cajaAnterior, setCajaAnterior] = useState(null);
+  const [saldoAnteriorInfo, setSaldoAnteriorInfo] = useState({
+    label: "Cierre anterior",
+    saldo: 0,
+    sinCierreAnterior: false,
+  });
   const [movimientos, setMovimientos] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -38,6 +49,11 @@ export default function CajaPage({ perfil, onVerVenta }) {
   const [saldoCierreReal, setSaldoCierreReal] = useState("");
 
   const [modalMovimiento, setModalMovimiento] = useState(false);
+  const [modalCambioTurno, setModalCambioTurno] = useState(false);
+  const [efectivoTurno, setEfectivoTurno] = useState("");
+  const [observacionTurno, setObservacionTurno] = useState("");
+  const [historialSucursalId, setHistorialSucursalId] = useState("actual");
+
   const [tipoManual, setTipoManual] = useState("egreso");
   const [subtipoManual, setSubtipoManual] = useState("gasto_caja");
   const [montoManual, setMontoManual] = useState("");
@@ -104,17 +120,126 @@ const movimientosFiltrados = useMemo(() => {
 useEffect(() => {
   if (!perfil?.clienteId) return;
 
+  const q = query(
+    collection(db, "sucursales"),
+    where("clienteId", "==", perfil.clienteId)
+  );
+
+  const unsub = onSnapshot(q, (snap) => {
+    const lista = snap.docs
+      .map((d) => ({
+        firebaseId: d.id,
+        ...d.data(),
+      }))
+      .filter((s) => s.activa !== false)
+      .sort((a, b) => {
+        if (a.esPrincipal) return -1;
+        if (b.esPrincipal) return 1;
+        return (a.nombre || "").localeCompare(b.nombre || "");
+      });
+
+     const listaNormalizada = lista.map((s) => {
+      const esPrincipal =
+        s.esPrincipal === true ||
+        s.codigo === "principal" ||
+        String(s.firebaseId || "").endsWith("_principal");
+
+      return {
+        ...s,
+        firebaseId: esPrincipal ? "principal" : s.firebaseId,
+        esPrincipal,
+      };
+    }); 
+
+    const permitidasUsuario =
+      perfil?.rol === "admin"
+        ? null
+        : Array.isArray(perfil?.sucursalesPermitidas) &&
+          perfil.sucursalesPermitidas.length
+        ? perfil.sucursalesPermitidas
+        : ["principal"];
+
+    const listaPermitida = permitidasUsuario
+      ? listaNormalizada.filter((s) => permitidasUsuario.includes(s.firebaseId))
+      : listaNormalizada;
+
+    setSucursales(listaPermitida);
+
+const defaultUsuario = perfil?.sucursalDefaultId || "principal";
+
+if (!listaPermitida.some((s) => s.firebaseId === sucursalSeleccionadaId)) {
+  const sucursalDefault =
+    listaPermitida.find((s) => s.firebaseId === defaultUsuario) ||
+    listaPermitida.find((s) => s.esPrincipal) ||
+    listaPermitida[0];
+
+  setSucursalSeleccionadaId(sucursalDefault?.firebaseId || "principal");
+}
+  });
+
+  return () => unsub();
+}, [
+  perfil?.clienteId,
+  perfil?.rol,
+  perfil?.sucursalDefaultId,
+  perfil?.sucursalesPermitidas,
+  sucursalSeleccionadaId,
+]);
+
+const normalizarSucursalVista = (sucursal) => {
+  const esPrincipal =
+    sucursal?.esPrincipal === true ||
+    sucursal?.codigo === "principal" ||
+    String(sucursal?.firebaseId || "").endsWith("_principal");
+
+  return {
+    ...sucursal,
+    firebaseId: esPrincipal ? "principal" : sucursal?.firebaseId,
+    nombre: sucursal?.nombre || "Sucursal principal",
+    esPrincipal,
+  };
+};
+
+const sucursalSeleccionada = normalizarSucursalVista(
+  sucursales.find((s) => {
+    const idNormalizado =
+      s.esPrincipal || s.codigo === "principal" || String(s.firebaseId || "").endsWith("_principal")
+        ? "principal"
+        : s.firebaseId;
+
+    return idNormalizado === sucursalSeleccionadaId;
+  }) ||
+    sucursales.find((s) => s.esPrincipal || s.codigo === "principal") || {
+      firebaseId: "principal",
+      nombre: "Sucursal principal",
+      esPrincipal: true,
+      codigo: "principal",
+    }
+);
+
+useEffect(() => {
+  if (!perfil?.clienteId) return;
+
   setLoading(true);
 
-  obtenerUltimaCajaCerradaAnterior({ perfil, fechaCaja })
-    .then((anterior) => setCajaAnterior(anterior))
-    .catch((err) => {
-      console.error("Error cargando caja anterior:", err);
-    });
+obtenerUltimaCajaAnteriorConSaldo({
+  perfil,
+  fechaCaja,
+  sucursal: sucursalSeleccionada,
+})
+  .then((info) => {
+    setCajaAnterior(info.caja);
+    setSaldoAnteriorInfo(info);
+    setSaldoApertura(info.saldo);
+  })
+  .catch((err) => {
+    console.error("Error cargando caja anterior:", err);
+  });
 
   const unsubCaja = escucharCajaDelDia({
     perfil,
     fechaCaja,
+    sucursal: sucursalSeleccionada,
     onData: (cajaData) => {
       setCaja(cajaData);
       setLoading(false);
@@ -133,6 +258,7 @@ useEffect(() => {
   const unsubMovimientos = escucharMovimientosCajaDia({
     perfil,
     fechaCaja,
+    sucursal: sucursalSeleccionada,
     onData: (movs) => {
       setMovimientos(movs);
     },
@@ -145,7 +271,7 @@ useEffect(() => {
     unsubCaja();
     unsubMovimientos();
   };
-}, [perfil?.clienteId, fechaCaja]);
+}, [perfil?.clienteId, fechaCaja, sucursalSeleccionadaId]);
 
   const resumen = useMemo(() => {
     const activos = movimientos.filter(
@@ -189,11 +315,9 @@ useEffect(() => {
     };
   }, [movimientos, caja]);
 
-  const aperturaReferencia = Number(
-    caja?.saldoCierreAnteriorEfectivo ??
-      cajaAnterior?.saldoCierreRealEfectivo ??
-      0
-  );
+const aperturaReferencia = Number(
+  caja?.saldoCierreAnteriorEfectivo ?? saldoAnteriorInfo.saldo ?? 0
+);
 
   const aperturaActual = caja
     ? Number(caja.saldoAperturaEfectivo || 0)
@@ -226,12 +350,14 @@ useEffect(() => {
 
       if (!ok) return;
 
-      await abrirCaja({
-        perfil,
-        fechaCaja,
-        saldoAperturaEfectivo: Number(saldoApertura || 0),
-        cajaAnterior,
-      });
+  await abrirCaja({
+    perfil,
+    fechaCaja,
+    saldoAperturaEfectivo: Number(saldoApertura || 0),
+    cajaAnterior,
+    sucursal: sucursalSeleccionada,
+    saldoReferenciaAnterior: aperturaReferencia,
+  });
 
     setExito("Caja abierta correctamente.");
     } catch (err) {
@@ -362,23 +488,57 @@ setExito("Apertura corregida.");
     }
   };
 
-  const abrirHistorialCaja = async () => {
+const handleCambioTurno = async () => {
+  try {
+    setError("");
+    setExito("");
+
+    if (efectivoTurno === "" || isNaN(Number(efectivoTurno))) {
+      setError("Ingresá el efectivo contado para registrar el cambio de turno.");
+      return;
+    }
+
+    await crearCambioTurnoCaja({
+      perfil,
+      caja,
+      efectivoContado: Number(efectivoTurno || 0),
+      observacion: observacionTurno,
+    });
+
+    setModalCambioTurno(false);
+    setEfectivoTurno("");
+    setObservacionTurno("");
+    setExito("Cambio de turno registrado correctamente.");
+  } catch (err) {
+    console.error(err);
+    setError(err.message || "No se pudo registrar el cambio de turno.");
+  }
+};
+
+const abrirHistorialCaja = async () => {
   try {
     setLoadingHistorial(true);
+
+    const todasSucursales = historialSucursalId === "todas";
+
+    const sucursalHistorial =
+      historialSucursalId === "actual"
+        ? sucursalSeleccionada
+        : sucursales.find((s) => s.firebaseId === historialSucursalId) ||
+          sucursalSeleccionada;
 
     const cajas = await obtenerHistorialCajas({
       perfil,
       fechaDesde: historialDesde,
       fechaHasta: historialHasta,
+      sucursal: sucursalHistorial,
+      todasSucursales,
     });
 
     setHistorialCajas(cajas);
-
     setMostrarHistorial(true);
-
   } catch (err) {
     setError(err.message);
-
   } finally {
     setLoadingHistorial(false);
   }
@@ -396,10 +556,20 @@ const toggleDetalleCajaHistorial = async (cajaHist) => {
 
   
 
-  const movs = await obtenerMovimientosCajaDia({
-    perfil,
-    fechaCaja: cajaHist.fechaCaja,
-  });
+const todasSucursales = historialSucursalId === "todas";
+
+const sucursalHistorial =
+  historialSucursalId === "actual"
+    ? sucursalSeleccionada
+    : sucursales.find((s) => s.firebaseId === historialSucursalId) ||
+      sucursalSeleccionada;
+
+const movs = await obtenerMovimientosCajaDia({
+  perfil,
+  fechaCaja: cajaHist.fechaCaja,
+  sucursal: sucursalHistorial,
+  todasSucursales,
+});
 
   setMovimientosHistorial((prev) => ({
     ...prev,
@@ -449,13 +619,70 @@ const toggleDetalleCajaHistorial = async (cajaHist) => {
 
   return (
     <div className="clientes-lista">
-      <div className="encabezado-lista" style={{ marginBottom: 14 }}>
+      <div
+        className="encabezado-lista"
+        style={{
+          marginBottom: 14,
+          display: "flex",
+          justifyContent: "space-between",
+          gap: 12,
+          alignItems: "flex-start",
+          flexWrap: "wrap",
+        }}
+      >
         <div>
           <h1>Caja</h1>
+            {sucursales.length > 1 && (
+              <div
+                style={{
+                  marginTop: 10,
+                  display: "grid",
+                  gap: 6,
+                  maxWidth: 320,
+                }}
+              >
+                <label style={{ fontSize: 13, fontWeight: 800, color: "#0096d1" }}>
+                  Sucursal de trabajo
+                </label>
+
+                <select
+                  value={sucursalSeleccionadaId}
+                  onChange={(e) => setSucursalSeleccionadaId(e.target.value)}
+                  style={{
+                    height: 42,
+                    padding: "0 12px",
+                    borderRadius: 10,
+                    border: "2px solid #0096d1",
+                    fontWeight: 700,
+                    background: "#f0faff",
+                  }}
+                  disabled={false}
+                >
+                  {sucursales.map((s) => (
+                    <option key={s.firebaseId} value={s.firebaseId}>
+                      {s.nombre}
+                    </option>
+                  ))}
+                </select>
+
+                {!caja && (
+                  <small style={{ color: "#64748b", fontWeight: 600 }}>
+                    {!caja
+                      ? `La apertura se realizará en: ${sucursalSeleccionada?.nombre || "Sucursal principal"}`
+                      : `Estás viendo la caja de: ${sucursalSeleccionada?.nombre || "Sucursal principal"}`}
+                  </small>
+                )}
+              </div>
+            )}
           <p style={{ margin: "6px 0 0", color: "#666" }}>
             Control diario.
           </p>
         </div>
+        {puedeVerHistorialCaja && (
+            <button style={btnSecondarySmall} onClick={abrirHistorialCaja}>
+              Historial
+            </button>
+          )}
       </div>
 
       {error && <div style={alertError}>{error}</div>}
@@ -484,7 +711,15 @@ const toggleDetalleCajaHistorial = async (cajaHist) => {
         </div>
 
         <div style={kpiGrid}>
-          <Kpi label="Cierre anterior" value={formatearMoneda(aperturaReferencia, configMoneda.moneda, configMoneda.localeMoneda)} />
+          <Kpi
+            label={saldoAnteriorInfo.label}
+            value={formatearMoneda(
+              aperturaReferencia,
+              configMoneda.moneda,
+              configMoneda.localeMoneda
+            )}
+            color={saldoAnteriorInfo.sinCierreAnterior ? "#a15c00" : "#111827"}
+          />
           <Kpi label="Apertura" value={formatearMoneda(aperturaActual, configMoneda.moneda, configMoneda.localeMoneda)} />
             {caja && (
               <Kpi
@@ -523,6 +758,14 @@ const toggleDetalleCajaHistorial = async (cajaHist) => {
             style={btnSecondarySmall}
           >
             + Agregar movimiento
+          </button>
+
+          <button
+            onClick={() => setModalCambioTurno(true)}
+            disabled={!puedeAbrirCerrarCaja}
+            style={btnSecondarySmall}
+          >
+            Cambio de turno
           </button>
 
             {movimientos.length === 0 && (
@@ -603,14 +846,7 @@ const toggleDetalleCajaHistorial = async (cajaHist) => {
                   Resumen
                 </button>
 
-                {puedeVerHistorialCaja && (
-                <button
-                style={btnSecondarySmall}
-                onClick={abrirHistorialCaja}
-                >
-                Historial
-                </button>
-                )}
+
               </div>
           </div>
 
@@ -699,6 +935,54 @@ const toggleDetalleCajaHistorial = async (cajaHist) => {
           </div>
         </div>
       )}
+
+      {modalCambioTurno && (
+        <div style={modalOverlay}>
+          <div style={modalCard}>
+            <div style={sectionHeader}>
+              <h2 style={{ margin: 0 }}>Cambio de turno</h2>
+              <button onClick={() => setModalCambioTurno(false)} style={btnGhost}>
+                Cerrar
+              </button>
+            </div>
+
+            <div style={{ display: "grid", gap: 12 }}>
+              <p style={{ margin: 0, color: "#64748b" }}>
+                Registrá el efectivo contado al entregar la caja. La caja seguirá abierta.
+              </p>
+
+              <div>
+                <label>Efectivo contado</label>
+                <input
+                  type="number"
+                  value={efectivoTurno}
+                  onChange={(e) => setEfectivoTurno(e.target.value)}
+                  placeholder="Ej: 15000"
+                  style={input}
+                />
+              </div>
+
+              <div>
+                <label>Observación opcional</label>
+                <input
+                  value={observacionTurno}
+                  onChange={(e) => setObservacionTurno(e.target.value)}
+                  placeholder="Ej: Entrega turno mañana"
+                  style={input}
+                />
+              </div>
+
+              <button
+                onClick={handleCambioTurno}
+                disabled={!puedeAbrirCerrarCaja}
+                style={btnPrimary}
+              >
+                Registrar cambio de turno
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {mostrarResumen && (
   <div style={modalOverlay}>
     <div style={modalCaja}>
@@ -771,11 +1055,28 @@ const toggleDetalleCajaHistorial = async (cajaHist) => {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
           gap: 10,
           marginBottom: 14,
         }}
       >
+        <select
+          value={historialSucursalId}
+          onChange={(e) => setHistorialSucursalId(e.target.value)}
+          style={input}
+        >
+          <option value="actual">
+            Sucursal actual: {sucursalSeleccionada?.nombre || "Sucursal principal"}
+          </option>
+
+          <option value="todas">Todas las sucursales</option>
+
+          {sucursales.map((s) => (
+            <option key={s.firebaseId} value={s.firebaseId}>
+              {s.nombre}
+            </option>
+          ))}
+        </select>
         <input
           type="date"
           value={historialDesde}
@@ -1023,6 +1324,7 @@ function MovimientoTabla({ movimientos, configMoneda, onVerVenta }) {
           {movimientos.map((m) => {
             const esIngreso = m.tipo === "ingreso";
             const monto = Number(m.monto || 0);
+            const esControl = m.tipo === "control";
 
             return (
               <tr
@@ -1033,7 +1335,9 @@ function MovimientoTabla({ movimientos, configMoneda, onVerVenta }) {
                   }
                 }}
                 style={{
-                  background: esIngreso
+                  background: esControl
+                    ? "rgba(0,150,209,0.06)"
+                    : esIngreso
                     ? "rgba(25,135,84,0.05)"
                     : "rgba(220,53,69,0.05)",
                   cursor: m.origen === "venta" ? "pointer" : "default",
@@ -1041,18 +1345,55 @@ function MovimientoTabla({ movimientos, configMoneda, onVerVenta }) {
               >
                 <td>{formatearFechaCaja(m.fecha)}</td>
                 <td>{m.medioPago || "-"}</td>
-                <td>{m.descripcion || m.subtipo || "-"}</td>
+                <td>
+                  <div style={{ fontWeight: 700 }}>
+                    {m.descripcion || m.subtipo || "-"}
+                  </div>
+
+                  {m.tipo === "control" && (
+                    <small style={{ color: "#64748b" }}>
+                      Usuario: {m.creadoPorNombre || m.creadoPor || "-"}
+                    </small>
+                  )}
+                </td>
                 <td
                   style={{
                     fontWeight: 800,
                     color: esIngreso ? "#198754" : "#dc3545",
                   }}
                 >
-                  {esIngreso ? "+" : "-"}{" "}
-                  {formatearMoneda(
-                    monto,
-                    configMoneda.moneda,
-                    configMoneda.localeMoneda
+                  {esControl ? (
+                    <span style={{ color: "#0096d1" }}>
+                      Esperado{" "}
+                      {formatearMoneda(
+                        m.efectivoEsperado,
+                        configMoneda.moneda,
+                        configMoneda.localeMoneda
+                      )}
+                      {" / "}
+                      Contado{" "}
+                      {formatearMoneda(
+                        m.efectivoContado,
+                        configMoneda.moneda,
+                        configMoneda.localeMoneda
+                      )}
+                      {" / "}
+                      Dif.{" "}
+                      {formatearMoneda(
+                        m.diferenciaTurno,
+                        configMoneda.moneda,
+                        configMoneda.localeMoneda
+                      )}
+                    </span>
+                  ) : (
+                    <>
+                      {esIngreso ? "+" : "-"}{" "}
+                      {formatearMoneda(
+                        monto,
+                        configMoneda.moneda,
+                        configMoneda.localeMoneda
+                      )}
+                    </>
                   )}
                 </td>
               </tr>
