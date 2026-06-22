@@ -158,3 +158,7 @@ body.dark-mode .tab-btn.activo {
     white-space: nowrap;
   }
 }
+
+.sucursales-page .container-secundaria:hover {
+  transform: none !important;
+}

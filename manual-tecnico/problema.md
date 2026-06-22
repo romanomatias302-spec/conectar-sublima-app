@@ -1,3 +1,13 @@
+### action menu fuera de lugar
+
+.sucursales-page .container-secundaria:hover {
+transform: none !important;
+}
+
+con esto se soluciono actionmenu fuera de lugar
+
+###
+
 ## problema pantalla en blanco al actualizar 11-06-2026
 
 PROBLEMA IMPORTANTE RESUELTO

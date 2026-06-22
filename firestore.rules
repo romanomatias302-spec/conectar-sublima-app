@@ -723,6 +723,39 @@ function canReadMovimientos(clienteId) {
       allow delete: if false;
     }
 
+
+    // =========================
+    // sucursales
+    // =========================
+    match /sucursales/{sucursalId} {
+      allow read: if isSuperAdmin()
+        || (
+          resource.data.clienteId is string
+          && tenantUserBase(resource.data.clienteId)
+          && (
+            isAdmin()
+            || permisoModuloAccion("configuracion", "ver")
+          )
+        );
+
+      allow create: if isSuperAdmin()
+        || (
+          request.resource.data.clienteId is string
+          && tenantUserBase(request.resource.data.clienteId)
+          && isAdmin()
+        );
+
+      allow update: if isSuperAdmin()
+        || (
+          resource.data.clienteId is string
+          && tenantUserBase(resource.data.clienteId)
+          && isAdmin()
+          && request.resource.data.clienteId == resource.data.clienteId
+        );
+
+      allow delete: if false;
+    }
+
     // =========================
     // clientes
     // =========================

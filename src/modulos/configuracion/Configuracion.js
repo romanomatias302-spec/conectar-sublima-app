@@ -6,6 +6,7 @@ import {
   FaSlidersH,
   FaBoxOpen,
   FaUserCog,
+  FaStore,
 } from "react-icons/fa";
 import ConfiguracionProductos from "./ConfiguracionProductos";
 import {
@@ -19,6 +20,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../../firebase";
 import ConfiguracionUsuarios from "./ConfiguracionUsuarios";
+import ConfiguracionSucursales from "./ConfiguracionSucursales";
 
 export default function Configuracion({ modoOscuro, setModoOscuro, perfil, onActualizarPerfil, }) {
   const [pestañaActiva, setPestañaActiva] = useState(
@@ -316,6 +318,13 @@ const pagarPeriodoMercadoPago = async (periodo) => {
         </button>
 
         <button
+          className={`tab-btn ${pestañaActiva === "sucursales" ? "activo" : ""}`}
+          onClick={() => setPestañaActiva("sucursales")}
+        >
+          <FaStore /> Sucursales
+        </button>
+
+        <button
           className={`tab-btn ${pestañaActiva === "cuenta" ? "activo" : ""}`}
           onClick={() => setPestañaActiva("cuenta")}
         >
@@ -461,6 +470,16 @@ const pagarPeriodoMercadoPago = async (periodo) => {
             Invitá y administrá los accesos del equipo.
           </p>
           <ConfiguracionUsuarios perfil={perfil} />
+        </section>
+      )}
+
+      {pestañaActiva === "sucursales" && (
+        <section className="config-section">
+          <h2>Sucursales</h2>
+          <p className="config-note">
+            Administrá los locales o puntos de trabajo del negocio.
+          </p>
+          <ConfiguracionSucursales perfil={perfil} />
         </section>
       )}
 
