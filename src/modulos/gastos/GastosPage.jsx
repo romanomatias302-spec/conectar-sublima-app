@@ -428,7 +428,7 @@ const verComprobante = (comprobante) => {
       comprobanteNumero: form.comprobanteNumero || "",
       comprobantes: form.comprobantes || [],
       observaciones: form.observaciones || "",
-      medioPago: form.medioPago || "",
+      medioPago: form.pagos?.[0]?.medioPago || "",
       descripcion: descripcionResumen,
         items: itemsValidos,
         pagos: (form.pagos || []).map((pago) => ({
@@ -708,7 +708,7 @@ const duplicarGastoLocal = async (gasto) => {
               <tr>
                 <th>Fecha</th>
                 <th>Categoría</th>
-                <th>Descripción</th>
+                
                 <th>Proveedor</th>
                 <th>Medio</th>
                 <th>Total</th>
@@ -730,9 +730,9 @@ const duplicarGastoLocal = async (gasto) => {
                 >
                   <td>{g.fecha}</td>
                   <td>{g.categoria}</td>
-                  <td>{g.descripcion}</td>
+                  
                   <td>{g.proveedor || "-"}</td>
-                  <td>{g.medioPago || "-"}</td>
+                  <td>{g.pagos?.[0]?.medioPago || g.medioPago || "-"}</td>
                   <td>{formatearMonto(g.total || g.monto)}</td>
 
                     <td>
@@ -795,7 +795,7 @@ const duplicarGastoLocal = async (gasto) => {
 
               {gastosFiltrados.length === 0 && (
                 <tr>
-                  <td colSpan="9" style={{ textAlign: "center", padding: 18 }}>
+                  <td colSpan="8" style={{ textAlign: "center", padding: 18 }}>
                     Todavía no hay gastos cargados.
                   </td>
                 </tr>

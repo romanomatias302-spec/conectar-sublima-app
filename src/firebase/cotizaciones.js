@@ -13,6 +13,7 @@ import {
   runTransaction,
   serverTimestamp,
   writeBatch,
+  onSnapshot,
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { crearVenta } from "./ventas";
@@ -522,4 +523,46 @@ export async function buscarCotizacionesEnFirestore({
     firebaseId: d.id,
     ...d.data(),
   }));
+}
+
+export function escucharCotizacionesRecientes({
+  perfil,
+  pageSize = 50,
+  onData,
+  onError,
+}) {
+  const cotizacionesRef = collection(db, "cotizaciones");
+
+  const q =
+    perfil?.rol === "superadmin"
+      ? query(
+          cotizacionesRef,
+          orderBy("createdAt", "desc"),
+          limit(pageSize)
+        )
+      : query(
+          cotizacionesRef,
+          where("clienteId", "==", perfil.clienteId),
+          orderBy("createdAt", "desc"),
+          limit(pageSize)
+        );
+
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      onData({
+        cotizaciones: snapshot.docs.map((d) => ({
+          firebaseId: d.id,
+          ...d.data(),
+        })),
+        ultimoDoc: snapshot.docs.length
+          ? snapshot.docs[snapshot.docs.length - 1]
+          : null,
+        hayMas: snapshot.docs.length === pageSize,
+      });
+    },
+    (error) => {
+      if (onError) onError(error);
+    }
+  );
 }

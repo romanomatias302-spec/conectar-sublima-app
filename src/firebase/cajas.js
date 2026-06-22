@@ -106,6 +106,81 @@ export async function obtenerUltimaCajaCerradaAnterior({
   return cajas[0] || null;
 }
 
+export async function obtenerUltimaCajaAnteriorConSaldo({
+  perfil,
+  fechaCaja = fechaHoyInput(),
+}) {
+  if (!perfil?.clienteId) throw new Error("Perfil inválido.");
+
+  const qCajas = query(
+    collection(db, "cajas"),
+    where("clienteId", "==", perfil.clienteId),
+    limit(60)
+  );
+
+  const snapCajas = await getDocs(qCajas);
+
+  const cajas = snapCajas.docs
+    .map((d) => ({
+      firebaseId: d.id,
+      ...d.data(),
+    }))
+    .filter((caja) => caja.fechaCaja && caja.fechaCaja < fechaCaja)
+    .sort((a, b) => (a.fechaCaja < b.fechaCaja ? 1 : -1));
+
+  const cajaAnterior = cajas[0] || null;
+
+  if (!cajaAnterior) {
+    return {
+      caja: null,
+      label: "Cierre anterior",
+      saldo: 0,
+      sinCierreAnterior: false,
+    };
+  }
+
+  if (cajaAnterior.estado === "cerrada") {
+    return {
+      caja: cajaAnterior,
+      label: "Cierre anterior",
+      saldo: Number(cajaAnterior.saldoCierreRealEfectivo || 0),
+      sinCierreAnterior: false,
+    };
+  }
+
+  const qMovimientos = query(
+    collection(db, "movimientos"),
+    where("clienteId", "==", perfil.clienteId),
+    where("fecha", "==", cajaAnterior.fechaCaja)
+  );
+
+  const snapMovimientos = await getDocs(qMovimientos);
+
+  const activos = snapMovimientos.docs
+    .map((d) => d.data())
+    .filter((m) => (m.estadoMovimiento || "activo") === "activo");
+
+  const ingresosEfectivo = activos
+    .filter((m) => m.tipo === "ingreso" && m.medioPago === "efectivo")
+    .reduce((acc, m) => acc + Number(m.monto || 0), 0);
+
+  const egresosEfectivo = activos
+    .filter((m) => m.tipo === "egreso" && m.medioPago === "efectivo")
+    .reduce((acc, m) => acc + Number(m.monto || 0), 0);
+
+  const saldo =
+    Number(cajaAnterior.saldoAperturaEfectivo || 0) +
+    ingresosEfectivo -
+    egresosEfectivo;
+
+  return {
+    caja: cajaAnterior,
+    label: "Sin cierre anterior",
+    saldo,
+    sinCierreAnterior: true,
+  };
+}
+
 export async function abrirCaja({
   perfil,
   fechaCaja = fechaHoyInput(),
@@ -239,31 +314,76 @@ export async function crearMovimientoManualCaja({
 
   const impactaResultado = ["gasto_caja", "descuento_efectivo"].includes(subtipo);
 
-  await addDoc(collection(db, "movimientos"), {
+  const movimientoRef = await addDoc(collection(db, "movimientos"), {
+  clienteId: perfil.clienteId,
+  cajaId: caja.firebaseId,
+  fechaCaja: caja.fechaCaja,
+  fecha: caja.fechaCaja,
+
+  tipo,
+  subtipo,
+  origen: "caja",
+  origenRefId: caja.firebaseId,
+
+  descripcion,
+  observacion,
+
+  monto: montoNum,
+  medioPago,
+
+  impactaCaja: true,
+  impactaResultado,
+  estadoMovimiento: "activo",
+
+  creadoPor: perfil?.email || "",
+  createdAt: serverTimestamp(),
+  updatedAt: serverTimestamp(),
+});
+
+if (tipo === "egreso") {
+  await addDoc(collection(db, "gastos"), {
     clienteId: perfil.clienteId,
-    cajaId: caja.firebaseId,
-    fechaCaja: caja.fechaCaja,
     fecha: caja.fechaCaja,
+    categoria: "Gasto de caja",
+    proveedor: "",
+    comprobanteNumero: "",
+    comprobantes: [],
+    observaciones: observacion || "",
 
-    tipo,
-    subtipo,
-    origen: "caja",
-    origenRefId: caja.firebaseId,
+    descripcion: descripcion || "Caja - Gasto de caja",
 
-    descripcion,
-    observacion,
+    items: [
+      {
+        descripcion: descripcion || "Caja - Gasto de caja",
+        cantidad: 1,
+        precioUnitario: montoNum,
+        subtotal: montoNum,
+      },
+    ],
 
+    pagos: [
+      {
+        monto: montoNum,
+        medioPago: medioPago || "efectivo",
+      },
+    ],
+
+    medioPago: medioPago || "efectivo",
+    total: montoNum,
+    totalPagado: montoNum,
+    saldo: 0,
     monto: montoNum,
-    medioPago,
 
-    impactaCaja: true,
-    impactaResultado,
-    estadoMovimiento: "activo",
+    activo: true,
+    estado: "activo",
 
-    creadoPor: perfil?.email || "",
+    creadoPor: perfil?.uid || perfil?.firebaseUid || "",
+    creadoPorNombre: perfil?.nombre || perfil?.email || "",
+
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
+}
 }
 
 export async function cerrarCaja({

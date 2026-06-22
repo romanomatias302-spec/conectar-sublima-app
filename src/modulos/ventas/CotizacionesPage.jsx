@@ -14,6 +14,7 @@ import {
   crearCotizacion,
   obtenerCotizacionesPaginadas,
   buscarCotizacionesEnFirestore,
+  escucharCotizacionesRecientes,
 } from "../../firebase/cotizaciones";
 import { formatearMoneda, obtenerConfigMonedaDesdePerfil } from "../../utils/moneda";
 import { puedeHacer } from "../../utils/permisos";
@@ -182,13 +183,33 @@ const [configNegocio, setConfigNegocio] = useState({
     }
   };
 
-  useEffect(() => {
-    if (!perfil) return;
-    cargarCotizaciones();
-    cargarClientes();
-    cargarUsuarios();
-    cargarConfigNegocio();
-  }, [perfil]);
+useEffect(() => {
+  if (!perfil) return;
+
+  cargarClientes();
+  cargarUsuarios();
+  cargarConfigNegocio();
+
+  setLoading(true);
+
+  const unsubscribe = escucharCotizacionesRecientes({
+    perfil,
+    pageSize: 50,
+    onData: (res) => {
+      setCotizaciones(res.cotizaciones);
+      setUltimoDoc(res.ultimoDoc);
+      setHayMas(res.hayMas);
+      setLoading(false);
+    },
+    onError: (err) => {
+      console.error("Error escuchando cotizaciones:", err);
+      setError("No se pudieron cargar las cotizaciones.");
+      setLoading(false);
+    },
+  });
+
+  return () => unsubscribe();
+}, [perfil]);
 
 const cotizacionesFiltradas = useMemo(() => {
   const texto = (busqueda || "").trim().toLowerCase();

@@ -12,6 +12,7 @@ import {
   query,
   where,
   serverTimestamp,
+  onSnapshot,
 } from "firebase/firestore";
 import { FaTrashAlt, FaCog, FaPlus } from "react-icons/fa";
 import "./ConfiguracionProductos.css";
@@ -101,6 +102,31 @@ const cargarProductos = async () => {
   }
 };
 
+const escucharProductos = () => {
+  if (!perfil) return () => {};
+
+  const ref = collection(db, "productosBase");
+
+  const q =
+    perfil.rol === "superadmin"
+      ? query(ref)
+      : query(ref, where("clienteId", "==", perfil.clienteId));
+
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const lista = snapshot.docs.map((d) => ({
+        id: d.id,
+        ...d.data(),
+      }));
+
+      setProductos(lista);
+    },
+    (error) => {
+      console.error("Error escuchando productos:", error);
+    }
+  );
+};
   
 
   // 🧩 Crear productos por defecto (Remera y Taza)
@@ -168,9 +194,15 @@ const cargarProductos = async () => {
     }
   };
 
-  useEffect(() => {
-    cargarProductos();
-  }, [perfil]);
+useEffect(() => {
+  if (!perfil) return;
+
+  cargarProductos();
+
+  const unsubscribe = escucharProductos();
+
+  return () => unsubscribe();
+}, [perfil]);
 
   const renombrarProducto = async (producto) => {
   const nombreActual = producto?.nombre || "";
@@ -201,7 +233,6 @@ const cargarProductos = async () => {
     updatedAt: serverTimestamp(),
   });
 
-  cargarProductos();
 };
 
 const duplicarProducto = async (producto) => {
@@ -239,14 +270,14 @@ const duplicarProducto = async (producto) => {
     updatedAt: serverTimestamp(),
   });
 
-  cargarProductos();
+ 
 };
 
   // 🔹 Eliminar producto
   const eliminarProducto = async (id) => {
     if (window.confirm("¿Seguro que querés eliminar este producto?")) {
       await deleteDoc(doc(db, "productosBase", id));
-      cargarProductos();
+      
     }
   };
 
@@ -275,7 +306,7 @@ const duplicarProducto = async (producto) => {
       },
     });
 
-    cargarProductos();
+    
   };
 
   // 🔹 Abrir configuración individual
