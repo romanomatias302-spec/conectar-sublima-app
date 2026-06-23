@@ -987,6 +987,35 @@ function canReadMovimientos(clienteId) {
     }
 
     // =========================
+    // contadores
+    // =========================
+    match /contadores/{clienteId} {
+      allow read: if isSuperAdmin()
+        || (
+          tenantUserBase(clienteId)
+          && (
+            isAdmin()
+            || permisoModuloAccion("ventas", "crear")
+            || permisoModuloAccion("pedidos", "crear")
+            || permisoModuloAccion("gastos", "crear")
+          )
+        );
+
+      allow create, update: if isSuperAdmin()
+        || (
+          tenantUserBase(clienteId)
+          && (
+            isAdmin()
+            || permisoModuloAccion("ventas", "crear")
+            || permisoModuloAccion("pedidos", "crear")
+            || permisoModuloAccion("gastos", "crear")
+          )
+        );
+
+      allow delete: if false;
+    }
+
+    // =========================
     // gastos
     // =========================
     match /gastos/{gastoId} {

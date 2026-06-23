@@ -10,6 +10,7 @@ import {
   obtenerGastosPaginados,
   escucharGastosRecientes,
 } from "../../firebase/gastos";
+import { puedeHacer } from "../../utils/permisos";
 
 const categoriasBase = [
   "Gasto fijo",
@@ -47,6 +48,15 @@ const gastoInicial = {
 };
 
 export default function GastosPage({ perfil }) {
+
+const puedeCrearGastos = puedeHacer(perfil, "gastos", "crear");
+const puedeEditarGastos = puedeHacer(perfil, "gastos", "editar");
+const puedeAnularGastos = puedeHacer(perfil, "gastos", "anular");
+const puedeVerDetalleGastos = puedeHacer(perfil, "gastos", "verDetalle");
+
+const puedeAbrirDetalleGastos =
+  puedeVerDetalleGastos || puedeEditarGastos;
+
   const [gastos, setGastos] = useState([]);
   const [ultimoDoc, setUltimoDoc] = useState(null);
 const [hayMas, setHayMas] = useState(true);
@@ -56,12 +66,14 @@ const [guardando, setGuardando] = useState(false);
 
   const [modalAbierto, setModalAbierto] = useState(false);
   const [gastoEditando, setGastoEditando] = useState(null);
+  const [modalSoloLectura, setModalSoloLectura] = useState(false);
   const [form, setForm] = useState(gastoInicial);
 
   const [busqueda, setBusqueda] = useState("");
   const [filtroCategoria, setFiltroCategoria] = useState("");
   const [fechaDesde, setFechaDesde] = useState("");
   const [filtroSaldo, setFiltroSaldo] = useState("");
+  const [mostrarFiltrosMobile, setMostrarFiltrosMobile] = useState(false);
   const [fechaHasta, setFechaHasta] = useState("");
   const limpiarFiltros = () => {
     setBusqueda("");
@@ -76,6 +88,9 @@ const [guardando, setGuardando] = useState(false);
   const [categoriaDropdownAbierto, setCategoriaDropdownAbierto] = useState(false);
   const [editandoCategoria, setEditandoCategoria] = useState("");
   const [nombreCategoriaEditando, setNombreCategoriaEditando] = useState("");
+  const [gastoMobileAbiertoId, setGastoMobileAbiertoId] = useState(null);
+
+
 
   const categoriaDropdownRef = useRef(null);
 
@@ -171,7 +186,9 @@ useEffect(() => {
 }, [perfil?.clienteId, filtroCategoria, fechaDesde, fechaHasta]);
 
   const abrirNuevoGasto = () => {
+    if (!puedeCrearGastos) return;
     setGastoEditando(null);
+    setModalSoloLectura(false);
     setForm({
       ...gastoInicial,
       fecha: new Date().toISOString().split("T")[0],
@@ -473,7 +490,54 @@ const verComprobante = (comprobante) => {
     
   };
 
+  const abrirDetalleGasto = (gasto) => {
+  if (!puedeAbrirDetalleGastos) return;
+
+  setGastoEditando(gasto);
+  setModalSoloLectura(!puedeEditarGastos);
+
+  setForm({
+    fecha: gasto.fecha || "",
+    categoria: gasto.categoria || "",
+    proveedor: gasto.proveedor || "",
+    comprobanteNumero: gasto.comprobanteNumero || "",
+    comprobantes: gasto.comprobantes || [],
+    observaciones: gasto.observaciones || "",
+
+    items: gasto.items?.length
+      ? gasto.items.map((item) => ({
+          descripcion: item.descripcion || "",
+          cantidad: item.cantidad || 1,
+          precioUnitario: item.precioUnitario || 0,
+        }))
+      : [
+          {
+            descripcion: gasto.descripcion || "",
+            cantidad: 1,
+            precioUnitario: gasto.monto || 0,
+          },
+        ],
+
+    pagos: gasto.pagos?.length
+      ? gasto.pagos.map((pago) => ({
+          monto: pago.monto || 0,
+          medioPago: pago.medioPago || "efectivo",
+        }))
+      : [
+          {
+            monto: gasto.total || gasto.monto || 0,
+            medioPago: gasto.medioPago || "efectivo",
+          },
+        ],
+  });
+
+  setModalAbierto(true);
+};
+
   const editarGasto = (gasto) => {
+    if (!puedeEditarGastos) return;
+    setModalSoloLectura(false);
+    
     setGastoEditando(gasto);
     setForm({
       fecha: gasto.fecha || "",
@@ -510,6 +574,8 @@ const verComprobante = (comprobante) => {
     });
     setModalAbierto(true);
   };
+
+
 
 const anularGastoLocal = async (gasto) => {
   const confirmar = window.confirm("¿Querés anular este gasto?");
@@ -605,15 +671,28 @@ const duplicarGastoLocal = async (gasto) => {
           
         </div>
 
-        <button className="btn btn-primary" onClick={abrirNuevoGasto}>
-          + Nuevo gasto
-        </button>
+            {puedeCrearGastos && (
+            <button className="btn btn-primary" onClick={abrirNuevoGasto}>
+                + Nuevo gasto
+            </button>
+            )}
       </div>
 
       <div className="container-secundaria">
         <h3 style={{ marginTop: 0 }}>Listado de gastos</h3>
 
+        <button
+        type="button"
+        className="gastos-filtros-toggle"
+        onClick={() => setMostrarFiltrosMobile((prev) => !prev)}
+        >
+        {mostrarFiltrosMobile ? "Ocultar filtros" : "Mostrar filtros"}
+        </button>
+
         <div
+          className={`gastos-filtros-grid ${
+            mostrarFiltrosMobile ? "abierto" : ""
+            }`}
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
@@ -706,6 +785,7 @@ const duplicarGastoLocal = async (gasto) => {
           <table style={{ minWidth: 760 }}>
             <thead>
               <tr>
+                <th>N°</th>
                 <th>Fecha</th>
                 <th>Categoría</th>
                 
@@ -721,15 +801,34 @@ const duplicarGastoLocal = async (gasto) => {
             <tbody>
               {gastosFiltrados.map((g) => (
                 <tr
-                key={g.firebaseId}
-                onClick={() => editarGasto(g)}
+                    key={g.firebaseId}
+                    className={g.activo === false ? "gasto-anulado" : ""}
+                   onClick={() => {
+                    if (puedeEditarGastos) {
+                        editarGasto(g);
+                        return;
+                    }
+
+                   if (puedeAbrirDetalleGastos) {
+                    abrirDetalleGasto(g);
+                   }
+                    }}
                 style={{
                     opacity: g.activo === false ? 0.55 : 1,
                     cursor: "pointer",
                 }}
                 >
+                  <td>{g.numeroGasto ? `#${g.numeroGasto}` : "-"}</td>  
                   <td>{g.fecha}</td>
-                  <td>{g.categoria}</td>
+                  <td>
+                    {g.categoria}
+
+                    {g.activo === false && (
+                        <span className="badge-anulado">
+                        ANULADO
+                        </span>
+                    )}
+                    </td>
                   
                   <td>{g.proveedor || "-"}</td>
                   <td>{g.pagos?.[0]?.medioPago || g.medioPago || "-"}</td>
@@ -777,25 +876,40 @@ const duplicarGastoLocal = async (gasto) => {
                     })()}
                     </td>
 
-                    <td>{g.activo === false ? "Anulado" : "Activo"}</td>
+                    <td>
+                    {g.activo === false ? (
+                        <span className="badge-anulado">
+                        ANULADO
+                        </span>
+                    ) : (
+                        "Activo"
+                    )}
+                    </td>
                     <td onClick={(e) => e.stopPropagation()}>
-                    <ActionMenu
-                        onVer={() => editarGasto(g)}
-                        onEditar={() => editarGasto(g)}
-                        onDuplicar={() => duplicarGastoLocal(g)}
-                        onEliminar={
-                        g.activo !== false
-                            ? () => anularGastoLocal(g)
-                            : null
+                        <ActionMenu
+                       onVer={
+                        puedeAbrirDetalleGastos
+                            ? () => abrirDetalleGasto(g)
+                            : undefined
                         }
-                    />
+                        onEditar={
+                            puedeEditarGastos
+                            ? () => editarGasto(g)
+                            : undefined
+                        }
+                        onEliminar={
+                            puedeAnularGastos && g.activo !== false
+                            ? () => anularGastoLocal(g)
+                            : undefined
+                        }
+                        />
                     </td>
                 </tr>
               ))}
 
               {gastosFiltrados.length === 0 && (
                 <tr>
-                  <td colSpan="8" style={{ textAlign: "center", padding: 18 }}>
+                  <td colSpan="9" style={{ textAlign: "center", padding: 18 }}>
                     Todavía no hay gastos cargados.
                   </td>
                 </tr>
@@ -810,6 +924,98 @@ const duplicarGastoLocal = async (gasto) => {
             </div>
            )}
         </div>
+        <div className="gastos-mobile-list">
+            {gastosFiltrados.map((g) => {
+                const abierto = gastoMobileAbiertoId === g.firebaseId;
+
+                return (
+                <div
+                    key={g.firebaseId}
+                    className={`gasto-mobile-card ${
+                        g.activo === false ? "gasto-mobile-anulado" : ""
+                    }`}
+                >
+                    <div
+                    className="gasto-mobile-header"
+                    onClick={() =>
+                        setGastoMobileAbiertoId((prev) =>
+                        prev === g.firebaseId ? null : g.firebaseId
+                        )
+                    }
+                    >
+                    <div>
+                        <strong className="gasto-mobile-numero">
+                        #{g.numeroGasto || "-"}
+                        </strong>
+                        <div
+                        style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                            flexWrap: "wrap",
+                        }}
+                        >
+                        <span>{g.categoria || "-"}</span>
+
+                        {g.activo === false && (
+                            <span className="badge-anulado">
+                            ANULADO
+                            </span>
+                        )}
+                        </div>
+                    </div>
+
+                    <div>
+                        <strong>{formatearMonto(g.total || g.monto)}</strong>
+                        <span className="gasto-mobile-arrow">
+                        {abierto ? "⌃" : "⌄"}
+                        </span>
+                    </div>
+                    </div>
+
+                    {abierto && (
+                    <div className="gasto-mobile-body">
+                        <p><b>Fecha:</b> {g.fecha}</p>
+                        <p><b>Proveedor:</b> {g.proveedor || "-"}</p>
+                        <p><b>Medio:</b> {g.pagos?.[0]?.medioPago || g.medioPago || "-"}</p>
+                        <p><b>Estado:</b> {g.activo === false ? "Anulado" : "Activo"}</p>
+
+                        {(puedeAbrirDetalleGastos || puedeEditarGastos || puedeAnularGastos) && (
+                        <div className="gasto-mobile-actions">
+                            {puedeAbrirDetalleGastos && (
+                            <button
+                            className="gasto-mobile-btn-primary"
+                            onClick={() => abrirDetalleGasto(g)}
+                            >
+                            Ver
+                            </button>
+                            )}
+
+                            {puedeEditarGastos && (
+                            <button
+                            className="gasto-mobile-btn-secondary"
+                            onClick={() => editarGasto(g)}
+                            >
+                            Editar
+                            </button>
+                            )}
+
+                            {puedeAnularGastos && g.activo !== false && (
+                            <button
+                            className="gasto-mobile-btn-secondary"
+                            onClick={() => anularGastoLocal(g)}
+                            >
+                            Anular
+                            </button>
+                            )}
+                        </div>
+                        )}
+                    </div>
+                    )}
+                </div>
+                );
+            })}
+            </div>
       </div>
 
       
@@ -828,10 +1034,16 @@ const duplicarGastoLocal = async (gasto) => {
             >
               <div>
                 <h2 style={{ margin: 0 }}>
-                  {gastoEditando ? "Editar gasto" : "Nuevo gasto"}
+                  {modalSoloLectura
+                    ? "Detalle del gasto"
+                    : gastoEditando
+                    ? "Editar gasto"
+                    : "Nuevo gasto"}
                 </h2>
                 <p style={{ margin: "6px 0 0", color: "#666" }}>
-                  Cargá uno o varios ítems del gasto.
+                  {modalSoloLectura
+                    ? "Vista de solo lectura. No tenés permisos para modificar este gasto."
+                    : "Cargá uno o varios ítems del gasto."}
                 </p>
               </div>
 
@@ -854,6 +1066,7 @@ const duplicarGastoLocal = async (gasto) => {
                   type="date"
                   value={form.fecha}
                   onChange={(e) => actualizarCampo("fecha", e.target.value)}
+                  disabled={modalSoloLectura}
                 />
               </div>
 
@@ -867,7 +1080,10 @@ const duplicarGastoLocal = async (gasto) => {
                 <label>Categoría</label>
 
                 <div
-                  onClick={() => setCategoriaDropdownAbierto((prev) => !prev)}
+                  onClick={() => {
+                    if (modalSoloLectura) return;
+                    setCategoriaDropdownAbierto((prev) => !prev);
+                    }}
                     style={{
                     width: "100%",
                     height: 38,
@@ -875,7 +1091,8 @@ const duplicarGastoLocal = async (gasto) => {
                     border: "1px solid #d3d9de",
                     borderRadius: 6,
                     background: "#fff",
-                    cursor: "pointer",
+                    cursor: modalSoloLectura ? "not-allowed" : "pointer",
+                    opacity: modalSoloLectura ? 0.75 : 1,
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "space-between",
@@ -1086,6 +1303,7 @@ const duplicarGastoLocal = async (gasto) => {
                   value={form.proveedor}
                   onChange={(e) => actualizarCampo("proveedor", e.target.value)}
                   placeholder="Ej: Textil Norte"
+                  disabled={modalSoloLectura}
                 />
               </div>
 
@@ -1099,11 +1317,20 @@ const duplicarGastoLocal = async (gasto) => {
                     actualizarCampo("comprobanteNumero", e.target.value)
                 }
                 placeholder="Ej: Factura A 0001-00001234"
+                disabled={modalSoloLectura}
                 />
 
-                <label
-                className="gastos-adjunto-btn"
-                title="Adjuntar comprobante"
+               <label
+                    className="gastos-adjunto-btn"
+                    title={
+                        modalSoloLectura
+                        ? "Solo lectura"
+                        : "Adjuntar comprobante"
+                    }
+                    style={{
+                        pointerEvents: modalSoloLectura ? "none" : "auto",
+                        opacity: modalSoloLectura ? 0.5 : 1,
+                    }}
                 >
                 <FaPaperclip size={15} />
 
@@ -1137,6 +1364,7 @@ const duplicarGastoLocal = async (gasto) => {
                         <FaEye size={12} />
                     </button>
 
+                   {!modalSoloLectura && (
                     <button
                         type="button"
                         className="gastos-adjunto-icon-btn"
@@ -1145,6 +1373,7 @@ const duplicarGastoLocal = async (gasto) => {
                     >
                         ×
                     </button>
+                    )}
                     </div>
                 ))}
                 </div>
@@ -1158,6 +1387,7 @@ const duplicarGastoLocal = async (gasto) => {
                         onChange={(e) => actualizarCampo("observaciones", e.target.value)}
                         placeholder="Notas internas del gasto, aclaraciones o detalles adicionales..."
                         rows={3}
+                        disabled={modalSoloLectura}
                     />
                 </div>
 
@@ -1168,9 +1398,11 @@ const duplicarGastoLocal = async (gasto) => {
               <div style={{ display: "flex", justifyContent: "space-between" }}>
                 <h3 style={{ marginTop: 0 }}>Ítems del gasto</h3>
 
+                {!modalSoloLectura && (
                 <button className="btn btn-primary" onClick={agregarItem}>
-                  + Agregar ítem
+                    + Agregar ítem
                 </button>
+                )}
               </div>
 
               <div style={{ width: "100%", overflowX: "auto" }}>
@@ -1195,6 +1427,7 @@ const duplicarGastoLocal = async (gasto) => {
                               actualizarItem(index, "descripcion", e.target.value)
                             }
                             placeholder="Ej: Tela, tinta, servicio..."
+                            disabled={modalSoloLectura}
                           />
                         </td>
 
@@ -1206,6 +1439,7 @@ const duplicarGastoLocal = async (gasto) => {
                               actualizarItem(index, "cantidad", e.target.value)
                             }
                             min="0"
+                            disabled={modalSoloLectura}
                           />
                         </td>
 
@@ -1217,19 +1451,22 @@ const duplicarGastoLocal = async (gasto) => {
                               actualizarItem(index, "precioUnitario", e.target.value)
                             }
                             min="0"
+                            disabled={modalSoloLectura}
                           />
                         </td>
 
                         <td>{formatearMonto(item.subtotal)}</td>
 
                         <td>
-                          <button
-                            className="btn"
-                            onClick={() => eliminarItem(index)}
-                            disabled={form.items.length === 1}
-                          >
-                            X
-                          </button>
+                            {!modalSoloLectura && (
+                            <button
+                                className="btn"
+                                onClick={() => eliminarItem(index)}
+                                disabled={form.items.length === 1}
+                            >
+                                X
+                            </button>
+                            )}
                         </td>
                       </tr>
                     ))}
@@ -1292,6 +1529,7 @@ const duplicarGastoLocal = async (gasto) => {
                             min="0"
                             placeholder="0"
                             style={{ marginBottom: 0 }}
+                            disabled={modalSoloLectura}
                         />
 
                         <select
@@ -1300,6 +1538,7 @@ const duplicarGastoLocal = async (gasto) => {
                             actualizarPago(index, "medioPago", e.target.value)
                             }
                             style={{ marginBottom: 0 }}
+                            disabled={modalSoloLectura}
                         >
                             <option value="efectivo">Efectivo</option>
                             <option value="transferencia">Transferencia</option>
@@ -1309,6 +1548,7 @@ const duplicarGastoLocal = async (gasto) => {
                             <option value="otro">Otro</option>
                         </select>
 
+                        {!modalSoloLectura && (
                         <button
                             type="button"
                             onClick={() => eliminarPago(index)}
@@ -1326,9 +1566,11 @@ const duplicarGastoLocal = async (gasto) => {
                         >
                             ×
                         </button>
+                        )}
                         </div>
                     ))}
 
+                    {!modalSoloLectura && (
                     <button
                         type="button"
                         className="btn btn-secondary"
@@ -1340,6 +1582,7 @@ const duplicarGastoLocal = async (gasto) => {
                     >
                         + Agregar otro pago
                     </button>
+                    )}
                     </div>
 
                     <div
@@ -1383,17 +1626,19 @@ const duplicarGastoLocal = async (gasto) => {
                 Cancelar
               </button>
 
+               {!modalSoloLectura && (
                 <button
-                className="btn btn-primary"
-                onClick={guardarGasto}
-                disabled={guardando}
+                    className="btn btn-primary"
+                    onClick={guardarGasto}
+                    disabled={guardando}
                 >
-                {guardando
+                    {guardando
                     ? "Guardando..."
                     : gastoEditando
                     ? "Guardar cambios"
                     : "Guardar gasto"}
                 </button>
+                )}
             </div>
           </div>
         </div>
@@ -1401,3 +1646,4 @@ const duplicarGastoLocal = async (gasto) => {
     </div>
   );
 }
+

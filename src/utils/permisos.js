@@ -52,8 +52,9 @@ produccion: {
     historial: false,
   },
 
-    gastos: {
+  gastos: {
     ver: false,
+    verDetalle: false,
     crear: false,
     editar: false,
     anular: false,

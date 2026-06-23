@@ -397,7 +397,7 @@ const pagarPeriodoMercadoPago = async (periodo) => {
                 }}
               >
                 <span style={{ marginBottom: "10px", fontWeight: 600 }}>
-                  Nombre visible del cliente
+                  Nombre visible del Negocio
                 </span>
 
                 <input
@@ -408,7 +408,7 @@ const pagarPeriodoMercadoPago = async (periodo) => {
                 />
 
                 <span style={{ marginBottom: "10px", fontWeight: 600 }}>
-                  Logo del cliente
+                  Logo del Negocio
                 </span>
 
                 <input

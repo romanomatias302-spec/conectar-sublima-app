@@ -11,6 +11,8 @@ import {
   updateDoc,
   where,
   onSnapshot,
+  runTransaction,
+  increment,
 } from "firebase/firestore";
 import {
   getDownloadURL,
@@ -20,6 +22,31 @@ import {
 import { db, storage } from "../firebase";
 
 const GASTOS_COLLECTION = "gastos";
+async function obtenerSiguienteNumeroGasto(clienteId) {
+  const contadorRef = doc(db, "contadores", clienteId);
+
+  return await runTransaction(db, async (transaction) => {
+    const snap = await transaction.get(contadorRef);
+
+    const actual = snap.exists()
+      ? Number(snap.data().ultimoNumeroGasto || 0)
+      : 0;
+
+    const siguiente = actual + 1;
+
+    transaction.set(
+      contadorRef,
+      {
+        clienteId,
+        ultimoNumeroGasto: siguiente,
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true }
+    );
+
+    return siguiente;
+  });
+}
 
 async function subirComprobantes({ clienteId, archivos = [] }) {
   const archivosSubidos = [];
@@ -51,6 +78,7 @@ async function subirComprobantes({ clienteId, archivos = [] }) {
 
 export async function crearGasto({ perfil, gasto }) {
   if (!perfil?.clienteId) throw new Error("No se encontró clienteId.");
+  const numeroGasto = await obtenerSiguienteNumeroGasto(perfil.clienteId);
 
   const comprobantes = await subirComprobantes({
     clienteId: perfil.clienteId,
@@ -59,6 +87,7 @@ export async function crearGasto({ perfil, gasto }) {
 
   const data = {
     ...gasto,
+    numeroGasto,
     comprobantes,
     clienteId: perfil.clienteId,
     estado: "activo",
@@ -77,7 +106,7 @@ export async function crearGasto({ perfil, gasto }) {
     subtipo: "gasto",
     origen: "gasto",
     origenRefId: refDoc.id,
-    descripcion: `Gasto - ${gasto.categoria || ""} - ${gasto.descripcion || ""}`,
+    descripcion: `Gasto #${numeroGasto} - ${gasto.categoria || ""} - ${gasto.descripcion || ""}`,
     monto: Number(gasto.total || gasto.monto || 0),
     medioPago: gasto.pagos?.[0]?.medioPago || "",
     fecha: gasto.fecha,

@@ -93,8 +93,9 @@ produccion: {
     historial: false,
   },
 
-    gastos: {
+  gastos: {
     ver: false,
+    verDetalle: false,
     crear: false,
     editar: false,
     anular: false,
@@ -228,6 +229,7 @@ const MODULOS_PERMISOS = [
   label: "Gastos",
   acciones: [
     { key: "ver", label: "Ver módulo" },
+    { key: "verDetalle", label: "Ver detalle" },
     { key: "crear", label: "Crear gasto" },
     { key: "editar", label: "Editar gasto" },
     { key: "anular", label: "Anular gasto" },
