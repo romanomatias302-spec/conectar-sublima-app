@@ -21,6 +21,9 @@ import {
   subirImagenPortadaProduccion,
   asignarUsuarioProduccion,
   obtenerHistorialProduccionPedido,
+  migrarMiniaturasProduccionCliente,
+  migrarMiniaturaProduccionPedido,
+  migrarPrimeraMiniaturaProduccionCliente, 
   
 } from "../../firebase/produccionPedidos";
 import { agruparPedidosPorColumna } from "./produccionUtils";
@@ -1269,12 +1272,93 @@ async function manejarReordenManualPedido({ pedidoId, pedidoObjetivoId, columnaI
   }
 }
 
+  async function ejecutarMigracionMiniaturas() {
+    try {
+      if (!perfil?.clienteId) return;
+
+      const ok = window.confirm(
+        "Esto va a optimizar las portadas existentes de este cliente. No borra imágenes originales. ¿Continuar?"
+      );
+
+      if (!ok) return;
+
+      const resultado = await migrarMiniaturasProduccionCliente(perfil.clienteId);
+
+      alert(
+        `Migración finalizada.\nProcesadas: ${resultado.procesadas}\nOmitidas: ${resultado.omitidas}\nErrores: ${resultado.errores}`
+      );
+    } catch (error) {
+      console.error("Error ejecutando migración:", error);
+      alert(error.message || "No se pudo ejecutar la migración.");
+    }
+  }
+
+
+  async function ejecutarMigracionUnaMiniatura() {
+  try {
+    const pedidoId = window.prompt("Pegá el firebaseId del pedido a optimizar:");
+
+    if (!pedidoId) return;
+
+    const resultado = await migrarMiniaturaProduccionPedido(pedidoId.trim());
+
+    alert(
+      resultado.procesada
+        ? "Miniatura creada correctamente."
+        : `No se procesó: ${resultado.motivo}`
+    );
+
+    console.log("Resultado migración una imagen:", resultado);
+  } catch (error) {
+    console.error("Error migrando una imagen:", error);
+    alert(error.message || "No se pudo migrar la imagen.");
+  }
+}
+
+
+async function ejecutarMigracionPrimeraMiniatura() {
+  try {
+    if (!perfil?.clienteId) return;
+
+    const resultado = await migrarPrimeraMiniaturaProduccionCliente(perfil.clienteId);
+
+    alert(
+      resultado.procesada
+        ? `Miniatura creada correctamente.\nPedido: ${resultado.pedidoId}`
+        : resultado.motivo
+    );
+
+    console.log("Resultado primera miniatura:", resultado);
+  } catch (error) {
+    console.error("Error migrando primera miniatura:", error);
+    alert(error.message || "No se pudo migrar la miniatura.");
+  }
+}
+
+
+
   return (
     <div className="produccion-page">
       <div className="produccion-page-header">
         <div className="produccion-page-header-top">
             <div className="produccion-titulo-row">
               <h2>Producción</h2>
+
+              {/* <button
+                type="button"
+                className="btn-produccion-secundario"
+                onClick={ejecutarMigracionPrimeraMiniatura}
+              >
+                Optimizar 1 imagen
+              </button>
+
+              <button
+                type="button"
+                className="btn-secundario"
+                onClick={ejecutarMigracionMiniaturas}
+              >
+                Optimizar imágenes
+              </button> */}
 
               <button
                 type="button"

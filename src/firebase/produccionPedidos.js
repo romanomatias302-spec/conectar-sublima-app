@@ -629,7 +629,7 @@ export async function obtenerHistorialProduccionPedido(pedidoId) {
 }
 
 
-/*export async function migrarMiniaturasProduccionCliente(clienteId) {
+export async function migrarMiniaturasProduccionCliente(clienteId) {
   if (!clienteId) throw new Error("Cliente inválido.");
 
   const q = query(
@@ -696,7 +696,123 @@ export async function obtenerHistorialProduccionPedido(pedidoId) {
   }
 
   return { procesadas, omitidas, errores };
-}*/
+}
 
 
 
+
+
+export async function migrarMiniaturaProduccionPedido(pedidoId) {
+  if (!pedidoId) throw new Error("Pedido inválido.");
+
+  const pedidoRef = doc(db, PEDIDOS_COLLECTION, pedidoId);
+  const snapshot = await getDocs(query(
+    collection(db, PEDIDOS_COLLECTION),
+    where("__name__", "==", pedidoId)
+  ));
+
+  if (snapshot.empty) throw new Error("No se encontró el pedido.");
+
+  const pedido = {
+    firebaseId: snapshot.docs[0].id,
+    ...snapshot.docs[0].data(),
+  };
+
+  if (!pedido.produccionImagenPortada) {
+    throw new Error("Este pedido no tiene portada.");
+  }
+
+  if (pedido.produccionImagenPortadaThumb) {
+    return { procesada: false, motivo: "Ya tenía miniatura." };
+  }
+
+  const response = await fetch(pedido.produccionImagenPortada);
+  if (!response.ok) throw new Error("No se pudo descargar imagen original.");
+
+  const blobOriginal = await response.blob();
+
+  const archivo = new File(
+    [blobOriginal],
+    `portada-${pedido.firebaseId}.jpg`,
+    { type: blobOriginal.type || "image/jpeg" }
+  );
+
+  const miniaturaBlob = await crearMiniaturaImagen(archivo, 420, 0.72);
+
+  const thumbRef = ref(
+    storage,
+    `produccion/${pedido.firebaseId}/portada/thumb-prueba-${Date.now()}.jpg`
+  );
+
+  await uploadBytes(thumbRef, miniaturaBlob, {
+    contentType: "image/jpeg",
+  });
+
+  const thumbUrl = await getDownloadURL(thumbRef);
+
+  await updateDoc(pedidoRef, {
+    produccionImagenPortadaThumb: thumbUrl,
+  });
+
+  return { procesada: true, pedidoId, thumbUrl };
+}
+
+export async function migrarPrimeraMiniaturaProduccionCliente(clienteId) {
+  if (!clienteId) throw new Error("Cliente inválido.");
+
+  const q = query(
+    collection(db, PEDIDOS_COLLECTION),
+    where("clienteId", "==", clienteId)
+  );
+
+  const snapshot = await getDocs(q);
+
+  const docPedido = snapshot.docs.find((d) => {
+    const p = d.data();
+    return p.produccionImagenPortada && !p.produccionImagenPortadaThumb;
+  });
+
+  if (!docPedido) {
+    return {
+      procesada: false,
+      motivo: "No hay pedidos pendientes de optimizar.",
+    };
+  }
+
+  const pedidoId = docPedido.id;
+  const pedido = docPedido.data();
+
+  const response = await fetch(pedido.produccionImagenPortada);
+  if (!response.ok) throw new Error("No se pudo descargar imagen original.");
+
+  const blobOriginal = await response.blob();
+
+  const archivo = new File(
+    [blobOriginal],
+    `portada-${pedidoId}.jpg`,
+    { type: blobOriginal.type || "image/jpeg" }
+  );
+
+  const miniaturaBlob = await crearMiniaturaImagen(archivo, 420, 0.72);
+
+  const thumbRef = ref(
+    storage,
+    `produccion/${pedidoId}/portada/thumb-prueba-${Date.now()}.jpg`
+  );
+
+  await uploadBytes(thumbRef, miniaturaBlob, {
+    contentType: "image/jpeg",
+  });
+
+  const thumbUrl = await getDownloadURL(thumbRef);
+
+  await updateDoc(doc(db, PEDIDOS_COLLECTION, pedidoId), {
+    produccionImagenPortadaThumb: thumbUrl,
+  });
+
+  return {
+    procesada: true,
+    pedidoId,
+    thumbUrl,
+  };
+}
