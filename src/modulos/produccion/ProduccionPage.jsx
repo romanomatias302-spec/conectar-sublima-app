@@ -127,6 +127,7 @@ const [pedidoNuevoResaltadoId, setPedidoNuevoResaltadoId] = useState(null);
   const [mostrarSelectorPortada,setMostrarSelectorPortada]=useState(false);
 
   const [imagenPortadaProduccion,setImagenPortadaProduccion]=useState("");
+  const [imagenPortadaThumbProduccion, setImagenPortadaThumbProduccion] = useState("");
   const [imagenPreviewProduccion, setImagenPreviewProduccion] = useState("");
   const [archivosProduccion, setArchivosProduccion] = useState([]);
   const [subiendoArchivoProduccion, setSubiendoArchivoProduccion] = useState(false);
@@ -827,6 +828,10 @@ setEtiquetasSeleccionadasIds(etiquetasActuales.map((e) => e.id).filter(Boolean))
     pedido?.produccionImagenPortada || ""
     );
 
+    setImagenPortadaThumbProduccion(
+      pedido?.produccionImagenPortadaThumb || ""
+    );
+
     setMostrarSelectorPortada(false);
 
 const productosDelPedido = await cargarProductosDelPedidoProduccion(
@@ -952,6 +957,10 @@ setImagenPortadaProduccion(
 subida.url
 );
 
+setImagenPortadaThumbProduccion(
+  subida.thumbUrl || subida.url
+);
+
 setMostrarSelectorPortada(false);
 
 }
@@ -1008,6 +1017,8 @@ notaLargaManual,
 
 produccionImagenPortada:
 imagenPortadaProduccion,
+produccionImagenPortadaThumb:
+imagenPortadaThumbProduccion,
 
 produccionArchivos: 
 archivosProduccion,
@@ -1788,6 +1799,7 @@ async function manejarReordenManualPedido({ pedidoId, pedidoObjetivoId, columnaI
             className="btn-produccion-cancelar"
             onClick={() => {
               setImagenPortadaProduccion("");
+              setImagenPortadaThumbProduccion("");
               setMostrarSelectorPortada(false);
             }}
           >
@@ -1856,6 +1868,7 @@ async function manejarReordenManualPedido({ pedidoId, pedidoObjetivoId, columnaI
           }}
           onClick={() => {
             setImagenPortadaProduccion(img.url);
+            setImagenPortadaThumbProduccion(img.thumbUrl || img.url);
             setMostrarSelectorPortada(false);
           }}
         >

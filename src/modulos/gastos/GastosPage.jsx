@@ -11,6 +11,7 @@ import {
   escucharGastosRecientes,
 } from "../../firebase/gastos";
 import { puedeHacer } from "../../utils/permisos";
+import { escucharProveedores } from "../../firebase/proveedores";
 
 const categoriasBase = [
   "Gasto fijo",
@@ -40,6 +41,8 @@ const gastoInicial = {
   fecha: new Date().toISOString().split("T")[0],
   categoria: "",
   proveedor: "",
+    proveedorId: "",
+    proveedorNombre: "",
   comprobanteNumero: "",
   comprobantes: [],
   observaciones: "",
@@ -63,6 +66,8 @@ const [hayMas, setHayMas] = useState(true);
 const [loading, setLoading] = useState(false);
 const [guardando, setGuardando] = useState(false);
   const [categorias, setCategorias] = useState(categoriasBase);
+  const [proveedores, setProveedores] = useState([]);
+const [proveedorDropdownAbierto, setProveedorDropdownAbierto] = useState(false);
 
   const [modalAbierto, setModalAbierto] = useState(false);
   const [gastoEditando, setGastoEditando] = useState(null);
@@ -184,6 +189,20 @@ useEffect(() => {
 
   return () => unsubscribe();
 }, [perfil?.clienteId, filtroCategoria, fechaDesde, fechaHasta]);
+
+useEffect(() => {
+  if (!perfil?.clienteId) return;
+
+  const unsub = escucharProveedores({
+    perfil,
+    onData: (lista) => {
+      setProveedores(lista.filter((p) => p.activo !== false));
+    },
+    onError: console.error,
+  });
+
+  return () => unsub();
+}, [perfil?.clienteId]);
 
   const abrirNuevoGasto = () => {
     if (!puedeCrearGastos) return;
@@ -441,7 +460,9 @@ const verComprobante = (comprobante) => {
     const gastoNormalizado = {
       fecha: form.fecha,
       categoria: form.categoria,
-      proveedor: form.proveedor || "",
+      proveedor: form.proveedorNombre || form.proveedor || "",
+        proveedorId: form.proveedorId || "",
+        proveedorNombre: form.proveedorNombre || form.proveedor || "",
       comprobanteNumero: form.comprobanteNumero || "",
       comprobantes: form.comprobantes || [],
       observaciones: form.observaciones || "",
@@ -500,6 +521,8 @@ const verComprobante = (comprobante) => {
     fecha: gasto.fecha || "",
     categoria: gasto.categoria || "",
     proveedor: gasto.proveedor || "",
+    proveedorId: gasto.proveedorId || "",
+    proveedorNombre: gasto.proveedorNombre || gasto.proveedor || "",
     comprobanteNumero: gasto.comprobanteNumero || "",
     comprobantes: gasto.comprobantes || [],
     observaciones: gasto.observaciones || "",
@@ -543,6 +566,8 @@ const verComprobante = (comprobante) => {
       fecha: gasto.fecha || "",
       categoria: gasto.categoria || "",
       proveedor: gasto.proveedor || "",
+      proveedorId: gasto.proveedorId || "",
+      proveedorNombre: gasto.proveedorNombre || gasto.proveedor || "",
       comprobanteNumero: gasto.comprobanteNumero || "",
       comprobantes: gasto.comprobantes || [],
       observaciones: gasto.observaciones || "",
@@ -830,7 +855,7 @@ const duplicarGastoLocal = async (gasto) => {
                     )}
                     </td>
                   
-                  <td>{g.proveedor || "-"}</td>
+                  <td>{g.proveedorNombre || g.proveedor || "-"}</td>
                   <td>{g.pagos?.[0]?.medioPago || g.medioPago || "-"}</td>
                   <td>{formatearMonto(g.total || g.monto)}</td>
 
@@ -976,7 +1001,7 @@ const duplicarGastoLocal = async (gasto) => {
                     {abierto && (
                     <div className="gasto-mobile-body">
                         <p><b>Fecha:</b> {g.fecha}</p>
-                        <p><b>Proveedor:</b> {g.proveedor || "-"}</p>
+                        <p><b>Proveedor:</b> {g.proveedorNombre || g.proveedor || "-"}</p>
                         <p><b>Medio:</b> {g.pagos?.[0]?.medioPago || g.medioPago || "-"}</p>
                         <p><b>Estado:</b> {g.activo === false ? "Anulado" : "Activo"}</p>
 
@@ -1297,15 +1322,30 @@ const duplicarGastoLocal = async (gasto) => {
                 )}
               </div>
 
-              <div>
-                <label>Proveedor opcional</label>
-                <input
-                  value={form.proveedor}
-                  onChange={(e) => actualizarCampo("proveedor", e.target.value)}
-                  placeholder="Ej: Textil Norte"
-                  disabled={modalSoloLectura}
-                />
-              </div>
+            <div>
+            <label>Proveedor opcional</label>
+            <select
+                value={form.proveedorId || ""}
+                onChange={(e) => {
+                const proveedor = proveedores.find(
+                    (p) => p.firebaseId === e.target.value
+                );
+
+                actualizarCampo("proveedorId", proveedor?.firebaseId || "");
+                actualizarCampo("proveedorNombre", proveedor?.nombre || "");
+                actualizarCampo("proveedor", proveedor?.nombre || "");
+                }}
+                disabled={modalSoloLectura}
+            >
+                <option value="">Sin proveedor</option>
+
+                {proveedores.map((p) => (
+                <option key={p.firebaseId} value={p.firebaseId}>
+                    {p.nombre}
+                </option>
+                ))}
+            </select>
+            </div>
 
             <div className="gastos-comprobante-row">
             <label>N° comprobante / factura</label>

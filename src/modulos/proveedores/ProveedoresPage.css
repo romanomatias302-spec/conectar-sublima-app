@@ -1,0 +1,40 @@
+.fila-inactiva {
+  opacity: 0.55;
+}
+
+.fila-inactiva td {
+  color: #6b7280;
+}
+
+.badge-activo,
+.badge-inactivo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.badge-activo {
+  background: #ecfdf5;
+  color: #15803d;
+}
+
+.badge-inactivo {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.btn-estado-proveedor {
+  margin-left: 8px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid #d9dee8;
+  background: #fff;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}

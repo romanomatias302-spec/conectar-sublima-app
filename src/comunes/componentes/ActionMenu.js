@@ -1,5 +1,12 @@
 import React, { useState, useEffect, useRef, useLayoutEffect } from "react";
-import { FaEllipsisV, FaEye, FaEdit, FaTrash, FaCopy } from "react-icons/fa";
+import {
+  FaEllipsisV,
+  FaEye,
+  FaEdit,
+  FaTrash,
+  FaCopy,
+  FaToggleOn,
+} from "react-icons/fa";
 import "./ActionMenu.css";
 
 export default function ActionMenu({
@@ -8,6 +15,8 @@ export default function ActionMenu({
   onRenombrar,
   onDuplicar,
   onEliminar,
+  onCambiarEstado,
+  labelCambiarEstado = "Cambiar estado",
 }) {
   const [abierto, setAbierto] = useState(false);
   const [pos, setPos] = useState({ top: 0, left: 0 });
@@ -99,7 +108,15 @@ export default function ActionMenu({
     );
 
     setPos({ top, left });
-  }, [abierto, onVer, onEditar, onEliminar]);
+  }, [
+    abierto,
+    onVer,
+    onEditar,
+    onRenombrar,
+    onDuplicar,
+    onEliminar,
+    onCambiarEstado,
+  ]);
 
   const abrirCerrar = (e) => {
     e.preventDefault();
@@ -172,6 +189,13 @@ export default function ActionMenu({
             <button type="button" onClick={(e) => ejecutar(onDuplicar, e)}>
               <FaCopy className="icono" />
               <span>Duplicar</span>
+            </button>
+          )}
+
+          {onCambiarEstado && (
+            <button type="button" onClick={(e) => ejecutar(onCambiarEstado, e)}>
+              <FaToggleOn className="icono" />
+              <span>{labelCambiarEstado}</span>
             </button>
           )}
 

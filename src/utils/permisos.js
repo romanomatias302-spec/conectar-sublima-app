@@ -60,6 +60,13 @@ produccion: {
     anular: false,
   },
 
+  proveedores: {
+  ver: false,
+  crear: false,
+  editar: false,
+  anular: false,
+},
+
   informes: {
     ver: false,
   },

@@ -501,6 +501,22 @@ function canReadMovimientos(clienteId) {
         || canModulo(clienteId, "gastos", "anular");
     }
 
+    function canReadProveedores(clienteId) {
+      return canModulo(clienteId, "proveedores", "ver")
+        || canModulo(clienteId, "gastos", "ver")
+        || canModulo(clienteId, "gastos", "crear")
+        || canModulo(clienteId, "gastos", "editar");
+    }
+
+    function canCreateProveedores(clienteId) {
+      return canModulo(clienteId, "proveedores", "crear");
+    }
+
+    function canUpdateProveedores(clienteId) {
+      return canModulo(clienteId, "proveedores", "editar")
+        || canModulo(clienteId, "proveedores", "anular");
+    }
+
     // =========================
     // usuarios
     // =========================
@@ -1011,6 +1027,20 @@ function canReadMovimientos(clienteId) {
             || permisoModuloAccion("gastos", "crear")
           )
         );
+
+      allow delete: if false;
+    }
+
+    // =========================
+    // proveedores
+    // =========================
+    match /proveedores/{proveedorId} {
+      allow read: if canReadProveedores(resource.data.clienteId);
+
+      allow create: if canCreateProveedores(request.resource.data.clienteId);
+
+      allow update: if canUpdateProveedores(resource.data.clienteId)
+        && request.resource.data.clienteId == resource.data.clienteId;
 
       allow delete: if false;
     }

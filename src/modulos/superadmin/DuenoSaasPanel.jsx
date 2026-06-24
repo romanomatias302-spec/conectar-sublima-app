@@ -36,6 +36,8 @@ export default function DuenoSaasPanel() {
   const [mostrarInvitacion, setMostrarInvitacion] = useState(false);
   const [linkGenerado, setLinkGenerado] = useState("");
 
+
+
   const [formInvitacion, setFormInvitacion] = useState({
     clienteId: "",
     nombre: "",
@@ -46,10 +48,13 @@ export default function DuenoSaasPanel() {
 const [filtroEstado, setFiltroEstado] = useState("todos");
 const [busquedaCliente, setBusquedaCliente] = useState("");
 const [filtroPlan, setFiltroPlan] = useState("todos");
+const [ordenClientes, setOrdenClientes] = useState("recientes");
 const [pagosCliente, setPagosCliente] = useState([]);
 const [mostrarPago, setMostrarPago] = useState(false);
 const [mostrarCargoMasivo, setMostrarCargoMasivo] = useState(false);
 const [menuClienteAbierto, setMenuClienteAbierto] = useState(null);
+
+
 
 const [formCargoMasivo, setFormCargoMasivo] = useState({
   planNombre: "",
@@ -68,6 +73,7 @@ const [formPago, setFormPago] = useState({
   periodoFacturado: "",
   observacion: "",
 });
+
 
  
 
@@ -93,6 +99,22 @@ const formatearFecha = (valor) => {
   const anio = fecha.getFullYear();
 
   return `${dia}/${mes}/${anio}`;
+};
+
+const obtenerTimestampCliente = (c) => {
+  const valor =
+    c.createdAt ||
+    c.fechaAlta ||
+    c.fechaCreacion ||
+    c.created_at ||
+    null;
+
+  if (!valor) return 0;
+
+  if (valor.seconds) return valor.seconds * 1000;
+
+  const fecha = new Date(valor);
+  return isNaN(fecha.getTime()) ? 0 : fecha.getTime();
 };
 
   const formatearMoneda = (valor) => {
@@ -445,14 +467,30 @@ const clientesFiltrados = clientes
 
     return coincideBusqueda && coincideEstado && coincidePlan;
   })
-  .sort((a, b) => {
+.sort((a, b) => {
+  if (ordenClientes === "recientes") {
+    return obtenerTimestampCliente(b) - obtenerTimestampCliente(a);
+  }
+
+  if (ordenClientes === "antiguos") {
+    return obtenerTimestampCliente(a) - obtenerTimestampCliente(b);
+  }
+
+  if (ordenClientes === "nombre") {
+    return (a.nombre || "").localeCompare(b.nombre || "");
+  }
+
+  if (ordenClientes === "estado") {
     const aActivo = (a.estado || "activo") !== "suspendido";
     const bActivo = (b.estado || "activo") !== "suspendido";
 
     if (aActivo === bActivo) return 0;
 
     return aActivo ? -1 : 1;
-  });
+  }
+
+  return 0;
+});
 
 const periodoActual = new Date().toISOString().slice(0, 7);
 
@@ -679,6 +717,16 @@ const emitirCargoMasivo = async () => {
               <option value="saldo_favor">Con saldo a favor</option>
               <option value="suspendido">Suspendidos</option>
               <option value="inactivo">Inactivos</option>
+            </select>
+            <select
+              value={ordenClientes}
+              onChange={(e) => setOrdenClientes(e.target.value)}
+              style={selectFiltro}
+            >
+              <option value="recientes">Más recientes primero</option>
+              <option value="antiguos">Más antiguos primero</option>
+              <option value="nombre">Nombre A-Z</option>
+              <option value="estado">Activos primero</option>
             </select>
             <select
               value={filtroPlan}
@@ -2001,7 +2049,6 @@ const selectFiltro = {
 
 const filaSuspendida = {
   background: "#f3f4f6",
-  color: "#9ca3af",
-  opacity: 0.75,
+  color: "#6b7280",
 };
 

@@ -73,8 +73,11 @@ const puedeVerCaja = puedeHacer(perfil, "caja", "ver");
 const puedeVerInformes = puedeHacer(perfil, "informes", "ver");
 const puedeVerGastos = puedeHacer(perfil, "gastos", "ver");
 
+
   const puedeCrearPedidos = puedeHacer(perfil, "pedidos", "crear");
   const puedeCrearClientes = puedeHacer(perfil, "clientes", "crear");
+
+  const puedeVerProveedores = puedeHacer(perfil, "proveedores", "ver");
 
   const mostrarBotonCentral = puedeCrearPedidos || puedeCrearClientes;
 
@@ -272,6 +275,12 @@ const puedeVerGastos = puedeHacer(perfil, "gastos", "ver");
           {puedeVerGastos && (
             <button onClick={() => irA("gastos")}>
               <Wallet size={18} /> Gastos
+            </button>
+          )}
+
+          {puedeVerProveedores && (
+            <button onClick={() => irA("proveedores")}>
+              <Wallet size={18} /> Proveedores
             </button>
           )}
 

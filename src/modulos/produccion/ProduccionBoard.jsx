@@ -151,11 +151,13 @@ onMoverPedido?.(pedidoId, columnaDestinoId);
       collisionDetection={pointerWithin}
       modifiers={[]}
       autoScroll={false}
+ 
       measuring={{
         droppable: {
           strategy: "always",
         },
-      }}
+      }} 
+         
       onDragMove={manejarDragMove}
       onDragEnd={manejarDragEnd}
     >

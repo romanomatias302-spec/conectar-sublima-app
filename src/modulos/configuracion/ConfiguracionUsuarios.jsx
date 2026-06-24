@@ -101,6 +101,13 @@ produccion: {
     anular: false,
   },
 
+  proveedores: {
+    ver: false,
+    crear: false,
+    editar: false,
+    anular: false,
+  },
+
   informes: {
     ver: false,
   },
@@ -233,6 +240,17 @@ const MODULOS_PERMISOS = [
     { key: "crear", label: "Crear gasto" },
     { key: "editar", label: "Editar gasto" },
     { key: "anular", label: "Anular gasto" },
+  ],
+},
+
+{
+  key: "proveedores",
+  label: "Proveedores",
+  acciones: [
+    { key: "ver", label: "Ver módulo" },
+    { key: "crear", label: "Crear proveedor" },
+    { key: "editar", label: "Editar proveedor" },
+    { key: "anular", label: "Desactivar proveedor" },
   ],
 },
 

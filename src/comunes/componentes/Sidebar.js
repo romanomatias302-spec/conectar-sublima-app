@@ -55,6 +55,8 @@ const puedeVerListadoVentas =
   const puedeVerCotizaciones =
   puedeHacer(perfil, "ventas", "cotizaciones");
 
+  const puedeVerProveedores = puedeHacer(perfil, "proveedores", "ver");
+
   return (
     <div className={`sidebar ${expandido ? "expandido" : "colapsado"}`}>
       <div className="sidebar-header">
@@ -166,6 +168,13 @@ const puedeVerListadoVentas =
           <li onClick={() => onSelect("gastos")}>
             <FaMoneyBillWave className="icon" />
             {expandido && <span>Gastos</span>}
+          </li>
+        )}
+
+        {puedeVerProveedores && (
+          <li onClick={() => onSelect("proveedores")}>
+            <FaUsers className="icon" />
+            {expandido && <span>Proveedores</span>}
           </li>
         )}
 

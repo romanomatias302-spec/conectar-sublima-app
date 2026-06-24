@@ -414,6 +414,7 @@ export async function actualizarDetalleManualProduccion({
   produccionNotaCorta = "",
   produccionNotaLarga = "",
   produccionImagenPortada = "",
+  produccionImagenPortadaThumb = "",
   produccionArchivos = [],
   produccionEtiquetas = [],
   produccionEtiquetaId = "",
@@ -438,6 +439,8 @@ export async function actualizarDetalleManualProduccion({
     produccionNotaLarga: produccionNotaLarga || "",
     produccionImagenPortada: produccionImagenPortada || "",
     produccionImagenPortadaOrigen: produccionImagenPortada ? "pedido" : "",
+    produccionImagenPortadaThumb:
+    produccionImagenPortadaThumb || "",
     produccionArchivos: produccionArchivos || [],
 
     produccionEtiquetas: etiquetasNormalizadas,
@@ -495,6 +498,47 @@ if (
   };
 }
 
+async function crearMiniaturaImagen(archivo, maxWidth = 420, calidad = 0.72) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(archivo);
+
+    img.onload = () => {
+      const scale = Math.min(1, maxWidth / img.width);
+      const width = Math.round(img.width * scale);
+      const height = Math.round(img.height * scale);
+
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, width, height);
+
+      canvas.toBlob(
+        (blob) => {
+          URL.revokeObjectURL(url);
+          if (!blob) {
+            reject(new Error("No se pudo generar miniatura."));
+            return;
+          }
+
+          resolve(blob);
+        },
+        "image/jpeg",
+        calidad
+      );
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("No se pudo leer la imagen."));
+    };
+
+    img.src = url;
+  });
+}
+
 export async function subirImagenPortadaProduccion({
   pedidoId,
   archivo,
@@ -502,38 +546,44 @@ export async function subirImagenPortadaProduccion({
   if (!pedidoId) throw new Error("Pedido inválido.");
   if (!archivo) throw new Error("Imagen inválida.");
 
-  const tipos = [
-    "image/png",
-    "image/jpeg",
-    "image/webp",
-  ];
+  const tipos = ["image/png", "image/jpeg", "image/webp"];
 
   if (!tipos.includes(archivo.type)) {
-    throw new Error(
-      "Solo JPG, PNG o WEBP."
-    );
+    throw new Error("Solo JPG, PNG o WEBP.");
   }
 
   if (archivo.size > 5 * 1024 * 1024) {
-    throw new Error(
-      "Máximo 5MB para portada."
-    );
+    throw new Error("Máximo 5MB para portada.");
   }
 
   const id = `portada-${Date.now()}`;
 
-  const storageRef = ref(
-    storage,
-    `produccion/${pedidoId}/portada/${id}`
-  );
-
+  const storageRef = ref(storage, `produccion/${pedidoId}/portada/${id}`);
   await uploadBytes(storageRef, archivo);
+  const url = await getDownloadURL(storageRef);
 
-  const url =
-    await getDownloadURL(storageRef);
+  let thumbUrl = "";
+
+  try {
+    const miniaturaBlob = await crearMiniaturaImagen(archivo);
+
+    const thumbRef = ref(
+      storage,
+      `produccion/${pedidoId}/portada/thumb-${id}.jpg`
+    );
+
+    await uploadBytes(thumbRef, miniaturaBlob, {
+      contentType: "image/jpeg",
+    });
+
+    thumbUrl = await getDownloadURL(thumbRef);
+  } catch (error) {
+    console.error("No se pudo generar miniatura:", error);
+  }
 
   return {
     url,
+    thumbUrl,
     origen: "produccion",
   };
 }
@@ -577,3 +627,76 @@ export async function obtenerHistorialProduccionPedido(pedidoId) {
       return bTime - aTime;
     });
 }
+
+
+/*export async function migrarMiniaturasProduccionCliente(clienteId) {
+  if (!clienteId) throw new Error("Cliente inválido.");
+
+  const q = query(
+    collection(db, PEDIDOS_COLLECTION),
+    where("clienteId", "==", clienteId)
+  );
+
+  const snapshot = await getDocs(q);
+
+  let procesadas = 0;
+  let omitidas = 0;
+  let errores = 0;
+
+  for (const d of snapshot.docs) {
+    const pedido = { firebaseId: d.id, ...d.data() };
+
+    if (!pedido.produccionImagenPortada) {
+      omitidas++;
+      continue;
+    }
+
+    if (pedido.produccionImagenPortadaThumb) {
+      omitidas++;
+      continue;
+    }
+
+    try {
+      const response = await fetch(pedido.produccionImagenPortada);
+
+      if (!response.ok) {
+        throw new Error("No se pudo descargar imagen original.");
+      }
+
+      const blobOriginal = await response.blob();
+
+      const archivo = new File(
+        [blobOriginal],
+        `portada-${pedido.firebaseId}.jpg`,
+        { type: blobOriginal.type || "image/jpeg" }
+      );
+
+      const miniaturaBlob = await crearMiniaturaImagen(archivo, 420, 0.72);
+
+      const thumbRef = ref(
+        storage,
+        `produccion/${pedido.firebaseId}/portada/thumb-migrada-${Date.now()}.jpg`
+      );
+
+      await uploadBytes(thumbRef, miniaturaBlob, {
+        contentType: "image/jpeg",
+      });
+
+      const thumbUrl = await getDownloadURL(thumbRef);
+
+      await updateDoc(doc(db, PEDIDOS_COLLECTION, pedido.firebaseId), {
+        produccionImagenPortadaThumb: thumbUrl,
+      });
+
+      procesadas++;
+    } catch (error) {
+      console.error("Error migrando miniatura:", pedido.firebaseId, error);
+      errores++;
+    }
+  }
+
+  return { procesadas, omitidas, errores };
+}*/
+
+
+
