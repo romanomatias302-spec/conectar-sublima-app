@@ -14,6 +14,9 @@ import { db, storage } from "../../firebase";
 import "./ProductoFormModal.css";
 import { puedeHacer } from "../../utils/permisos";
 
+const MAX_IMAGEN_PRODUCTO_MB = 5;
+const TIPOS_IMAGEN_PERMITIDOS = ["image/png", "image/jpeg", "image/webp"];
+
 export default function ProductoFormModal({
   pedidoId,
   pedido,
@@ -239,6 +242,7 @@ const modoSoloLecturaReal = !modoEdicionLocal && soloVer;
               })
             : [{ url: "", tipo: "link", portada: false }],
       });
+      setBusquedaProducto(productoEditando.productoNombre || "");
     }
 
     // si entro a ver un producto ya cargado, arranco en modo vista
@@ -466,6 +470,16 @@ useEffect(() => {
 const subirImagenProducto = async (file) => {
   try {
     if (!file) return;
+
+    if (!TIPOS_IMAGEN_PERMITIDOS.includes(file.type)) {
+      setError("Solo se permiten imágenes JPG, PNG o WEBP.");
+      return;
+    }
+
+    if (file.size > MAX_IMAGEN_PRODUCTO_MB * 1024 * 1024) {
+      setError(`La imagen no puede superar ${MAX_IMAGEN_PRODUCTO_MB}MB.`);
+      return;
+    }
 
     const path = `pedidos/${pedidoId}/productos/${Date.now()}_${file.name}`;
     const storageRef = ref(storage, path);
@@ -1439,12 +1453,7 @@ const countZonas = (z) => {
                       ? "Cargando productos..."
                       : "Escribí para buscar producto..."
                   }
-                  value={
-                    busquedaProducto ||
-                    formData.productoNombre ||
-                    getProductoNombreById(formData.producto) ||
-                    ""
-                  }
+                  value={busquedaProducto}
                   disabled={loadingProductos || soloVer}
                   onFocus={() => setMostrarProductosDropdown(true)}
                   onChange={(e) => {

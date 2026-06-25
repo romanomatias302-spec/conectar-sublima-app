@@ -51,7 +51,7 @@ if (zonasVacias) {
     };
   } else if (nombre.includes("taza")) {
     data.zonas = {
-      General: ["Zona única de impresión"],
+      General: ["Zona única"],
     };
   }
 }
@@ -151,21 +151,108 @@ if (!producto) return <p>Cargando producto...</p>;
 
 
   // 🔹 Alternar switches
-  const toggleSwitch = async (campo) => {
-    const nuevosSwitches = {
-      ...producto.switches,
-      [campo]: !producto.switches[campo],
-    };
-    setProducto({ ...producto, switches: nuevosSwitches });
+ const getZonasDefaultProducto = (nombre = "") => {
+  const nombreLower = (nombre || "").toLowerCase();
 
-    try {
-      await updateDoc(doc(db, "productosBase", productoId), {
-        switches: nuevosSwitches,
-      });
-    } catch (error) {
-      console.error("Error al actualizar switches:", error);
-    }
+  if (nombreLower.includes("taza") || nombreLower.includes("gorra")) {
+    return {
+      General: ["Zona única"],
+    };
+  }
+
+  return {
+    Frente: ["F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8"],
+    Espalda: ["E1", "E2", "E3", "E4"],
+    Mangas: ["M1", "M2"],
   };
+};
+
+const hayValorConfig = (valor) => {
+  if (!valor) return false;
+  if (Array.isArray(valor)) return valor.length > 0;
+  if (typeof valor === "object") return Object.keys(valor).length > 0;
+  return true;
+};
+
+const toggleSwitch = async (campo) => {
+  const estabaActivo = !!producto.switches?.[campo];
+  const nuevoActivo = !estabaActivo;
+
+  const nuevosSwitches = {
+    ...producto.switches,
+    [campo]: nuevoActivo,
+  };
+
+  const payload = {
+    switches: nuevosSwitches,
+  };
+
+  const productoActualizado = {
+    ...producto,
+    switches: nuevosSwitches,
+  };
+
+  if (nuevoActivo) {
+    if (campo === "zonas" && !hayValorConfig(producto.zonas)) {
+      const zonasDefault = getZonasDefaultProducto(producto.nombre);
+
+      payload.zonas = zonasDefault;
+      payload.tipoArea =
+        Object.keys(zonasDefault).length === 1 ? "unica" : "multiple";
+
+      productoActualizado.zonas = zonasDefault;
+      productoActualizado.tipoArea = payload.tipoArea;
+    }
+
+    if (campo === "talles" && !hayValorConfig(producto.talles)) {
+      const tallesDefault = [
+        "XS", "S", "M", "L", "XL", "XXL",
+        "S Mujer", "M Mujer", "L Mujer", "XL Mujer", "XXL Mujer",
+        "T4", "T6", "T8", "T10", "T12", "T14", "T16",
+      ];
+
+      payload.talles = tallesDefault;
+      productoActualizado.talles = tallesDefault;
+    }
+
+    if (campo === "colores" && !hayValorConfig(producto.colores)) {
+      const coloresDefault = [
+        { nombre: "Blanco", codigo: "#FFFFFF" },
+        { nombre: "Negro", codigo: "#000000" },
+        { nombre: "Rojo", codigo: "#FF0000" },
+        { nombre: "Azul", codigo: "#0000FF" },
+        { nombre: "Amarillo", codigo: "#FFFF00" },
+      ];
+
+      payload.colores = coloresDefault;
+      productoActualizado.colores = coloresDefault;
+    }
+
+    if (campo === "detallesCostura" && !hayValorConfig(producto.detallesCostura)) {
+      const detallesDefault = [
+        { nombre: "Cuello" },
+        { nombre: "Mangas" },
+        { nombre: "Hilos" },
+      ];
+
+      payload.detallesCostura = detallesDefault;
+      productoActualizado.detallesCostura = detallesDefault;
+    }
+
+    if (campo === "atributosExtra" && !hayValorConfig(producto.atributosExtra)) {
+      payload.atributosExtra = [];
+      productoActualizado.atributosExtra = [];
+    }
+  }
+
+  setProducto(productoActualizado);
+
+  try {
+    await updateDoc(doc(db, "productosBase", productoId), payload);
+  } catch (error) {
+    console.error("Error al actualizar switches:", error);
+  }
+};
 
   // 🔹 Abrir modal de configuración
   const abrirConfig = (campo) => {

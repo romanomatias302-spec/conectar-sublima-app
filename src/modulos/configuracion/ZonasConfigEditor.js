@@ -17,6 +17,14 @@ const [tipoArea, setTipoArea] = useState("multiple"); // multiple | unica | pers
 const [imagenReferenciaPersonalizada, setImagenReferenciaPersonalizada] = useState("");
 const [subiendoImagen, setSubiendoImagen] = useState(false);
 const [errorImagen, setErrorImagen] = useState("");
+const MAX_IMAGEN_REFERENCIA_MB = 3;
+
+const TIPOS_IMAGEN_REFERENCIA_PERMITIDOS = [
+  "image/png",
+  "image/jpeg",
+  "image/jpg",
+  "image/webp",
+];
 
   // ✅ Helpers: convertir formatos
   const objectToArray = (obj) => {
@@ -56,7 +64,7 @@ const [errorImagen, setErrorImagen] = useState("");
     }
 
     if (tipo === "unica") {
-      return [{ grupo: "General", subzonas: ["Zona única de impresión"] }];
+      return [{ grupo: "General", subzonas: ["Zona única"] }];
     }
 
     if (tipo === "personalizada") {
@@ -72,7 +80,7 @@ const [errorImagen, setErrorImagen] = useState("");
     }
 
     if (nombreLower.includes("taza") || nombreLower.includes("gorra")) {
-      return [{ grupo: "General", subzonas: ["Zona única de impresión"] }];
+      return [{ grupo: "General", subzonas: ["Zona única"] }];
     }
 
     return [];
@@ -161,6 +169,13 @@ const [errorImagen, setErrorImagen] = useState("");
       "image/jpg",
       "image/webp",
     ];
+
+    if (file.size > MAX_IMAGEN_REFERENCIA_MB * 1024 * 1024) {
+      setErrorImagen(
+        `La imagen de referencia no puede superar ${MAX_IMAGEN_REFERENCIA_MB}MB.`
+      );
+      return;
+    }
 
     if (!tiposPermitidos.includes(file.type)) {
       setErrorImagen("Solo se permiten imágenes PNG, JPG, JPEG o WEBP.");
