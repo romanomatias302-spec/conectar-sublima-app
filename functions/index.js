@@ -2,6 +2,9 @@ const { onRequest } = require("firebase-functions/v2/https");
 
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { defineSecret } = require("firebase-functions/params");
+
+const sharp = require("sharp");
+
 const admin = require("firebase-admin");
 
 admin.initializeApp();
@@ -628,3 +631,124 @@ exports.webhookMercadoPagoSaas = onRequest(
     }
   }
 );
+
+
+/*aca se agrega funcion nueva para solucionar lo de las imagenes, de manera temporal */
+
+
+function obtenerStoragePathDesdeUrl(url) {
+  const match = url.match(/\/o\/([^?]+)/);
+  if (!match) return null;
+  return decodeURIComponent(match[1]);
+}
+
+async function migrarMiniaturasProduccion({ clienteId, soloUna = true }) {
+  const pedidosSnap = await db
+    .collection("pedidos")
+    .where("clienteId", "==", clienteId)
+    .get();
+
+  let procesadas = 0;
+  let omitidas = 0;
+  let errores = 0;
+
+  const bucket = admin.storage().bucket();
+
+  for (const docu of pedidosSnap.docs) {
+    const pedido = docu.data();
+
+    if (!pedido.produccionImagenPortada) {
+      omitidas++;
+      continue;
+    }
+
+    if (pedido.produccionImagenPortadaThumb) {
+      omitidas++;
+      continue;
+    }
+
+    try {
+      const pathOriginal = obtenerStoragePathDesdeUrl(pedido.produccionImagenPortada);
+
+      if (!pathOriginal) {
+        omitidas++;
+        continue;
+      }
+
+      const [bufferOriginal] = await bucket.file(pathOriginal).download();
+
+      const thumbBuffer = await sharp(bufferOriginal)
+        .resize({
+          width: 420,
+          withoutEnlargement: true,
+        })
+        .jpeg({
+          quality: 72,
+        })
+        .toBuffer();
+
+      const thumbPath = `produccion/${docu.id}/portada/thumb-migrada-${Date.now()}.jpg`;
+
+      const thumbFile = bucket.file(thumbPath);
+
+      await thumbFile.save(thumbBuffer, {
+        metadata: {
+          contentType: "image/jpeg",
+        },
+      });
+
+      await thumbFile.makePublic();
+
+      const thumbUrl = `https://storage.googleapis.com/${bucket.name}/${thumbPath}`;
+
+      await docu.ref.update({
+        produccionImagenPortadaThumb: thumbUrl,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      procesadas++;
+
+      if (soloUna) break;
+    } catch (error) {
+      console.error("Error migrando miniatura:", docu.id, error);
+      errores++;
+    }
+  }
+
+  return {
+    procesadas,
+    omitidas,
+    errores,
+    soloUna,
+  };
+}
+
+exports.migrarMiniaturasProduccion = onRequest(async (req, res) => {
+  try {
+    const token = req.query.token;
+    const clienteId = req.query.clienteId;
+    const modo = req.query.modo || "uno";
+
+    if (token !== "zalfro-miniaturas-2026-seguro") {
+      res.status(403).json({ error: "No autorizado" });
+      return;
+    }
+
+    if (!clienteId) {
+      res.status(400).json({ error: "Falta clienteId" });
+      return;
+    }
+
+    const resultado = await migrarMiniaturasProduccion({
+      clienteId,
+      soloUna: modo !== "todos",
+    });
+
+    res.json(resultado);
+  } catch (error) {
+    console.error("Error migrando miniaturas:", error);
+    res.status(500).json({
+      error: error.message || "Error migrando miniaturas",
+    });
+  }
+});
