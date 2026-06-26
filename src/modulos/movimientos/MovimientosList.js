@@ -410,7 +410,7 @@ useEffect(() => {
     
      
 
-      {(vistaActiva === "resumen" || vistaActiva === "finanzas") && (
+{(vistaActiva === "resumen" || vistaActiva === "finanzas") && (
   <div
     style={{
       background: "#fff",
@@ -418,155 +418,170 @@ useEffect(() => {
       borderRadius: 12,
       padding: 16,
       marginBottom: 18,
-      display: "flex",
-      gap: 10,
-      alignItems: "end",
-      flexWrap: "wrap",
+      display: "grid",
+      gap: 14,
     }}
   >
-    {[
-      ["hoy", "Hoy"],
-      ["ayer", "Ayer"],
-      ["7dias", "Últimos 7 días"],
-      ["30dias", "Últimos 30 días"],
-    ].map(([key, label]) => (
-      <button
-        key={key}
-        onClick={() => aplicarRangoRapidoFinanzas(key)}
-        style={{
-          padding: "9px 12px",
-          borderRadius: 10,
-          border: "1px solid #d9dee8",
-          background: rangoFinanzasActivo === key ? "#eaf2ff" : "#fff",
-          fontWeight: 700,
-          cursor: "pointer",
-          height: 38,
-        }}
-      >
-        {label}
-      </button>
-    ))}
-
-    <div>
-      <label style={{ fontSize: 13, fontWeight: 700 }}>Desde</label>
-      <input
-        type="date"
-        value={fechaDesdeFinanzas}
-        onChange={(e) => {
-          setRangoFinanzasActivo("personalizado");
-          setFechaDesdeFinanzas(e.target.value);
-        }}
-        style={{
-          display: "block",
-          padding: "9px 10px",
-          marginTop: 4,
-          height: 38,
-        }}
-      />
-    </div>
-
-    <div>
-      <label style={{ fontSize: 13, fontWeight: 700 }}>Hasta</label>
-      <input
-        type="date"
-        value={fechaHastaFinanzas}
-        onChange={(e) => {
-          setRangoFinanzasActivo("personalizado");
-          setFechaHastaFinanzas(e.target.value);
-        }}
-        style={{
-          display: "block",
-          padding: "9px 10px",
-          marginTop: 4,
-          height: 38,
-        }}
-      />
-    </div>
-    
-    
-
-{vistaActiva === "finanzas" && (
-  <>
     <div
-    style={{
-      padding: "8px 10px",
-      border: "1px solid #0096d1",
-      borderRadius: 12,
-      background: "#eaf7ff",
-    }}
-  >
-    <label style={{ fontSize: 13, fontWeight: 800, color: "#0096d1" }}>
-      Mostrar
-    </label>
-
-    <select
-      value={vistaFinanzas}
-      onChange={(e) => {
-        const valor = e.target.value;
-        setVistaFinanzas(valor);
-
-        if (valor === "ingresos") {
-          setTipoMovimientoFiltro("ingreso");
-        } else if (valor === "egresos") {
-          setTipoMovimientoFiltro("egreso");
-        } else {
-          setTipoMovimientoFiltro("");
-        }
-
-        if (
-          valor === "clientesPendientes" ||
-          valor === "proveedoresPendientes"
-        ) {
-          setRangoFinanzasActivo("todos");
-          setFechaDesdeFinanzas("");
-          setFechaHastaFinanzas("");
-          setSaldoAbiertoId(null);
-        }
-      }}
       style={{
-        display: "block",
-        padding: "9px 10px",
-        marginTop: 4,
-        minWidth: 230,
-        height: 38,
-        border: "1px solid #0096d1",
-        borderRadius: 10,
-        background: "#fff",
-        fontWeight: 700,
+        display: "flex",
+        gap: 10,
+        alignItems: "center",
+        flexWrap: "wrap",
       }}
     >
-      <option value="movimientos">Movimientos</option>
-      <option value="ingresos">Ingresos</option>
-      <option value="egresos">Egresos</option>
-      <option value="clientesPendientes">Clientes con saldo pendiente</option>
-      <option value="proveedoresPendientes">Proveedores con saldo pendiente</option>
-    </select>
-  </div>
+      {[
+        ["hoy", "Hoy"],
+        ["ayer", "Ayer"],
+        ["7dias", "Últimos 7 días"],
+        ["30dias", "Últimos 30 días"],
+      ].map(([key, label]) => (
+        <button
+          key={key}
+          onClick={() => aplicarRangoRapidoFinanzas(key)}
+          style={{
+            padding: "9px 12px",
+            borderRadius: 10,
+            border: "1px solid #d9dee8",
+            background: rangoFinanzasActivo === key ? "#eaf2ff" : "#fff",
+            fontWeight: 700,
+            cursor: "pointer",
+            height: 38,
+          }}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
 
-      <button
-        onClick={exportarMovimientosCSV}
-        disabled={exportandoExcel}
+    <div
       style={{
-        padding: "9px 14px",
-        borderRadius: 10,
-        border: "1px solid #d9dee8",
-        background: "#fff",
-        fontWeight: 700,
-        cursor: "pointer",
-        height: 38,
-        opacity: exportandoExcel ? 0.6 : 1,
-        pointerEvents: exportandoExcel ? "none" : "auto",
+        display: "flex",
+        gap: 12,
+        alignItems: "end",
+        flexWrap: "wrap",
       }}
     >
-      {exportandoExcel ? "Descargando..." : "Exportar Excel"}
-    </button>
-    {mensajeExportacion && (
-      <span style={{ fontSize: 13, color: "#666" }}>
-        {mensajeExportacion}
-      </span>
-    )}
-  </>
-)}
+      <div>
+        <label style={{ fontSize: 13, fontWeight: 700 }}>Desde</label>
+        <input
+          type="date"
+          value={fechaDesdeFinanzas}
+          onChange={(e) => {
+            setRangoFinanzasActivo("personalizado");
+            setFechaDesdeFinanzas(e.target.value);
+          }}
+          style={{
+            display: "block",
+            padding: "9px 10px",
+            marginTop: 4,
+            height: 38,
+          }}
+        />
+      </div>
+
+      <div>
+        <label style={{ fontSize: 13, fontWeight: 700 }}>Hasta</label>
+        <input
+          type="date"
+          value={fechaHastaFinanzas}
+          onChange={(e) => {
+            setRangoFinanzasActivo("personalizado");
+            setFechaHastaFinanzas(e.target.value);
+          }}
+          style={{
+            display: "block",
+            padding: "9px 10px",
+            marginTop: 4,
+            height: 38,
+          }}
+        />
+      </div>
+
+      {vistaActiva === "finanzas" && (
+        <>
+          <div
+            style={{
+              padding: "8px 10px",
+              border: "1px solid #0096d1",
+              borderRadius: 12,
+              background: "#eaf7ff",
+            }}
+          >
+            <label style={{ fontSize: 13, fontWeight: 800, color: "#0096d1" }}>
+              Mostrar
+            </label>
+
+            <select
+              value={vistaFinanzas}
+              onChange={(e) => {
+                const valor = e.target.value;
+                setVistaFinanzas(valor);
+
+                if (valor === "ingresos") {
+                  setTipoMovimientoFiltro("ingreso");
+                } else if (valor === "egresos") {
+                  setTipoMovimientoFiltro("egreso");
+                } else {
+                  setTipoMovimientoFiltro("");
+                }
+
+                if (
+                  valor === "clientesPendientes" ||
+                  valor === "proveedoresPendientes"
+                ) {
+                  setRangoFinanzasActivo("todos");
+                  setFechaDesdeFinanzas("");
+                  setFechaHastaFinanzas("");
+                  setSaldoAbiertoId(null);
+                }
+              }}
+              style={{
+                display: "block",
+                padding: "9px 10px",
+                marginTop: 4,
+                minWidth: 230,
+                height: 38,
+                border: "1px solid #0096d1",
+                borderRadius: 10,
+                background: "#fff",
+                fontWeight: 700,
+              }}
+            >
+              <option value="movimientos">Movimientos</option>
+              <option value="ingresos">Ingresos</option>
+              <option value="egresos">Egresos</option>
+              <option value="clientesPendientes">Clientes con saldo pendiente</option>
+              <option value="proveedoresPendientes">Proveedores con saldo pendiente</option>
+            </select>
+          </div>
+
+          <button
+            onClick={exportarMovimientosCSV}
+            disabled={exportandoExcel}
+            style={{
+              padding: "9px 14px",
+              borderRadius: 10,
+              border: "1px solid #d9dee8",
+              background: "#fff",
+              fontWeight: 700,
+              cursor: "pointer",
+              height: 38,
+              opacity: exportandoExcel ? 0.6 : 1,
+              pointerEvents: exportandoExcel ? "none" : "auto",
+            }}
+          >
+            {exportandoExcel ? "Descargando..." : "Exportar Excel"}
+          </button>
+
+          {mensajeExportacion && (
+            <span style={{ fontSize: 13, color: "#666" }}>
+              {mensajeExportacion}
+            </span>
+          )}
+        </>
+      )}
+    </div>
   </div>
 )}
 

@@ -239,10 +239,20 @@ const toggleSwitch = async (campo) => {
       productoActualizado.detallesCostura = detallesDefault;
     }
 
-    if (campo === "atributosExtra" && !hayValorConfig(producto.atributosExtra)) {
-      payload.atributosExtra = [];
-      productoActualizado.atributosExtra = [];
-    }
+if (campo === "atributosExtra" && !hayValorConfig(producto.atributosExtra)) {
+  const atributosDefault = [
+    {
+      id: crypto.randomUUID(),
+      nombre: "Nuevo atributo",
+      tipo: "texto",
+      obligatorio: false,
+      opciones: [],
+    },
+  ];
+
+  payload.atributosExtra = atributosDefault;
+  productoActualizado.atributosExtra = atributosDefault;
+}
   }
 
   setProducto(productoActualizado);

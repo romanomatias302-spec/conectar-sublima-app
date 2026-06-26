@@ -102,6 +102,9 @@ export async function crearVenta({
   if (!perfil?.clienteId) throw new Error("No se encontró clienteId.");
   if (!cliente?.firebaseId) throw new Error("Falta cliente seleccionado.");
 
+  const sucursalId = perfil?.sucursalDefaultId || "principal";
+const sucursalNombre = perfil?.sucursalDefaultNombre || "Sucursal principal";
+
   const itemsNormalizados = normalizarItems({
     items,
     descripcion,
@@ -148,6 +151,8 @@ export async function crearVenta({
   const ventaData = {
     numeroVenta,
     clienteId: perfil.clienteId,
+    sucursalId,
+    sucursalNombre,
     fechaVenta,
     clienteRefId: cliente.firebaseId,
     clienteNombre: cliente.nombre || "",
@@ -215,6 +220,8 @@ export async function crearVenta({
     for (const pago of pagosNormalizados) {
       const pagoData = {
         clienteId: perfil.clienteId,
+        sucursalId,
+        sucursalNombre,
         ventaRefId: ventaRef.id,
         numeroVenta,
         fechaPago: pago.fechaPago || fechaVenta,
@@ -232,6 +239,8 @@ export async function crearVenta({
 
       await addDoc(collection(db, "movimientos"), {
         clienteId: perfil.clienteId,
+        sucursalId,
+        sucursalNombre,
         tipo: "ingreso",
         subtipo: "venta",
         origen: "venta",
@@ -240,6 +249,12 @@ export async function crearVenta({
         monto: Number(pago.monto || 0),
         medioPago: pago.medioPago || "efectivo",
         fecha: pago.fechaPago || fechaVenta,
+
+        impactaCaja: true,
+        impactaResultado: true,
+        estadoMovimiento: "activo",
+        activo: true,
+
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
@@ -274,8 +289,16 @@ export async function agregarPagoAVenta({
   if (!perfil?.clienteId) throw new Error("Perfil inválido.");
   if (montoNum <= 0) throw new Error("El monto debe ser mayor a 0.");
 
+  const sucursalId = venta?.sucursalId || perfil?.sucursalDefaultId || "principal";
+  const sucursalNombre =
+    venta?.sucursalNombre ||
+    perfil?.sucursalDefaultNombre ||
+    "Sucursal principal";
+
   await addDoc(collection(db, "ventas", venta.firebaseId, "pagos"), {
     clienteId: perfil.clienteId,
+    sucursalId,
+    sucursalNombre,
     ventaRefId: venta.firebaseId,
     numeroVenta: venta.numeroVenta,
     fechaPago,
@@ -289,19 +312,27 @@ export async function agregarPagoAVenta({
     updatedAt: serverTimestamp(),
   });
 
-  await addDoc(collection(db, "movimientos"), {
-    clienteId: perfil.clienteId,
-    tipo: "ingreso",
-    subtipo: "venta",
-    origen: "venta",
-    origenRefId: venta.firebaseId,
-    descripcion: `Pago venta #${venta.numeroVenta} - ${venta.clienteNombre || ""}`,
-    monto: montoNum,
-    medioPago: medioPago || "efectivo",
-    fecha: fechaPago,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  });
+await addDoc(collection(db, "movimientos"), {
+  clienteId: perfil.clienteId,
+  sucursalId,
+  sucursalNombre,
+  tipo: "ingreso",
+  subtipo: "venta",
+  origen: "venta",
+  origenRefId: venta.firebaseId,
+  descripcion: `Pago venta #${venta.numeroVenta} - ${venta.clienteNombre || ""}`,
+  monto: montoNum,
+  medioPago: medioPago || "efectivo",
+  fecha: fechaPago,
+
+  impactaCaja: true,
+  impactaResultado: true,
+  estadoMovimiento: "activo",
+  activo: true,
+
+  createdAt: serverTimestamp(),
+  updatedAt: serverTimestamp(),
+});
 
     await recalcularTotalesVenta(venta.firebaseId);
 }

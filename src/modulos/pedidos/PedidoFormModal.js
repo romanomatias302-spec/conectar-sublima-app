@@ -262,6 +262,14 @@ const guardarPedido = async () => {
           ...formData,
           clienteBusqueda: (formData.cliente || "").trim().toLowerCase(),
           clienteId: pedido.clienteId || perfil?.clienteId || "",
+          sucursalId:
+            pedido.sucursalId ||
+            perfil?.sucursalDefaultId ||
+            "principal",
+          sucursalNombre:
+            pedido.sucursalNombre ||
+            perfil?.sucursalDefaultNombre ||
+            "Sucursal principal",
           updatedAt: serverTimestamp(),
         });
 
@@ -269,6 +277,14 @@ const guardarPedido = async () => {
           ...pedido,
           ...formData,
           clienteId: pedido.clienteId || perfil?.clienteId || "",
+          sucursalId:
+            pedido.sucursalId ||
+            perfil?.sucursalDefaultId ||
+            "principal",
+          sucursalNombre:
+            pedido.sucursalNombre ||
+            perfil?.sucursalDefaultNombre ||
+            "Sucursal principal",
         };
 
         guardadoCorrecto = true;
@@ -305,6 +321,8 @@ const guardarPedido = async () => {
         fechaEntrega: formData.fechaEntrega,
         estado: formData.estado,
         clienteId: perfil?.clienteId || "",
+        sucursalId: perfil?.sucursalDefaultId || "principal",
+        sucursalNombre: perfil?.sucursalDefaultNombre || "Sucursal principal",
 
         creadoPorUid: perfil?.uid || perfil?.firebaseUid || "",
         creadoPorNombre: perfil?.nombre || perfil?.displayName || perfil?.email || "",

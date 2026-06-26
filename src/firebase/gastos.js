@@ -79,6 +79,10 @@ async function subirComprobantes({ clienteId, archivos = [] }) {
 
 export async function crearGasto({ perfil, gasto }) {
   if (!perfil?.clienteId) throw new Error("No se encontró clienteId.");
+
+  const sucursalId = perfil?.sucursalDefaultId || "principal";
+  const sucursalNombre = perfil?.sucursalDefaultNombre || "Sucursal principal";
+
   const numeroGasto = await obtenerSiguienteNumeroGasto(perfil.clienteId);
 
   const comprobantes = await subirComprobantes({
@@ -91,6 +95,8 @@ export async function crearGasto({ perfil, gasto }) {
     numeroGasto,
     comprobantes,
     clienteId: perfil.clienteId,
+    sucursalId,
+    sucursalNombre,
     estado: "activo",
     activo: true,
     creadoPor: perfil.uid || perfil.firebaseUid || "",
@@ -102,8 +108,10 @@ export async function crearGasto({ perfil, gasto }) {
   const refDoc = await addDoc(collection(db, GASTOS_COLLECTION), data);
 
  await addDoc(collection(db, "movimientos"), {
-  clienteId: perfil.clienteId,
-  tipo: "egreso",
+    clienteId: perfil.clienteId,
+    sucursalId,
+    sucursalNombre,
+    tipo: "egreso",
   subtipo: "gasto",
   origen: "gasto",
   origenRefId: refDoc.id,
@@ -136,12 +144,17 @@ export async function actualizarGasto({ perfil, gastoId, gasto }) {
     archivos: gasto.comprobantes || [],
   });
 
-  await updateDoc(doc(db, GASTOS_COLLECTION, gastoId), {
-    ...gasto,
-    comprobantes,
-    clienteId: perfil.clienteId,
-    updatedAt: serverTimestamp(),
-  });
+await updateDoc(doc(db, GASTOS_COLLECTION, gastoId), {
+  ...gasto,
+  comprobantes,
+  clienteId: perfil.clienteId,
+  sucursalId: gasto.sucursalId || perfil?.sucursalDefaultId || "principal",
+  sucursalNombre:
+    gasto.sucursalNombre ||
+    perfil?.sucursalDefaultNombre ||
+    "Sucursal principal",
+  updatedAt: serverTimestamp(),
+});
 }
 
 export async function anularGasto({ perfil, gastoId, motivo = "" }) {
