@@ -517,6 +517,24 @@ function canReadMovimientos(clienteId) {
         || canModulo(clienteId, "proveedores", "anular");
     }
 
+        function canReadListasPrecios(clienteId) {
+      return canModulo(clienteId, "listasPrecios", "ver")
+        || canModulo(clienteId, "ventas", "crear")
+        || canModulo(clienteId, "ventas", "crearCotizacion");
+    }
+
+    function canCreateListasPrecios(clienteId) {
+      return canModulo(clienteId, "listasPrecios", "crear");
+    }
+
+    function canUpdateListasPrecios(clienteId) {
+      return canModulo(clienteId, "listasPrecios", "editar");
+    }
+
+    function canDeleteListasPrecios(clienteId) {
+      return canModulo(clienteId, "listasPrecios", "eliminar");
+    }
+
     // =========================
     // usuarios
     // =========================
@@ -1043,6 +1061,22 @@ function canReadMovimientos(clienteId) {
         && request.resource.data.clienteId == resource.data.clienteId;
 
       allow delete: if false;
+    }
+
+    // =========================
+    // listasPrecios
+    // =========================
+    match /listasPrecios/{listaId} {
+      allow read: if canReadListasPrecios(resource.data.clienteId);
+
+      allow create: if canCreateListasPrecios(request.resource.data.clienteId)
+        && request.resource.data.clienteId is string
+        && request.resource.data.clienteId != "";
+
+      allow update: if canUpdateListasPrecios(resource.data.clienteId)
+        && request.resource.data.clienteId == resource.data.clienteId;
+
+      allow delete: if canDeleteListasPrecios(resource.data.clienteId);
     }
 
     // =========================

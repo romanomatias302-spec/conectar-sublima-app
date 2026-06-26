@@ -67,6 +67,13 @@ produccion: {
   anular: false,
 },
 
+  listasPrecios: {
+    ver: false,
+    crear: false,
+    editar: false,
+    eliminar: false,
+  },
+
   informes: {
     ver: false,
   },

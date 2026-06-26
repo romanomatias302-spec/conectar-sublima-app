@@ -9,12 +9,14 @@ import {
   FaCashRegister,
   FaExchangeAlt,
   FaMoneyBillWave,
+  FaTags,
 } from "react-icons/fa";
 import { signOut } from "firebase/auth";
 import { auth } from "../../firebase";
 import "./Sidebar.css";
 import logoZalfro from "../../assets/logo-zalfro.png";
 import { puedeHacer } from "../../utils/permisos";
+
 
 export default function Sidebar({
   onSelect,
@@ -56,6 +58,7 @@ const puedeVerListadoVentas =
   puedeHacer(perfil, "ventas", "cotizaciones");
 
   const puedeVerProveedores = puedeHacer(perfil, "proveedores", "ver");
+  const puedeVerListasPrecios = puedeHacer(perfil, "listasPrecios", "ver");
 
   return (
     <div className={`sidebar ${expandido ? "expandido" : "colapsado"}`}>
@@ -175,6 +178,13 @@ const puedeVerListadoVentas =
           <li onClick={() => onSelect("proveedores")}>
             <FaUsers className="icon" />
             {expandido && <span>Proveedores</span>}
+          </li>
+        )}
+
+        {puedeVerListasPrecios && (
+          <li onClick={() => onSelect("listasPrecios")}>
+            <FaTags className="icon" />
+            {expandido && <span>Lista de precios</span>}
           </li>
         )}
 

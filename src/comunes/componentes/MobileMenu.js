@@ -14,6 +14,7 @@ import {
   Wallet,
   LogOut,
   X,
+  Tags,
 } from "lucide-react";
 import "./MobileMenu.css";
 import { puedeHacer } from "../../utils/permisos";
@@ -78,6 +79,7 @@ const puedeVerGastos = puedeHacer(perfil, "gastos", "ver");
   const puedeCrearClientes = puedeHacer(perfil, "clientes", "crear");
 
   const puedeVerProveedores = puedeHacer(perfil, "proveedores", "ver");
+  const puedeVerListasPrecios = puedeHacer(perfil, "listasPrecios", "ver");
 
   const mostrarBotonCentral = puedeCrearPedidos || puedeCrearClientes;
 
@@ -281,6 +283,12 @@ const puedeVerGastos = puedeHacer(perfil, "gastos", "ver");
           {puedeVerProveedores && (
             <button onClick={() => irA("proveedores")}>
               <Wallet size={18} /> Proveedores
+            </button>
+          )}
+
+          {puedeVerListasPrecios && (
+            <button onClick={() => irA("listasPrecios")}>
+              <Tags size={18} /> Lista de precios
             </button>
           )}
 

@@ -28,6 +28,7 @@ import CajaPage from "./modulos/caja/CajaPage";
 import GastosPage from "./modulos/gastos/GastosPage";
 import { puedeHacer as puedeHacerPerfil } from "./utils/permisos";
 import ProveedoresPage from "./modulos/proveedores/ProveedoresPage";
+import ListasPreciosPage from "./modulos/listasPrecios/ListasPreciosPage";
 
 
 
@@ -386,6 +387,7 @@ useEffect(() => {
         caja: "caja",
         gastos: "gastos",
         proveedores: "proveedores",
+        listasPrecios: "listasPrecios",
         configuracion: "configuracion",
       };
 
@@ -777,6 +779,10 @@ if (!perfil) {
 
         {vista === "proveedores" && (
           <ProveedoresPage perfil={perfil} />
+        )}
+
+        {vista === "listasPrecios" && (
+          <ListasPreciosPage perfil={perfil} />
         )}
 
         {vista === "configuracion" && (

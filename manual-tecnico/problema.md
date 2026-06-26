@@ -1,3 +1,103 @@
+### ERROR RESUELTO – LENTITUD EXTREMA EN PRODUCCIÓN
+Problema detectado
+
+Un cliente de México reportó que el módulo de Producción se congelaba completamente.
+
+Síntomas observados:
+
+El tablero tardaba entre 20 y 35 segundos en responder.
+El mouse quedaba congelado.
+El scroll no funcionaba.
+Windows mostraba el mensaje "La página no responde".
+Después de unos segundos el sistema volvía a funcionar normalmente.
+El resto del sistema (Ventas, Pedidos, Caja, etc.) funcionaba correctamente.
+
+Inicialmente se sospechó de:
+
+cantidad de pedidos;
+listeners de Firestore;
+dnd-kit;
+renderizado de tarjetas;
+carga de imágenes.
+Investigación realizada
+
+Se probaron distintas optimizaciones:
+
+eliminación temporal del measuring de dnd-kit;
+optimización del render de imágenes;
+incorporación de miniaturas (produccionImagenPortadaThumb);
+migración automática mediante Cloud Function;
+revisión de Firebase Storage;
+análisis del rendimiento del navegador.
+
+Ninguna de estas pruebas eliminó completamente el problema.
+
+Causa real encontrada
+
+Finalmente se detectó que un pedido contenía dos imágenes de aproximadamente 23 MB cada una.
+
+Mientras que normalmente las imágenes del sistema pesan entre:
+
+20 KB
+50 KB
+200 KB
+
+estas imágenes eran cientos de veces más pesadas.
+
+El navegador debía:
+
+descargar la imagen;
+decodificarla;
+crear el bitmap;
+renderizarla;
+escalarla;
+volver a calcular el layout.
+
+Eso provocaba el congelamiento del hilo principal (Main Thread).
+
+Incluso Firebase Console se ralentizaba al intentar visualizar dichas imágenes.
+
+Solución aplicada
+
+Se eliminaron únicamente esas imágenes pesadas desde Firebase Storage.
+
+Inmediatamente:
+
+Producción volvió a funcionar normalmente.
+El detalle del pedido dejó de congelarse.
+Desapareció el retraso del navegador.
+
+Quedó confirmado que el origen era exclusivamente el tamaño excesivo de las imágenes.
+
+Mejora implementada
+
+Se incorporó el sistema de miniaturas para las portadas de Producción.
+
+Nuevo comportamiento:
+
+la tarjeta intenta utilizar produccionImagenPortadaThumb;
+si existe, muestra la miniatura;
+si no existe, utiliza la imagen original.
+
+Además se desarrolló una Cloud Function que permite generar miniaturas para pedidos antiguos cuando sea necesario.
+
+No es necesario ejecutar una migración masiva para todos los clientes.
+
+Solo deberá utilizarse en casos puntuales de clientes antiguos.
+
+Medidas preventivas
+
+A partir de ahora el sistema deberá incorporar validaciones de tamaño máximo para todas las imágenes subidas.
+
+Propuesta:
+
+Portadas de Producción → máximo 2 MB.
+Imágenes de productos/pedidos → máximo 5 MB.
+Plantillas o imágenes de configuración → máximo 3 MB.
+Archivos adjuntos (PDF, Excel, etc.) → límite independiente (por ejemplo 10 MB).
+
+
+
 ### action menu fuera de lugar
 
 .sucursales-page .container-secundaria:hover {
