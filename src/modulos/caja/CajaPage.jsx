@@ -273,10 +273,17 @@ obtenerUltimaCajaAnteriorConSaldo({
   };
 }, [perfil?.clienteId, fechaCaja, sucursalSeleccionadaId]);
 
+const movimientoEstaAnulado = (m) => {
+  return (
+    m?.estadoMovimiento === "anulado" ||
+    m?.estado === "anulado" ||
+    m?.activo === false ||
+    m?.anulado === true
+  );
+};
+
   const resumen = useMemo(() => {
-    const activos = movimientos.filter(
-      (m) => (m.estadoMovimiento || "activo") === "activo"
-    );
+const activos = movimientos.filter((m) => !movimientoEstaAnulado(m));
 
     const totalPorMedio = {
       efectivo: 0,
@@ -1326,6 +1333,12 @@ function MovimientoTabla({ movimientos, configMoneda, onVerVenta }) {
             const monto = Number(m.monto || 0);
             const esControl = m.tipo === "control";
 
+            const anulado =
+              m?.estadoMovimiento === "anulado" ||
+              m?.estado === "anulado" ||
+              m?.activo === false ||
+              m?.anulado === true;
+
             return (
               <tr
                 key={m.firebaseId}
@@ -1335,11 +1348,15 @@ function MovimientoTabla({ movimientos, configMoneda, onVerVenta }) {
                   }
                 }}
                 style={{
-                  background: esControl
+                  background: anulado
+                    ? "#f1f5f9"
+                    : esControl
                     ? "rgba(0,150,209,0.06)"
                     : esIngreso
                     ? "rgba(25,135,84,0.05)"
                     : "rgba(220,53,69,0.05)",
+                  color: anulado ? "#64748b" : undefined,
+                  opacity: anulado ? 0.65 : 1,
                   cursor: m.origen === "venta" ? "pointer" : "default",
                 }}
               >
@@ -1348,6 +1365,11 @@ function MovimientoTabla({ movimientos, configMoneda, onVerVenta }) {
                 <td>
                   <div style={{ fontWeight: 700 }}>
                     {m.descripcion || m.subtipo || "-"}
+                     {anulado && (
+                    <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 900, color: "#64748b" }}>
+                      ANULADO
+                    </span>
+                  )}
                   </div>
 
                   {m.tipo === "control" && (

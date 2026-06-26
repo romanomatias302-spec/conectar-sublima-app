@@ -8,6 +8,7 @@ import {
 } from "../../firebase/proveedores";
 import ActionMenu from "../../comunes/componentes/ActionMenu";
 import "./ProveedoresPage.css";
+import { puedeHacer } from "../../utils/permisos";
 
 
 const RUBROS_BASE = [
@@ -22,6 +23,11 @@ const RUBROS_BASE = [
 ];
 
 export default function ProveedoresPage({ perfil }) {
+
+const puedeCrearProveedores = puedeHacer(perfil, "proveedores", "crear");
+const puedeEditarProveedores = puedeHacer(perfil, "proveedores", "editar");
+const puedeAnularProveedores = puedeHacer(perfil, "proveedores", "anular");
+     
   const [proveedores, setProveedores] = useState([]);
   
   const [busqueda, setBusqueda] = useState("");
@@ -110,12 +116,15 @@ const rubrosDisponibles = useMemo(() => {
     setNuevoRubro("");
   };
 
-  const abrirNuevo = () => {
-    limpiarForm();
-    setModalAbierto(true);
-  };
+const abrirNuevo = () => {
+  if (!puedeCrearProveedores) return;
+
+  limpiarForm();
+  setModalAbierto(true);
+};
 
   const abrirEditar = (proveedor) => {
+  if (!puedeEditarProveedores) return;
     setProveedorEditando(proveedor);
 
     setForm({
@@ -252,9 +261,11 @@ const eliminarRubro = (rubro) => {
           ))}
         </select>
 
-        <button className="btn-nuevo" onClick={abrirNuevo}>
-          + Nuevo proveedor
-        </button>
+            {puedeCrearProveedores && (
+            <button className="btn-nuevo" onClick={abrirNuevo}>
+                + Nuevo proveedor
+            </button>
+            )}
       </div>
 
       <table className="tabla-config">
@@ -275,7 +286,9 @@ const eliminarRubro = (rubro) => {
                 key={p.firebaseId}
                 className={p.activo === false ? "fila-inactiva" : ""}
                 className="fila-clickable"
-                onClick={() => abrirEditar(p)}
+                onClick={() => {
+                if (puedeEditarProveedores) abrirEditar(p);
+                }}
             >
               <td>{p.nombre}</td>
               <td>{p.cuit || "-"}</td>
@@ -297,18 +310,25 @@ const eliminarRubro = (rubro) => {
                 style={{ textAlign: "right" }}
                 onClick={(e) => e.stopPropagation()}
                 >
+                {(puedeEditarProveedores || puedeAnularProveedores) && (
                 <ActionMenu
-                onEditar={() => abrirEditar(p)}
-                onCambiarEstado={() =>
-                    cambiarEstadoProveedor({
-                    perfil,
-                    proveedor: p,
-                    })
-                }
-                labelCambiarEstado={
+                    onEditar={
+                    puedeEditarProveedores ? () => abrirEditar(p) : undefined
+                    }
+                    onCambiarEstado={
+                    puedeAnularProveedores
+                        ? () =>
+                            cambiarEstadoProveedor({
+                            perfil,
+                            proveedor: p,
+                            })
+                        : undefined
+                    }
+                    labelCambiarEstado={
                     p.activo === false ? "Reactivar" : "Desactivar"
-                }
+                    }
                 />
+                )}
               </td>
             </tr>
           ))}
@@ -662,15 +682,22 @@ const eliminarRubro = (rubro) => {
                 }))
               }
             />
-
             <div className="modal-buttons">
-              <button onClick={() => setModalAbierto(false)}>
+            <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setModalAbierto(false)}
+            >
                 Cancelar
-              </button>
+            </button>
 
-              <button onClick={guardarProveedor}>
+            <button
+                type="button"
+                className="btn btn-primary"
+                onClick={guardarProveedor}
+            >
                 Guardar
-              </button>
+            </button>
             </div>
           </div>
         </div>

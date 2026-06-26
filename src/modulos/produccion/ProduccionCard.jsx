@@ -285,22 +285,16 @@ const usuarioVisible =
         onClick={() => onEditarDetalleManual(pedido)}
       >
 
-          {pedido.produccionImagenPortada && (
-            <div className="produccion-card-cover">
-              {pedido.produccionImagenPortadaThumb ? (
-                <img
-                  src={pedido.produccionImagenPortadaThumb}
-                  alt=""
-                  loading="lazy"
-                  decoding="async"
-                />
-              ) : (
-                <div className="produccion-card-cover-placeholder">
-                  Optimizando imagen
-                </div>
-              )}
-            </div>
-          )}
+      {pedido.produccionImagenPortada && (
+        <div className="produccion-card-cover">
+          <img
+            src={pedido.produccionImagenPortadaThumb || pedido.produccionImagenPortada}
+            alt=""
+            loading="lazy"
+            decoding="async"
+          />
+        </div>
+      )}
           
         <div className="produccion-card-top-row">
           {ordenManualActivo && indiceOrdenManual && (

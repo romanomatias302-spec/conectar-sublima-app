@@ -286,25 +286,43 @@ useEffect(() => {
     }));
     };
 
-    const agregarComprobantes = (archivos) => {
-        const lista = Array.from(archivos || []);
+const agregarComprobantes = (archivos) => {
+  const lista = Array.from(archivos || []);
 
-        if (!lista.length) return;
+  if (!lista.length) return;
 
-        const nuevos = lista.map((archivo) => ({
-            id: crypto.randomUUID(),
-            nombre: archivo.name,
-            tipo: archivo.type,
-            size: archivo.size,
-            archivo,
-            urlTemporal: URL.createObjectURL(archivo),
-        }));
+  const LIMITE = 2 * 1024 * 1024; // 2 MB
 
-        setForm((prev) => ({
-            ...prev,
-            comprobantes: [...(prev.comprobantes || []), ...nuevos],
-        }));
-        };
+  const archivosValidos = [];
+
+  for (const archivo of lista) {
+    if (archivo.size > LIMITE) {
+      alert(
+        `"${archivo.name}" supera el tamaño máximo permitido de 2 MB.`
+      );
+      continue;
+    }
+
+    archivosValidos.push({
+      id: crypto.randomUUID(),
+      nombre: archivo.name,
+      tipo: archivo.type,
+      size: archivo.size,
+      archivo,
+      urlTemporal: URL.createObjectURL(archivo),
+    });
+  }
+
+  if (!archivosValidos.length) return;
+
+  setForm((prev) => ({
+    ...prev,
+    comprobantes: [
+      ...(prev.comprobantes || []),
+      ...archivosValidos,
+    ],
+  }));
+};
 
         const eliminarComprobante = (comprobanteId) => {
         setForm((prev) => ({

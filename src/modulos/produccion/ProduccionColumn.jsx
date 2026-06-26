@@ -50,6 +50,20 @@ export default function ProduccionColumn({
   const ordenManualActivo =
     columna.ordenManualActivo === true || columna.tipoOrden === "manual";
 
+    const LIMITE_FINALIZADOS_VISIBLES = 40;
+
+const esColumnaFinal = columna.esFinal === true;
+
+const pedidosVisibles =
+  esColumnaFinal && !estaContraida
+    ? pedidos.slice(0, LIMITE_FINALIZADOS_VISIBLES)
+    : pedidos;
+
+const cantidadOculta =
+  esColumnaFinal && pedidos.length > LIMITE_FINALIZADOS_VISIBLES
+    ? pedidos.length - LIMITE_FINALIZADOS_VISIBLES
+    : 0;
+
 useEffect(() => {
   function cerrarMenuColumna(e) {
     if (!menuColumnaRef.current) return;
@@ -270,7 +284,7 @@ useEffect(() => {
 
       <div className="produccion-column-body">
         {!estaContraida &&
-          pedidos.map((pedido, index) => (
+          pedidosVisibles.map((pedido, index) => (
         <ProduccionCard
           key={pedido.firebaseId || pedido.id}
           pedido={pedido}
@@ -292,6 +306,11 @@ useEffect(() => {
           }
         />
           ))}
+          {!estaContraida && cantidadOculta > 0 && (
+            <div className="produccion-column-limite-info">
+              Mostrando últimos {LIMITE_FINALIZADOS_VISIBLES}. Hay {cantidadOculta} finalizados más.
+            </div>
+          )}
       </div>
     </div>
   );

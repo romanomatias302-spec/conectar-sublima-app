@@ -11,6 +11,7 @@ import {
   updateDoc,
   where,
   onSnapshot,
+  writeBatch,
   runTransaction,
   increment,
 } from "firebase/firestore";
@@ -100,20 +101,25 @@ export async function crearGasto({ perfil, gasto }) {
 
   const refDoc = await addDoc(collection(db, GASTOS_COLLECTION), data);
 
-  await addDoc(collection(db, "movimientos"), {
-    clienteId: perfil.clienteId,
-    tipo: "egreso",
-    subtipo: "gasto",
-    origen: "gasto",
-    origenRefId: refDoc.id,
-    descripcion: `Gasto #${numeroGasto} - ${gasto.categoria || ""} - ${gasto.descripcion || ""}`,
-    monto: Number(gasto.total || gasto.monto || 0),
-    medioPago: gasto.pagos?.[0]?.medioPago || "",
-    fecha: gasto.fecha,
-    estadoMovimiento: "activo",
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  });
+ await addDoc(collection(db, "movimientos"), {
+  clienteId: perfil.clienteId,
+  tipo: "egreso",
+  subtipo: "gasto",
+  origen: "gasto",
+  origenRefId: refDoc.id,
+  descripcion: `Gasto #${numeroGasto} - ${gasto.categoria || ""} - ${gasto.descripcion || ""}`,
+  monto: Number(gasto.total || gasto.monto || 0),
+  medioPago: gasto.pagos?.[0]?.medioPago || "",
+  fecha: gasto.fecha,
+
+  impactaCaja: false,
+  impactaResultado: true,
+  estadoMovimiento: "activo",
+  activo: true,
+
+  createdAt: serverTimestamp(),
+  updatedAt: serverTimestamp(),
+});
 
   return {
     firebaseId: refDoc.id,
@@ -142,14 +148,40 @@ export async function anularGasto({ perfil, gastoId, motivo = "" }) {
   if (!perfil?.clienteId) throw new Error("No se encontró clienteId.");
   if (!gastoId) throw new Error("Falta gastoId.");
 
-  await updateDoc(doc(db, GASTOS_COLLECTION, gastoId), {
+const batch = writeBatch(db);
+
+batch.update(doc(db, GASTOS_COLLECTION, gastoId), {
+  activo: false,
+  estado: "anulado",
+  motivoAnulacion: motivo,
+  anuladoAt: serverTimestamp(),
+  anuladoPor: perfil.uid || perfil.firebaseUid || "",
+  anuladoPorNombre: perfil.nombre || perfil.email || "",
+  updatedAt: serverTimestamp(),
+});
+
+const movSnap = await getDocs(
+  query(
+    collection(db, "movimientos"),
+    where("clienteId", "==", perfil.clienteId),
+    where("origen", "==", "gasto"),
+    where("origenRefId", "==", gastoId)
+  )
+);
+
+movSnap.docs.forEach((movDoc) => {
+  batch.update(doc(db, "movimientos", movDoc.id), {
+    estadoMovimiento: "anulado",
     activo: false,
-    estado: "anulado",
-    motivoAnulacion: motivo,
     anuladoAt: serverTimestamp(),
     anuladoPor: perfil.uid || perfil.firebaseUid || "",
+    anuladoPorNombre: perfil.nombre || perfil.email || "",
+    motivoAnulacion: motivo || "",
     updatedAt: serverTimestamp(),
   });
+});
+
+await batch.commit();
 }
 
 export async function duplicarGasto({ perfil, gasto }) {

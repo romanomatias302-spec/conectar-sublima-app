@@ -336,3 +336,29 @@
   letter-spacing: 0.3px;
   text-transform: uppercase;
 }
+
+.modal-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.modal-buttons .btn-primary {
+  background: #0096d1;
+  color: #fff;
+  border: 1px solid #0096d1;
+}
+
+.modal-buttons .btn-primary:hover {
+  background: #007fb0;
+}
+
+.modal-buttons .btn-secondary {
+  background: #f3f4f6;
+  color: #374151;
+  border: 1px solid #d1d5db;
+}
+
+.modal-buttons .btn-secondary:hover {
+  background: #e5e7eb;
+}

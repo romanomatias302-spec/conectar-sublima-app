@@ -224,13 +224,15 @@ export async function obtenerUltimaCajaAnteriorConSaldo({
 
   const snapMovimientos = await getDocs(qMovimientos);
 
-  const activos = snapMovimientos.docs
-    .map((d) => d.data())
-    .filter(
-      (m) =>
-        (m.estadoMovimiento || "activo") === "activo" &&
-        movimientoPerteneceASucursal(m, sucursalId)
-    );
+const activos = snapMovimientos.docs
+  .map((d) => d.data())
+  .filter(
+    (m) =>
+      (m.estadoMovimiento || "activo") === "activo" &&
+      m.activo !== false &&
+      m.impactaCaja !== false &&
+      movimientoPerteneceASucursal(m, sucursalId)
+  );
 
   const ingresosEfectivo = activos
     .filter((m) => m.tipo === "ingreso" && m.medioPago === "efectivo")
@@ -506,9 +508,12 @@ export async function crearCambioTurnoCaja({
     },
   });
 
-  const activos = movimientos.filter(
-    (m) => (m.estadoMovimiento || "activo") === "activo"
-  );
+ const activos = movimientos.filter(
+  (m) =>
+    (m.estadoMovimiento || "activo") === "activo" &&
+    m.activo !== false &&
+    m.impactaCaja !== false
+);
 
   const ingresosEfectivo = activos
     .filter((m) => m.tipo === "ingreso" && m.medioPago === "efectivo")
@@ -578,9 +583,12 @@ const movimientos = await obtenerMovimientosCajaDia({
   },
 });
 
-  const activos = movimientos.filter(
-    (m) => (m.estadoMovimiento || "activo") === "activo"
-  );
+const activos = movimientos.filter(
+  (m) =>
+    (m.estadoMovimiento || "activo") === "activo" &&
+    m.activo !== false &&
+    m.impactaCaja !== false
+);
 
   const ingresosEfectivo = activos
     .filter((m) => m.tipo === "ingreso" && m.medioPago === "efectivo")
@@ -644,9 +652,12 @@ const movimientos = await obtenerMovimientosCajaDia({
   },
 });
 
-  const activos = movimientos.filter(
-    (m) => (m.estadoMovimiento || "activo") === "activo"
-  );
+const activos = movimientos.filter(
+  (m) =>
+    (m.estadoMovimiento || "activo") === "activo" &&
+    m.activo !== false &&
+    m.impactaCaja !== false
+);
 
   if (activos.length > 0) {
     throw new Error(

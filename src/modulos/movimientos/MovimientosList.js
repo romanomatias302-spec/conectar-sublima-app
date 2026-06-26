@@ -1,8 +1,14 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { obtenerMovimientosPaginados } from "../../firebase/movimientos";
+import { obtenerDetalleMovimientoAuditoria } from "../../firebase/auditoriaMovimientos";
 import { obtenerHistorialProduccionGlobal } from "../../firebase/informesProduccion";
 import { obtenerEstadoActualProduccion } from "../../firebase/informesProduccion";
+import {
+  obtenerSaldosPendientesClientes,
+  obtenerSaldosPendientesProveedores,
+} from "../../firebase/informesFinancieros";
 import * as XLSX from "xlsx";
+
 
 function formatearMoneda(valor) {
   const numero = Number(valor) || 0;
@@ -81,9 +87,20 @@ const hoyDefault = rangoHoy();
 const [rangoFinanzasActivo, setRangoFinanzasActivo] = useState("hoy");
 const [fechaDesdeFinanzas, setFechaDesdeFinanzas] = useState(hoyDefault.desde);
 const [fechaHastaFinanzas, setFechaHastaFinanzas] = useState(hoyDefault.hasta);
+
 const [tipoMovimientoFiltro, setTipoMovimientoFiltro] = useState("");
+const [vistaFinanzas, setVistaFinanzas] = useState("movimientos");
+const [saldosClientes, setSaldosClientes] = useState([]);
+const [saldosProveedores, setSaldosProveedores] = useState([]);
+const [loadingSaldos, setLoadingSaldos] = useState(false);
+
+const [saldoAbiertoId, setSaldoAbiertoId] = useState(null);
+
 const [exportandoExcel, setExportandoExcel] = useState(false);
 const [mensajeExportacion, setMensajeExportacion] = useState("");
+const [modalAuditoria, setModalAuditoria] = useState(null);
+const [loadingAuditoria, setLoadingAuditoria] = useState(false);
+
 const [esMobile, setEsMobile] = useState(window.innerWidth <= 768);
 
 useEffect(() => {
@@ -161,6 +178,48 @@ const cargarMas = async () => {
   } catch (error) {
     console.error("Error al cargar más movimientos:", error);
   }
+};
+
+const cargarSaldosPendientes = async () => {
+  try {
+    setLoadingSaldos(true);
+
+    const [clientes, proveedores] = await Promise.all([
+      obtenerSaldosPendientesClientes({ perfil }),
+      obtenerSaldosPendientesProveedores({ perfil }),
+    ]);
+
+    setSaldosClientes(clientes);
+    setSaldosProveedores(proveedores);
+  } catch (error) {
+    console.error("Error cargando saldos pendientes:", error);
+  } finally {
+    setLoadingSaldos(false);
+  }
+};
+
+const abrirAuditoriaMovimiento = async (movimiento) => {
+  try {
+    setLoadingAuditoria(true);
+
+    const detalle = await obtenerDetalleMovimientoAuditoria(movimiento);
+
+    setModalAuditoria(detalle);
+  } catch (error) {
+    console.error("Error abriendo auditoría:", error);
+    alert("No se pudo abrir el comprobante del movimiento.");
+  } finally {
+    setLoadingAuditoria(false);
+  }
+};
+
+const movimientoEstaAnulado = (m) => {
+  return (
+    m?.estadoMovimiento === "anulado" ||
+    m?.estado === "anulado" ||
+    m?.activo === false ||
+    m?.anulado === true
+  );
 };
 
 const aplicarRangoRapidoFinanzas = (rango) => {
@@ -258,9 +317,21 @@ useEffect(() => {
   cargarMovimientos();
 }, [perfil, fechaDesdeFinanzas, fechaHastaFinanzas, tipoMovimientoFiltro]);
 
+useEffect(() => {
+  if (
+    vistaActiva === "finanzas" &&
+    (vistaFinanzas === "clientesPendientes" ||
+      vistaFinanzas === "proveedoresPendientes")
+  ) {
+    cargarSaldosPendientes();
+  }
+}, [vistaActiva, vistaFinanzas, perfil]);
+
   const resumen = useMemo(() => {
-    const ingresos = movimientos.filter((m) => m.tipo === "ingreso");
-    const egresos = movimientos.filter((m) => m.tipo === "egreso");
+    const movimientosActivos = movimientos.filter((m) => !movimientoEstaAnulado(m));
+
+    const ingresos = movimientosActivos.filter((m) => m.tipo === "ingreso");
+    const egresos = movimientosActivos.filter((m) => m.tipo === "egreso");
 
     const totalIngresos = ingresos.reduce((acc, m) => acc + (Number(m.monto) || 0), 0);
     const totalEgresos = egresos.reduce((acc, m) => acc + (Number(m.monto) || 0), 0);
@@ -416,24 +487,61 @@ useEffect(() => {
 
 {vistaActiva === "finanzas" && (
   <>
-    <div>
-      <label style={{ fontSize: 13, fontWeight: 700 }}>Tipo</label>
-      <select
-        value={tipoMovimientoFiltro}
-        onChange={(e) => setTipoMovimientoFiltro(e.target.value)}
-        style={{
-          display: "block",
-          padding: "9px 10px",
-          marginTop: 4,
-          minWidth: 140,
-          height: 38,
-        }}
-      >
-        <option value="">Todos</option>
-        <option value="ingreso">Ingresos</option>
-        <option value="egreso">Egresos</option>
-      </select>
-    </div>
+    <div
+    style={{
+      padding: "8px 10px",
+      border: "1px solid #0096d1",
+      borderRadius: 12,
+      background: "#eaf7ff",
+    }}
+  >
+    <label style={{ fontSize: 13, fontWeight: 800, color: "#0096d1" }}>
+      Mostrar
+    </label>
+
+    <select
+      value={vistaFinanzas}
+      onChange={(e) => {
+        const valor = e.target.value;
+        setVistaFinanzas(valor);
+
+        if (valor === "ingresos") {
+          setTipoMovimientoFiltro("ingreso");
+        } else if (valor === "egresos") {
+          setTipoMovimientoFiltro("egreso");
+        } else {
+          setTipoMovimientoFiltro("");
+        }
+
+        if (
+          valor === "clientesPendientes" ||
+          valor === "proveedoresPendientes"
+        ) {
+          setRangoFinanzasActivo("todos");
+          setFechaDesdeFinanzas("");
+          setFechaHastaFinanzas("");
+          setSaldoAbiertoId(null);
+        }
+      }}
+      style={{
+        display: "block",
+        padding: "9px 10px",
+        marginTop: 4,
+        minWidth: 230,
+        height: 38,
+        border: "1px solid #0096d1",
+        borderRadius: 10,
+        background: "#fff",
+        fontWeight: 700,
+      }}
+    >
+      <option value="movimientos">Movimientos</option>
+      <option value="ingresos">Ingresos</option>
+      <option value="egresos">Egresos</option>
+      <option value="clientesPendientes">Clientes con saldo pendiente</option>
+      <option value="proveedoresPendientes">Proveedores con saldo pendiente</option>
+    </select>
+  </div>
 
       <button
         onClick={exportarMovimientosCSV}
@@ -487,26 +595,62 @@ useEffect(() => {
             <div style={{ fontSize: 24, fontWeight: 800 }}>{formatearMoneda(resumen.resultado)}</div>
           </div>
 
-          <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 16 }}>
-            <div style={{ fontSize: 13, color: "#666", marginBottom: 6 }}>Movimientos cargados</div>
-            <div style={{ fontSize: 24, fontWeight: 800 }}>{resumen.cantidadMovimientos}</div>
-          </div>
+        
         </div>
       )}
 
       {!loading && vistaActiva === "finanzas" && (
         <>
-          {(() => {
-            const ingresos = movimientos
-              .filter((m) => (m.tipo || "").toLowerCase() === "ingreso")
-              .reduce((acc, m) => acc + (Number(m.monto) || 0), 0);
+        {(() => {
+          const movimientosActivos = movimientos.filter((m) => !movimientoEstaAnulado(m));
 
-            const egresos = movimientos
-              .filter((m) => (m.tipo || "").toLowerCase() === "egreso")
-              .reduce((acc, m) => acc + (Number(m.monto) || 0), 0);
+          const ingresos = movimientosActivos
+            .filter((m) => (m.tipo || "").toLowerCase() === "ingreso")
+            .reduce((acc, m) => acc + (Number(m.monto) || 0), 0);
 
-            const resultado = ingresos - egresos;
+          const egresos = movimientosActivos
+            .filter((m) => (m.tipo || "").toLowerCase() === "egreso")
+            .reduce((acc, m) => acc + (Number(m.monto) || 0), 0);
 
+          const resultado = ingresos - egresos;
+
+          const totalClientesPendiente = saldosClientes.reduce(
+            (acc, c) => acc + Number(c.totalPendiente || 0),
+            0
+          );
+
+          const totalProveedoresPendiente = saldosProveedores.reduce(
+            (acc, p) => acc + Number(p.totalPendiente || 0),
+            0
+          );
+
+          const mayorCliente = [...saldosClientes].sort(
+            (a, b) => Number(b.totalPendiente || 0) - Number(a.totalPendiente || 0)
+          )[0];
+
+          const mayorProveedor = [...saldosProveedores].sort(
+            (a, b) => Number(b.totalPendiente || 0) - Number(a.totalPendiente || 0)
+          )[0];
+
+          const cardStyle = {
+            background: "#fff",
+            border: "1px solid #e5e7eb",
+            borderRadius: 12,
+            padding: 16,
+          };
+
+          const labelStyle = {
+            fontSize: 13,
+            color: "#666",
+            marginBottom: 6,
+          };
+
+          const valueStyle = {
+            fontSize: 24,
+            fontWeight: 800,
+          };
+
+          if (vistaFinanzas === "clientesPendientes") {
             return (
               <div
                 style={{
@@ -516,28 +660,263 @@ useEffect(() => {
                   marginBottom: 18,
                 }}
               >
-                <div style={{ background:"#fff", border:"1px solid #e5e7eb", borderRadius:12, padding:16 }}>
-                  <div style={{ fontSize:13, color:"#666", marginBottom:6 }}>Ingresos del período</div>
-                  <div style={{ fontSize:24, fontWeight:800 }}>{formatearMoneda(ingresos)}</div>
+                <div style={cardStyle}>
+                  <div style={labelStyle}>Clientes con saldo</div>
+                  <div style={valueStyle}>{saldosClientes.length}</div>
                 </div>
 
-                <div style={{ background:"#fff", border:"1px solid #e5e7eb", borderRadius:12, padding:16 }}>
-                  <div style={{ fontSize:13, color:"#666", marginBottom:6 }}>Egresos del período</div>
-                  <div style={{ fontSize:24, fontWeight:800 }}>{formatearMoneda(egresos)}</div>
+                <div style={cardStyle}>
+                  <div style={labelStyle}>Total pendiente de cobro</div>
+                  <div style={valueStyle}>{formatearMoneda(totalClientesPendiente)}</div>
                 </div>
 
-                <div style={{ background:"#fff", border:"1px solid #e5e7eb", borderRadius:12, padding:16 }}>
-                  <div style={{ fontSize:13, color:"#666", marginBottom:6 }}>Resultado neto</div>
-                  <div style={{ fontSize:24, fontWeight:800 }}>{formatearMoneda(resultado)}</div>
-                </div>
-
-                <div style={{ background:"#fff", border:"1px solid #e5e7eb", borderRadius:12, padding:16 }}>
-                  <div style={{ fontSize:13, color:"#666", marginBottom:6 }}>Cantidad movimientos</div>
-                  <div style={{ fontSize:24, fontWeight:800 }}>{movimientos.length}</div>
+                <div style={cardStyle}>
+                  <div style={labelStyle}>Mayor saldo cliente</div>
+                  <div style={{ fontSize: 18, fontWeight: 800 }}>
+                    {mayorCliente?.clienteNombre || "-"}
+                  </div>
+                  <div style={{ fontSize: 13, color: "#666" }}>
+                    {mayorCliente ? formatearMoneda(mayorCliente.totalPendiente) : ""}
+                  </div>
                 </div>
               </div>
             );
-          })()}
+          }
+
+          if (vistaFinanzas === "proveedoresPendientes") {
+            return (
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                  gap: 14,
+                  marginBottom: 18,
+                }}
+              >
+                <div style={cardStyle}>
+                  <div style={labelStyle}>Proveedores con saldo</div>
+                  <div style={valueStyle}>{saldosProveedores.length}</div>
+                </div>
+
+                <div style={cardStyle}>
+                  <div style={labelStyle}>Total a pagar</div>
+                  <div style={valueStyle}>{formatearMoneda(totalProveedoresPendiente)}</div>
+                </div>
+
+                <div style={cardStyle}>
+                  <div style={labelStyle}>Mayor saldo proveedor</div>
+                  <div style={{ fontSize: 18, fontWeight: 800 }}>
+                    {mayorProveedor?.proveedorNombre || "-"}
+                  </div>
+                  <div style={{ fontSize: 13, color: "#666" }}>
+                    {mayorProveedor ? formatearMoneda(mayorProveedor.totalPendiente) : ""}
+                  </div>
+                </div>
+              </div>
+            );
+          }
+
+          return (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                gap: 14,
+                marginBottom: 18,
+              }}
+            >
+              <div style={cardStyle}>
+                <div style={labelStyle}>Ingresos del período</div>
+                <div style={valueStyle}>{formatearMoneda(ingresos)}</div>
+              </div>
+
+              <div style={cardStyle}>
+                <div style={labelStyle}>Egresos del período</div>
+                <div style={valueStyle}>{formatearMoneda(egresos)}</div>
+              </div>
+
+              <div style={cardStyle}>
+                <div style={labelStyle}>Resultado neto</div>
+                <div style={valueStyle}>{formatearMoneda(resultado)}</div>
+              </div>
+            </div>
+          );
+        })()}
+      {vistaFinanzas === "clientesPendientes" && (
+        <div style={{ marginBottom: 18 }}>
+          {loadingSaldos ? (
+            <p>Cargando saldos...</p>
+          ) : (
+            <table style={{ minWidth: 820 }}>
+              <thead>
+                <tr>
+                  <th></th>
+                  <th>Cliente</th>
+                  <th>Ventas pendientes</th>
+                  <th>Total pendiente</th>
+                  <th>Última venta</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {saldosClientes.map((c) => {
+                  const abierto = saldoAbiertoId === (c.clienteId || c.clienteNombre);
+
+                  return (
+                    <React.Fragment key={c.clienteId || c.clienteNombre}>
+                      <tr>
+                        <td>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setSaldoAbiertoId(abierto ? null : c.clienteId || c.clienteNombre)
+                            }
+                          >
+                            {abierto ? "⌃" : "⌄"}
+                          </button>
+                        </td>
+                        <td>{c.clienteNombre}</td>
+                        <td>{c.cantidad}</td>
+                        <td>{formatearMoneda(c.totalPendiente)}</td>
+                        <td>{c.ultimaVenta ? `#${c.ultimaVenta}` : "-"}</td>
+                      </tr>
+
+                      {abierto && (
+                        <tr>
+                          <td colSpan="5">
+                            <div style={{ padding: 12, background: "#f8fafc", borderRadius: 12 }}>
+                              {(c.ventas || []).map((v) => (
+                                <div
+                                  key={v.firebaseId}
+                                  onClick={() =>
+                                    abrirAuditoriaMovimiento({
+                                      origen: "venta",
+                                      origenRefId: v.firebaseId,
+                                      tipo: "ingreso",
+                                      subtipo: "venta",
+                                      fecha: v.fechaVenta,
+                                      descripcion: `Venta #${v.numeroVenta}`,
+                                      monto: v.saldoPendiente,
+                                    })
+                                  }
+                                  style={{
+                                    display: "grid",
+                                    gridTemplateColumns: "1fr 1fr 1fr 1fr",
+                                    gap: 10,
+                                    padding: "10px 0",
+                                    borderBottom: "1px solid #e5e7eb",
+                                    cursor: "pointer",
+                                  }}
+                                >
+                                  <span>Venta #{v.numeroVenta || "-"}</span>
+                                  <span>{v.fechaVenta || "-"}</span>
+                                  <span>Total {formatearMoneda(v.total)}</span>
+                                  <strong>Saldo pendiente {formatearMoneda(v.saldoPendiente)}</strong>
+                                </div>
+                              ))}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+
+        {vistaFinanzas === "proveedoresPendientes" && (
+          <div style={{ marginBottom: 18 }}>
+            {loadingSaldos ? (
+              <p>Cargando saldos...</p>
+            ) : (
+              <table style={{ minWidth: 820 }}>
+                <thead>
+                  <tr>
+                    <th></th>
+                    <th>Proveedor</th>
+                    <th>Gastos pendientes</th>
+                    <th>Total a pagar</th>
+                    <th>Último gasto</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {saldosProveedores.map((p) => {
+                    const abierto = saldoAbiertoId === (p.proveedorId || p.proveedorNombre);
+
+                    return (
+                      <React.Fragment key={p.proveedorId || p.proveedorNombre}>
+                        <tr>
+                          <td>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setSaldoAbiertoId(
+                                  abierto ? null : p.proveedorId || p.proveedorNombre
+                                )
+                              }
+                            >
+                              {abierto ? "⌃" : "⌄"}
+                            </button>
+                          </td>
+
+                          <td>{p.proveedorNombre}</td>
+                          <td>{p.cantidad}</td>
+                          <td>{formatearMoneda(p.totalPendiente)}</td>
+                          <td>{p.ultimoGasto ? `#${p.ultimoGasto}` : "-"}</td>
+                        </tr>
+
+                        {abierto && (
+                          <tr>
+                            <td colSpan="5">
+                              <div style={{ padding: 12, background: "#f8fafc", borderRadius: 12 }}>
+                                {(p.gastos || []).map((g) => (
+                                  <div
+                                    key={g.firebaseId}
+                                    onClick={() =>
+                                      abrirAuditoriaMovimiento({
+                                        origen: "gasto",
+                                        origenRefId: g.firebaseId,
+                                        tipo: "egreso",
+                                        subtipo: "gasto",
+                                        fecha: g.fecha,
+                                        descripcion: `Gasto #${g.numeroGasto || "-"}`,
+                                        monto: g.saldo,
+                                        estadoMovimiento: "activo",
+                                      })
+                                    }
+                                    style={{
+                                      display: "grid",
+                                      gridTemplateColumns: "1fr 1fr 1fr 1fr",
+                                      gap: 10,
+                                      padding: "10px 0",
+                                      borderBottom: "1px solid #e5e7eb",
+                                      cursor: "pointer",
+                                    }}
+                                  >
+                                    <span>Gasto #{g.numeroGasto || "-"}</span>
+                                    <span>{g.fecha || "-"}</span>
+                                    <span>Total {formatearMoneda(g.total)}</span>
+                                    <strong>Saldo a pagar {formatearMoneda(g.saldo)}</strong>
+                                  </div>
+                                ))}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+        )}
+        
+          {!["clientesPendientes", "proveedoresPendientes"].includes(vistaFinanzas) && (
           <div style={{ width: "100%", overflowX: "auto" }}>
           <table style={{ minWidth: 720 }}>
             <thead>
@@ -548,27 +927,55 @@ useEffect(() => {
                 <th>Descripción</th>
                 <th>Medio de pago</th>
                 <th>Monto</th>
+                <th>Estado</th>
               </tr>
             </thead>
             <tbody>
               {movimientos.map((m) => (
-                <tr key={m.firebaseId}>
+                <tr
+                  key={m.firebaseId}
+                  onClick={() => abrirAuditoriaMovimiento(m)}
+                 style={{
+                    cursor: "pointer",
+                    opacity: movimientoEstaAnulado(m) ? 0.62 : 1,
+                    background: movimientoEstaAnulado(m) ? "#f1f5f9" : undefined,
+                    color: movimientoEstaAnulado(m) ? "#64748b" : undefined,
+                  }}
+                >
                   <td>{m.fecha}</td>
                   <td>{m.tipo}</td>
                   <td>{m.subtipo}</td>
-                  <td>{m.descripcion}</td>
+                  <td>
+                    {m.descripcion}
+
+                    {movimientoEstaAnulado(m) && (
+                      <span className="badge-anulado" style={{ marginLeft: 8 }}>
+                        ANULADO
+                      </span>
+                    )}
+                  </td>
                   <td>{m.medioPago}</td>
                   <td>{formatearMoneda(m.monto)}</td>
+                  <td>
+                    {movimientoEstaAnulado(m) ? (
+                      <span className="badge-anulado">ANULADO</span>
+                    ) : (
+                      "Activo"
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
           </div>
-
-          {!loading && hayMas && (
-            <div style={{ textAlign: "center", marginTop: 20 }}>
-              <button onClick={cargarMas}>Cargar más</button>
-            </div>
+          )}
+          
+         {!["clientesPendientes", "proveedoresPendientes"].includes(vistaFinanzas) &&
+            !loading &&
+            hayMas && (
+              <div style={{ textAlign: "center", marginTop: 20 }}>
+                <button onClick={cargarMas}>Cargar más</button>
+              </div>
           )}
         </>
       )}
@@ -878,6 +1285,8 @@ return (
       </div>
     </div>
   </>
+
+  
 );
   })()
 )}
@@ -1191,6 +1600,148 @@ const productividadKpi = Object.values(productividadPorUsuarioEtapa)
     )}
   </div>
 )}
+
+        {modalAuditoria && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.45)",
+            zIndex: 9999,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 20,
+          }}
+          onClick={() => setModalAuditoria(null)}
+        >
+          <div
+            style={{
+              background: "#fff",
+              borderRadius: 14,
+              padding: 20,
+              width: "95%",
+              maxWidth: 780,
+              maxHeight: "85vh",
+              overflow: "auto",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+              <div>
+                <h2 style={{ marginTop: 0 }}>Comprobante / auditoría</h2>
+                <p style={{ color: "#666", marginTop: -6 }}>
+                  Origen: {modalAuditoria.origen || "movimiento"}
+                </p>
+                {movimientoEstaAnulado(modalAuditoria.movimiento) && (
+                  <span className="badge-anulado">ANULADO</span>
+                )}
+              </div>
+
+              <button onClick={() => setModalAuditoria(null)}>
+                Cerrar
+              </button>
+            </div>
+
+            <div style={{ display: "grid", gap: 10 }}>
+              <p><b>Fecha:</b> {modalAuditoria.movimiento?.fecha || "-"}</p>
+              <p><b>Tipo:</b> {modalAuditoria.movimiento?.tipo || "-"}</p>
+              <p><b>Subtipo:</b> {modalAuditoria.movimiento?.subtipo || "-"}</p>
+              <p><b>Descripción:</b> {modalAuditoria.movimiento?.descripcion || "-"}</p>
+              <p><b>Medio:</b> {modalAuditoria.movimiento?.medioPago || "-"}</p>
+              <p><b>Monto:</b> {formatearMoneda(modalAuditoria.movimiento?.monto || 0)}</p>
+              <p>
+              <b>Creado por:</b>{" "}
+              {modalAuditoria.movimiento?.creadoPorNombre ||
+                modalAuditoria.detalle?.creadoPorNombre ||
+                modalAuditoria.movimiento?.creadoPor ||
+                modalAuditoria.detalle?.creadoPor ||
+                "-"}
+            </p>
+
+           {movimientoEstaAnulado(modalAuditoria.movimiento) && (
+              <>
+                <p>
+                  <b>Anulado por:</b>{" "}
+                  {modalAuditoria.movimiento?.anuladoPorNombre ||
+                    modalAuditoria.detalle?.anuladoPorNombre ||
+                    modalAuditoria.movimiento?.anuladoPor ||
+                    modalAuditoria.detalle?.anuladoPor ||
+                    "-"}
+                </p>
+
+                <p>
+                  <b>Fecha anulación:</b>{" "}
+                  {modalAuditoria.movimiento?.anuladoAt?.toDate
+                    ? modalAuditoria.movimiento.anuladoAt
+                        .toDate()
+                        .toLocaleString("es-AR")
+                    : modalAuditoria.detalle?.anuladoAt?.toDate
+                    ? modalAuditoria.detalle.anuladoAt
+                        .toDate()
+                        .toLocaleString("es-AR")
+                    : modalAuditoria.detalle?.anuladaAt?.toDate
+                    ? modalAuditoria.detalle.anuladaAt
+                        .toDate()
+                        .toLocaleString("es-AR")
+                    : "-"}
+                </p>
+              </>
+            )}
+
+              {movimientoEstaAnulado(modalAuditoria.movimiento) && (
+                <p>
+                  <span className="badge-anulado">ANULADO</span>
+                </p>
+              )}
+
+              {modalAuditoria.detalle && (
+                <div
+                  style={{
+                    marginTop: 10,
+                    padding: 14,
+                    borderRadius: 12,
+                    border: "1px solid #e5e7eb",
+                    background: "#f8fafc",
+                  }}
+                >
+                  <h3 style={{ marginTop: 0 }}>Detalle origen</h3>
+
+                  <p><b>Número:</b> {modalAuditoria.detalle.numeroGasto || modalAuditoria.detalle.numeroVenta || "-"}</p>
+                  <p><b>Proveedor / Cliente:</b> {modalAuditoria.detalle.proveedorNombre || modalAuditoria.detalle.proveedor || modalAuditoria.detalle.clienteNombre || "-"}</p>
+                  <p><b>Total:</b> {formatearMoneda(modalAuditoria.detalle.total || modalAuditoria.detalle.monto || 0)}</p>
+
+                  {(modalAuditoria.detalle.comprobantes || []).length > 0 && (
+                    <div style={{ marginTop: 12 }}>
+                      <b>Comprobantes:</b>
+
+                      <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
+                        {modalAuditoria.detalle.comprobantes.map((comp) => (
+                          <button
+                            key={comp.id || comp.url}
+                            type="button"
+                            onClick={() => window.open(comp.url, "_blank")}
+                            style={{
+                              textAlign: "left",
+                              padding: "10px 12px",
+                              borderRadius: 10,
+                              border: "1px solid #d9dee8",
+                              background: "#fff",
+                              cursor: "pointer",
+                            }}
+                          >
+                            {comp.nombre || "Ver comprobante"}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

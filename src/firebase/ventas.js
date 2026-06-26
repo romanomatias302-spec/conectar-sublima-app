@@ -13,6 +13,7 @@ import {
   runTransaction,
   serverTimestamp,
   onSnapshot,
+  writeBatch,
 } from "firebase/firestore";
 import { db } from "../firebase";
 
@@ -597,20 +598,46 @@ export async function anularVenta({
     throw new Error("La venta ya está anulada.");
   }
 
-  await updateDoc(ventaRef, {
-    estadoVenta: "anulada",
+const batch = writeBatch(db);
+
+batch.update(ventaRef, {
+  estadoVenta: "anulada",
+  motivoAnulacion,
+  anuladaAt: serverTimestamp(),
+  anuladaPor: perfil?.email || "",
+  anuladaPorNombre: perfil?.nombre || perfil?.email || "",
+  updatedAt: serverTimestamp(),
+});
+
+const movSnap = await getDocs(
+  query(
+    collection(db, "movimientos"),
+    where("clienteId", "==", perfil.clienteId),
+    where("origen", "==", "venta"),
+    where("origenRefId", "==", ventaId)
+  )
+);
+
+movSnap.docs.forEach((movDoc) => {
+  batch.update(doc(db, "movimientos", movDoc.id), {
+    estadoMovimiento: "anulado",
+    activo: false,
+    anuladoAt: serverTimestamp(),
+    anuladoPor: perfil?.uid || perfil?.firebaseUid || perfil?.email || "",
+    anuladoPorNombre: perfil?.nombre || perfil?.email || "",
     motivoAnulacion,
-    anuladaAt: serverTimestamp(),
-    anuladaPor: perfil?.email || "",
     updatedAt: serverTimestamp(),
   });
+});
 
-  if (ventaData.pedidoRefId) {
-    await updateDoc(doc(db, "pedidos", ventaData.pedidoRefId), {
-      ventaEstado: "anulada",
-      updatedAt: serverTimestamp(),
-    });
-  }
+if (ventaData.pedidoRefId) {
+  batch.update(doc(db, "pedidos", ventaData.pedidoRefId), {
+    ventaEstado: "anulada",
+    updatedAt: serverTimestamp(),
+  });
+}
+
+await batch.commit();
 }
 
 export function escucharVentasRecientes({

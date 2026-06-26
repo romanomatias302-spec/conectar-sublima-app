@@ -13,7 +13,7 @@ export default function ClienteDetalle({ cliente, onVolver, onEditar, perfil }) 
       <div className="detalle-info">
         <p><strong>Nombre y Apellido:</strong> {cliente.nombre}</p>
         
-        <p><strong>DNI:</strong> {cliente.dni}</p>
+        <p><strong>Documento de identidad:</strong> {cliente.dni}</p>
         <p><strong>Teléfono:</strong> {cliente.telefono}</p>
         <p><strong>Email:</strong> {cliente.email}</p>
         <p><strong>Dirección:</strong> {cliente.direccion}</p>

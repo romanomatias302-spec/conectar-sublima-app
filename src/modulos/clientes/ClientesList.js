@@ -103,7 +103,7 @@ useEffect(() => {
         >
           <div>
             <strong>{cliente.nombre || "Sin nombre"}</strong>
-            <span>DNI {cliente.dni || "-"}</span>
+            <span>Documento de identidad {cliente.dni || "-"}</span>
           </div>
 
           <span className="cliente-mobile-arrow">
@@ -141,7 +141,7 @@ useEffect(() => {
 <table className="clientes-table-desktop">
         <thead>
           <tr>
-            <th>DNI</th>
+            <th>Documento de identidad</th>
             <th>Nombre</th>
             <th>Teléfono</th>
             <th>Dirección</th>
