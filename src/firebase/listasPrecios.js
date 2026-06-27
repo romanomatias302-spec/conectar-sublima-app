@@ -11,7 +11,12 @@ import {
   serverTimestamp,
   writeBatch,
 } from "firebase/firestore";
-import { db } from "../firebase";
+import { db, storage } from "../firebase";
+import {
+  ref,
+  uploadBytes,
+  getDownloadURL,
+} from "firebase/storage";
 
 const listasRef = () => collection(db, "listasPrecios");
 
@@ -135,4 +140,30 @@ export async function duplicarListaPrecio(perfil, lista) {
     updatedAt: serverTimestamp(),
     creadoPor: perfil.uid || perfil.firebaseUid || "",
   });
+}
+
+export async function subirImagenProductoBase(clienteId, productoBaseId, archivo) {
+  if (!clienteId) throw new Error("Falta clienteId");
+  if (!productoBaseId) throw new Error("Falta productoBaseId");
+  if (!archivo) throw new Error("Falta archivo");
+
+  const extension = archivo.name?.split(".").pop() || "jpg";
+  const nombreArchivo = `${Date.now()}.${extension}`;
+
+  const storageRef = ref(
+    storage,
+    `clientes/${clienteId}/productosBase/${productoBaseId}/${nombreArchivo}`
+  );
+
+  await uploadBytes(storageRef, archivo);
+
+  const url = await getDownloadURL(storageRef);
+
+  await updateDoc(doc(db, "productosBase", productoBaseId), {
+    imagenUrl: url,
+    imagenActualizadaAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+
+  return url;
 }

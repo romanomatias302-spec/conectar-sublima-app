@@ -10,11 +10,11 @@ import {
   Power,
   ArrowLeft,
   BadgeDollarSign,
-  ListChecks,
-  Sparkles,
   Copy,
   Star,
+  MoreVertical,
 } from "lucide-react";
+
 import {
   obtenerListasPrecios,
   crearListaPrecio,
@@ -23,6 +23,7 @@ import {
   obtenerProductosBase,
   marcarListaPrecioPredeterminada,
   duplicarListaPrecio,
+  subirImagenProductoBase,
 } from "../../firebase/listasPrecios";
 
 import "./ListasPreciosPage.css";
@@ -55,10 +56,19 @@ export default function ListasPreciosPage({ perfil }) {
 
   const [listaSeleccionada, setListaSeleccionada] = useState(null);
   const [productoSeleccionadoIndex, setProductoSeleccionadoIndex] = useState(null);
+  const [busquedaProductoLista, setBusquedaProductoLista] = useState("");
+    const [adicionalesSimulados, setAdicionalesSimulados] = useState([]);
+    const [reglaSeleccionadaIndex, setReglaSeleccionadaIndex] = useState(null);
+    const [menuListaAbierto, setMenuListaAbierto] = useState(false);
+
+
+
 
   const [modalProducto, setModalProducto] = useState(false);
   const [productoEditandoIndex, setProductoEditandoIndex] = useState(null);
   const [formProducto, setFormProducto] = useState(productoVacio);
+
+  const [subiendoImagen, setSubiendoImagen] = useState(false);
 
   const cargarDatos = async () => {
     try {
@@ -99,13 +109,46 @@ export default function ListasPreciosPage({ perfil }) {
 
   const productosLista = listaSeleccionada?.productos || [];
 
+    const productosListaFiltrados = useMemo(() => {
+    const texto = busquedaProductoLista.trim().toLowerCase();
+
+    if (!texto) {
+      return productosLista.map((producto, index) => ({ producto, indexOriginal: index }));
+    }
+
+    return productosLista
+      .map((producto, index) => ({ producto, indexOriginal: index }))
+      .filter(({ producto }) =>
+        (producto.nombre || "").toLowerCase().includes(texto)
+      );
+  }, [productosLista, busquedaProductoLista]);
+
   const productoSeleccionado =
     productoSeleccionadoIndex !== null
       ? productosLista[productoSeleccionadoIndex]
-      : productosLista[0] || null;
+      : productosListaFiltrados[0]?.producto || productosLista[0] || null;
 
-  const productoActivoIndex =
-    productoSeleccionadoIndex !== null ? productoSeleccionadoIndex : 0;
+   const productoActivoIndex =
+    productoSeleccionadoIndex !== null
+      ? productoSeleccionadoIndex
+      : productosListaFiltrados[0]?.indexOriginal ?? 0;
+
+   const productoBaseSeleccionado = productosBase.find(
+        (p) => p.firebaseId === productoSeleccionado?.productoBaseId
+    );
+
+    const imagenProductoSeleccionado =
+    productoBaseSeleccionado?.imagenUrl ||
+    productoSeleccionado?.imagenUrl ||
+    "";
+
+    const obtenerImagenProducto = (producto) => {
+    const base = productosBase.find(
+        (p) => p.firebaseId === producto?.productoBaseId
+    );
+
+    return base?.imagenUrl || producto?.imagenUrl || "";
+    };   
 
   const abrirNuevaLista = () => {
     setListaEditando(null);
@@ -236,6 +279,10 @@ export default function ListasPreciosPage({ perfil }) {
   const abrirDetalleLista = (lista) => {
     setListaSeleccionada(lista);
     setProductoSeleccionadoIndex(null);
+    setBusquedaProductoLista("");
+    setAdicionalesSimulados([]);
+    setReglaSeleccionadaIndex(null);
+    setMenuListaAbierto(false);
   };
 
   const abrirNuevoProducto = () => {
@@ -432,6 +479,42 @@ export default function ListasPreciosPage({ perfil }) {
     }).format(Number(valor || 0));
   };
 
+  const toggleAdicionalSimulado = (adicionalId) => {
+    setAdicionalesSimulados((prev) =>
+      prev.includes(adicionalId)
+        ? prev.filter((id) => id !== adicionalId)
+        : [...prev, adicionalId]
+    );
+  };
+
+const precioFinalSeleccionado = useMemo(() => {
+  if (!productoSeleccionado) return 0;
+
+  const reglas = Array.isArray(productoSeleccionado.reglasCantidad)
+    ? productoSeleccionado.reglasCantidad
+    : [];
+
+  const reglaSeleccionada =
+    reglaSeleccionadaIndex !== null ? reglas[reglaSeleccionadaIndex] : null;
+
+  const precioBaseAplicado = Number(
+    reglaSeleccionada?.precio || productoSeleccionado.precioBase || 0
+  );
+
+  const adicionales = Array.isArray(productoSeleccionado.adicionales)
+    ? productoSeleccionado.adicionales
+    : [];
+
+  const totalAdicionales = adicionales
+    .filter((a, index) => {
+      const id = a.id || `adicional-${index}`;
+      return adicionalesSimulados.includes(id);
+    })
+    .reduce((acc, a) => acc + Number(a.precio || 0), 0);
+
+  return precioBaseAplicado + totalAdicionales;
+}, [productoSeleccionado, adicionalesSimulados, reglaSeleccionadaIndex]);
+
   const totalProductos = productosLista.length;
   const totalReglas = productosLista.reduce(
     (acc, p) => acc + (p.reglasCantidad || []).length,
@@ -441,6 +524,34 @@ export default function ListasPreciosPage({ perfil }) {
     (acc, p) => acc + (p.adicionales || []).length,
     0
   );
+
+  const cambiarImagenProducto = async (e) => {
+  try {
+    const archivo = e.target.files?.[0];
+    if (!archivo) return;
+
+    if (!productoSeleccionado?.productoBaseId) {
+      alert("Este producto no está vinculado a un producto base.");
+      return;
+    }
+
+    setSubiendoImagen(true);
+
+    await subirImagenProductoBase(
+      perfil.clienteId,
+      productoSeleccionado.productoBaseId,
+      archivo
+    );
+
+    await cargarDatos();
+  } catch (error) {
+    console.error("Error subiendo imagen:", error);
+    alert("No se pudo subir la imagen.");
+  } finally {
+    setSubiendoImagen(false);
+    e.target.value = "";
+  }
+};
 
   return (
     <div className="listas-precios-page">
@@ -529,88 +640,106 @@ export default function ListasPreciosPage({ perfil }) {
             </div>
           ) : (
             <>
-              <div className="lp-detalle-header">
+              <div className="lp-detalle-header lp-detalle-header-limpio">
                 <div>
                   <span className="lp-kicker">Lista seleccionada</span>
-                  <h2>{listaSeleccionada.nombre}</h2>
-                  {listaSeleccionada.predeterminada && (
-                    <span className="lp-badge-star">
-                      <Star size={14} />
-                      Predeterminada
-                    </span>
-                  )}
+
+                  <div className="lp-title-row">
+                    <h2>{listaSeleccionada.nombre}</h2>
+
+                    {listaSeleccionada.predeterminada && (
+                      <span className="lp-badge-star">
+                        <Star size={14} />
+                        Predeterminada
+                      </span>
+                    )}
+                  </div>
+
+                  <p>
+                    {(listaSeleccionada.productos || []).length} productos configurados
+                  </p>
                 </div>
 
-                <div className="lp-detalle-actions">
-                  {puedeEditar && !listaSeleccionada.predeterminada && (
-                    <button
-                      className="lp-btn-secundario"
-                      onClick={() => marcarComoPredeterminada(listaSeleccionada)}
-                    >
-                      <Star size={16} />
-                      Predeterminada
-                    </button>
+                <div className="lp-menu-wrapper">
+                  <button
+                    type="button"
+                    className="lp-icon-btn"
+                    onClick={() => setMenuListaAbierto((prev) => !prev)}
+                  >
+                    <MoreVertical size={20} />
+                  </button>
+
+                  {menuListaAbierto && (
+                    <div className="lp-menu-acciones">
+                      {puedeEditar && !listaSeleccionada.predeterminada && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            marcarComoPredeterminada(listaSeleccionada);
+                            setMenuListaAbierto(false);
+                          }}
+                        >
+                          <Star size={16} />
+                          Marcar predeterminada
+                        </button>
+                      )}
+
+                      {puedeCrear && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            duplicarLista(listaSeleccionada);
+                            setMenuListaAbierto(false);
+                          }}
+                        >
+                          <Copy size={16} />
+                          Duplicar lista
+                        </button>
+                      )}
+
+                      {puedeEditar && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            abrirEditarLista(listaSeleccionada);
+                            setMenuListaAbierto(false);
+                          }}
+                        >
+                          <Pencil size={16} />
+                          Editar lista
+                        </button>
+                      )}
+
+                      {puedeEditar && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            desactivarLista(listaSeleccionada);
+                            setMenuListaAbierto(false);
+                          }}
+                        >
+                          <Power size={16} />
+                          {listaSeleccionada.activa === false
+                            ? "Activar lista"
+                            : "Desactivar lista"}
+                        </button>
+                      )}
+
+                      {puedeEliminar && (
+                        <button
+                          type="button"
+                          className="danger"
+                          onClick={() => {
+                            borrarLista(listaSeleccionada);
+                            setMenuListaAbierto(false);
+                          }}
+                        >
+                          <Trash2 size={16} />
+                          Eliminar lista
+                        </button>
+                      )}
+                    </div>
                   )}
-
-                  {puedeCrear && (
-                    <button
-                      className="lp-btn-secundario"
-                      onClick={() => duplicarLista(listaSeleccionada)}
-                    >
-                      <Copy size={16} />
-                      Duplicar
-                    </button>
-                  )}
-
-                  {puedeEditar && (
-                    <button
-                      className="lp-btn-secundario"
-                      onClick={() => abrirEditarLista(listaSeleccionada)}
-                    >
-                      <Pencil size={16} />
-                      Editar
-                    </button>
-                  )}
-
-                  {puedeEditar && (
-                    <button
-                      className="lp-btn-secundario"
-                      onClick={() => desactivarLista(listaSeleccionada)}
-                    >
-                      <Power size={16} />
-                      {listaSeleccionada.activa === false ? "Activar" : "Desactivar"}
-                    </button>
-                  )}
-
-                  {puedeEliminar && (
-                    <button
-                      className="lp-btn-danger"
-                      onClick={() => borrarLista(listaSeleccionada)}
-                    >
-                      <Trash2 size={16} />
-                      Eliminar
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              <div className="lp-resumen-grid">
-                <div className="lp-stat-card">
-                  <Package size={22} />
-                  <span>Productos</span>
-                  <strong>{totalProductos}</strong>
-                </div>
-
-                <div className="lp-stat-card">
-                  <ListChecks size={22} />
-                  <span>Reglas por cantidad</span>
-                  <strong>{totalReglas}</strong>
-                </div>
-
-                <div className="lp-stat-card">
-                  <Sparkles size={22} />
-                  <span>Adicionales</span>
-                  <strong>{totalAdicionales}</strong>
                 </div>
               </div>
 
@@ -619,7 +748,7 @@ export default function ListasPreciosPage({ perfil }) {
                   <div className="lp-section-head">
                     <div>
                       <h3>Productos de la lista</h3>
-                      <p>Productos personalizados con precio configurado.</p>
+                     
                     </div>
 
                     {puedeEditar && (
@@ -636,19 +765,43 @@ export default function ListasPreciosPage({ perfil }) {
                       <strong>Sin productos</strong>
                       <span>Agregá el primer producto a esta lista.</span>
                     </div>
-                  ) : (
+                ) : (
+                    <>
+                      <div className="lp-search-productos">
+                        <Search size={17} />
+                        <input
+                        value={busquedaProductoLista}
+                        onChange={(e) => {
+                        setBusquedaProductoLista(e.target.value);
+                        setProductoSeleccionadoIndex(null);
+                        setAdicionalesSimulados([]);
+                        setReglaSeleccionadaIndex(null);
+                        }}
+                        placeholder="Buscar producto en esta lista..."
+                      />
+                    </div>
+
+                    
                     <div className="lp-product-card-list">
-                      {productosLista.map((producto, index) => (
+                      {productosListaFiltrados.map(({ producto, indexOriginal }) => (
                         <button
-                          key={`${producto.nombre}-${index}`}
+                          key={`${producto.nombre}-${indexOriginal}`}
                           className={`lp-product-row ${
-                            productoActivoIndex === index ? "activo" : ""
+                            productoActivoIndex === indexOriginal ? "activo" : ""
                           }`}
-                          onClick={() => setProductoSeleccionadoIndex(index)}
+                        onClick={() => {
+                            setProductoSeleccionadoIndex(indexOriginal);
+                            setAdicionalesSimulados([]);
+                            setReglaSeleccionadaIndex(null);
+                          }}
                         >
-                          <div className="lp-product-thumb">
-                            <Package size={22} />
-                          </div>
+                            <div className="lp-product-thumb">
+                            {obtenerImagenProducto(producto) ? (
+                                <img src={obtenerImagenProducto(producto)} alt={producto.nombre} />
+                            ) : (
+                                <Package size={22} />
+                            )}
+                            </div>
 
                           <div className="lp-product-main">
                             <strong>{producto.nombre}</strong>
@@ -662,7 +815,9 @@ export default function ListasPreciosPage({ perfil }) {
                         </button>
                       ))}
                     </div>
+                </>
                   )}
+                  
                 </div>
 
                 <div className="lp-product-preview">
@@ -675,9 +830,28 @@ export default function ListasPreciosPage({ perfil }) {
                   ) : (
                     <>
                       <div className="lp-preview-hero">
-                        <div className="lp-preview-image">
-                          <Package size={48} />
-                        </div>
+                        <label className="lp-preview-image lp-preview-image-upload">
+                        {imagenProductoSeleccionado ? (
+                            <img src={imagenProductoSeleccionado} alt={productoSeleccionado.nombre} />
+                        ) : (
+                            <Package size={48} />
+                        )}
+
+                        <span className="lp-image-overlay">
+                            {subiendoImagen
+                            ? "Subiendo..."
+                            : imagenProductoSeleccionado
+                            ? "Cambiar imagen"
+                            : "Agregar imagen"}
+                        </span>
+
+                        <input
+                            type="file"
+                            accept="image/*"
+                            onChange={cambiarImagenProducto}
+                            disabled={subiendoImagen}
+                        />
+                        </label>
 
                         <div className="lp-preview-info">
                           <span className="lp-pill-soft">
@@ -717,20 +891,36 @@ export default function ListasPreciosPage({ perfil }) {
                         <h4>Reglas por cantidad</h4>
 
                         {(productoSeleccionado.reglasCantidad || []).length === 0 ? (
-                          <p className="lp-empty">Sin reglas por cantidad.</p>
+                            <p className="lp-empty">Sin reglas por cantidad.</p>
                         ) : (
-                          <div className="lp-mini-table">
-                            {(productoSeleccionado.reglasCantidad || []).map((regla, index) => (
-                              <div className="lp-mini-row" key={index}>
-                                <span>
-                                  {regla.desde || 0} a {regla.hasta || "sin límite"}
-                                </span>
-                                <strong>{formatearMoneda(regla.precio)}</strong>
-                              </div>
-                            ))}
-                          </div>
+                            <div className="lp-mini-table">
+                            {(productoSeleccionado.reglasCantidad || []).map((regla, index) => {
+                                const activo = reglaSeleccionadaIndex === index;
+
+                                return (
+                                <button
+                                    type="button"
+                                    className={`lp-mini-row lp-adicional-row ${activo ? "activo" : ""}`}
+                                    key={index}
+                                    onClick={() =>
+                                    setReglaSeleccionadaIndex((prev) =>
+                                        prev === index ? null : index
+                                    )
+                                    }
+                                >
+                                    <span className="lp-check-circle" />
+
+                                    <span>
+                                    {regla.desde || 0} a {regla.hasta || "sin límite"}
+                                    </span>
+
+                                    <strong>{formatearMoneda(regla.precio)}</strong>
+                                </button>
+                                );
+                            })}
+                            </div>
                         )}
-                      </div>
+                        </div>
 
                       <div className="lp-preview-section">
                         <h4>Adicionales</h4>
@@ -739,24 +929,46 @@ export default function ListasPreciosPage({ perfil }) {
                           <p className="lp-empty">Sin adicionales cargados.</p>
                         ) : (
                           <div className="lp-mini-table">
-                            {(productoSeleccionado.adicionales || []).map((adicional, index) => (
-                              <div className="lp-mini-row" key={adicional.id || index}>
-                                <span>
-                                  {adicional.nombre} ·{" "}
-                                  {adicional.tipoCalculo === "por_pedido"
-                                    ? "por pedido"
-                                    : "por unidad"}
-                                </span>
-                                <strong>{formatearMoneda(adicional.precio)}</strong>
-                              </div>
-                            ))}
+                            {(productoSeleccionado.adicionales || []).map((adicional, index) => {
+                              const id = adicional.id || `adicional-${index}`;
+                              const activo = adicionalesSimulados.includes(id);
+
+                              return (
+                                <button
+                                  type="button"
+                                  className={`lp-mini-row lp-adicional-row ${
+                                    activo ? "activo" : ""
+                                  }`}
+                                  key={id}
+                                  onClick={() => toggleAdicionalSimulado(id)}
+                                >
+                                    <span className="lp-check-circle" />
+
+                                  <span>
+                                    {adicional.nombre} ·{" "}
+                                    {adicional.tipoCalculo === "por_pedido"
+                                      ? "por pedido"
+                                      : "por unidad"}
+                                  </span>
+
+                                  <strong>{formatearMoneda(adicional.precio)}</strong>
+                                </button>
+                              );
+                            })}
                           </div>
                         )}
                       </div>
+
+                      <div className="lp-precio-final-card">
+                        <span>Precio final</span>
+                        <strong>{formatearMoneda(precioFinalSeleccionado)}</strong>
+                      </div>
+
                     </>
                   )}
                 </div>
               </div>
+
             </>
           )}
         </section>
@@ -830,7 +1042,7 @@ export default function ListasPreciosPage({ perfil }) {
               <div>
                 <label>Producto personalizado</label>
                 <select
-                  value={formProducto.productoBaseId}
+                  value={formProducto.productoBaseId ?? ""}
                   onChange={(e) => seleccionarProductoBase(e.target.value)}
                 >
                   <option value="">Seleccionar producto...</option>
@@ -845,7 +1057,7 @@ export default function ListasPreciosPage({ perfil }) {
               <div>
                 <label>Nombre visible</label>
                 <input
-                  value={formProducto.nombre}
+                  value={formProducto.nombre ?? ""}
                   onChange={(e) =>
                     setFormProducto((prev) => ({
                       ...prev,
@@ -860,7 +1072,7 @@ export default function ListasPreciosPage({ perfil }) {
                 <label>Precio base</label>
                 <input
                   type="number"
-                  value={formProducto.precioBase}
+                  value={formProducto.precioBase ?? ""}
                   onChange={(e) =>
                     setFormProducto((prev) => ({
                       ...prev,
@@ -888,19 +1100,19 @@ export default function ListasPreciosPage({ perfil }) {
                 <input
                   type="number"
                   placeholder="Desde"
-                  value={regla.desde}
+                  value={regla.desde ?? ""}
                   onChange={(e) => actualizarRegla(index, "desde", e.target.value)}
                 />
                 <input
                   type="number"
                   placeholder="Hasta"
-                  value={regla.hasta}
+                  value={regla.hasta ?? ""}
                   onChange={(e) => actualizarRegla(index, "hasta", e.target.value)}
                 />
                 <input
                   type="number"
                   placeholder="Precio"
-                  value={regla.precio}
+                  value={regla.precio ?? ""}
                   onChange={(e) => actualizarRegla(index, "precio", e.target.value)}
                 />
                 <button type="button" onClick={() => quitarRegla(index)}>
@@ -924,13 +1136,13 @@ export default function ListasPreciosPage({ perfil }) {
               <div className="lp-grid-4" key={adicional.id || index}>
                 <input
                   placeholder="Nombre"
-                  value={adicional.nombre}
+                  value={adicional.nombre ?? ""}
                   onChange={(e) =>
                     actualizarAdicional(index, "nombre", e.target.value)
                   }
                 />
                 <select
-                  value={adicional.tipoCalculo}
+                  value={adicional.tipoCalculo ?? "por_unidad"}
                   onChange={(e) =>
                     actualizarAdicional(index, "tipoCalculo", e.target.value)
                   }
@@ -941,7 +1153,7 @@ export default function ListasPreciosPage({ perfil }) {
                 <input
                   type="number"
                   placeholder="Precio"
-                  value={adicional.precio}
+                  value={adicional.precio ?? ""}
                   onChange={(e) =>
                     actualizarAdicional(index, "precio", e.target.value)
                   }
