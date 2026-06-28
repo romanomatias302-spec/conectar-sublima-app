@@ -149,6 +149,8 @@ export default function ProductoSelectorModal({
       listaPrecioNombre: listaSeleccionada.nombre || "",
       productoListaNombre: productoSeleccionado.nombre || "",
       productoBaseId: productoSeleccionado.productoBaseId || "",
+      imagenUrl: obtenerImagen(productoSeleccionado),
+      imagenThumb: obtenerImagen(productoSeleccionado),
       reglaCantidad: reglaSeleccionada || null,
       adicionalesSeleccionados: adicionales,
       precioDetalleInterno: {

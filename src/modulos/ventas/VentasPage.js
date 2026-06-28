@@ -817,66 +817,156 @@ const aplicarProductoSeleccionado = (datosPrecio) => {
         </div>
         )}
 
-      <div className="ventas-layout">
-        <section className="ventas-card ventas-card-lg">
-          <div className="ventas-card-header">
-            <h2>Datos de la venta</h2>
-          </div>
+        <div className="ventas-layout ventas-layout-con-resumen-alto">
+          <div className="ventas-main-column ventas-main-column-crear">
 
-        <div className="ventas-grid ventas-grid-top">
-            <div className="ventas-field">
-              <label>Fecha</label>
-              <input
-                type="date"
-                value={fechaVenta}
-                disabled
-              />
+         <div className="ventas-datos-pro ventas-datos-pro-externa">
+            <div className="ventas-datos-title">
+              <span className="ventas-datos-icon">
+                <ShieldCheck size={17} />
+              </span>
+              <h3>Información de la venta</h3>
             </div>
 
-            <div className="ventas-field ventas-field-cliente">
-              <label>Seleccionar cliente</label>
-              <div className="ventas-cliente-inline">
-              <div className="ventas-cliente-buscador">
-                <input
-                  placeholder="Escribí para buscar cliente..."
-                  value={busquedaCliente}
-                  onFocus={() => setMostrarDropdownCliente(true)}
-                  onBlur={() => {
-                    setTimeout(() => setMostrarDropdownCliente(false), 180);
-                  }}
-                  onChange={(e) => {
-                    setBusquedaCliente(e.target.value);
-                    setClienteRefId("");
-                    setMostrarDropdownCliente(true);
-                  }}
-                  disabled={!puedeCrearVentas}
-                />
-
-                {mostrarDropdownCliente && !clienteRefId && (
-                  <div className="ventas-dropdown">
-                    {clientesFiltrados.slice(0, 8).map((c) => (
-                      <button
-                        key={c.firebaseId}
-                        type="button"
-                        onClick={() => usarClienteExistenteEnVenta(c)}
-                      >
-                        {c.nombre || "Sin nombre"} {c.dni ? `- ${c.dni}` : ""}
-                      </button>
-                    ))}
-                  </div>
-                )}
+            <div className="ventas-datos-row ventas-datos-row-principal">
+              <div className="ventas-field">
+                <label>Fecha</label>
+                <div className="ventas-input-icon-wrap">
+                  <CalendarDays size={17} />
+                  <input type="date" value={fechaVenta} disabled />
+                </div>
               </div>
+
+              <div className="ventas-field ventas-field-cliente">
+                <label>Cliente</label>
+
+                <div className="ventas-cliente-inline">
+                  <div className="ventas-cliente-buscador ventas-input-icon-wrap">
+                    <User size={17} />
+                    <input
+                      placeholder="Escribí para buscar cliente..."
+                      value={busquedaCliente}
+                      onFocus={() => setMostrarDropdownCliente(true)}
+                      onBlur={() => {
+                        setTimeout(() => setMostrarDropdownCliente(false), 180);
+                      }}
+                      onChange={(e) => {
+                        setBusquedaCliente(e.target.value);
+                        setClienteRefId("");
+                        setMostrarDropdownCliente(true);
+                      }}
+                      disabled={!puedeCrearVentas}
+                    />
+
+                    {mostrarDropdownCliente && !clienteRefId && (
+                      <div className="ventas-dropdown">
+                        {clientesFiltrados.slice(0, 8).map((c) => (
+                          <button
+                            key={c.firebaseId}
+                            type="button"
+                            onClick={() => usarClienteExistenteEnVenta(c)}
+                          >
+                            {c.nombre || "Sin nombre"} {c.dni ? `- ${c.dni}` : ""}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
 
                   {puedeCrearClientes && (
                     <button
                       type="button"
-                      className="btn btn-secondary ventas-btn-inline"
+                      className="btn btn-secondary ventas-btn-inline ventas-btn-soft"
                       onClick={() => setMostrarClienteRapido((prev) => !prev)}
                       disabled={!puedeCrearVentas}
                     >
-                      {mostrarClienteRapido ? "Cerrar" : "Cliente rápido"}
+                      <Plus size={16} />
+                      Cliente rápido
                     </button>
                   )}
+                </div>
+              </div>
+            </div>
+
+            <div className="ventas-datos-row ventas-datos-row-secundaria">
+              <div className="ventas-field ventas-pedido-field">
+                <label>Pedido asociado</label>
+
+                <div className="ventas-pedido-buscador ventas-input-icon-wrap">
+                  <Search size={17} />
+                  <input
+                    value={busquedaPedido}
+                    placeholder="Sin pedido asociado / buscar pedido..."
+                    onFocus={() => setMostrarDropdownPedido(true)}
+                    onBlur={() => {
+                      setTimeout(() => setMostrarDropdownPedido(false), 180);
+                    }}
+                    onChange={(e) => {
+                      setBusquedaPedido(e.target.value);
+                      setPedidoRefId("");
+                      setMostrarDropdownPedido(true);
+                    }}
+                    disabled={!puedeCrearVentas}
+                  />
+
+                  {mostrarDropdownPedido && (
+                    <div className="ventas-dropdown">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPedidoRefId("");
+                          setBusquedaPedido("");
+                          setMostrarDropdownPedido(false);
+                        }}
+                      >
+                        Sin pedido asociado
+                      </button>
+
+                      {pedidosFiltrados.slice(0, 8).map((p) => (
+                        <button
+                          key={p.firebaseId}
+                          type="button"
+                          onClick={() => usarPedidoEnVenta(p)}
+                        >
+                          #{p.id || "-"} - {p.cliente || p.clienteNombre || "Sin cliente"} -{" "}
+                          {p.fechaPedido || p.fechaEntrega || "-"}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="ventas-field ventas-vendedor-field">
+                <label>Vendedor</label>
+                <div className="ventas-input-icon-wrap">
+                  <BriefcaseBusiness size={17} />
+                  <select
+                    value={vendedorUid}
+                    onChange={(e) => setVendedorUid(e.target.value)}
+                    disabled={!puedeCrearVentas}
+                  >
+                    <option value="">Sin vendedor</option>
+                    {usuarios.map((u) => (
+                      <option key={u.uid} value={u.uid}>
+                        {u.nombre || u.email || "Usuario sin nombre"}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="ventas-field">
+                <label>Observaciones</label>
+                <div className="ventas-input-icon-wrap">
+                  <MessageSquareText size={17} />
+                  <input
+                    value={observaciones}
+                    onChange={(e) => setObservaciones(e.target.value)}
+                    placeholder="Detalle extra de la venta..."
+                    disabled={!puedeCrearVentas}
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -927,81 +1017,14 @@ const aplicarProductoSeleccionado = (datosPrecio) => {
             </div>
           )}
 
-          <div className="ventas-grid ventas-grid-pedido ventas-mt">
-            <div className="ventas-field ventas-pedido-field">
-              <label>Asociar pedido (opcional)</label>
-                <div className="ventas-pedido-buscador">
-                  <input
-                    value={busquedaPedido}
-                    placeholder="Sin pedido asociado / buscar pedido..."
-                    onFocus={() => setMostrarDropdownPedido(true)}
-                    onBlur={() => {
-                      setTimeout(() => setMostrarDropdownPedido(false), 180);
-                    }}
-                    onChange={(e) => {
-                      setBusquedaPedido(e.target.value);
-                      setPedidoRefId("");
-                      setMostrarDropdownPedido(true);
-                    }}
-                    disabled={!puedeCrearVentas}
-                  />
+          <section className="ventas-card ventas-card-lg">
+            
+              <div className="ventas-card-header">
+                <h2>Ítems de la venta</h2>
+              </div>  
 
-                  {mostrarDropdownPedido && (
-                    <div className="ventas-dropdown">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setPedidoRefId("");
-                          setBusquedaPedido("");
-                          setMostrarDropdownPedido(false);
-                        }}
-                      >
-                        Sin pedido asociado
-                      </button>
 
-                      {pedidosFiltrados.slice(0, 8).map((p) => (
-                        <button
-                          key={p.firebaseId}
-                          type="button"
-                          onClick={() => usarPedidoEnVenta(p)}
-                        >
-                          #{p.id || "-"} - {p.cliente || p.clienteNombre || "Sin cliente"} -{" "}
-                          {p.fechaPedido || p.fechaEntrega || "-"}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-            </div>
-
-            <div className="ventas-field">
-              <label>Observaciones</label>
-              <input
-                value={observaciones}
-                onChange={(e) => setObservaciones(e.target.value)}
-                placeholder="Detalle extra de la venta..."
-                disabled={!puedeCrearVentas}
-              />
-            </div>
-          </div>
-
-          <div className="ventas-grid ventas-grid-pedido ventas-mt">
-            <div className="ventas-field">
-              <label>Vendedor opcional</label>
-              <select
-                value={vendedorUid}
-                onChange={(e) => setVendedorUid(e.target.value)}
-                disabled={!puedeCrearVentas}
-              >
-                <option value="">Sin vendedor asignado</option>
-                {usuarios.map((u) => (
-                  <option key={u.uid} value={u.uid}>
-                    {u.nombre || u.email || "Usuario sin nombre"}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
+ 
 
           
 
@@ -1012,10 +1035,10 @@ const aplicarProductoSeleccionado = (datosPrecio) => {
           </div>
 
           <div className="ventas-table-wrap">
-            <table className="ventas-table">
+            <table className="ventas-table ventas-items-table">
               <thead>
                 <tr>
-                  <th>Descripción</th>
+                  <th>Producto</th>
                   <th>Cantidad</th>
                   <th>Precio unitario</th>
                   <th>Subtotal</th>
@@ -1026,76 +1049,161 @@ const aplicarProductoSeleccionado = (datosPrecio) => {
               <tbody>
                 {itemsNormalizados.map((item, index) => (
                   <tr key={index}>
-                    <td>
-                      <div className="ventas-descripcion-selector">
-                        <input
-                          value={item.descripcion}
-                          onChange={(e) =>
-                            actualizarItem(index, "descripcion", e.target.value)
-                          }
-                          placeholder="Ej: Remera personalizada"
-                          disabled={!puedeCrearVentas}
-                        />
+                    <td className="ventas-producto-td">
+                      <div className="ventas-producto-row">
+                        <div className="ventas-producto-img">
+                          {item.imagenThumb || item.imagenUrl ? (
+                            <img
+                              src={item.imagenThumb || item.imagenUrl}
+                              alt={item.descripcion || "Producto"}
+                            />
+                          ) : (
+                            <span />
+                          )}
+                        </div>
 
-                    <button
-                      type="button"
-                      className="ventas-selector-precio-btn"
-                      onClick={() => abrirSelectorPrecio(index)}
-                      disabled={!puedeCrearVentas}
-                      title="Agregar desde lista de precios"
-                    />
+                        <div
+                          className={`ventas-producto-main ${
+                            item.origenPrecio === "lista_precio"
+                              ? "ventas-producto-main-lista"
+                              : "ventas-producto-main-manual"
+                          }`}
+                        >
+                          {item.origenPrecio === "lista_precio" ? (
+                            <>
+                              <strong className="ventas-producto-nombre">
+                                {item.descripcion || "Producto sin descripción"}
+                              </strong>
+
+                              <small className="ventas-item-source">
+                                Lista de precios
+                              </small>
+                            </>
+                          ) : (
+                            <div className="ventas-descripcion-selector ventas-descripcion-selector-clean">
+                              <input
+                                value={item.descripcion}
+                                onChange={(e) =>
+                                  actualizarItem(index, "descripcion", e.target.value)
+                                }
+                                placeholder="Ej: Remera personalizada"
+                                disabled={!puedeCrearVentas}
+                              />
+
+                              <button
+                                type="button"
+                                className="ventas-selector-precio-btn"
+                                onClick={() => abrirSelectorPrecio(index)}
+                                disabled={!puedeCrearVentas}
+                                title="Agregar desde lista de precios"
+                              />
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </td>
-                    <td>
-                      <input
-                        type="number"
-                        min="1"
-                        value={item.cantidad}
-                        onChange={(e) =>
-                          actualizarItem(index, "cantidad", e.target.value)
-                        }
-                        disabled={!puedeCrearVentas}
-                      />
+                        <td className="ventas-cantidad-td">
+                        <input
+                          className="ventas-cantidad-input"
+                          type="number"
+                          min="1"
+                          value={Number(item.cantidad) === 0 ? "" : item.cantidad}
+                          onFocus={(e) => {
+                            if (Number(e.target.value) === 0) {
+                              e.target.value = "";
+                            }
+                          }}
+                          onChange={(e) =>
+                            actualizarItem(
+                              index,
+                              "cantidad",
+                              e.target.value === "" ? "" : Number(e.target.value)
+                            )
+                          }
+                          onBlur={(e) => {
+                            if (e.target.value === "") {
+                              actualizarItem(index, "cantidad", 0);
+                            }
+                          }}
+                          disabled={!puedeCrearVentas}
+                        />
+                        </td>
+                        <td className="ventas-money-td">
+                          {item.origenPrecio === "lista_precio" ? (
+                            <strong>
+                              {formatearMoneda(
+                                item.precioUnitario,
+                                configMoneda.moneda,
+                                configMoneda.localeMoneda
+                              )}
+                            </strong>
+                          ) : (
+                            <input
+                              className="ventas-precio-input-clean"
+                              type="number"
+                              min="0"
+                              value={item.precioUnitario}
+                              onFocus={(e) => {
+                                if (Number(e.target.value) === 0) {
+                                  e.target.value = "";
+                                }
+                              }}
+                              onChange={(e) =>
+                                actualizarItem(
+                                  index,
+                                  "precioUnitario",
+                                  e.target.value === "" ? "" : Number(e.target.value)
+                                )
+                              }
+                              onBlur={(e) => {
+                                if (e.target.value === "") {
+                                  actualizarItem(index, "precioUnitario", 0);
+                                }
+                              }}
+                              disabled={!puedeCrearVentas}
+                            />
+                          )}
+                        </td>
+                     <td className="ventas-money-td ventas-subtotal-td">
+                      <strong>
+                        {formatearMoneda(
+                          item.subtotal,
+                          configMoneda.moneda,
+                          configMoneda.localeMoneda
+                        )}
+                      </strong>
                     </td>
-                    <td>
-                      <input
-                        type="number"
-                        min="0"
-                        value={item.precioUnitario}
-                        onChange={(e) =>
-                          actualizarItem(index, "precioUnitario", e.target.value)
-                        }
-                        disabled={!puedeCrearVentas}
-                      />
-                    </td>
-                     <td>{formatearMoneda(item.subtotal, configMoneda.moneda, configMoneda.localeMoneda)}</td>
-                    <td>
-                      <button
-                        className="btn btn-danger"
-                        onClick={() => eliminarItem(index)}
-                        disabled={items.length === 1 || !puedeCrearVentas}
-                      >
-                        Eliminar
-                      </button>
-                    </td>
-                    <td style={{ textAlign: "center" }}>
-                      <input
-                        type="checkbox"
-                        checked={item.excluirDescuento === true}
-                        onChange={(e) =>
-                          actualizarItem(index, "excluirDescuento", e.target.checked)
-                        }
-                        disabled={!puedeCrearVentas}
-                        title="Excluir este ítem del descuento porcentual"
-                      />
-                    </td>
+                      <td className="ventas-action-td">
+                        <div className="ventas-action-center">
+                          <button
+                            type="button"
+                            className="ventas-delete-icon-btn"
+                            onClick={() => eliminarItem(index)}
+                            disabled={items.length === 1 || !puedeCrearVentas}
+                            title="Eliminar ítem"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
+                      </td>
+                  <td className="ventas-check-td">
+                    <input
+                      type="checkbox"
+                      checked={item.excluirDescuento === true}
+                      onChange={(e) =>
+                        actualizarItem(index, "excluirDescuento", e.target.checked)
+                      }
+                      disabled={!puedeCrearVentas}
+                      title="Excluir este ítem del descuento porcentual"
+                    />
+                  </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         </section>
-
+        </div>          
         <aside className="ventas-card ventas-card-sm ventas-card-sticky-wrap">
           <div className="ventas-card-sticky">
             <div className="ventas-card-header">
@@ -1103,14 +1211,16 @@ const aplicarProductoSeleccionado = (datosPrecio) => {
             </div>
 
             <div className="ventas-resumen">
-              <div className="ventas-resumen-row">
-                <span>Cliente</span>
-                <strong>{clienteSeleccionado?.nombre || "-"}</strong>
-              </div>
+              <div className="ventas-resumen-duo">
+                <div>
+                  <span>Cliente</span>
+                  <strong>{clienteSeleccionado?.nombre || "-"}</strong>
+                </div>
 
-              <div className="ventas-resumen-row">
-                <span>Pedido asociado</span>
-                <strong>{pedidoSeleccionado ? `#${pedidoSeleccionado.id}` : "-"}</strong>
+                <div>
+                  <span>Pedido</span>
+                  <strong>{pedidoSeleccionado ? `#${pedidoSeleccionado.id}` : "-"}</strong>
+                </div>
               </div>
 
               <div className="ventas-resumen-row">
@@ -1118,8 +1228,10 @@ const aplicarProductoSeleccionado = (datosPrecio) => {
                 <strong>{formatearMoneda(subtotal, configMoneda.moneda, configMoneda.localeMoneda)}</strong>
               </div>
 
-              <div className="ventas-field">
-                <label>Descuento (%)</label>
+              <div className="ventas-descuento-mini">
+                <span>Descuento</span>
+
+                <div className="ventas-descuento-input-wrap">
                   <input
                     type="number"
                     min="0"
@@ -1127,24 +1239,18 @@ const aplicarProductoSeleccionado = (datosPrecio) => {
                     value={descuento}
                     onChange={(e) => setDescuento(e.target.value)}
                     disabled={!puedeCrearVentas}
-                    placeholder="Ej: 10"
+                    placeholder="0"
                   />
-                  <small>
-                    Descuento aplicado:{" "}
-                    {formatearMoneda(
-                      descuentoMonto,
-                      configMoneda.moneda,
-                      configMoneda.localeMoneda
-                    )}
-                  </small>
-                  <small>
-                    Base con descuento:{" "}
-                    {formatearMoneda(
-                      subtotalAplicableDescuento,
-                      configMoneda.moneda,
-                      configMoneda.localeMoneda
-                    )}
-                  </small>
+                  <small>%</small>
+                </div>
+
+                <strong>
+                  {formatearMoneda(
+                    descuentoMonto,
+                    configMoneda.moneda,
+                    configMoneda.localeMoneda
+                  )}
+                </strong>
               </div>
 
               <div className="ventas-resumen-row ventas-total">

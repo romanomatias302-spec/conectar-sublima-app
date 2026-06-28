@@ -20,12 +20,25 @@ import { formatearMoneda, obtenerConfigMonedaDesdePerfil } from "../../utils/mon
 import { puedeHacer } from "../../utils/permisos";
 import { obtenerUsuariosPorCliente } from "../../firebase/usuariosConfig";
 import "./VentasPage.css";
+import ProductoSelectorModal from "../../components/ProductoSelectorModal/ProductoSelectorModal";
+import { Trash2 } from "lucide-react";
 
 const itemVacio = () => ({
   descripcion: "",
   cantidad: 1,
   precioUnitario: 0,
   excluirDescuento: false,
+
+  origenPrecio: "manual",
+  listaPrecioId: "",
+  listaPrecioNombre: "",
+  productoListaNombre: "",
+  productoBaseId: "",
+  imagenUrl: "",
+  imagenThumb: "",
+  reglaCantidad: null,
+  adicionalesSeleccionados: [],
+  precioDetalleInterno: null,
 });
 
 const clienteRapidoInicial = {
@@ -66,6 +79,9 @@ const [configNegocio, setConfigNegocio] = useState({
   });
 
   const [items, setItems] = useState([itemVacio()]);
+  const [modalPrecioAbierto, setModalPrecioAbierto] = useState(false);
+  const [itemPrecioIndex, setItemPrecioIndex] = useState(null);
+
   const [descuento, setDescuento] = useState(0);
   const [notas, setNotas] = useState("");
 
@@ -444,6 +460,24 @@ const cotizacionesFiltradas = useMemo(() => {
     );
   };
 
+  const abrirSelectorPrecio = (index) => {
+    setItemPrecioIndex(index);
+    setModalPrecioAbierto(true);
+    setError("");
+  };
+
+  const aplicarProductoSeleccionado = (datosPrecio) => {
+    if (itemPrecioIndex === null) return;
+
+    Object.entries(datosPrecio).forEach(([campo, valor]) => {
+      actualizarItem(itemPrecioIndex, campo, valor);
+    });
+
+    setModalPrecioAbierto(false);
+    setItemPrecioIndex(null);
+    setError("");
+  };
+
   const guardarCotizacion = async () => {
     try {
       if (!puedeCrearCotizacion) {
@@ -617,15 +651,15 @@ const cotizacionesFiltradas = useMemo(() => {
             </div>
 
             <div className="ventas-table-wrap ventas-table-desktop">
-              <table className="ventas-table">
+              <table className="ventas-table ventas-items-table">
                 <thead>
                   <tr>
-                    <th>N°</th>
-                    <th>Fecha</th>
-                    <th>Cliente</th>
-                    <th>Estado</th>
-                    <th>Total</th>
-                    
+                    <th>Producto</th>
+                    <th>Cantidad</th>
+                    <th>Precio unitario</th>
+                    <th>Subtotal</th>
+                    <th>Acción</th>
+                    <th>Excluir desc.</th>
                   </tr>
                 </thead>
 
@@ -894,53 +928,142 @@ const cotizacionesFiltradas = useMemo(() => {
                 <tbody>
                   {itemsNormalizados.map((item, index) => (
                     <tr key={index}>
-                      <td>
+                      <td className="ventas-producto-td">
+                        <div className="ventas-producto-row">
+                          <div className="ventas-producto-img">
+                            {item.imagenThumb || item.imagenUrl ? (
+                              <img
+                                src={item.imagenThumb || item.imagenUrl}
+                                alt={item.descripcion || "Producto"}
+                              />
+                            ) : (
+                              <span />
+                            )}
+                          </div>
+
+                          <div
+                            className={`ventas-producto-main ${
+                              item.origenPrecio === "lista_precio"
+                                ? "ventas-producto-main-lista"
+                                : "ventas-producto-main-manual"
+                            }`}
+                          >
+                            {item.origenPrecio === "lista_precio" ? (
+                              <>
+                                <span className="ventas-producto-nombre">
+                                  {item.descripcion || "Producto sin descripción"}
+                                </span>
+
+                                <small className="ventas-item-source">
+                                  Lista de precios
+                                </small>
+                              </>
+                            ) : (
+                              <div className="ventas-descripcion-selector ventas-descripcion-selector-clean">
+                                <input
+                                  value={item.descripcion}
+                                  onChange={(e) =>
+                                    actualizarItem(index, "descripcion", e.target.value)
+                                  }
+                                  placeholder="Ej: Remera personalizada"
+                                />
+
+                                <button
+                                  type="button"
+                                  className="ventas-selector-precio-btn"
+                                  onClick={() => abrirSelectorPrecio(index)}
+                                  title="Agregar desde lista de precios"
+                                />
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+
+                      <td className="ventas-cantidad-td">
                         <input
-                          value={item.descripcion}
-                          onChange={(e) =>
-                            actualizarItem(index, "descripcion", e.target.value)
-                          }
-                        />
-                      </td>
-
-                      <td>
-                       <input
+                          className="ventas-cantidad-input"
                           type="number"
-                          value={item.cantidad === 0 ? "" : item.cantidad}
+                          min="1"
+                          value={Number(item.cantidad) === 0 ? "" : item.cantidad}
                           onChange={(e) =>
-                            actualizarItem(index, "cantidad", e.target.value)
+                            actualizarItem(
+                              index,
+                              "cantidad",
+                              e.target.value === "" ? "" : Number(e.target.value)
+                            )
                           }
-                          placeholder="0"
+                          onBlur={(e) => {
+                            if (e.target.value === "") actualizarItem(index, "cantidad", 0);
+                          }}
                         />
                       </td>
 
-                      <td>
-                   <input
-                      type="number"
-                      value={item.precioUnitario === 0 ? "" : item.precioUnitario}
-                      onChange={(e) =>
-                        actualizarItem(index, "precioUnitario", e.target.value)
-                      }
-                      placeholder="0"
-                    />
-                      </td>
-
-                      <td>
-                        {formatearMoneda(
-                          item.subtotal,
-                          configMoneda.moneda,
-                          configMoneda.localeMoneda
+                      <td className="ventas-money-td">
+                        {item.origenPrecio === "lista_precio" ? (
+                          <span>
+                            {formatearMoneda(
+                              item.precioUnitario,
+                              configMoneda.moneda,
+                              configMoneda.localeMoneda
+                            )}
+                          </span>
+                        ) : (
+                          <input
+                            className="ventas-precio-input-clean"
+                            type="number"
+                            min="0"
+                            value={item.precioUnitario}
+                            onFocus={(e) => {
+                              if (Number(e.target.value) === 0) e.target.select();
+                            }}
+                            onChange={(e) =>
+                              actualizarItem(
+                                index,
+                                "precioUnitario",
+                                e.target.value === "" ? "" : Number(e.target.value)
+                              )
+                            }
+                            onBlur={(e) => {
+                              if (e.target.value === "") actualizarItem(index, "precioUnitario", 0);
+                            }}
+                          />
                         )}
                       </td>
 
-                      <td>
-                        <button
-                          className="btn btn-danger btn-xs"
-                          onClick={() => eliminarItem(index)}
-                          disabled={items.length === 1}
-                        >
-                          X
-                        </button>
+                      <td className="ventas-money-td ventas-subtotal-td">
+                        <span>
+                          {formatearMoneda(
+                            item.subtotal,
+                            configMoneda.moneda,
+                            configMoneda.localeMoneda
+                          )}
+                        </span>
+                      </td>
+
+                      <td className="ventas-action-td">
+                        <div className="ventas-action-center">
+                          <button
+                            type="button"
+                            className="ventas-delete-icon-btn"
+                            onClick={() => eliminarItem(index)}
+                            disabled={items.length === 1}
+                            title="Eliminar ítem"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
+                      </td>
+
+                      <td className="ventas-check-td">
+                        <input
+                          type="checkbox"
+                          checked={item.excluirDescuento === true}
+                          onChange={(e) =>
+                            actualizarItem(index, "excluirDescuento", e.target.checked)
+                          }
+                          title="Excluir este ítem del descuento porcentual"
+                        />
                       </td>
                     </tr>
                   ))}
@@ -1007,6 +1130,17 @@ const cotizacionesFiltradas = useMemo(() => {
           </div>
         </div>
       )}
+      <ProductoSelectorModal
+        open={modalPrecioAbierto}
+        perfil={perfil}
+        configMoneda={configMoneda}
+        itemActual={itemPrecioIndex !== null ? items[itemPrecioIndex] : null}
+        onClose={() => {
+          setModalPrecioAbierto(false);
+          setItemPrecioIndex(null);
+        }}
+        onAplicar={aplicarProductoSeleccionado}
+      />
     </div>
   );
 }

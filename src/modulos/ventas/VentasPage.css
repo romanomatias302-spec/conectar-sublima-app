@@ -2545,8 +2545,993 @@ margin-top:20px;
 }
 
 
+/* =========================
+   VENTAS - CABECERA UX PRO
+   ========================= */
+
+.ventas-datos-pro {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  background: linear-gradient(180deg, #ffffff, #f8fcff);
+  border: 1px solid #e2e8f0;
+  border-radius: 20px;
+  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.06);
+  margin-bottom: 18px;
+}
+
+.ventas-datos-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #eaf0f6;
+}
+
+.ventas-datos-title h3 {
+  margin: 0;
+  font-size: 16px;
+  color: #0f172a;
+}
+
+.ventas-datos-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #e0f7ff, #bfefff);
+  color: #0796c9;
+  display: grid;
+  place-items: center;
+}
+
+.ventas-datos-row {
+  display: grid;
+  gap: 12px;
+  align-items: end;
+}
+
+.ventas-datos-row-principal {
+  grid-template-columns: 170px minmax(0, 1fr);
+}
+
+.ventas-datos-row-secundaria {
+  grid-template-columns: 260px 220px minmax(0, 1fr);
+  gap: 10px;
+}
+
+.ventas-datos-pro .ventas-field {
+  gap: 5px;
+}
+
+.ventas-datos-pro .ventas-field label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+  font-weight: 800;
+}
+
+.ventas-input-icon-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.ventas-input-icon-wrap > svg {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #0796c9;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.ventas-input-icon-wrap input,
+.ventas-input-icon-wrap select {
+  width: 100%;
+  height: 38px;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid #dbe3ef;
+  padding-left: 38px;
+  outline: none;
+}
+
+.ventas-input-icon-wrap input:focus,
+.ventas-input-icon-wrap select:focus {
+  border-color: #0796c9;
+  box-shadow: 0 0 0 3px rgba(7, 150, 201, 0.1);
+}
+
+.ventas-datos-pro .ventas-cliente-inline {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.ventas-btn-soft {
+  border: 1px solid rgba(7, 150, 201, 0.25);
+  background: #effbff;
+  color: #0796c9;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 38px;
+  border-radius: 12px;
+  transform: none !important;
+}
+
+.ventas-btn-soft:hover {
+  background: #dff7ff;
+}
+
+@media (max-width: 980px) {
+  .ventas-datos-row-principal,
+  .ventas-datos-row-secundaria {
+    grid-template-columns: 1fr;
+  }
+
+  .ventas-datos-pro .ventas-cliente-inline {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Ajuste fino cabecera ventas */
+.ventas-input-icon-wrap > svg {
+  top: 50% !important;
+  transform: translateY(-80%) !important;
+}
+
+.ventas-datos-pro .ventas-btn-soft {
+  transform: translateY(-11px) !important;
+}
+
+.ventas-datos-pro .ventas-cliente-inline {
+  align-items: end;
+}
+
+.ventas-datos-pro .ventas-btn-inline {
+  height: 38px !important;
+  align-self: end;
+}
+
+.ventas-datos-pro-externa {
+  margin-bottom: 18px;
+}
+
+.ventas-card-lg .ventas-card-header h2 {
+  color: #0f172a;
+}
+
+.ventas-producto-cell {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+
+.ventas-producto-img {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background: linear-gradient(145deg, #0f172a, #0796c9);
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+
+.ventas-producto-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.ventas-producto-img span {
+  width: 15px;
+  height: 15px;
+  border: 2px solid #fff;
+  border-radius: 4px;
+  transform: rotate(45deg);
+}
+
+.ventas-producto-info {
+  min-width: 0;
+}
+
+.ventas-item-source {
+  margin-top: 5px;
+  display: inline-flex;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #e0f7ff;
+  color: #036986;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.ventas-delete-icon-btn {
+  width: 32px;
+  height: 32px;
+  border: 1px solid #fecaca;
+  background: #fff5f5;
+  color: #ef4444;
+  border-radius: 11px;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: 0.16s ease;
+}
+
+.ventas-delete-icon-btn:hover:not(:disabled) {
+  background: #fee2e2;
+  transform: translateY(-1px);
+}
+
+.ventas-delete-icon-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* =========================
+   VENTAS - TABLA ITEMS PRO
+   ========================= */
+
+.ventas-table {
+  table-layout: fixed;
+}
+
+.ventas-table th:nth-child(1),
+.ventas-table td:nth-child(1) {
+  width: 48%;
+}
+
+.ventas-table th:nth-child(2),
+.ventas-table td:nth-child(2) {
+  width: 12%;
+}
+
+.ventas-table th:nth-child(3),
+.ventas-table td:nth-child(3) {
+  width: 14%;
+}
+
+.ventas-table th:nth-child(4),
+.ventas-table td:nth-child(4) {
+  width: 14%;
+}
+
+.ventas-table th:nth-child(5),
+.ventas-table td:nth-child(5) {
+  width: 7%;
+}
+
+.ventas-table th:nth-child(6),
+.ventas-table td:nth-child(6) {
+  width: 5%;
+}
+
+.ventas-table th {
+  background: #f8fafc;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 900;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.ventas-table td {
+  height: 68px;
+  vertical-align: middle;
+}
+
+.ventas-producto-td {
+  padding-left: 10px !important;
+}
+
+.ventas-producto-row {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  min-height: 52px;
+}
+
+.ventas-producto-img {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: linear-gradient(145deg, #0f172a, #0796c9);
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  align-self: center;
+}
+
+.ventas-producto-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.ventas-producto-img span {
+  width: 15px;
+  height: 15px;
+  border: 2px solid #fff;
+  border-radius: 4px;
+  transform: rotate(45deg);
+}
+
+.ventas-producto-main {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  align-content: center;
+}
+
+.ventas-producto-nombre {
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.25;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.ventas-item-source {
+  width: fit-content;
+  display: inline-flex;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #e0f7ff;
+  color: #036986;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.ventas-descripcion-selector-clean input {
+  border-color: transparent !important;
+  background: transparent !important;
+  padding-left: 0 !important;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.ventas-descripcion-selector-clean input:focus {
+  background: #fff !important;
+  border-color: #dbe3ef !important;
+  padding-left: 8px !important;
+}
+
+.ventas-cantidad-td,
+.ventas-money-td,
+.ventas-action-td,
+.ventas-check-td {
+  text-align: center !important;
+}
+
+.ventas-cantidad-input {
+  width: 68px !important;
+  height: 38px !important;
+  text-align: center;
+  border-radius: 12px !important;
+}
+
+.ventas-precio-input-clean {
+  width: 96px !important;
+  height: 34px !important;
+  text-align: right;
+  border-color: transparent !important;
+  background: transparent !important;
+  font-weight: 800;
+}
+
+.ventas-precio-input-clean:focus {
+  background: #fff !important;
+  border-color: #dbe3ef !important;
+}
+
+.ventas-money-td strong {
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.ventas-subtotal-td strong {
+  color: #036986;
+}
+
+.ventas-delete-icon-btn {
+  width: 34px;
+  height: 34px;
+  border: 1px solid #fecaca;
+  background: #fff5f5;
+  color: #ef4444;
+  border-radius: 12px;
+  cursor: pointer;
+  display: inline-grid;
+  place-items: center;
+  transition: 0.16s ease;
+}
+
+.ventas-delete-icon-btn:hover:not(:disabled) {
+  background: #fee2e2;
+  transform: translateY(-1px);
+}
+
+.ventas-delete-icon-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.ventas-check-td input[type="checkbox"] {
+  width: 17px;
+  height: 17px;
+  accent-color: #0796c9;
+}
+
+/* =========================
+   VENTAS - AJUSTE FINO TABLA PRO
+   ========================= */
+
+/* Cabecera superior: labels más livianos y en minúscula */
+.ventas-datos-pro .ventas-field label {
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+  font-weight: 500 !important;
+  color: #475569;
+}
+
+/* Cabecera tabla más marcada */
+.ventas-table thead th {
+  background: linear-gradient(180deg, #f8fbff, #eef7ff) !important;
+  color: #334155 !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  border-top: 1px solid #e2e8f0;
+  border-bottom: 1px solid #cfe8f5 !important;
+  height: 42px;
+  vertical-align: middle !important;
+}
+
+/* Alineación general vertical */
+.ventas-table th,
+.ventas-table td {
+  vertical-align: middle !important;
+}
+
+.ventas-table tbody tr {
+  min-height: 68px;
+}
+
+.ventas-table tbody td {
+  height: 68px;
+}
+
+/* Textos de producto más normales */
+.ventas-producto-nombre {
+  font-weight: 500 !important;
+  color: #0f172a;
+}
+
+/* Input descripción limpio, sin negrita */
+.ventas-descripcion-selector-clean input {
+  font-weight: 400 !important;
+  color: #0f172a;
+}
+
+.ventas-descripcion-selector-clean input::placeholder {
+  color: #94a3b8 !important;
+  font-weight: 400 !important;
+}
+
+/* Placeholder general más suave */
+.ventas-table input::placeholder {
+  color: #94a3b8 !important;
+  font-weight: 400 !important;
+}
+
+/* Celdas centradas respecto a su cabecera */
+.ventas-cantidad-td,
+.ventas-money-td,
+.ventas-action-td,
+.ventas-check-td {
+  text-align: center !important;
+  vertical-align: middle !important;
+}
+
+/* Inputs centrados dentro de su celda */
+.ventas-cantidad-td {
+  display: table-cell !important;
+}
+
+.ventas-cantidad-input {
+  display: inline-block !important;
+  margin: 0 auto !important;
+  text-align: center !important;
+  font-weight: 400 !important;
+}
+
+/* Precio y subtotal sin negrita excesiva */
+.ventas-money-td strong {
+  font-weight: 500 !important;
+}
+
+.ventas-subtotal-td strong {
+  font-weight: 600 !important;
+}
+
+/* Acción eliminar centrada */
+.ventas-action-td {
+  text-align: center !important;
+}
+
+.ventas-delete-icon-btn {
+  margin: 0 auto !important;
+  display: inline-grid !important;
+  place-items: center !important;
+  vertical-align: middle !important;
+}
+
+.ventas-delete-icon-btn svg {
+  display: block;
+}
+
+/* Checkbox centrado */
+.ventas-check-td {
+  text-align: center !important;
+}
+
+.ventas-check-td input[type="checkbox"] {
+  margin: 0 auto !important;
+  display: block !important;
+}
+
+/* Imagen alineada al centro vertical del item */
+.ventas-producto-row {
+  align-items: center !important;
+}
+
+.ventas-producto-img {
+  align-self: center !important;
+}
+
+/* Pastilla menos pesada */
+.ventas-item-source {
+  font-weight: 500 !important;
+}
+
+/* ======================================
+   Alineación definitiva de columnas
+====================================== */
+
+.ventas-table thead th {
+  text-align: center;
+}
+
+.ventas-table thead th:first-child {
+  text-align: left;
+  padding-left: 18px;
+}
+
+/* Producto */
+.ventas-producto-td {
+  padding-left: 18px !important;
+}
+
+/* Cantidad */
+.ventas-cantidad-td{
+  padding-left:0 !important;
+  padding-right:0 !important;
+}
+
+.ventas-cantidad-td .ventas-cantidad-input{
+  margin:auto !important;
+}
+
+/* Precio */
+.ventas-money-td{
+  padding-left:0 !important;
+  padding-right:0 !important;
+  text-align:center !important;
+}
+
+/* Acción */
+.ventas-action-td{
+  padding-left:0 !important;
+  padding-right:0 !important;
+
+  display:flex;
+  justify-content:center;
+  align-items:center;
+}
+
+.ventas-delete-icon-btn{
+  margin:0 !important;
+  flex-shrink:0;
+}
+
+.ventas-delete-icon-btn svg{
+    margin: 0 !important;
+    padding: 0 !important;
+
+    position: absolute;
+    left: 50%;
+    top: 50%;
+
+    transform: translate(-50%, -50%);
+
+    width: 15px;
+    height: 15px;
+}
+
+.ventas-delete-icon-btn{
+    position: relative;
+}
+
+/* Checkbox */
+.ventas-check-td{
+  padding-left:0 !important;
+  padding-right:0 !important;
+
+  text-align:center;
+}
+
+.ventas-check-td input{
+  margin:auto !important;
+}
+
+/* ===============================
+   Ajuste final columnas ítems
+   =============================== */
+
+/* Acción: mismo eje para título, celda e icono */
+.ventas-table th:nth-child(5),
+.ventas-table td:nth-child(5) {
+  text-align: center !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+.ventas-action-td {
+  display: table-cell !important;
+  text-align: center !important;
+  vertical-align: middle !important;
+}
+
+.ventas-delete-icon-btn {
+  margin: 0 auto !important;
+  display: inline-grid !important;
+  place-items: center !important;
+}
+
+/* Precio manual: sin negrita y centrado */
+.ventas-precio-input-clean {
+  display: inline-block !important;
+  margin: 0 auto !important;
+  text-align: center !important;
+  font-weight: 400 !important;
+  color: #0f172a !important;
+}
+
+/* Evita que el input herede negrita de la tabla */
+.ventas-table td input {
+  font-weight: 400 !important;
+}
+
+/* Centrado horizontal del precio manual */
+.ventas-money-td {
+  text-align: center !important;
+  vertical-align: middle !important;
+}
+
+.ventas-action-td{
+    padding:0 !important;
+}
+
+.ventas-action-center{
+    width:100%;
+    height:100%;
+
+    display:flex;
+    align-items:center;
+    justify-content:center;
+}
+
+.ventas-delete-icon-btn{
+    margin:0 !important;
+}
 
 
 
+
+/* Producto manual vs producto de lista */
+.ventas-producto-main {
+  min-width: 0;
+}
+
+.ventas-producto-main-lista {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  min-height: 48px;
+}
+
+.ventas-producto-main-manual {
+  display: flex;
+  align-items: center;
+  min-height: 48px;
+}
+
+.ventas-producto-main-manual .ventas-descripcion-selector-clean {
+  width: 100%;
+}
+
+.ventas-producto-main-manual .ventas-descripcion-selector-clean input {
+  height: 32px !important;
+  line-height: 32px !important;
+}
+
+/* Producto manual: input tipo línea, sin recuadro */
+.ventas-producto-main-manual .ventas-descripcion-selector-clean {
+  width: 100%;
+}
+
+.ventas-producto-main-manual .ventas-descripcion-selector-clean input,
+.ventas-descripcion-selector-clean input {
+  height: 30px !important;
+  border: none !important;
+  border-bottom: 1px solid #cbd5e1 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  padding: 0 34px 0 0 !important;
+  box-shadow: none !important;
+  font-weight: 400 !important;
+}
+
+.ventas-producto-main-manual .ventas-descripcion-selector-clean input:focus,
+.ventas-descripcion-selector-clean input:focus {
+  border-bottom-color: #0796c9 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.ventas-producto-main-manual .ventas-descripcion-selector-clean input::placeholder,
+.ventas-descripcion-selector-clean input::placeholder {
+  color: #94a3b8 !important;
+  font-weight: 400 !important;
+}
+
+/* Botón + alineado con input de línea */
+.ventas-descripcion-selector-clean .ventas-selector-precio-btn {
+  right: 0 !important;
+  width: 24px;
+  height: 24px;
+}
+
+.ventas-datos-pro .ventas-pedido-field {
+  max-width: none;
+}
+
+.ventas-datos-pro .ventas-vendedor-field {
+  max-width: none;
+}
+
+.ventas-datos-pro .ventas-field {
+  min-width: 0;
+}
+
+.ventas-datos-pro .ventas-input-icon-wrap input,
+.ventas-datos-pro .ventas-input-icon-wrap select {
+  min-width: 0;
+}
+
+/* Resumen compacto */
+.ventas-resumen-duo {
+  display: grid;
+  grid-template-columns: 1fr 90px;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid #eef2f7;
+}
+
+.ventas-resumen-duo div {
+  min-width: 0;
+}
+
+.ventas-resumen-duo span,
+.ventas-descuento-mini span {
+  display: block;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.ventas-resumen-duo strong {
+  display: block;
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ventas-descuento-mini {
+  display: grid;
+  grid-template-columns: 1fr 76px auto;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid #eef2f7;
+}
+
+.ventas-descuento-mini > span {
+  margin-bottom: 0;
+}
+
+.ventas-descuento-input-wrap {
+  position: relative;
+}
+
+.ventas-descuento-input-wrap input {
+  width: 100%;
+  height: 34px;
+  border: 1px solid #dbe3ef;
+  border-radius: 10px;
+  padding: 0 24px 0 10px;
+  text-align: right;
+}
+
+.ventas-descuento-input-wrap small {
+  position: absolute;
+  right: 9px;
+  top: 50%;
+  transform: translateY(-60%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+  pointer-events: none;
+}
+
+.ventas-descuento-mini strong {
+  color: #036986;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+/* ===============================
+   FIX: tablas globales
+   =============================== */
+
+/* Resetea listados: ventas, pedidos, cotizaciones */
+.ventas-table:not(.ventas-items-table) {
+  table-layout: auto !important;
+}
+
+.ventas-table:not(.ventas-items-table) th,
+.ventas-table:not(.ventas-items-table) td {
+  width: auto !important;
+  min-width: unset !important;
+  max-width: unset !important;
+  padding: 12px 14px !important;
+  vertical-align: middle;
+}
+
+/* Los encabezados siguen exactamente la alineación del contenido */
+.ventas-table:not(.ventas-items-table) th {
+  text-align: inherit;
+  font-weight: 700;
+}
+
+.ventas-table:not(.ventas-items-table) td {
+  text-align: inherit;
+}
+
+/* Columnas numéricas del listado alineadas */
+.ventas-table:not(.ventas-items-table) th:nth-last-child(-n + 3),
+.ventas-table:not(.ventas-items-table) td:nth-last-child(-n + 3) {
+  text-align: right !important;
+}
+
+/* Badges de saldo visibles */
+.ventas-saldo-badge {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  width: auto !important;
+  min-width: 96px;
+}
+
+/* Desde ahora, los anchos especiales aplican solo a crear venta */
+.ventas-items-table {
+  table-layout: fixed !important;
+}
+
+/* ==========================================
+   LISTADOS - Encabezados alineados con datos
+========================================== */
+
+/* Columnas de texto */
+.ventas-table:not(.ventas-items-table) th:nth-child(1),
+.ventas-table:not(.ventas-items-table) td:nth-child(1),
+.ventas-table:not(.ventas-items-table) th:nth-child(2),
+.ventas-table:not(.ventas-items-table) td:nth-child(2),
+.ventas-table:not(.ventas-items-table) th:nth-child(3),
+.ventas-table:not(.ventas-items-table) td:nth-child(3),
+.ventas-table:not(.ventas-items-table) th:nth-child(4),
+.ventas-table:not(.ventas-items-table) td:nth-child(4),
+.ventas-table:not(.ventas-items-table) th:nth-child(5),
+.ventas-table:not(.ventas-items-table) td:nth-child(5) {
+  text-align: center !important;
+}
+
+/* Columnas monetarias */
+.ventas-table:not(.ventas-items-table) th:nth-child(6),
+.ventas-table:not(.ventas-items-table) td:nth-child(6),
+.ventas-table:not(.ventas-items-table) th:nth-child(7),
+.ventas-table:not(.ventas-items-table) td:nth-child(7),
+.ventas-table:not(.ventas-items-table) th:nth-child(8),
+.ventas-table:not(.ventas-items-table) td:nth-child(8) {
+  text-align: center !important;
+}
+
+/* Los badges también quedan centrados */
+.ventas-table:not(.ventas-items-table) td .ventas-estado-badge,
+.ventas-table:not(.ventas-items-table) td .ventas-saldo-badge {
+  margin: 0 auto;
+}
+
+.ventas-layout-con-resumen-alto {
+  align-items: start;
+}
+
+.ventas-layout-con-resumen-alto .ventas-card-sticky {
+  top: 84px;
+}
+
+.ventas-card-sticky .btn-full {
+  position: sticky;
+  bottom: 10px;
+  z-index: 3;
+  box-shadow: 0 10px 22px rgba(7, 150, 201, 0.24);
+}
+
+@media (max-width: 900px) {
+  .ventas-card-sticky .btn-full {
+    position: static;
+    box-shadow: none;
+  }
+
+  .ventas-layout-con-resumen-alto .ventas-card-sticky {
+    top: auto;
+  }
+}
+
+.ventas-layout-con-resumen-alto {
+  align-items: start;
+}
+
+.ventas-main-column-crear {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.ventas-datos-pro-externa {
+  margin-bottom: 0 !important;
+}
+
+.ventas-layout-con-resumen-alto .ventas-card-sticky {
+  top: 20px;
+}
 
 
