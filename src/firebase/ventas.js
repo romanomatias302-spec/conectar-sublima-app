@@ -68,6 +68,17 @@ return itemsValidos.map((item) => ({
   ...item,
   subtotal: item.cantidad * item.precioUnitario,
   excluirDescuento: item.excluirDescuento === true,
+
+  origenPrecio: item.origenPrecio || "manual",
+  listaPrecioId: item.listaPrecioId || "",
+  listaPrecioNombre: item.listaPrecioNombre || "",
+  productoListaNombre: item.productoListaNombre || "",
+  productoBaseId: item.productoBaseId || "",
+  reglaCantidad: item.reglaCantidad || null,
+  adicionalesSeleccionados: Array.isArray(item.adicionalesSeleccionados)
+    ? item.adicionalesSeleccionados
+    : [],
+  precioDetalleInterno: item.precioDetalleInterno || null,
 }));
   }
 
@@ -208,6 +219,15 @@ const sucursalNombre = perfil?.sucursalDefaultNombre || "Sucursal principal";
         precioUnitario: item.precioUnitario,
         subtotal: item.subtotal,
         excluirDescuento: item.excluirDescuento === true,
+
+        origenPrecio: item.origenPrecio || "manual",
+        listaPrecioId: item.listaPrecioId || "",
+        listaPrecioNombre: item.listaPrecioNombre || "",
+        productoListaNombre: item.productoListaNombre || "",
+        productoBaseId: item.productoBaseId || "",
+        reglaCantidad: item.reglaCantidad || null,
+        adicionalesSeleccionados: item.adicionalesSeleccionados || [],
+        precioDetalleInterno: item.precioDetalleInterno || null,
         origenItem: "inicial",
         estadoItem: "activo",
         motivoAnulacion: "",

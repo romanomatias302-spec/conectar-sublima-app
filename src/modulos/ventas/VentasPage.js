@@ -13,15 +13,39 @@ import { db } from "../../firebase";
 import { crearVenta } from "../../firebase/ventas";
 import { formatearMoneda, obtenerConfigMonedaDesdePerfil } from "../../utils/moneda";
 import "./VentasPage.css";
+import ProductoSelectorModal from "../../components/ProductoSelectorModal/ProductoSelectorModal";
+import {
+  CalendarDays,
+  User,
+  Search,
+  ClipboardList,
+  MessageSquareText,
+  BriefcaseBusiness,
+  Plus,
+  Trash2,
+  ShieldCheck,
+} from "lucide-react";
 import { puedeHacer } from "../../utils/permisos";
 import { obtenerUsuariosPorCliente } from "../../firebase/usuariosConfig";
 import { marcarCotizacionConvertida } from "../../firebase/cotizaciones";
+
 
 const itemVacio = () => ({
   descripcion: "",
   cantidad: 1,
   precioUnitario: 0,
   excluirDescuento: false,
+
+  origenPrecio: "manual",
+  listaPrecioId: "",
+  listaPrecioNombre: "",
+  productoListaNombre: "",
+  productoBaseId: "",
+  imagenUrl: "",
+  imagenThumb: "",
+  reglaCantidad: null,
+  adicionalesSeleccionados: [],
+  precioDetalleInterno: null,
 });
 
 function convertirProductosPedidoAVenta(productos = []) {
@@ -86,8 +110,11 @@ const [pedidoRefId, setPedidoRefId] = useState("");
   const [error, setError] = useState("");
   const [exito, setExito] = useState("");
   const [ventaCreada, setVentaCreada] = useState(null);
-  const [mostrarImportarPedido, setMostrarImportarPedido] =
-  useState(false);
+  const [mostrarImportarPedido, setMostrarImportarPedido] = useState(false);
+const [modalPrecioAbierto, setModalPrecioAbierto] = useState(false);
+const [itemPrecioIndex, setItemPrecioIndex] = useState(null);
+
+
 
 const [pedidoImportado, setPedidoImportado] =
   useState(false);
@@ -120,10 +147,10 @@ const [pedidoImportado, setPedidoImportado] =
               limit(50)
             );
 
-  const [snapClientes, snapPedidos] = await Promise.all([
-    getDocs(qClientes),
-    getDocs(qPedidos),
-  ]);
+const [snapClientes, snapPedidos] = await Promise.all([
+  getDocs(qClientes),
+  getDocs(qPedidos),
+]);
 
   setClientes(
     snapClientes.docs.map((d) => ({
@@ -138,6 +165,8 @@ const [pedidoImportado, setPedidoImportado] =
       ...d.data(),
     }))
   );
+
+
 
   try {
     const usuariosCliente = await obtenerUsuariosPorCliente(perfil.clienteId);
@@ -575,6 +604,24 @@ if (cliente) {
   setMostrarImportarPedido(false);
 };
 
+const abrirSelectorPrecio = (index) => {
+  setItemPrecioIndex(index);
+  setModalPrecioAbierto(true);
+  setError("");
+};
+
+const aplicarProductoSeleccionado = (datosPrecio) => {
+  if (itemPrecioIndex === null) return;
+
+  Object.entries(datosPrecio).forEach(([campo, valor]) => {
+    actualizarItem(itemPrecioIndex, campo, valor);
+  });
+
+  setModalPrecioAbierto(false);
+  setItemPrecioIndex(null);
+  setError("");
+};
+
   const guardarVenta = async () => {
     try {
       if (!puedeCrearVentas) {
@@ -640,6 +687,8 @@ if (cliente) {
       setGuardando(false);
     }
   };
+
+ 
 
   return (
     <div className="ventas-page">
@@ -978,14 +1027,24 @@ if (cliente) {
                 {itemsNormalizados.map((item, index) => (
                   <tr key={index}>
                     <td>
-                      <input
-                        value={item.descripcion}
-                        onChange={(e) =>
-                          actualizarItem(index, "descripcion", e.target.value)
-                        }
-                        placeholder="Ej: Remera personalizada"
-                        disabled={!puedeCrearVentas}
-                      />
+                      <div className="ventas-descripcion-selector">
+                        <input
+                          value={item.descripcion}
+                          onChange={(e) =>
+                            actualizarItem(index, "descripcion", e.target.value)
+                          }
+                          placeholder="Ej: Remera personalizada"
+                          disabled={!puedeCrearVentas}
+                        />
+
+                    <button
+                      type="button"
+                      className="ventas-selector-precio-btn"
+                      onClick={() => abrirSelectorPrecio(index)}
+                      disabled={!puedeCrearVentas}
+                      title="Agregar desde lista de precios"
+                    />
+                      </div>
                     </td>
                     <td>
                       <input
@@ -1167,8 +1226,19 @@ if (cliente) {
           </div>
         </aside>
       </div>
-
+        <ProductoSelectorModal
+          open={modalPrecioAbierto}
+          perfil={perfil}
+          configMoneda={configMoneda}
+          itemActual={itemPrecioIndex !== null ? items[itemPrecioIndex] : null}
+          onClose={() => {
+            setModalPrecioAbierto(false);
+            setItemPrecioIndex(null);
+          }}
+          onAplicar={aplicarProductoSeleccionado}
+        />       
       
     </div>
+
   );
 }
