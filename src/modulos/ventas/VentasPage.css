@@ -3572,3 +3572,57 @@ margin-top:20px;
 }
 
 
+@media (max-width: 768px) {
+  .ventas-items-table-wrap {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .ventas-items-table-wrap table {
+    min-width: 760px;
+  }
+}
+
+/* ===============================
+   MOBILE - Scroll horizontal tablas de carga
+   Crear venta / Crear cotización / Detalle cotización
+   =============================== */
+
+@media (max-width: 768px) {
+  .ventas-table-wrap:has(.ventas-items-table),
+  .ventas-table-wrap:has(.cotizacion-items-table),
+  .ventas-table-wrap:has(.cotizacion-detalle-items-table) {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    -webkit-overflow-scrolling: touch;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+  }
+
+  .ventas-table-wrap:has(.ventas-items-table) .ventas-table,
+  .ventas-table-wrap:has(.cotizacion-items-table) .ventas-table,
+  .ventas-table-wrap:has(.cotizacion-detalle-items-table) .ventas-table {
+    width: max-content !important;
+    min-width: 760px !important;
+    table-layout: auto !important;
+  }
+
+  .ventas-table-wrap:has(.ventas-items-table) th,
+  .ventas-table-wrap:has(.ventas-items-table) td,
+  .ventas-table-wrap:has(.cotizacion-items-table) th,
+  .ventas-table-wrap:has(.cotizacion-items-table) td,
+  .ventas-table-wrap:has(.cotizacion-detalle-items-table) th,
+  .ventas-table-wrap:has(.cotizacion-detalle-items-table) td {
+    white-space: nowrap !important;
+    overflow: visible !important;
+    text-overflow: unset !important;
+  }
+
+  .cotizacion-detalle-items-table {
+    min-width: 680px !important;
+    table-layout: auto !important;
+  }
+}

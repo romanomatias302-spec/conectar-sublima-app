@@ -28,7 +28,12 @@ function formatearFechaCaja(fechaISO) {
 }
 
 export default function CajaPage({ perfil, onVerVenta }) {
-  const fechaCaja = fechaHoyInput();
+  const timezoneCaja =
+    perfil?.timezone ||
+    perfil?.zonaHoraria ||
+    "America/Argentina/Buenos_Aires";
+
+  const fechaCaja = fechaHoyInput(timezoneCaja);
 
   const [caja, setCaja] = useState(null);
   const [sucursales, setSucursales] = useState([]);

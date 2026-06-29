@@ -15,13 +15,13 @@ import {
 } from "firebase/firestore";
 import { db } from "../firebase";
 
-export function fechaHoyInput() {
-  const hoy = new Date();
-  const yyyy = hoy.getFullYear();
-  const mm = String(hoy.getMonth() + 1).padStart(2, "0");
-  const dd = String(hoy.getDate()).padStart(2, "0");
-
-  return `${yyyy}-${mm}-${dd}`;
+export function fechaHoyInput(timezone = "America/Argentina/Buenos_Aires") {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone || "America/Argentina/Buenos_Aires",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
 }
 
 const SUCURSAL_PRINCIPAL_ID = "principal";

@@ -853,7 +853,8 @@ function canReadMovimientos(clienteId) {
     // productosBase
     // =========================
     match /productosBase/{productoId} {
-      allow read: if canReadPedidos(resource.data.clienteId);
+      allow read: if canReadPedidos(resource.data.clienteId)
+        || canReadListasPrecios(resource.data.clienteId);
       allow create: if canCreatePedidos(request.resource.data.clienteId);
       allow update: if canEditPedidoGeneral(resource.data.clienteId)
         && request.resource.data.clienteId == resource.data.clienteId;

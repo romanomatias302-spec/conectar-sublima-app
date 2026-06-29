@@ -189,15 +189,7 @@ const actualizarSucursal = async () => {
   return (
     <div className="sucursales-page" style={{ display: "grid", gap: 18 }}>
       <div className="container-secundaria">
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            gap: 12,
-            alignItems: "center",
-            flexWrap: "wrap",
-          }}
-        >
+<div className="sucursales-head">
           <div>
             <h3 style={{ margin: 0 }}>Sucursales</h3>
           </div>

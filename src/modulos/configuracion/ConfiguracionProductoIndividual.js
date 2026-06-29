@@ -215,7 +215,7 @@ const toggleSwitch = async (campo) => {
       productoActualizado.talles = tallesDefault;
     }
 
-    if (campo === "colores" && !hayValorConfig(producto.colores)) {
+    if (campo === "colores") {
       const coloresDefault = [
         { nombre: "Blanco", codigo: "#FFFFFF" },
         { nombre: "Negro", codigo: "#000000" },
@@ -224,8 +224,13 @@ const toggleSwitch = async (campo) => {
         { nombre: "Amarillo", codigo: "#FFFF00" },
       ];
 
-      payload.colores = coloresDefault;
-      productoActualizado.colores = coloresDefault;
+      if (!hayValorConfig(producto.colores)) {
+        payload.colores = coloresDefault;
+        productoActualizado.colores = coloresDefault;
+      } else {
+        payload.colores = producto.colores;
+        productoActualizado.colores = producto.colores;
+      }
     }
 
     if (campo === "detallesCostura" && !hayValorConfig(producto.detallesCostura)) {

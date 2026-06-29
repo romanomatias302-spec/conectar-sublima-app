@@ -3,8 +3,10 @@
   border-radius: 14px;
   padding: 25px;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
-  max-width: 800px;
+  width: 100%;
+  max-width: 1180px;
   margin: 0 auto;
+  box-sizing: border-box;
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
@@ -162,3 +164,140 @@ body.dark-mode .tab-btn.activo {
 .sucursales-page .container-secundaria:hover {
   transform: none !important;
 }
+
+/* =========================
+   CONFIGURACIÓN - layout mobile
+   ========================= */
+
+.config-contenido {
+  min-width: 0;
+}
+
+.config-section {
+  min-width: 0;
+}
+
+.config-section h2 {
+  display: flex;
+  align-items: center;
+  min-height: 28px;
+}
+
+.container-secundaria {
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.config-item {
+  gap: 14px;
+}
+
+.config-item select,
+.config-item input {
+  max-width: 100%;
+}
+
+/* =========================
+   SUCURSALES
+   ========================= */
+
+.sucursales-page {
+  min-width: 0;
+}
+
+.sucursales-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.sucursales-search {
+  width: 100%;
+  max-width: 420px;
+  margin-top: 14px;
+  box-sizing: border-box;
+}
+
+.sucursales-table-wrap {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-top: 14px;
+}
+
+.sucursales-table {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+}
+
+.sucursales-table th,
+.sucursales-table td {
+  white-space: nowrap;
+}
+
+.sucursal-badge-principal {
+  margin-left: 8px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #eaf7ff;
+  color: #0096d1;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.sucursales-actions {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.sucursales-reactivar-btn {
+  padding: 6px 10px !important;
+  font-size: 12px !important;
+  margin: 0 !important;
+}
+
+@media (max-width: 768px) {
+  .config-container {
+    padding: 14px;
+    border-radius: 12px;
+  }
+
+  .config-section h2 {
+    font-size: 15px;
+    line-height: 1.25;
+  }
+
+  .config-note {
+    font-size: 13px;
+    line-height: 1.35;
+  }
+
+  .config-item {
+    align-items: flex-start;
+    flex-direction: column;
+    padding: 12px;
+  }
+
+  .config-item select,
+  .config-item input,
+  .config-item button {
+    width: 100%;
+  }
+
+  .sucursales-head {
+    align-items: stretch;
+  }
+
+  .sucursales-head button {
+    width: 100%;
+  }
+
+  .sucursales-search {
+    max-width: 100%;
+  }
+}
+

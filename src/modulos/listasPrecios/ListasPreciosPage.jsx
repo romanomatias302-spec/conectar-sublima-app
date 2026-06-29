@@ -1,5 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
+  collection,
+  onSnapshot,
+  query,
+  where,
+} from "firebase/firestore";
+import { db } from "../../firebase";
+import {
   Plus,
   Search,
   Tags,
@@ -45,6 +52,7 @@ export default function ListasPreciosPage({ perfil }) {
   const [listas, setListas] = useState([]);
   const [productosBase, setProductosBase] = useState([]);
   const [busqueda, setBusqueda] = useState("");
+  const [busquedaGlobalProducto, setBusquedaGlobalProducto] = useState("");
   const [cargando, setCargando] = useState(true);
 
   const [modalLista, setModalLista] = useState(false);
@@ -95,9 +103,98 @@ export default function ListasPreciosPage({ perfil }) {
     }
   };
 
-  useEffect(() => {
-    cargarDatos();
-  }, [perfil?.clienteId]);
+useEffect(() => {
+  if (!perfil?.clienteId) return;
+
+  setCargando(true);
+
+const qListas = query(
+  collection(db, "listasPrecios"),
+  where("clienteId", "==", perfil.clienteId)
+);
+
+  const qProductos = query(
+    collection(db, "productosBase"),
+    where("clienteId", "==", perfil.clienteId)
+  );
+
+  const unsubListas = onSnapshot(
+    qListas,
+    (snap) => {
+      const listasDb = snap.docs.map((d) => ({
+        firebaseId: d.id,
+        ...d.data(),
+      }));
+
+      setListas(listasDb);
+      setCargando(false);
+    },
+    (error) => {
+      console.error("Error escuchando listas de precios:", error);
+      setCargando(false);
+    }
+  );
+
+  const unsubProductos = onSnapshot(
+    qProductos,
+    (snap) => {
+      const productosDb = snap.docs.map((d) => ({
+        firebaseId: d.id,
+        ...d.data(),
+      }));
+
+      setProductosBase(productosDb);
+    },
+    (error) => {
+      console.error("Error escuchando productos base:", error);
+    }
+  );
+
+  return () => {
+    unsubListas();
+    unsubProductos();
+  };
+}, [perfil?.clienteId]);
+
+useEffect(() => {
+  setListaSeleccionada((prev) => {
+    if (!listas.length) return null;
+
+    if (!prev?.firebaseId) {
+      return listas[0];
+    }
+
+    const actualizada = listas.find(
+      (l) => l.firebaseId === prev.firebaseId
+    );
+
+    return actualizada || listas[0];
+  });
+}, [listas]);
+
+const productosGlobalesFiltrados = useMemo(() => {
+  const texto = busquedaGlobalProducto.trim().toLowerCase();
+
+  if (!texto) return [];
+
+  return listas
+    .flatMap((lista) =>
+      (lista.productos || []).map((producto, index) => ({
+        lista,
+        producto,
+        indexOriginal: index,
+      }))
+    )
+    .filter(({ lista, producto }) => {
+      return (
+        (producto.nombre || "").toLowerCase().includes(texto) ||
+        (lista.nombre || "").toLowerCase().includes(texto) ||
+        (producto.adicionales || []).some((a) =>
+          (a.nombre || "").toLowerCase().includes(texto)
+        )
+      );
+    });
+}, [listas, busquedaGlobalProducto]);
 
   const listasFiltradas = useMemo(() => {
     const texto = busqueda.trim().toLowerCase();
@@ -221,6 +318,12 @@ export default function ListasPreciosPage({ perfil }) {
   };
 
   const borrarLista = async (lista) => {
+    if (lista.activa !== false) {
+        alert(
+            "Solo se pueden eliminar listas inactivas. Primero desactivá la lista."
+        );
+        return;
+    }
     if (!lista?.firebaseId) return;
 
     const confirmar = window.confirm(
@@ -570,6 +673,47 @@ const precioFinalSeleccionado = useMemo(() => {
         )}
       </div>
 
+      <div className="lp-buscador-global-productos">
+        <Search size={18} />
+
+        <input
+            value={busquedaGlobalProducto}
+            onChange={(e) => setBusquedaGlobalProducto(e.target.value)}
+            placeholder="Buscar producto en todas las listas..."
+        />
+
+        {busquedaGlobalProducto.trim() && (
+            <div className="lp-resultados-globales">
+            {productosGlobalesFiltrados.length === 0 ? (
+                <div className="lp-global-empty">
+                No se encontraron productos.
+                </div>
+            ) : (
+                productosGlobalesFiltrados.slice(0, 10).map(
+                ({ lista, producto, indexOriginal }) => (
+                    <button
+                    type="button"
+                    key={`${lista.firebaseId}-${producto.nombre}-${indexOriginal}`}
+                    onClick={() => {
+                        abrirDetalleLista(lista);
+                        setProductoSeleccionadoIndex(indexOriginal);
+                        setAdicionalesSimulados([]);
+                        setReglaSeleccionadaIndex(null);
+                        setBusquedaGlobalProducto("");
+                    }}
+                    >
+                    <strong>{producto.nombre}</strong>
+                    <span>
+                        {lista.nombre} · {formatearMoneda(producto.precioBase)}
+                    </span>
+                    </button>
+                )
+                )
+            )}
+            </div>
+        )}
+        </div>
+
       <div className="lp-layout-pro">
         <aside className="lp-sidebar-listas">
           <div className="lp-sidebar-title">
@@ -725,19 +869,19 @@ const precioFinalSeleccionado = useMemo(() => {
                         </button>
                       )}
 
-                      {puedeEliminar && (
+                        {puedeEliminar && listaSeleccionada.activa === false && (
                         <button
-                          type="button"
-                          className="danger"
-                          onClick={() => {
+                            type="button"
+                            className="danger"
+                            onClick={() => {
                             borrarLista(listaSeleccionada);
                             setMenuListaAbierto(false);
-                          }}
+                            }}
                         >
-                          <Trash2 size={16} />
-                          Eliminar lista
+                            <Trash2 size={16} />
+                            Eliminar lista
                         </button>
-                      )}
+                        )}
                     </div>
                   )}
                 </div>

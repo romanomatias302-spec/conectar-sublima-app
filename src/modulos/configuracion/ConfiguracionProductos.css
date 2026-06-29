@@ -2049,3 +2049,54 @@ body.dark-mode .cancelar {
   margin-left: -3px;
 }
 
+/* ===============================
+   FIX SWITCHES CONFIG PRODUCTO
+   =============================== */
+
+.switch-fila {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  gap: 12px !important;
+  align-items: center !important;
+  padding: 12px 14px !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+}
+
+.switch-label {
+  min-width: 0 !important;
+  overflow-wrap: anywhere !important;
+  line-height: 1.25 !important;
+}
+
+.switch-acciones {
+  flex-shrink: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+.switch {
+  flex: 0 0 46px !important;
+  width: 46px !important;
+  min-width: 46px !important;
+}
+
+@media (max-width: 768px) {
+  .config-productos {
+    padding: 12px !important;
+  }
+
+  .switch-fila {
+    padding: 10px 12px !important;
+    gap: 8px !important;
+  }
+
+  .switch-label {
+    font-size: 13px !important;
+  }
+
+  .switch-acciones {
+    gap: 6px !important;
+  }
+}

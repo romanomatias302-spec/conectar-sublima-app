@@ -33,6 +33,9 @@ export default function Configuracion({ modoOscuro, setModoOscuro, perfil, onAct
   const [guardandoConfig, setGuardandoConfig] = useState(false);
   const [mensajeConfig, setMensajeConfig] = useState("");
   const [moneda, setMoneda] = useState(perfil?.moneda || "ARS");
+  const [timezone, setTimezone] = useState(
+    perfil?.timezone || "America/Argentina/Buenos_Aires"
+  );
   
   const [guardandoMoneda, setGuardandoMoneda] = useState(false);
   const [mensajeMoneda, setMensajeMoneda] = useState("");
@@ -53,6 +56,23 @@ export default function Configuracion({ modoOscuro, setModoOscuro, perfil, onAct
     CLP: { moneda: "CLP", localeMoneda: "es-CL", label: "CLP - Peso chileno" },
     MXN: { moneda: "MXN", localeMoneda: "es-MX", label: "MXN - Peso mexicano" },
     USD: { moneda: "USD", localeMoneda: "en-US", label: "USD - Dólar estadounidense" },
+  };
+
+  const TIMEZONES_CONFIG = {
+    "America/Argentina/Buenos_Aires": "Argentina",
+    "America/Mexico_City": "México - Centro",
+    "America/Cancun": "México - Quintana Roo",
+    "America/Tijuana": "México - Baja California",
+    "America/Bogota": "Colombia",
+    "America/Lima": "Perú",
+    "America/Guayaquil": "Ecuador",
+    "America/La_Paz": "Bolivia",
+    "America/Santiago": "Chile",
+    "America/Montevideo": "Uruguay",
+    "America/Asuncion": "Paraguay",
+    "America/New_York": "Estados Unidos Este",
+    "America/Chicago": "Estados Unidos Centro",
+    "America/Los_Angeles": "Estados Unidos Pacífico",
   };
   
 
@@ -210,12 +230,14 @@ export default function Configuracion({ modoOscuro, setModoOscuro, perfil, onAct
       await updateDoc(ref, {
         moneda: configSeleccionada.moneda,
         localeMoneda: configSeleccionada.localeMoneda,
+        timezone,
       });
 
       if (onActualizarPerfil) {
         onActualizarPerfil({
           moneda: configSeleccionada.moneda,
           localeMoneda: configSeleccionada.localeMoneda,
+          timezone,
         });
       }
 
@@ -375,14 +397,28 @@ const pagarPeriodoMercadoPago = async (periodo) => {
                   {guardandoMoneda ? "Guardando..." : "Guardar moneda"}
                 </button>
 
-                <p style={{ margin: 0, color: "#666" }}>
-                  El formato regional se ajusta automáticamente según la moneda elegida.
-                </p>
 
                 {mensajeMoneda && (
                   <p style={{ margin: 0, color: "#666" }}>{mensajeMoneda}</p>
                 )}
               </div>
+
+              
+            </div>
+
+            <div className="config-item">
+              <span>Zona horaria del negocio</span>
+
+              <select
+                value={timezone}
+                onChange={(e) => setTimezone(e.target.value)}
+              >
+                {Object.entries(TIMEZONES_CONFIG).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
             </div>
 
 
