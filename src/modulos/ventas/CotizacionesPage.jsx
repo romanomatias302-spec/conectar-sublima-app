@@ -651,15 +651,14 @@ const cotizacionesFiltradas = useMemo(() => {
             </div>
 
             <div className="ventas-table-wrap ventas-table-desktop">
-              <table className="ventas-table ventas-items-table">
+              <table className="ventas-table">
                 <thead>
                   <tr>
-                    <th>Producto</th>
-                    <th>Cantidad</th>
-                    <th>Precio unitario</th>
-                    <th>Subtotal</th>
-                    <th>Acción</th>
-                    <th>Excluir desc.</th>
+                    <th>N°</th>
+                    <th>Fecha</th>
+                    <th>Cliente</th>
+                    <th>Estado</th>
+                    <th>Total</th>
                   </tr>
                 </thead>
 
@@ -914,14 +913,15 @@ const cotizacionesFiltradas = useMemo(() => {
             </div>
 
             <div className="ventas-table-wrap">
-              <table className="ventas-table">
+              <table className="ventas-table ventas-items-table cotizacion-items-table">
                 <thead>
                   <tr>
                     <th>Descripción</th>
                     <th>Cant.</th>
                     <th>Precio</th>
                     <th>Subtotal</th>
-                    <th></th>
+                    <th>Acción</th>
+                    <th>Excluir desc.</th>
                   </tr>
                 </thead>
 

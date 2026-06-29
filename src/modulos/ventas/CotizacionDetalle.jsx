@@ -359,14 +359,25 @@ const handleConvertirAVenta = () => {
     return;
   }
 
-  const itemsVenta = items
-    .filter((item) => (item.estadoItem || "activo") === "activo")
-    .map((item) => ({
-      descripcion: item.descripcion || "",
-      cantidad: Number(item.cantidad || 0),
-      precioUnitario: Number(item.precioUnitario || 0),
-      excluirDescuento: item.excluirDescuento === true,
-    }));
+const itemsVenta = items
+  .filter((item) => (item.estadoItem || "activo") === "activo")
+  .map((item) => ({
+    descripcion: item.descripcion || "",
+    cantidad: Number(item.cantidad || 0),
+    precioUnitario: Number(item.precioUnitario || 0),
+    excluirDescuento: item.excluirDescuento === true,
+
+    origenPrecio: item.origenPrecio || "manual",
+    listaPrecioId: item.listaPrecioId || "",
+    listaPrecioNombre: item.listaPrecioNombre || "",
+    productoListaNombre: item.productoListaNombre || "",
+    productoBaseId: item.productoBaseId || "",
+    imagenUrl: item.imagenUrl || "",
+    imagenThumb: item.imagenThumb || "",
+    reglaCantidad: item.reglaCantidad || null,
+    adicionalesSeleccionados: item.adicionalesSeleccionados || [],
+    precioDetalleInterno: item.precioDetalleInterno || null,
+  }));
 
   onPrepararVenta({
     cotizacion,
@@ -535,7 +546,7 @@ const handleConvertirAVenta = () => {
         </div>
 
         <div className="ventas-table-wrap">
-          <table className="ventas-table">
+          <table className="ventas-table cotizacion-detalle-items-table">
             <thead>
               <tr>
                 <th>Descripción</th>
@@ -548,16 +559,42 @@ const handleConvertirAVenta = () => {
             <tbody>
               {items.map((item) => (
                 <tr key={item.firebaseId}>
-                  <td>{item.descripcion}</td>
-                  <td>{item.cantidad}</td>
-                  <td>
+                  <td className="ventas-producto-td">
+                    <div className="ventas-producto-row">
+                      <div className="ventas-producto-img">
+                        {item.imagenThumb || item.imagenUrl ? (
+                          <img
+                            src={item.imagenThumb || item.imagenUrl}
+                            alt={item.descripcion || "Producto"}
+                          />
+                        ) : (
+                          <span />
+                        )}
+                      </div>
+
+                      <div className="ventas-producto-main ventas-producto-main-lista">
+                        <span className="ventas-producto-nombre">
+                          {item.descripcion || "Producto sin descripción"}
+                        </span>
+
+                        {item.origenPrecio === "lista_precio" && (
+                          <small className="ventas-item-source">Lista de precios</small>
+                        )}
+                      </div>
+                    </div>
+                  </td>
+
+                  <td className="ventas-cantidad-td">{item.cantidad}</td>
+
+                  <td className="ventas-money-td">
                     {formatearMoneda(
                       item.precioUnitario,
                       configMoneda.moneda,
                       configMoneda.localeMoneda
                     )}
                   </td>
-                  <td>
+
+                  <td className="ventas-money-td ventas-subtotal-td">
                     {formatearMoneda(
                       item.subtotal,
                       configMoneda.moneda,

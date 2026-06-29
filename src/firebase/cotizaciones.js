@@ -50,13 +50,24 @@ export async function obtenerSiguienteNumeroCotizacion(clienteId) {
 function normalizarItemsCotizacion(items = []) {
   return Array.isArray(items)
     ? items
-        .map((item) => ({
-          firebaseId: item.firebaseId || "",
-          descripcion: (item.descripcion || "").trim(),
-          cantidad: Number(item.cantidad || 0),
-          precioUnitario: Number(item.precioUnitario || 0),
-          excluirDescuento: item.excluirDescuento === true,
-        }))
+      .map((item) => ({
+        firebaseId: item.firebaseId || "",
+        descripcion: (item.descripcion || "").trim(),
+        cantidad: Number(item.cantidad || 0),
+        precioUnitario: Number(item.precioUnitario || 0),
+        excluirDescuento: item.excluirDescuento === true,
+
+        origenPrecio: item.origenPrecio || "manual",
+        listaPrecioId: item.listaPrecioId || "",
+        listaPrecioNombre: item.listaPrecioNombre || "",
+        productoListaNombre: item.productoListaNombre || "",
+        productoBaseId: item.productoBaseId || "",
+        imagenUrl: item.imagenUrl || "",
+        imagenThumb: item.imagenThumb || "",
+        reglaCantidad: item.reglaCantidad || null,
+        adicionalesSeleccionados: item.adicionalesSeleccionados || [],
+        precioDetalleInterno: item.precioDetalleInterno || null,
+      }))
         .filter(
           (item) =>
             item.descripcion &&
@@ -159,6 +170,16 @@ export async function crearCotizacion({
       precioUnitario: item.precioUnitario,
       subtotal: item.subtotal,
       excluirDescuento: item.excluirDescuento === true,
+      origenPrecio: item.origenPrecio,
+      listaPrecioId: item.listaPrecioId,
+      listaPrecioNombre: item.listaPrecioNombre,
+      productoListaNombre: item.productoListaNombre,
+      productoBaseId: item.productoBaseId,
+      imagenUrl: item.imagenUrl,
+      imagenThumb: item.imagenThumb,
+      reglaCantidad: item.reglaCantidad,
+      adicionalesSeleccionados: item.adicionalesSeleccionados,
+      precioDetalleInterno: item.precioDetalleInterno,
       estadoItem: "activo",
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
@@ -401,6 +422,7 @@ export async function actualizarCotizacion({
       );
 
       batch.update(itemRef, {
+        
         estadoItem: "anulado",
         updatedAt: serverTimestamp(),
       });
@@ -423,6 +445,16 @@ export async function actualizarCotizacion({
         precioUnitario: item.precioUnitario,
         subtotal: item.subtotal,
         excluirDescuento: item.excluirDescuento === true,
+        origenPrecio: item.origenPrecio,
+        listaPrecioId: item.listaPrecioId,
+        listaPrecioNombre: item.listaPrecioNombre,
+        productoListaNombre: item.productoListaNombre,
+        productoBaseId: item.productoBaseId,
+        imagenUrl: item.imagenUrl,
+        imagenThumb: item.imagenThumb,
+        reglaCantidad: item.reglaCantidad,
+        adicionalesSeleccionados: item.adicionalesSeleccionados,
+        precioDetalleInterno: item.precioDetalleInterno,
         estadoItem: "activo",
         updatedAt: serverTimestamp(),
       });
@@ -443,6 +475,16 @@ export async function actualizarCotizacion({
       precioUnitario: item.precioUnitario,
       subtotal: item.subtotal,
       excluirDescuento: item.excluirDescuento === true,
+      origenPrecio: item.origenPrecio,
+      listaPrecioId: item.listaPrecioId,
+      listaPrecioNombre: item.listaPrecioNombre,
+      productoListaNombre: item.productoListaNombre,
+      productoBaseId: item.productoBaseId,
+      imagenUrl: item.imagenUrl,
+      imagenThumb: item.imagenThumb,
+      reglaCantidad: item.reglaCantidad,
+      adicionalesSeleccionados: item.adicionalesSeleccionados,
+      precioDetalleInterno: item.precioDetalleInterno,
       estadoItem: "activo",
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
