@@ -394,6 +394,8 @@ const moverCampo = async (index, direccion) => {
     
 
 <ZonasConfigEditor
+  clienteId={producto.clienteId}
+  productoId={productoId}
   zonasIniciales={producto.zonas}
   productoNombre={producto.nombre}
   tipoAreaInicial={producto.tipoArea || ""}

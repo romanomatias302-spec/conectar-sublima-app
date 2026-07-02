@@ -3626,3 +3626,169 @@ margin-top:20px;
     table-layout: auto !important;
   }
 }
+
+.ventas-importar-lista-row {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0;
+}
+
+.ventas-importar-lista-row label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #475569;
+}
+
+.ventas-importar-lista-row select {
+  width: 100%;
+  height: 38px;
+  border: 1px solid #dbe3ec;
+  border-radius: 10px;
+  padding: 0 10px;
+}
+
+.ventas-importar-item-editable {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) 80px 110px 110px;
+  gap: 8px;
+  align-items: center;
+}
+
+.ventas-importar-item-editable input {
+  width: 100%;
+  height: 34px;
+  border: 1px solid #dbe3ec;
+  border-radius: 8px;
+  padding: 0 8px;
+  box-sizing: border-box;
+}
+
+.ventas-importar-item-editable span {
+  display: block;
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+@media (max-width: 768px) {
+  .ventas-importar-item-editable {
+    grid-template-columns: 1fr;
+  }
+}
+
+/*ultimo*/
+
+.ventas-importar-config-btn {
+  height: 34px;
+  border: 1px solid #dbe3ec;
+  background: #fff;
+  color: #334155;
+  border-radius: 9px;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.ventas-importar-config-btn:hover {
+  background: #f8fafc;
+}
+
+.ventas-producto-lista-btn {
+  border: none;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  display: grid;
+  gap: 2px;
+}
+
+.ventas-producto-lista-btn:hover .ventas-producto-nombre {
+  color: #0096d1;
+  text-decoration: underline;
+}
+
+.ventas-producto-lista-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.75;
+}
+
+@media (max-width: 768px) {
+  .ventas-importar-config-btn {
+    width: 100%;
+  }
+}
+
+.ventas-importar-plus-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: none;
+  background: #0096d1;
+  color: #fff;
+  font-size: 22px;
+  line-height: 1;
+  font-weight: 800;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ventas-importar-plus-btn:hover {
+  background: #007fb3;
+}
+
+.ventas-importar-plus-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ventas-importar-modal {
+  max-width: 760px;
+  width: min(760px, calc(100vw - 28px));
+}
+
+.ventas-importar-item-editable {
+  grid-template-columns: minmax(220px, 1fr) 90px 120px 34px 120px;
+  align-items: center;
+  gap: 10px;
+}
+
+.ventas-importar-nombre {
+  font-weight: 500;
+  color: #0f172a;
+  font-size: 14px;
+}
+
+.ventas-importar-plus-btn {
+  margin: 0;
+}
+
+@media (max-width: 768px) {
+  .ventas-importar-item-editable {
+    grid-template-columns: 1fr;
+  }
+
+  .ventas-importar-plus-btn {
+    width: 100%;
+  }
+}
+
+.ventas-importar-item-editable {
+  grid-template-columns: minmax(220px, 1fr) 90px 130px 42px 130px !important;
+  align-items: center !important;
+  column-gap: 12px !important;
+}
+
+.ventas-importar-plus-btn {
+  width: 30px !important;
+  height: 30px !important;
+  min-width: 30px !important;
+  justify-self: center !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border-radius: 999px !important;
+  line-height: 1 !important;
+}

@@ -3,6 +3,43 @@ import { obtenerListasPrecios, obtenerProductosBase } from "../../firebase/lista
 import { formatearMoneda } from "../../utils/moneda";
 import "./ProductoSelectorModal.css";
 
+function normalizarVariantesProducto(producto = {}) {
+  const productoSeguro = producto || {};
+
+  if (
+    Array.isArray(productoSeguro.variantes) &&
+    productoSeguro.variantes.length > 0
+  ) {
+    return productoSeguro.variantes.map((v, index) => ({
+      id: v.id || `variante-${index}`,
+      nombre: v.nombre || "General",
+      precioBase: Number(v.precioBase || 0),
+      reglasCantidad: Array.isArray(v.reglasCantidad) ? v.reglasCantidad : [],
+      adicionales: Array.isArray(v.adicionales) ? v.adicionales : [],
+      imagenUrl: v.imagenUrl || "",
+      imagenThumb: v.imagenThumb || "",
+      activa: v.activa !== false,
+    }));
+  }
+
+  return [
+    {
+      id: "general",
+      nombre: "General",
+      precioBase: Number(productoSeguro.precioBase || 0),
+      reglasCantidad: Array.isArray(productoSeguro.reglasCantidad)
+        ? productoSeguro.reglasCantidad
+        : [],
+      adicionales: Array.isArray(productoSeguro.adicionales)
+        ? productoSeguro.adicionales
+        : [],
+      imagenUrl: productoSeguro.imagenUrl || "",
+      imagenThumb: productoSeguro.imagenThumb || "",
+      activa: true,
+    },
+  ];
+}
+
 export default function ProductoSelectorModal({
   open,
   perfil,
@@ -19,7 +56,11 @@ export default function ProductoSelectorModal({
   const [busqueda, setBusqueda] = useState("");
   const [reglaIndex, setReglaIndex] = useState(null);
   const [adicionalesIds, setAdicionalesIds] = useState([]);
+  const [varianteIndex, setVarianteIndex] = useState(0);
+
   const [precioAnimando, setPrecioAnimando] = useState(false);
+
+
 
   useEffect(() => {
     const cargar = async () => {
@@ -40,16 +81,65 @@ export default function ProductoSelectorModal({
         activas[0]?.firebaseId ||
         "";
 
-      setOrigen("lista_precio");
-      setListaId(defaultId);
-      setProductoIndex("");
-      setBusqueda("");
-      setReglaIndex(null);
-      setAdicionalesIds([]);
+        setOrigen("lista_precio");
+        setListaId(defaultId);
+        setBusqueda("");
+
+        const listaBase = activas.find((l) => l.firebaseId === defaultId);
+        const productosBaseLista = listaBase?.productos || [];
+
+        const indexProductoActual = productosBaseLista.findIndex((p) => {
+          return (
+            (itemActual?.productoBaseId && p.productoBaseId === itemActual.productoBaseId) ||
+            (itemActual?.productoListaNombre &&
+              String(p.nombre || "").trim().toLowerCase() ===
+                String(itemActual.productoListaNombre || "").trim().toLowerCase())
+          );
+        });
+
+        if (indexProductoActual >= 0) {
+          const productoActual = productosBaseLista[indexProductoActual];
+          const variantes = normalizarVariantesProducto(productoActual);
+
+          const indexVarianteActual = variantes.findIndex(
+            (v) =>
+              v.id === itemActual?.varianteId ||
+              String(v.nombre || "").trim().toLowerCase() ===
+                String(itemActual?.varianteNombre || "").trim().toLowerCase()
+          );
+
+          const varianteActual =
+            variantes[indexVarianteActual >= 0 ? indexVarianteActual : 0];
+
+          const reglas = varianteActual?.reglasCantidad || [];
+
+          const indexReglaActual = reglas.findIndex((r) => {
+            const reglaActual = itemActual?.reglaCantidad || {};
+            return (
+              Number(r.desde || 0) === Number(reglaActual.desde || 0) &&
+              String(r.hasta ?? "") === String(reglaActual.hasta ?? "") &&
+              Number(r.precio || 0) === Number(reglaActual.precio || 0)
+            );
+          });
+
+          setProductoIndex(String(indexProductoActual));
+          setVarianteIndex(indexVarianteActual >= 0 ? indexVarianteActual : 0);
+          setReglaIndex(indexReglaActual >= 0 ? indexReglaActual : null);
+          setAdicionalesIds(
+            Array.isArray(itemActual?.adicionalesSeleccionados)
+              ? itemActual.adicionalesSeleccionados.map((a, index) => a.id || `adicional-${index}`)
+              : []
+          );
+        } else {
+          setProductoIndex("");
+          setVarianteIndex(0);
+          setReglaIndex(null);
+          setAdicionalesIds([]);
+        }
     };
 
     cargar();
-  }, [open, perfil?.clienteId]);
+  }, [open, perfil?.clienteId, itemActual]);
 
   const listaSeleccionada = useMemo(
     () => listas.find((l) => l.firebaseId === listaId) || null,
@@ -72,36 +162,45 @@ export default function ProductoSelectorModal({
   const productoSeleccionado =
     productoIndex !== "" ? productos[Number(productoIndex)] : null;
 
-  const obtenerImagen = (producto) => {
-    const base = productosBase.find(
-      (p) => p.firebaseId === producto?.productoBaseId
-    );
+  const variantesProducto = normalizarVariantesProducto(productoSeleccionado);
 
-    return (
-      base?.imagenThumb ||
-      base?.imagenUrl ||
-      producto?.imagenThumb ||
-      producto?.imagenUrl ||
-      ""
-    );
-  };
+  const varianteSeleccionada =
+    variantesProducto[varianteIndex] || variantesProducto[0] || null;  
 
-  const precioUnitario = useMemo(() => {
-    if (!productoSeleccionado) return 0;
+ const obtenerImagen = (producto, variante = null) => {
+  const base = productosBase.find(
+    (p) => p.firebaseId === producto?.productoBaseId
+  );
 
-    const reglas = productoSeleccionado.reglasCantidad || [];
-    const regla = reglaIndex !== null ? reglas[reglaIndex] : null;
+  return (
+    variante?.imagenThumb ||
+    variante?.imagenUrl ||
+    producto?.imagenThumb ||
+    producto?.imagenUrl ||
+    base?.imagenThumb ||
+    base?.imagenUrl ||
+    ""
+  );
+};
 
-    const precioBase = Number(regla?.precio || productoSeleccionado.precioBase || 0);
+const precioUnitario = useMemo(() => {
+  if (!productoSeleccionado || !varianteSeleccionada) return 0;
 
-    const adicionales = productoSeleccionado.adicionales || [];
+  const reglas = varianteSeleccionada.reglasCantidad || [];
+  const regla = reglaIndex !== null ? reglas[reglaIndex] : null;
 
-    const totalAdicionales = adicionales
-      .filter((a, index) => adicionalesIds.includes(a.id || `adicional-${index}`))
-      .reduce((acc, a) => acc + Number(a.precio || 0), 0);
+  const precioBase = Number(
+    regla?.precio || varianteSeleccionada.precioBase || 0
+  );
 
-    return precioBase + totalAdicionales;
-  }, [productoSeleccionado, reglaIndex, adicionalesIds]);
+  const adicionales = varianteSeleccionada.adicionales || [];
+
+  const totalAdicionales = adicionales
+    .filter((a, index) => adicionalesIds.includes(a.id || `adicional-${index}`))
+    .reduce((acc, a) => acc + Number(a.precio || 0), 0);
+
+  return precioBase + totalAdicionales;
+}, [productoSeleccionado, varianteSeleccionada, reglaIndex, adicionalesIds]);
 
   useEffect(() => {
     if (!open || !productoSeleccionado) return;
@@ -122,48 +221,68 @@ export default function ProductoSelectorModal({
     );
   };
 
-  const aplicar = () => {
-    if (!productoSeleccionado || !listaSeleccionada) return;
+const aplicar = () => {
+  if (!productoSeleccionado || !listaSeleccionada || !varianteSeleccionada) return;
 
-    const reglas = productoSeleccionado.reglasCantidad || [];
-    const reglaSeleccionada = reglaIndex !== null ? reglas[reglaIndex] : null;
+  const reglas = varianteSeleccionada.reglasCantidad || [];
+  const reglaSeleccionada = reglaIndex !== null ? reglas[reglaIndex] : null;
 
-    const adicionales = (productoSeleccionado.adicionales || []).filter((a, index) =>
-      adicionalesIds.includes(a.id || `adicional-${index}`)
-    );
+  const adicionales = (varianteSeleccionada.adicionales || []).filter((a, index) =>
+    adicionalesIds.includes(a.id || `adicional-${index}`)
+  );
 
-    const nombreProducto = productoSeleccionado.nombre || "";
+  const nombreProducto = productoSeleccionado.nombre || "";
+  const nombreVariante =
+    varianteSeleccionada.nombre && varianteSeleccionada.nombre !== "General"
+      ? varianteSeleccionada.nombre
+      : "";
 
-    const descripcion =
-      adicionales.length === 0
-        ? nombreProducto
-        : adicionales.length <= 2
-        ? `${nombreProducto} + ${adicionales.map((a) => a.nombre).join(" + ")}`
-        : `${nombreProducto} + ${adicionales.length} adicionales`;
+  const baseDescripcion = nombreVariante
+    ? `${nombreProducto} - ${nombreVariante}`
+    : nombreProducto;
 
-    onAplicar({
-      descripcion,
-      precioUnitario,
-      origenPrecio: "lista_precio",
+  const descripcion =
+    adicionales.length === 0
+      ? baseDescripcion
+      : adicionales.length <= 2
+      ? `${baseDescripcion} + ${adicionales.map((a) => a.nombre).join(" + ")}`
+      : `${baseDescripcion} + ${adicionales.length} adicionales`;
+
+  const imagen = obtenerImagen(productoSeleccionado, varianteSeleccionada);
+
+  onAplicar({
+    descripcion,
+    precioUnitario,
+    origenPrecio: "lista_precio",
+    listaPrecioId: listaSeleccionada.firebaseId,
+    listaPrecioNombre: listaSeleccionada.nombre || "",
+    productoListaNombre: productoSeleccionado.nombre || "",
+    productoBaseId: productoSeleccionado.productoBaseId || "",
+
+    varianteId: varianteSeleccionada.id || "general",
+    varianteNombre: varianteSeleccionada.nombre || "General",
+
+    imagenUrl: imagen,
+    imagenThumb: imagen,
+
+    reglaCantidad: reglaSeleccionada || null,
+    adicionalesSeleccionados: adicionales,
+    precioDetalleInterno: {
+      origen: "lista_precio",
       listaPrecioId: listaSeleccionada.firebaseId,
       listaPrecioNombre: listaSeleccionada.nombre || "",
       productoListaNombre: productoSeleccionado.nombre || "",
-      productoBaseId: productoSeleccionado.productoBaseId || "",
-      imagenUrl: obtenerImagen(productoSeleccionado),
-      imagenThumb: obtenerImagen(productoSeleccionado),
+      varianteId: varianteSeleccionada.id || "general",
+      varianteNombre: varianteSeleccionada.nombre || "General",
+      precioBase: Number(varianteSeleccionada.precioBase || 0),
+      precioAplicado: precioUnitario,
       reglaCantidad: reglaSeleccionada || null,
-      adicionalesSeleccionados: adicionales,
-      precioDetalleInterno: {
-        origen: "lista_precio",
-        precioBase: Number(productoSeleccionado.precioBase || 0),
-        precioAplicado: precioUnitario,
-        reglaCantidad: reglaSeleccionada || null,
-        adicionales,
-      },
-    });
+      adicionales,
+    },
+  });
 
-    onClose();
-  };
+  onClose();
+};
 
   if (!open) return null;
 
@@ -198,7 +317,7 @@ export default function ProductoSelectorModal({
 
           <div className={`ps-total ${precioAnimando ? "is-pulsing" : ""}`}>
             <div>
-              <span>Precio unitario</span>
+              <span>Precio final</span>
               <strong>
                 {formatearMoneda(
                   precioUnitario,
@@ -238,6 +357,7 @@ export default function ProductoSelectorModal({
                     setBusqueda("");
                     setReglaIndex(null);
                     setAdicionalesIds([]);
+                    setVarianteIndex(0);
                   }}
                 >
                   <strong>{lista.nombre}</strong>
@@ -264,6 +384,7 @@ export default function ProductoSelectorModal({
                   setProductoIndex("");
                   setReglaIndex(null);
                   setAdicionalesIds([]);
+                  setVarianteIndex(0);
                 }}
                 placeholder="Buscar producto..."
               />
@@ -316,9 +437,9 @@ export default function ProductoSelectorModal({
               <>
                 <div className="ps-hero">
                   <div className="ps-hero-img">
-                    {obtenerImagen(productoSeleccionado) ? (
+                    {obtenerImagen(productoSeleccionado, varianteSeleccionada) ? (
                       <img
-                        src={obtenerImagen(productoSeleccionado)}
+                        src={obtenerImagen(productoSeleccionado, varianteSeleccionada)}
                         alt={productoSeleccionado.nombre}
                       />
                     ) : (
@@ -333,7 +454,7 @@ export default function ProductoSelectorModal({
                     <h3>{productoSeleccionado.nombre}</h3>
                     <strong>
                       {formatearMoneda(
-                        productoSeleccionado.precioBase,
+                        precioUnitario,
                         configMoneda.moneda,
                         configMoneda.localeMoneda
                       )}
@@ -341,14 +462,51 @@ export default function ProductoSelectorModal({
                   </div>
                 </div>
 
+                {variantesProducto.length > 1 && (
+                  <div className="ps-section">
+                    <h3>Variantes</h3>
+
+                    <div className="ps-options">
+                      {variantesProducto.map((variante, index) => {
+                        const activo = varianteIndex === index;
+
+                        return (
+                          <button
+                            type="button"
+                            key={variante.id || index}
+                            className={`ps-option ${activo ? "activo" : ""}`}
+                            onClick={() => {
+                              setVarianteIndex(index);
+                              setReglaIndex(null);
+                              setAdicionalesIds([]);
+                            }}
+                          >
+                            <span className="ps-circle" />
+                            <span>{variante.nombre || "General"}</span>
+                          <strong>
+                            {formatearMoneda(
+                              varianteIndex === index
+                                ? precioUnitario
+                                : variante.precioBase || 0,
+                              configMoneda.moneda,
+                              configMoneda.localeMoneda
+                            )}
+                          </strong>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 <div className="ps-section">
                   <h3>Reglas</h3>
 
-                  {(productoSeleccionado.reglasCantidad || []).length === 0 ? (
+                  {(varianteSeleccionada?.reglasCantidad || []).length === 0 ? (
                     <p className="ps-muted">Usa precio base.</p>
                   ) : (
                     <div className="ps-options">
-                      {(productoSeleccionado.reglasCantidad || []).map((regla, index) => {
+                      {(varianteSeleccionada?.reglasCantidad || []).map((regla, index) => {
                         const activo = reglaIndex === index;
 
                         return (
@@ -381,11 +539,11 @@ export default function ProductoSelectorModal({
                 <div className="ps-section">
                   <h3>Adicionales</h3>
 
-                  {(productoSeleccionado.adicionales || []).length === 0 ? (
+                  {(varianteSeleccionada?.adicionales || []).length === 0 ? (
                     <p className="ps-muted">Sin adicionales.</p>
                   ) : (
                     <div className="ps-options">
-                      {(productoSeleccionado.adicionales || []).map((adicional, index) => {
+                      {(varianteSeleccionada?.adicionales || []).map((adicional, index) => {
                         const id = adicional.id || `adicional-${index}`;
                         const activo = adicionalesIds.includes(id);
 

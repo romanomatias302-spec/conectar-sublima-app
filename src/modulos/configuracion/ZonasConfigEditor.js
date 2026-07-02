@@ -5,6 +5,8 @@ import "./ConfiguracionProductos.css";
 
 
 export default function ZonasConfigEditor({
+  clienteId = "",
+  productoId = "",
   zonasIniciales = null,
   productoNombre = "",
   tipoAreaInicial = "",
@@ -186,14 +188,20 @@ const TIPOS_IMAGEN_REFERENCIA_PERMITIDOS = [
       setSubiendoImagen(true);
       setErrorImagen("");
 
-      const extension = file.name.split(".").pop() || "png";
-      const nombreProducto = safeFileName(productoNombre || "producto");
-      const fileName = `${nombreProducto}_${Date.now()}.${extension}`;
+    if (!clienteId) {
+      setErrorImagen("No se encontró la empresa del usuario.");
+      return;
+    }
 
-      const storageRef = ref(
-        storage,
-        `productosBase/referencias_personalizadas/${fileName}`
-      );
+    const extension = file.name.split(".").pop() || "png";
+    const nombreProducto = safeFileName(productoNombre || "producto");
+    const idProductoSeguro = safeFileName(productoId || nombreProducto || "producto");
+    const fileName = `${nombreProducto}_${Date.now()}.${extension}`;
+
+    const storageRef = ref(
+      storage,
+      `clientes/${clienteId}/referenciasPersonalizadas/${idProductoSeguro}/${fileName}`
+    );
 
       await uploadBytes(storageRef, file);
       const url = await getDownloadURL(storageRef);

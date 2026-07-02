@@ -20,6 +20,8 @@ import {
   Copy,
   Star,
   MoreVertical,
+  Trash,
+  
 } from "lucide-react";
 
 import {
@@ -35,14 +37,63 @@ import {
 
 import "./ListasPreciosPage.css";
 
+const varianteVacia = () => ({
+  id: crypto.randomUUID(),
+  nombre: "General",
+  talles: [],
+  precioBase: "",
+  reglasCantidad: [],
+  adicionales: [],
+  imagenUrl: "",
+  imagenThumb: "",
+  activa: true,
+});
+
 const productoVacio = {
   productoBaseId: "",
   nombre: "",
   tipoProducto: "personalizado",
-  precioBase: "",
-  reglasCantidad: [],
-  adicionales: [],
+  variantes: [varianteVacia()],
   activo: true,
+};
+
+const normalizarVariantesProducto = (producto = {}) => {
+  const productoSeguro = producto || {};
+
+  if (
+    Array.isArray(productoSeguro.variantes) &&
+    productoSeguro.variantes.length > 0
+  ) {
+    return productoSeguro.variantes.map((v, index) => ({
+      id: v.id || `variante-${index}`,
+      nombre: v.nombre || "General",
+      talles: Array.isArray(v.talles) ? v.talles : [],
+      precioBase: Number(v.precioBase || 0),
+      reglasCantidad: Array.isArray(v.reglasCantidad) ? v.reglasCantidad : [],
+      adicionales: Array.isArray(v.adicionales) ? v.adicionales : [],
+      imagenUrl: v.imagenUrl || "",
+      imagenThumb: v.imagenThumb || "",
+      activa: v.activa !== false,
+    }));
+  }
+
+  return [
+    {
+      id: "general",
+      nombre: "General",
+      talles: [],
+      precioBase: Number(productoSeguro.precioBase || 0),
+      reglasCantidad: Array.isArray(productoSeguro.reglasCantidad)
+        ? productoSeguro.reglasCantidad
+        : [],
+      adicionales: Array.isArray(productoSeguro.adicionales)
+        ? productoSeguro.adicionales
+        : [],
+      imagenUrl: productoSeguro.imagenUrl || "",
+      imagenThumb: productoSeguro.imagenThumb || "",
+      activa: true,
+    },
+  ];
 };
 
 export default function ListasPreciosPage({ perfil }) {
@@ -68,6 +119,9 @@ export default function ListasPreciosPage({ perfil }) {
     const [adicionalesSimulados, setAdicionalesSimulados] = useState([]);
     const [reglaSeleccionadaIndex, setReglaSeleccionadaIndex] = useState(null);
     const [menuListaAbierto, setMenuListaAbierto] = useState(false);
+    const [varianteSeleccionadaIndex, setVarianteSeleccionadaIndex] = useState(0);
+
+    const [menuProductoAbierto, setMenuProductoAbierto] = useState(null);
 
 
 
@@ -75,6 +129,7 @@ export default function ListasPreciosPage({ perfil }) {
   const [modalProducto, setModalProducto] = useState(false);
   const [productoEditandoIndex, setProductoEditandoIndex] = useState(null);
   const [formProducto, setFormProducto] = useState(productoVacio);
+  const [varianteEditandoIndex, setVarianteEditandoIndex] = useState(0);
 
   const [subiendoImagen, setSubiendoImagen] = useState(false);
 
@@ -156,6 +211,11 @@ const qListas = query(
   };
 }, [perfil?.clienteId]);
 
+
+
+
+
+
 useEffect(() => {
   setListaSeleccionada((prev) => {
     if (!listas.length) return null;
@@ -171,6 +231,17 @@ useEffect(() => {
     return actualizada || listas[0];
   });
 }, [listas]);
+
+useEffect(() => {
+  const cerrar = () => setMenuProductoAbierto(null);
+
+  window.addEventListener("click", cerrar);
+
+  return () => {
+    window.removeEventListener("click", cerrar);
+  };
+}, []);
+
 
 const productosGlobalesFiltrados = useMemo(() => {
   const texto = busquedaGlobalProducto.trim().toLowerCase();
@@ -234,10 +305,39 @@ const productosGlobalesFiltrados = useMemo(() => {
         (p) => p.firebaseId === productoSeleccionado?.productoBaseId
     );
 
+  const variantesProductoSeleccionado = normalizarVariantesProducto(productoSeleccionado);
+
+  const varianteSeleccionada =
+    variantesProductoSeleccionado[varianteSeleccionadaIndex] ||
+    variantesProductoSeleccionado[0] ||
+    null;
+
     const imagenProductoSeleccionado =
     productoBaseSeleccionado?.imagenUrl ||
     productoSeleccionado?.imagenUrl ||
     "";
+
+    const productoBaseFormSeleccionado = productosBase.find(
+      (p) => p.firebaseId === formProducto?.productoBaseId
+    );
+
+  const tallesDisponiblesForm = (() => {
+    if (Array.isArray(productoBaseFormSeleccionado?.talles)) {
+      return productoBaseFormSeleccionado.talles;
+    }
+
+    if (productoBaseFormSeleccionado?.tallesPorDefecto) {
+      return Object.keys(productoBaseFormSeleccionado.tallesPorDefecto);
+    }
+
+    if (Array.isArray(productoBaseFormSeleccionado?.detallesTalle)) {
+      return productoBaseFormSeleccionado.detallesTalle.map((d) =>
+        typeof d === "string" ? d : d?.nombre
+      ).filter(Boolean);
+    }
+
+    return [];
+  })();
 
     const obtenerImagenProducto = (producto) => {
     const base = productosBase.find(
@@ -386,23 +486,39 @@ const productosGlobalesFiltrados = useMemo(() => {
     setAdicionalesSimulados([]);
     setReglaSeleccionadaIndex(null);
     setMenuListaAbierto(false);
+    setVarianteSeleccionadaIndex(0);
   };
 
-  const abrirNuevoProducto = () => {
-    setProductoEditandoIndex(null);
-    setFormProducto(productoVacio);
-    setModalProducto(true);
-  };
+const abrirNuevoProducto = () => {
+  setProductoEditandoIndex(null);
+  setFormProducto({
+    ...productoVacio,
+    variantes: [varianteVacia()],
+  });
+  setVarianteEditandoIndex(0);
+  setModalProducto(true);
+};
 
-  const abrirEditarProducto = (producto, index) => {
-    setProductoEditandoIndex(index);
-    setFormProducto({
-      ...productoVacio,
-      ...producto,
-      reglasCantidad: producto.reglasCantidad || [],
-      adicionales: producto.adicionales || [],
+const abrirEditarProducto = (producto, index) => {
+  const variantes = normalizarVariantesProducto(producto);
+
+  setProductoEditandoIndex(index);
+  setFormProducto({
+    ...productoVacio,
+    ...producto,
+    variantes,
+  });
+  setVarianteEditandoIndex(0);
+  setModalProducto(true);
+};
+
+  const productoYaExisteEnLista = (productoBaseId) => {
+    if (!productoBaseId) return false;
+
+    return (listaSeleccionada?.productos || []).some((producto, index) => {
+      if (productoEditandoIndex === index) return false;
+      return producto.productoBaseId === productoBaseId;
     });
-    setModalProducto(true);
   };
 
   const seleccionarProductoBase = (productoBaseId) => {
@@ -416,47 +532,196 @@ const productosGlobalesFiltrados = useMemo(() => {
     }));
   };
 
-  const agregarReglaCantidad = () => {
-    setFormProducto((prev) => ({
-      ...prev,
-      reglasCantidad: [
-        ...(prev.reglasCantidad || []),
-        {
-          desde: "",
-          hasta: "",
+const agregarVariante = () => {
+  const variantesActuales = normalizarVariantesProducto(formProducto);
+
+  const nombre = prompt("Nombre de la nueva variante:", "Nueva variante");
+  if (!nombre) return;
+
+  let varianteBase = null;
+
+  if (variantesActuales.length > 0) {
+    const copiar = window.confirm(
+      "¿Querés copiar reglas y adicionales desde una variante existente?"
+    );
+
+    if (copiar) {
+      const opciones = variantesActuales
+        .map((v, index) => `${index + 1}. ${v.nombre || "General"}`)
+        .join("\n");
+
+      const seleccion = prompt(
+        `Elegí la variante a copiar:\n\n${opciones}\n\nIngresá el número:`,
+        "1"
+      );
+
+      const indexSeleccionado = Number(seleccion) - 1;
+
+      if (
+        Number.isInteger(indexSeleccionado) &&
+        variantesActuales[indexSeleccionado]
+      ) {
+        varianteBase = variantesActuales[indexSeleccionado];
+      }
+    }
+  }
+
+  const nuevaVariante = varianteBase
+    ? {
+        ...varianteBase,
+        id: crypto.randomUUID(),
+        nombre: nombre.trim(),
+        precioBase: "",
+        reglasCantidad: (varianteBase.reglasCantidad || []).map((r) => ({
+          ...r,
           precio: "",
-        },
+        })),
+        adicionales: (varianteBase.adicionales || []).map((a) => ({
+          ...a,
+          id: crypto.randomUUID(),
+        })),
+      }
+    : {
+        ...varianteVacia(),
+        nombre: nombre.trim(),
+      };
+
+  const nuevasVariantes = [...variantesActuales, nuevaVariante];
+
+  setFormProducto((prev) => ({
+    ...prev,
+    variantes: nuevasVariantes,
+  }));
+
+  setVarianteEditandoIndex(nuevasVariantes.length - 1);
+};
+
+const actualizarVariante = (index, campo, valor) => {
+  setFormProducto((prev) => {
+    const variantes = [...(prev.variantes || [])];
+
+    variantes[index] = {
+      ...variantes[index],
+      [campo]: valor,
+    };
+
+    return {
+      ...prev,
+      variantes,
+    };
+  });
+};
+
+const toggleTalleVariante = (indexVariante, talle) => {
+  setFormProducto((prev) => {
+    const variantes = normalizarVariantesProducto(prev);
+    const varianteActual = variantes[indexVariante];
+
+    if (!varianteActual) return prev;
+
+    const tallesActuales = Array.isArray(varianteActual.talles)
+      ? varianteActual.talles
+      : [];
+
+    const yaExiste = tallesActuales.includes(talle);
+
+    variantes[indexVariante] = {
+      ...varianteActual,
+      talles: yaExiste
+        ? tallesActuales.filter((t) => t !== talle)
+        : [...tallesActuales, talle],
+    };
+
+    return {
+      ...prev,
+      variantes,
+    };
+  });
+};
+
+const quitarVariante = (index) => {
+  setFormProducto((prev) => {
+    const variantes = normalizarVariantesProducto(prev);
+
+    if (index === 0 || variantes[index]?.id === "general") {
+      alert("La variante General no se puede eliminar.");
+      return prev;
+    }
+
+    if (variantes.length <= 1) {
+      alert("El producto debe tener al menos una variante.");
+      return prev;
+    }
+
+    return {
+      ...prev,
+      variantes: variantes.filter((_, i) => i !== index),
+    };
+  });
+};
+
+const agregarReglaCantidad = () => {
+  setFormProducto((prev) => {
+    const variantes = normalizarVariantesProducto(prev);
+    const index = varianteEditandoIndex;
+
+    variantes[index] = {
+      ...variantes[index],
+      reglasCantidad: [
+        ...(variantes[index].reglasCantidad || []),
+        { desde: "", hasta: "", precio: "" },
       ],
-    }));
-  };
+    };
 
-  const actualizarRegla = (index, campo, valor) => {
-    setFormProducto((prev) => {
-      const reglas = [...(prev.reglasCantidad || [])];
-      reglas[index] = {
-        ...reglas[index],
-        [campo]: valor,
-      };
+    return { ...prev, variantes };
+  });
+};
 
-      return {
-        ...prev,
-        reglasCantidad: reglas,
-      };
-    });
-  };
+const actualizarRegla = (indexRegla, campo, valor) => {
+  setFormProducto((prev) => {
+    const variantes = normalizarVariantesProducto(prev);
+    const indexVariante = varianteEditandoIndex;
+    const reglas = [...(variantes[indexVariante].reglasCantidad || [])];
 
-  const quitarRegla = (index) => {
-    setFormProducto((prev) => ({
-      ...prev,
-      reglasCantidad: (prev.reglasCantidad || []).filter((_, i) => i !== index),
-    }));
-  };
+    reglas[indexRegla] = {
+      ...reglas[indexRegla],
+      [campo]: valor,
+    };
 
-  const agregarAdicional = () => {
-    setFormProducto((prev) => ({
-      ...prev,
+    variantes[indexVariante] = {
+      ...variantes[indexVariante],
+      reglasCantidad: reglas,
+    };
+
+    return { ...prev, variantes };
+  });
+};
+
+const quitarRegla = (indexRegla) => {
+  setFormProducto((prev) => {
+    const variantes = normalizarVariantesProducto(prev);
+    const indexVariante = varianteEditandoIndex;
+
+    variantes[indexVariante] = {
+      ...variantes[indexVariante],
+      reglasCantidad: (variantes[indexVariante].reglasCantidad || []).filter(
+        (_, i) => i !== indexRegla
+      ),
+    };
+
+    return { ...prev, variantes };
+  });
+};
+
+const agregarAdicional = () => {
+  setFormProducto((prev) => {
+    const variantes = normalizarVariantesProducto(prev);
+    const indexVariante = varianteEditandoIndex;
+
+    variantes[indexVariante] = {
+      ...variantes[indexVariante],
       adicionales: [
-        ...(prev.adicionales || []),
+        ...(variantes[indexVariante].adicionales || []),
         {
           id: crypto.randomUUID(),
           nombre: "",
@@ -465,30 +730,47 @@ const productosGlobalesFiltrados = useMemo(() => {
           activo: true,
         },
       ],
-    }));
-  };
+    };
 
-  const actualizarAdicional = (index, campo, valor) => {
-    setFormProducto((prev) => {
-      const adicionales = [...(prev.adicionales || [])];
-      adicionales[index] = {
-        ...adicionales[index],
-        [campo]: valor,
-      };
+    return { ...prev, variantes };
+  });
+};
 
-      return {
-        ...prev,
-        adicionales,
-      };
-    });
-  };
+const actualizarAdicional = (indexAdicional, campo, valor) => {
+  setFormProducto((prev) => {
+    const variantes = normalizarVariantesProducto(prev);
+    const indexVariante = varianteEditandoIndex;
+    const adicionales = [...(variantes[indexVariante].adicionales || [])];
 
-  const quitarAdicional = (index) => {
-    setFormProducto((prev) => ({
-      ...prev,
-      adicionales: (prev.adicionales || []).filter((_, i) => i !== index),
-    }));
-  };
+    adicionales[indexAdicional] = {
+      ...adicionales[indexAdicional],
+      [campo]: valor,
+    };
+
+    variantes[indexVariante] = {
+      ...variantes[indexVariante],
+      adicionales,
+    };
+
+    return { ...prev, variantes };
+  });
+};
+
+const quitarAdicional = (indexAdicional) => {
+  setFormProducto((prev) => {
+    const variantes = normalizarVariantesProducto(prev);
+    const indexVariante = varianteEditandoIndex;
+
+    variantes[indexVariante] = {
+      ...variantes[indexVariante],
+      adicionales: (variantes[indexVariante].adicionales || []).filter(
+        (_, i) => i !== indexAdicional
+      ),
+    };
+
+    return { ...prev, variantes };
+  });
+};
 
   const guardarProductoEnLista = async () => {
     try {
@@ -499,23 +781,67 @@ const productosGlobalesFiltrados = useMemo(() => {
         return;
       }
 
-      const productoNormalizado = {
-        ...formProducto,
-        nombre: formProducto.nombre.trim(),
-        precioBase: Number(formProducto.precioBase || 0),
-        reglasCantidad: (formProducto.reglasCantidad || []).map((r) => ({
-          desde: Number(r.desde || 0),
-          hasta: r.hasta === "" || r.hasta === null ? null : Number(r.hasta),
-          precio: Number(r.precio || 0),
-        })),
-        adicionales: (formProducto.adicionales || []).map((a) => ({
-          ...a,
-          nombre: (a.nombre || "").trim(),
-          precio: Number(a.precio || 0),
-          activo: a.activo !== false,
-        })),
-        activo: true,
-      };
+      if (
+        formProducto.productoBaseId &&
+        productoYaExisteEnLista(formProducto.productoBaseId)
+      ) {
+        alert(
+          "Este producto ya está agregado en esta lista. Si necesitás otra configuración de precio, creá una lista alternativa."
+        );
+        return;
+      }
+
+    let variantesBase = normalizarVariantesProducto(formProducto);
+
+      const tieneGeneral = variantesBase.some(
+        (v) => v.id === "general" || v.nombre === "General"
+      );
+
+      if (!tieneGeneral) {
+        variantesBase = [
+          {
+            ...varianteVacia(),
+            id: "general",
+            nombre: "General",
+          },
+          ...variantesBase,
+        ];
+      }
+
+      const variantesNormalizadas = variantesBase.map((v) => ({
+      ...v,
+      nombre: (v.nombre || "General").trim(),
+      precioBase: Number(v.precioBase || 0),
+      reglasCantidad: (v.reglasCantidad || []).map((r) => ({
+        desde: Number(r.desde || 0),
+        hasta: r.hasta === "" || r.hasta === null ? null : Number(r.hasta),
+        precio: Number(r.precio || 0),
+      })),
+      adicionales: (v.adicionales || []).map((a) => ({
+        ...a,
+        nombre: (a.nombre || "").trim(),
+        precio: Number(a.precio || 0),
+        activo: a.activo !== false,
+      })),
+      activa: v.activa !== false,
+    }));
+
+    const varianteGeneral = variantesNormalizadas[0] || varianteVacia();
+
+    const productoNormalizado = {
+      ...formProducto,
+      nombre: formProducto.nombre.trim(),
+
+      // Compatibilidad vieja
+      precioBase: Number(varianteGeneral.precioBase || 0),
+      reglasCantidad: varianteGeneral.reglasCantidad || [],
+      adicionales: varianteGeneral.adicionales || [],
+
+      // Nueva arquitectura
+      variantes: variantesNormalizadas,
+
+      activo: true,
+    };
 
       const productosActuales = listaSeleccionada.productos || [];
       let nuevosProductos = [];
@@ -591,21 +917,21 @@ const productosGlobalesFiltrados = useMemo(() => {
   };
 
 const precioFinalSeleccionado = useMemo(() => {
-  if (!productoSeleccionado) return 0;
+  if (!productoSeleccionado || !varianteSeleccionada) return 0;
 
-  const reglas = Array.isArray(productoSeleccionado.reglasCantidad)
-    ? productoSeleccionado.reglasCantidad
+  const reglas = Array.isArray(varianteSeleccionada.reglasCantidad)
+    ? varianteSeleccionada.reglasCantidad
     : [];
 
   const reglaSeleccionada =
     reglaSeleccionadaIndex !== null ? reglas[reglaSeleccionadaIndex] : null;
 
   const precioBaseAplicado = Number(
-    reglaSeleccionada?.precio || productoSeleccionado.precioBase || 0
+    reglaSeleccionada?.precio || varianteSeleccionada.precioBase || 0
   );
 
-  const adicionales = Array.isArray(productoSeleccionado.adicionales)
-    ? productoSeleccionado.adicionales
+  const adicionales = Array.isArray(varianteSeleccionada.adicionales)
+    ? varianteSeleccionada.adicionales
     : [];
 
   const totalAdicionales = adicionales
@@ -616,7 +942,57 @@ const precioFinalSeleccionado = useMemo(() => {
     .reduce((acc, a) => acc + Number(a.precio || 0), 0);
 
   return precioBaseAplicado + totalAdicionales;
-}, [productoSeleccionado, adicionalesSimulados, reglaSeleccionadaIndex]);
+}, [
+  productoSeleccionado,
+  varianteSeleccionada,
+  adicionalesSimulados,
+  reglaSeleccionadaIndex,
+]);
+
+const composicionPrecioSeleccionado = useMemo(() => {
+  if (!productoSeleccionado || !varianteSeleccionada) return [];
+
+  const chips = [];
+
+  chips.push(varianteSeleccionada.nombre || "General");
+
+  const reglas = Array.isArray(varianteSeleccionada.reglasCantidad)
+    ? varianteSeleccionada.reglasCantidad
+    : [];
+
+  const reglaSeleccionada =
+    reglaSeleccionadaIndex !== null ? reglas[reglaSeleccionadaIndex] : null;
+
+  if (reglaSeleccionada) {
+    chips.push(
+      `${reglaSeleccionada.desde || 0} a ${
+        reglaSeleccionada.hasta || "sin límite"
+      } un.`
+    );
+  } else {
+    chips.push("Precio base");
+  }
+
+  const adicionales = Array.isArray(varianteSeleccionada.adicionales)
+    ? varianteSeleccionada.adicionales
+    : [];
+
+  adicionales
+    .filter((a, index) => {
+      const id = a.id || `adicional-${index}`;
+      return adicionalesSimulados.includes(id);
+    })
+    .forEach((a) => {
+      if (a.nombre) chips.push(a.nombre);
+    });
+
+  return chips;
+}, [
+  productoSeleccionado,
+  varianteSeleccionada,
+  reglaSeleccionadaIndex,
+  adicionalesSimulados,
+]);
 
   const totalProductos = productosLista.length;
   const totalReglas = productosLista.reduce(
@@ -878,7 +1254,7 @@ const precioFinalSeleccionado = useMemo(() => {
                             setMenuListaAbierto(false);
                             }}
                         >
-                            <Trash2 size={16} />
+                            <Trash2 className="lp-trash-svg" size={16} strokeWidth={2.4} />
                             Eliminar lista
                         </button>
                         )}
@@ -916,10 +1292,11 @@ const precioFinalSeleccionado = useMemo(() => {
                         <input
                         value={busquedaProductoLista}
                         onChange={(e) => {
-                        setBusquedaProductoLista(e.target.value);
-                        setProductoSeleccionadoIndex(null);
-                        setAdicionalesSimulados([]);
-                        setReglaSeleccionadaIndex(null);
+                          setBusquedaProductoLista(e.target.value);
+                          setProductoSeleccionadoIndex(null);
+                          setAdicionalesSimulados([]);
+                          setReglaSeleccionadaIndex(null);
+                          setVarianteSeleccionadaIndex(0);
                         }}
                         placeholder="Buscar producto en esta lista..."
                       />
@@ -928,35 +1305,81 @@ const precioFinalSeleccionado = useMemo(() => {
                     
                     <div className="lp-product-card-list">
                       {productosListaFiltrados.map(({ producto, indexOriginal }) => (
-                        <button
+                       <div
                           key={`${producto.nombre}-${indexOriginal}`}
-                          className={`lp-product-row ${
+                          className={`lp-product-row-wrap ${
                             productoActivoIndex === indexOriginal ? "activo" : ""
                           }`}
-                        onClick={() => {
-                            setProductoSeleccionadoIndex(indexOriginal);
-                            setAdicionalesSimulados([]);
-                            setReglaSeleccionadaIndex(null);
-                          }}
                         >
+                          <button
+                            type="button"
+                            className="lp-product-row"
+                            onClick={() => {
+                              setProductoSeleccionadoIndex(indexOriginal);
+                              setAdicionalesSimulados([]);
+                              setReglaSeleccionadaIndex(null);
+                              setVarianteSeleccionadaIndex(0);
+                              setMenuProductoAbierto(null);
+                            }}
+                          >
                             <div className="lp-product-thumb">
-                            {obtenerImagenProducto(producto) ? (
-                                <img src={obtenerImagenProducto(producto)} alt={producto.nombre} />
-                            ) : (
+                              {obtenerImagenProducto(producto) ? (
+                                <img
+                                  src={obtenerImagenProducto(producto)}
+                                  alt={producto.nombre}
+                                />
+                              ) : (
                                 <Package size={22} />
-                            )}
+                              )}
                             </div>
 
-                          <div className="lp-product-main">
-                            <strong>{producto.nombre}</strong>
-                            <span>{formatearMoneda(producto.precioBase)}</span>
-                          </div>
+                            <div className="lp-product-main">
+                              <span>{producto.nombre}</span>
+                              <small>{formatearMoneda(producto.precioBase)}</small>
+                            </div>
+                          </button>
 
-                          <div className="lp-product-meta">
-                            <span>{(producto.reglasCantidad || []).length} reglas</span>
-                            <span>{(producto.adicionales || []).length} adicionales</span>
-                          </div>
-                        </button>
+                          <button
+                            type="button"
+                            className="lp-product-row-menu-btn"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setMenuProductoAbierto((prev) =>
+                                prev === indexOriginal ? null : indexOriginal
+                              );
+                            }}
+                          >
+                            <MoreVertical size={18} />
+                          </button>
+
+                          {menuProductoAbierto === indexOriginal && (
+                            <div
+                              className="lp-product-row-menu"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setMenuProductoAbierto(null);
+                                  abrirEditarProducto(producto, indexOriginal);
+                                }}
+                              >
+                                Editar
+                              </button>
+
+                              <button
+                                type="button"
+                                className="danger"
+                                onClick={() => {
+                                  setMenuProductoAbierto(null);
+                                  quitarProductoDeLista(indexOriginal);
+                                }}
+                              >
+                                Quitar
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       ))}
                     </div>
                 </>
@@ -998,47 +1421,68 @@ const precioFinalSeleccionado = useMemo(() => {
                         </label>
 
                         <div className="lp-preview-info">
-                          <span className="lp-pill-soft">
-                            {productoSeleccionado.tipoProducto || "personalizado"}
-                          </span>
                           <h3>{productoSeleccionado.nombre}</h3>
-                          <strong>{formatearMoneda(productoSeleccionado.precioBase)}</strong>
+
+                          <strong>{formatearMoneda(precioFinalSeleccionado)}</strong>
+
+                          <div className="lp-price-chips">
+                            {composicionPrecioSeleccionado.map((chip, index) => (
+                              <span key={`${chip}-${index}`} className="lp-price-chip">
+                                {chip}
+                              </span>
+                            ))}
+                          </div>
                           
                         </div>
                       </div>
 
-                      <div className="lp-preview-actions">
-                        {puedeEditar && (
-                            <button
-                            className="lp-btn-secundario"
-                            onClick={() =>
-                                abrirEditarProducto(productoSeleccionado, productoActivoIndex)
-                            }
-                            >
-                            <Pencil size={16} />
-                            Editar producto
-                            </button>
-                        )}
+                      {variantesProductoSeleccionado.length > 1 && (
+                        <div className="lp-preview-section">
+                          <h4>Variantes</h4>
 
-                        {puedeEditar && (
-                            <button
-                            className="lp-btn-danger"
-                            onClick={() => quitarProductoDeLista(productoActivoIndex)}
-                            >
-                            <Trash2 size={16} />
-                            Quitar
-                            </button>
-                        )}
+                          <div className="lp-mini-table">
+                            {variantesProductoSeleccionado.map((variante, index) => (
+                              <button
+                                key={variante.id || index}
+                                type="button"
+                                className={`lp-mini-row lp-adicional-row ${
+                                  varianteSeleccionadaIndex === index ? "activo" : ""
+                                }`}
+                                onClick={() => {
+                                  setVarianteSeleccionadaIndex(index);
+                                  setReglaSeleccionadaIndex(null);
+                                  setAdicionalesSimulados([]);
+                                }}
+                              >
+                                <span className="lp-check-circle" />
+                                <span>{variante.nombre || "General"}</span>
+                                <strong>
+                                  {formatearMoneda(
+                                    varianteSeleccionadaIndex === index
+                                      ? precioFinalSeleccionado
+                                      : variante.precioBase || 0
+                                  )}
+                                </strong>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="lp-preview-actions">
+
+
+
                       </div>
 
                       <div className="lp-preview-section">
                         <h4>Reglas por cantidad</h4>
 
-                        {(productoSeleccionado.reglasCantidad || []).length === 0 ? (
+                        {(varianteSeleccionada?.reglasCantidad || []).length === 0 ? (
                             <p className="lp-empty">Sin reglas por cantidad.</p>
                         ) : (
                             <div className="lp-mini-table">
-                            {(productoSeleccionado.reglasCantidad || []).map((regla, index) => {
+                            {(varianteSeleccionada?.reglasCantidad || []).map((regla, index) => {
                                 const activo = reglaSeleccionadaIndex === index;
 
                                 return (
@@ -1069,11 +1513,11 @@ const precioFinalSeleccionado = useMemo(() => {
                       <div className="lp-preview-section">
                         <h4>Adicionales</h4>
 
-                        {(productoSeleccionado.adicionales || []).length === 0 ? (
+                        {(varianteSeleccionada?.adicionales || []).length === 0 ? (
                           <p className="lp-empty">Sin adicionales cargados.</p>
                         ) : (
                           <div className="lp-mini-table">
-                            {(productoSeleccionado.adicionales || []).map((adicional, index) => {
+                            {(varianteSeleccionada?.adicionales || []).map((adicional, index) => {
                               const id = adicional.id || `adicional-${index}`;
                               const activo = adicionalesSimulados.includes(id);
 
@@ -1190,11 +1634,20 @@ const precioFinalSeleccionado = useMemo(() => {
                   onChange={(e) => seleccionarProductoBase(e.target.value)}
                 >
                   <option value="">Seleccionar producto...</option>
-                  {productosBase.map((p) => (
-                    <option key={p.firebaseId} value={p.firebaseId}>
-                      {p.nombre}
-                    </option>
-                  ))}
+                    {productosBase.map((p) => {
+                      const yaExiste = productoYaExisteEnLista(p.firebaseId);
+
+                      return (
+                        <option
+                          key={p.firebaseId}
+                          value={p.firebaseId}
+                          disabled={yaExiste}
+                        >
+                          {p.nombre}
+                          {yaExiste ? " — ya agregado" : ""}
+                        </option>
+                      );
+                    })}
                 </select>
               </div>
 
@@ -1212,21 +1665,133 @@ const precioFinalSeleccionado = useMemo(() => {
                 />
               </div>
 
-              <div>
-                <label>Precio base</label>
-                <input
-                  type="number"
-                  value={formProducto.precioBase ?? ""}
-                  onChange={(e) =>
-                    setFormProducto((prev) => ({
-                      ...prev,
-                      precioBase: e.target.value,
-                    }))
-                  }
-                  placeholder="0"
-                />
-              </div>
+
             </div>
+
+            <div className="lp-section-title">
+              <div>
+                <h3>Variantes</h3>
+                <p>Creá precios separados por talle. (ej. Talle especial, Niños.)</p>
+              </div>
+
+              <button type="button" onClick={agregarVariante}>
+                <Plus size={16} />
+                Variante
+              </button>
+            </div>
+
+            <div className="lp-variantes-editor">
+              {normalizarVariantesProducto(formProducto).map((variante, index) => (
+                <button
+                  key={variante.id || index}
+                  type="button"
+                  className={`lp-variante-chip ${
+                    varianteEditandoIndex === index ? "activo" : ""
+                  }`}
+                  onClick={() => setVarianteEditandoIndex(index)}
+                >
+                  {variante.nombre || "General"}
+                </button>
+              ))}
+            </div>
+
+              <div className="lp-variante-linea">
+                <div className="lp-variante-campo nombre">
+                  <label>Nombre de variante</label>
+                  <input
+                    value={
+                      normalizarVariantesProducto(formProducto)[varianteEditandoIndex]
+                        ?.nombre ?? ""
+                    }
+                    onChange={(e) =>
+                      actualizarVariante(varianteEditandoIndex, "nombre", e.target.value)
+                    }
+                    placeholder="Ej: Adulto"
+                  />
+                </div>
+
+                <div className="lp-variante-campo precio">
+                  <label>Precio base</label>
+                  <input
+                    type="number"
+                    value={
+                      normalizarVariantesProducto(formProducto)[varianteEditandoIndex]
+                        ?.precioBase ?? ""
+                    }
+                    onChange={(e) =>
+                      actualizarVariante(varianteEditandoIndex, "precioBase", e.target.value)
+                    }
+                    placeholder="0"
+                  />
+                </div>
+
+                <div className="lp-variante-campo talles">
+                  <label>Talles asociados</label>
+
+                  {varianteEditandoIndex === 0 ? (
+                    <span className="lp-talles-ayuda">
+                      General aplica a talles no asignados.
+                    </span>
+                  ) : tallesDisponiblesForm.length === 0 ? (
+                    <span className="lp-talles-ayuda">Sin talles configurados.</span>
+                  ) : (
+                    <details className="lp-talles-dropdown">
+                      <summary>
+                        Seleccionar talles
+                        <span>
+                          {(
+                            normalizarVariantesProducto(formProducto)[varianteEditandoIndex]
+                              ?.talles || []
+                          ).length} seleccionados
+                        </span>
+                      </summary>
+
+                      <div className="lp-talles-dropdown-list">
+                        {tallesDisponiblesForm.map((talle) => {
+                          const tallesVariante =
+                            normalizarVariantesProducto(formProducto)[varianteEditandoIndex]
+                              ?.talles || [];
+
+                          const activo = tallesVariante.includes(talle);
+
+                          return (
+                            <label key={talle} className="lp-talle-dropdown-item">
+                              <input
+                                type="checkbox"
+                                checked={activo}
+                                onChange={() =>
+                                  toggleTalleVariante(varianteEditandoIndex, talle)
+                                }
+                              />
+                              <span>{talle}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </details>
+                  )}
+                </div>
+
+                <div className="lp-variante-campo accion">
+                  <label>Acción</label>
+                  <button
+                    type="button"
+                    className="lp-icon-danger"
+                    onClick={() => {
+                      quitarVariante(varianteEditandoIndex);
+                      setVarianteEditandoIndex(0);
+                    }}
+                    disabled={
+                      varianteEditandoIndex === 0 ||
+                      normalizarVariantesProducto(formProducto)[varianteEditandoIndex]?.id === "general" ||
+                      normalizarVariantesProducto(formProducto).length <= 1
+}
+                    title="Quitar variante"
+                  >
+                    <Trash size={16} />
+                  </button>
+                </div>
+              </div>
 
             <div className="lp-section-title">
               <div>
@@ -1239,7 +1804,10 @@ const precioFinalSeleccionado = useMemo(() => {
               </button>
             </div>
 
-            {(formProducto.reglasCantidad || []).map((regla, index) => (
+            {(
+                normalizarVariantesProducto(formProducto)[varianteEditandoIndex]
+                  ?.reglasCantidad || []
+              ).map((regla, index) => (
               <div className="lp-grid-4" key={index}>
                 <input
                   type="number"
@@ -1268,7 +1836,7 @@ const precioFinalSeleccionado = useMemo(() => {
             <div className="lp-section-title">
               <div>
                 <h3>Adicionales</h3>
-                <p>Agregá cargos por unidad o por pedido.</p>
+                <p>Agregá cargos por unidad.</p>
               </div>
               <button type="button" onClick={agregarAdicional}>
                 <Plus size={16} />
@@ -1276,7 +1844,10 @@ const precioFinalSeleccionado = useMemo(() => {
               </button>
             </div>
 
-            {(formProducto.adicionales || []).map((adicional, index) => (
+            {(
+              normalizarVariantesProducto(formProducto)[varianteEditandoIndex]
+                ?.adicionales || []
+            ).map((adicional, index) => (
               <div className="lp-grid-4" key={adicional.id || index}>
                 <input
                   placeholder="Nombre"

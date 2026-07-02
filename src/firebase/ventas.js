@@ -50,6 +50,7 @@ function normalizarItems({ items = [], descripcion = "", cantidad = 0, precioUni
   const itemsValidos = Array.isArray(items)
     ? items
         .map((item) => ({
+          ...item,
           descripcion: (item.descripcion || "").trim(),
           cantidad: Number(item.cantidad || 0),
           precioUnitario: Number(item.precioUnitario || 0),
@@ -225,6 +226,14 @@ const sucursalNombre = perfil?.sucursalDefaultNombre || "Sucursal principal";
         listaPrecioNombre: item.listaPrecioNombre || "",
         productoListaNombre: item.productoListaNombre || "",
         productoBaseId: item.productoBaseId || "",
+        varianteId: item.varianteId || "",
+        varianteNombre: item.varianteNombre || "",
+        imagenUrl: item.imagenUrl || "",
+        imagenThumb: item.imagenThumb || "",
+        varianteId: item.varianteId || "",
+        varianteNombre: item.varianteNombre || "",
+        imagenUrl: item.imagenUrl || "",
+        imagenThumb: item.imagenThumb || "",
         reglaCantidad: item.reglaCantidad || null,
         adicionalesSeleccionados: item.adicionalesSeleccionados || [],
         precioDetalleInterno: item.precioDetalleInterno || null,

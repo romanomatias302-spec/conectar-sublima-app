@@ -1488,3 +1488,456 @@
   border: none !important;
   box-shadow: none !important;
 }
+
+.lp-variantes-editor {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0 18px;
+}
+
+.lp-variante-chip {
+  border: 1px solid #dbe3ec;
+  background: #fff;
+  color: #334155;
+  border-radius: 999px;
+  padding: 7px 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.lp-variante-chip.activo {
+  background: #eaf7ff;
+  border-color: #0096d1;
+  color: #0096d1;
+}
+
+.lp-variante-chip:hover {
+  background: #f8fafc;
+}
+
+.lp-talles-variante-box {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 12px;
+  margin: 12px 0 18px;
+}
+
+.lp-talles-variante-box p {
+  margin: 0;
+  font-size: 13px;
+  color: #64748b;
+  line-height: 1.4;
+}
+
+.lp-talles-variante-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.lp-talles-variante-head strong {
+  display: block;
+  color: #0f172a;
+  font-size: 14px;
+}
+
+.lp-talles-variante-head span {
+  display: block;
+  color: #64748b;
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.lp-talles-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.lp-talle-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #dbe3ec;
+  border-radius: 999px;
+  padding: 7px 10px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  color: #334155;
+}
+
+.lp-talle-check input {
+  margin: 0;
+}
+
+.lp-talle-check.activo {
+  background: #eaf7ff;
+  border-color: #0096d1;
+  color: #0096d1;
+}
+
+.lp-variante-linea {
+  display: grid;
+  grid-template-columns: 1.15fr 120px minmax(260px, 1.8fr) 52px;
+  gap: 10px;
+  align-items: start;
+  margin: 12px 0 18px;
+}
+
+.lp-variante-campo label {
+  display: block;
+  font-size: 11px;
+  font-weight: 800;
+  color: #64748b;
+  margin-bottom: 5px;
+}
+
+.lp-variante-campo input {
+  height: 34px;
+}
+
+.lp-variante-campo.precio input {
+  padding-right: 6px;
+}
+
+.lp-talles-ayuda {
+  display: block;
+  font-size: 12px;
+  color: #64748b;
+  line-height: 1.3;
+  padding-top: 8px;
+}
+
+.lp-talles-checks-inline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  padding-top: 4px;
+}
+
+.lp-talle-check-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #334155;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.lp-talle-check-inline input {
+  width: 13px;
+  height: 13px;
+  margin: 0;
+}
+
+.lp-icon-danger {
+  width: 34px;
+  height: 34px;
+  border: 1px solid #fecaca;
+  background: #fff;
+  color: #dc2626;
+  border-radius: 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.lp-icon-danger:hover {
+  background: #fef2f2;
+}
+
+.lp-icon-danger:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+  .lp-variante-linea {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* FIX visual talles asociados */
+.lp-variante-linea {
+  grid-template-columns: 1fr 120px minmax(360px, 2fr) 44px !important;
+  align-items: start !important;
+}
+
+.lp-talles-checks-inline {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(58px, 1fr)) !important;
+  gap: 5px 8px !important;
+  padding-top: 2px !important;
+}
+
+.lp-talle-check-inline {
+  display: flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  line-height: 1.1 !important;
+  white-space: nowrap !important;
+}
+
+.lp-talle-check-inline input {
+  width: 12px !important;
+  height: 12px !important;
+  min-width: 12px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.lp-talle-check-inline span {
+  display: inline-block !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.lp-variante-campo.talles {
+  min-width: 0 !important;
+}
+
+.lp-talles-checks-inline {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(70px, 1fr)) !important;
+  gap: 6px 10px !important;
+  max-height: 74px !important;
+  overflow-y: auto !important;
+  padding: 6px 8px !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 10px !important;
+  background: #f8fafc !important;
+}
+
+.lp-talle-check-inline {
+  display: flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  color: #334155 !important;
+  white-space: nowrap !important;
+}
+
+.lp-talle-check-inline input {
+  width: 12px !important;
+  height: 12px !important;
+  min-width: 12px !important;
+  margin: 0 !important;
+}
+
+.lp-variante-linea {
+  grid-template-columns: 1fr 120px minmax(220px, 1.2fr) 44px !important;
+}
+
+.lp-talles-dropdown {
+  position: relative;
+  width: 100%;
+}
+
+.lp-talles-dropdown summary {
+  height: 34px;
+  border: 1px solid #dbe3ef;
+  border-radius: 10px;
+  background: #fff;
+  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+  color: #334155;
+}
+
+.lp-talles-dropdown summary span {
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 700;
+}
+
+.lp-talles-dropdown-list {
+  margin-top: 6px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+  max-height: 150px;
+  overflow-y: auto;
+  padding: 6px;
+  display: grid;
+  gap: 4px;
+}
+
+.lp-talle-dropdown-item {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 5px 6px;
+  border-radius: 7px;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  color: #334155 !important;
+  cursor: pointer;
+}
+
+.lp-talle-dropdown-item:hover {
+  background: #f1f5f9;
+}
+
+.lp-talle-dropdown-item input {
+  width: 13px !important;
+  height: 13px !important;
+  min-width: 13px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border-radius: 3px !important;
+}
+
+.lp-icon-danger svg,
+.lp-trash-svg {
+  display: block !important;
+  width: 16px !important;
+  height: 16px !important;
+  min-width: 16px !important;
+  stroke: currentColor !important;
+  color: inherit !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: none !important;
+}
+
+.lp-icon-danger {
+  color: #dc2626 !important;
+}
+
+.lp-price-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.lp-price-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: #eaf7ff;
+  color: #007bb2;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  border: 1px solid rgba(0, 150, 209, 0.18);
+}
+
+.lp-preview-info > strong {
+  display: block;
+  margin-top: 4px;
+}
+
+
+/* ===============================
+   PRODUCTO EN LISTA + MENÚ
+   =============================== */
+
+.lp-product-row-wrap {
+  position: relative;
+}
+
+.lp-product-row-wrap .lp-product-row {
+  position: relative;
+  width: 100%;
+  padding-right: 42px !important;
+}
+
+.lp-product-row-wrap.activo .lp-product-row {
+  border-color: rgba(7, 150, 201, 0.45);
+  background: #f0fbff;
+}
+
+.lp-product-row-menu-btn {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  background: transparent;
+  color: #64748b;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  line-height: 0;
+  cursor: pointer;
+  z-index: 6;
+}
+
+.lp-product-row-menu-btn svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+  stroke: currentColor;
+}
+
+.lp-product-row-menu-btn:hover {
+  background: #eef7fb;
+  color: #0796c9;
+}
+
+.lp-product-row-menu {
+  position: absolute;
+  top: 40px;
+  right: 10px;
+  z-index: 90;
+  width: 150px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.16);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.lp-product-row-menu button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  width: 100%;
+  min-height: 32px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 800;
+  text-align: left;
+  cursor: pointer;
+  display: block;
+}
+
+.lp-product-row-menu button:hover {
+  background: #f1f5f9;
+}
+
+.lp-product-row-menu button.danger {
+  color: #dc2626;
+}
+
+.lp-product-row-menu button.danger:hover {
+  background: #fef2f2;
+}

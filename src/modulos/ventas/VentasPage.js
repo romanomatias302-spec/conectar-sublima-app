@@ -48,24 +48,313 @@ const itemVacio = () => ({
   precioDetalleInterno: null,
 });
 
-function convertirProductosPedidoAVenta(productos = []) {
-  return productos.map((producto) => ({
-    descripcion:
+function obtenerCantidadProductoPedido(producto) {
+  return Number(producto.totalTalles || producto.cantidad || 1);
+}
+
+function buscarProductoEnLista(productoPedido, lista) {
+  const productosLista = Array.isArray(lista?.productos) ? lista.productos : [];
+
+  const nombrePedido = String(
+    productoPedido.productoNombre ||
+      productoPedido.producto ||
+      ""
+  )
+    .trim()
+    .toLowerCase();
+
+  return productosLista.find((item) => {
+    const nombreLista = String(item.nombre || item.productoListaNombre || "")
+      .trim()
+      .toLowerCase();
+
+    return nombreLista && nombrePedido && nombreLista === nombrePedido;
+  });
+}
+
+function normalizarVariantesProductoLista(productoLista = {}) {
+  if (
+    Array.isArray(productoLista.variantes) &&
+    productoLista.variantes.length > 0
+  ) {
+    return productoLista.variantes.map((v, index) => ({
+      id: v.id || `variante-${index}`,
+      nombre: v.nombre || "General",
+      talles: Array.isArray(v.talles) ? v.talles : [],
+      precioBase: Number(v.precioBase || 0),
+      reglasCantidad: Array.isArray(v.reglasCantidad) ? v.reglasCantidad : [],
+      adicionales: Array.isArray(v.adicionales) ? v.adicionales : [],
+      imagenUrl: v.imagenUrl || "",
+      imagenThumb: v.imagenThumb || "",
+      activa: v.activa !== false,
+    }));
+  }
+
+  return [
+    {
+      id: "general",
+      nombre: "General",
+      talles: [],
+      precioBase: Number(productoLista.precioBase || 0),
+      reglasCantidad: Array.isArray(productoLista.reglasCantidad)
+        ? productoLista.reglasCantidad
+        : [],
+      adicionales: Array.isArray(productoLista.adicionales)
+        ? productoLista.adicionales
+        : [],
+      imagenUrl: productoLista.imagenUrl || "",
+      imagenThumb: productoLista.imagenThumb || "",
+      activa: true,
+    },
+  ];
+}
+
+function obtenerPrecioPorCantidad(variante, cantidad) {
+  const reglas = Array.isArray(variante?.reglasCantidad)
+    ? variante.reglasCantidad
+    : [];
+
+  const regla = reglas.find((r) => {
+    const desde = Number(r.desde || 0);
+    const hasta = r.hasta === null || r.hasta === "" ? null : Number(r.hasta);
+
+    return cantidad >= desde && (hasta === null || cantidad <= hasta);
+  });
+
+  return {
+    precio: Number(regla?.precio || variante?.precioBase || 0),
+    regla: regla || null,
+  };
+}
+
+function obtenerVarianteGeneral(productoLista) {
+  const variantes = normalizarVariantesProductoLista(productoLista);
+
+  return (
+    variantes.find((v) => v.id === "general") ||
+    variantes.find((v) => String(v.nombre || "").toLowerCase() === "general") ||
+    variantes[0] ||
+    null
+  );
+}
+
+function normalizarTalle(valor) {
+  return String(valor || "").trim().toLowerCase();
+}
+
+function extraerTallesProductoPedido(producto = {}) {
+  const posibles =
+    producto.talles ||
+    producto.tallesSeleccionados ||
+    producto.detallesTalle ||
+    producto.detallesPorTalle ||
+    producto.cantidadesPorTalle ||
+    [];
+
+  if (Array.isArray(posibles)) {
+    return posibles
+      .map((t) => {
+        if (typeof t === "string") {
+          return { talle: t, cantidad: 1 };
+        }
+
+        return {
+          talle: t.talle || t.nombre || t.label || t.valor || "",
+          cantidad: Number(t.cantidad || t.cant || t.total || 0),
+        };
+      })
+      .filter((t) => t.talle && t.cantidad > 0);
+  }
+
+  if (posibles && typeof posibles === "object") {
+    return Object.entries(posibles)
+      .map(([talle, cantidad]) => ({
+        talle,
+        cantidad: Number(cantidad || 0),
+      }))
+      .filter((t) => t.talle && t.cantidad > 0);
+  }
+
+  return [];
+}
+
+function obtenerVarianteParaTalle(productoLista, talle) {
+  const variantes = normalizarVariantesProductoLista(productoLista);
+  const talleNormalizado = normalizarTalle(talle);
+
+  const varianteDetectada = variantes.find((v) => {
+    if (v.id === "general") return false;
+    if (String(v.nombre || "").toLowerCase() === "general") return false;
+
+    return (v.talles || []).some(
+      (t) => normalizarTalle(t) === talleNormalizado
+    );
+  });
+
+  if (varianteDetectada) return varianteDetectada;
+
+  return (
+    variantes.find((v) => v.id === "general") ||
+    variantes.find((v) => String(v.nombre || "").toLowerCase() === "general") ||
+    variantes[0] ||
+    null
+  );
+}
+
+function armarItemVentaDesdeVariante({
+  productoLista,
+  listaSeleccionada,
+  variante,
+  cantidad,
+  cantidadTotalParaRegla,
+  descripcionBase,
+  productosBase = [],
+}) {
+  const precioCalc = obtenerPrecioPorCantidad(variante, cantidadTotalParaRegla);
+
+  const nombreVariante =
+    variante?.nombre && variante.nombre !== "General"
+      ? variante.nombre
+      : "";
+
+  const descripcion = nombreVariante
+    ? `${productoLista.nombre || descripcionBase} - ${nombreVariante}`
+    : productoLista.nombre || descripcionBase;
+
+const productoBase = productosBase.find(
+  (p) => p.firebaseId === productoLista.productoBaseId
+);
+
+const imagen =
+  variante?.imagenThumb ||
+  variante?.imagenUrl ||
+  productoLista.imagenThumb ||
+  productoLista.imagenUrl ||
+  productoBase?.imagenThumb ||
+  productoBase?.imagenUrl ||
+  "";
+
+  return {
+    descripcion,
+    cantidad,
+    precioUnitario: precioCalc.precio,
+    excluirDescuento: false,
+
+    origenPrecio: "lista_precio",
+    listaPrecioId: listaSeleccionada.firebaseId || "",
+    listaPrecioNombre: listaSeleccionada.nombre || "",
+    productoListaNombre: productoLista.nombre || descripcionBase,
+    productoBaseId: productoLista.productoBaseId || "",
+
+    varianteId: variante?.id || "general",
+    varianteNombre: variante?.nombre || "General",
+
+    imagenUrl: imagen,
+    imagenThumb: imagen,
+
+    reglaCantidad: precioCalc.regla,
+    adicionalesSeleccionados: [],
+    precioDetalleInterno: {
+      origen: "pedido_importado",
+      listaPrecioId: listaSeleccionada.firebaseId || "",
+      listaPrecioNombre: listaSeleccionada.nombre || "",
+      productoListaNombre: productoLista.nombre || descripcionBase,
+      varianteId: variante?.id || "general",
+      varianteNombre: variante?.nombre || "General",
+      precioBase: Number(variante?.precioBase || 0),
+      precioFinalUnitario: precioCalc.precio,
+      cantidadTotalParaRegla,
+      reglaCantidad: precioCalc.regla,
+      adicionales: [],
+    },
+  };
+}
+
+function convertirProductosPedidoAVenta(
+  productos = [],
+  listaSeleccionada = null,
+  productosBase = []
+) {
+  return productos.flatMap((producto) => {
+    const cantidadTotal = obtenerCantidadProductoPedido(producto);
+
+    const descripcion =
       producto.productoNombre ||
       producto.producto ||
-      "",
+      "";
 
-    cantidad:
-      Number(
-        producto.totalTalles ||
-        producto.cantidad ||
-        1
-      ),
+    const productoLista = listaSeleccionada
+      ? buscarProductoEnLista(producto, listaSeleccionada)
+      : null;
 
-    precioUnitario: 0,
-    
-    excluirDescuento: false,
-  }));
+    if (!productoLista) {
+      return [{
+        descripcion,
+        cantidad: cantidadTotal,
+        precioUnitario: 0,
+        excluirDescuento: false,
+        origenPrecio: "manual",
+        listaPrecioId: "",
+        listaPrecioNombre: "",
+        productoListaNombre: "",
+        productoBaseId: "",
+        varianteId: "",
+        varianteNombre: "",
+        imagenUrl: "",
+        imagenThumb: "",
+        reglaCantidad: null,
+        adicionalesSeleccionados: [],
+        precioDetalleInterno: null,
+      }];
+    }
+
+    const tallesPedido = extraerTallesProductoPedido(producto);
+
+    if (!tallesPedido.length) {
+      const variante = obtenerVarianteGeneral(productoLista);
+
+      return [
+        armarItemVentaDesdeVariante({
+          productoLista,
+          listaSeleccionada,
+          variante,
+          cantidad: cantidadTotal,
+          cantidadTotalParaRegla: cantidadTotal,
+          descripcionBase: descripcion,
+          productosBase,
+         
+        }),
+      ];
+    }
+
+    const grupos = new Map();
+
+    tallesPedido.forEach(({ talle, cantidad }) => {
+      const variante = obtenerVarianteParaTalle(productoLista, talle);
+      const key = variante?.id || "general";
+
+      const actual = grupos.get(key) || {
+        variante,
+        cantidad: 0,
+      };
+
+      actual.cantidad += Number(cantidad || 0);
+      grupos.set(key, actual);
+    });
+
+    return Array.from(grupos.values()).map(({ variante, cantidad }) =>
+      armarItemVentaDesdeVariante({
+        productoLista,
+        listaSeleccionada,
+        variante,
+        cantidad,
+        cantidadTotalParaRegla: cantidadTotal,
+        descripcionBase: descripcion,
+        productosBase,
+        
+      })
+    );
+  });
 }
 
 const clienteRapidoInicial = {
@@ -113,6 +402,13 @@ const [pedidoRefId, setPedidoRefId] = useState("");
   const [mostrarImportarPedido, setMostrarImportarPedido] = useState(false);
 const [modalPrecioAbierto, setModalPrecioAbierto] = useState(false);
 const [itemPrecioIndex, setItemPrecioIndex] = useState(null);
+const [precioContexto, setPrecioContexto] = useState("venta");
+
+const [listasPrecios, setListasPrecios] = useState([]);
+const [listaImportacionId, setListaImportacionId] = useState("");
+const [itemsImportacionPedido, setItemsImportacionPedido] = useState([]);
+
+const [productosBase, setProductosBase] = useState([]);
 
 
 
@@ -131,6 +427,8 @@ const [pedidoImportado, setPedidoImportado] =
 
       const clientesRef = collection(db, "clientes");
       const pedidosRef = collection(db, "pedidos");
+      const listasRef = collection(db, "listasPrecios");
+      const productosBaseRef = collection(db, "productosBase");
 
       const qClientes =
         perfil.rol === "superadmin"
@@ -147,10 +445,27 @@ const [pedidoImportado, setPedidoImportado] =
               limit(50)
             );
 
-const [snapClientes, snapPedidos] = await Promise.all([
-  getDocs(qClientes),
-  getDocs(qPedidos),
-]);
+  const qListas =
+    perfil.rol === "superadmin"
+      ? query(listasRef)
+      : query(
+          listasRef,
+          where("clienteId", "==", perfil.clienteId),
+          where("activa", "==", true)
+        );
+
+const qProductosBase =
+  perfil.rol === "superadmin"
+    ? query(productosBaseRef)
+    : query(productosBaseRef, where("clienteId", "==", perfil.clienteId));
+
+const [snapClientes, snapPedidos, snapListas, snapProductosBase] =
+  await Promise.all([
+    getDocs(qClientes),
+    getDocs(qPedidos),
+    getDocs(qListas),
+    getDocs(qProductosBase),
+  ]);
 
   setClientes(
     snapClientes.docs.map((d) => ({
@@ -165,6 +480,27 @@ const [snapClientes, snapPedidos] = await Promise.all([
       ...d.data(),
     }))
   );
+
+  const listasDb = snapListas.docs.map((d) => ({
+  firebaseId: d.id,
+  ...d.data(),
+}));
+
+setListasPrecios(listasDb);
+
+setProductosBase(
+  snapProductosBase.docs.map((d) => ({
+    firebaseId: d.id,
+    ...d.data(),
+  }))
+);
+
+if (!listaImportacionId && listasDb.length > 0) {
+  const predeterminada =
+    listasDb.find((l) => l.predeterminada === true) || listasDb[0];
+
+  setListaImportacionId(predeterminada.firebaseId);
+}
 
 
 
@@ -193,6 +529,20 @@ useEffect(() => {
     productosPedido.length &&
     !pedidoImportado
   ) {
+    const listaInicial =
+      listasPrecios.find((l) => l.firebaseId === listaImportacionId) ||
+      listasPrecios.find((l) => l.predeterminada === true) ||
+      listasPrecios[0] ||
+      null;
+
+    setItemsImportacionPedido(
+      convertirProductosPedidoAVenta(productosPedido, listaInicial, productosBase)
+    );
+
+    if (listaInicial?.firebaseId && !listaImportacionId) {
+      setListaImportacionId(listaInicial.firebaseId);
+    }
+
     setMostrarImportarPedido(true);
     return;
   }
@@ -205,6 +555,8 @@ useEffect(() => {
 }, [
   pedidoInicial,
   productosPedido,
+  listasPrecios,
+  listaImportacionId,
 ]);
 
 const [cotizacionImportadaId, setCotizacionImportadaId] = useState("");
@@ -511,6 +863,24 @@ const guardarClienteRapido = async () => {
         setPagosIniciales((prev) => prev.filter((_, i) => i !== index));
     };
 
+    const cambiarListaImportacion = (listaId) => {
+  setListaImportacionId(listaId);
+
+  const lista = listasPrecios.find((l) => l.firebaseId === listaId) || null;
+
+  setItemsImportacionPedido(
+    convertirProductosPedidoAVenta(productosPedido, lista, productosBase)
+  );
+};
+
+const actualizarItemImportacion = (index, campo, valor) => {
+  setItemsImportacionPedido((prev) =>
+    prev.map((item, i) =>
+      i === index ? { ...item, [campo]: valor } : item
+    )
+  );
+};
+
 const importarPedidoComoVenta = () => {
 
   const clientePedidoNombre = (
@@ -598,14 +968,19 @@ if (cliente) {
       : ""
   );
 
-  setItems(convertirProductosPedidoAVenta(productosPedido));
+  setItems(
+    itemsImportacionPedido.length
+      ? itemsImportacionPedido
+      : convertirProductosPedidoAVenta(productosPedido, null, productosBase)
+  );
 
   setPedidoImportado(true);
   setMostrarImportarPedido(false);
 };
 
-const abrirSelectorPrecio = (index) => {
+const abrirSelectorPrecio = (index, contexto = "venta") => {
   setItemPrecioIndex(index);
+  setPrecioContexto(contexto);
   setModalPrecioAbierto(true);
   setError("");
 };
@@ -613,12 +988,27 @@ const abrirSelectorPrecio = (index) => {
 const aplicarProductoSeleccionado = (datosPrecio) => {
   if (itemPrecioIndex === null) return;
 
-  Object.entries(datosPrecio).forEach(([campo, valor]) => {
-    actualizarItem(itemPrecioIndex, campo, valor);
-  });
+  if (precioContexto === "importacion") {
+    setItemsImportacionPedido((prev) =>
+      prev.map((item, index) =>
+        index === itemPrecioIndex
+          ? {
+              ...item,
+              ...datosPrecio,
+              cantidad: item.cantidad,
+            }
+          : item
+      )
+    );
+  } else {
+    Object.entries(datosPrecio).forEach(([campo, valor]) => {
+      actualizarItem(itemPrecioIndex, campo, valor);
+    });
+  }
 
   setModalPrecioAbierto(false);
   setItemPrecioIndex(null);
+  setPrecioContexto("venta");
   setError("");
 };
 
@@ -742,50 +1132,72 @@ const aplicarProductoSeleccionado = (datosPrecio) => {
         <div className="ventas-importar-modal">
 
         <h3>
-        Crear factura desde pedido
+        Crear venta desde pedido
         </h3>
 
         <p>
         Pedido #{pedidoInicial?.id}
         </p>
 
-        <div
-        className="ventas-importar-preview"
-        >
+        
 
-        {productosPedido.map((p,index)=>(
+        <div className="ventas-importar-preview">
+          {itemsImportacionPedido.map((item, index) => (
+            <div key={index} className="ventas-importar-item ventas-importar-item-editable">
+              <div>
+                <span className="ventas-importar-nombre">
+                  {item.descripcion || "Producto sin nombre"}
+                </span>
 
-        <div
-        key={index}
-        className="ventas-importar-item"
-        >
 
-        <strong>
-        {
-        p.productoNombre ||
-        p.producto
-        }
-        </strong>
+              </div>
 
-        <span>
-        {
-        p.totalTalles ||
-        p.cantidad
-        }
-        uni.
-        </span>
+              <input
+                type="number"
+                min="1"
+                value={item.cantidad}
+                onChange={(e) =>
+                  actualizarItemImportacion(
+                    index,
+                    "cantidad",
+                    e.target.value === "" ? "" : Number(e.target.value)
+                  )
+                }
+              />
 
+              <input
+                type="number"
+                min="0"
+                value={item.precioUnitario}
+                onChange={(e) =>
+                  actualizarItemImportacion(
+                    index,
+                    "precioUnitario",
+                    e.target.value === "" ? "" : Number(e.target.value)
+                  )
+                }
+              />
+
+              <strong>
+                {formatearMoneda(
+                  Number(item.cantidad || 0) * Number(item.precioUnitario || 0),
+                  configMoneda.moneda,
+                  configMoneda.localeMoneda
+                )}
+              </strong>
+              <button
+                type="button"
+                className="ventas-importar-plus-btn"
+                onClick={() => abrirSelectorPrecio(index, "importacion")}
+                title="Configurar precio y adicionales"
+              >
+                +
+              </button>
+            </div>
+          ))}
         </div>
 
-        ))}
-
-        </div>
-
-        <p>
-        ¿Querés crear la factura usando estos productos?
-        Se cargarán descripción y cantidad.
-      
-        </p>
+       
 
         <div
         className="ventas-importar-actions"
@@ -1069,17 +1481,25 @@ const aplicarProductoSeleccionado = (datosPrecio) => {
                               : "ventas-producto-main-manual"
                           }`}
                         >
-                          {item.origenPrecio === "lista_precio" ? (
-                            <>
-                              <strong className="ventas-producto-nombre">
-                                {item.descripcion || "Producto sin descripción"}
-                              </strong>
+                        {item.origenPrecio === "lista_precio" ? (
+                          <button
+                            type="button"
+                            className="ventas-producto-lista-btn"
+                            onClick={() => abrirSelectorPrecio(index, "venta")}
+                            disabled={!puedeCrearVentas}
+                            title="Editar configuración de precio"
+                          >
+                            <strong className="ventas-producto-nombre">
+                              {item.descripcion || "Producto sin descripción"}
+                            </strong>
 
-                              <small className="ventas-item-source">
-                                Lista de precios
-                              </small>
-                            </>
-                          ) : (
+                            <small className="ventas-item-source">
+                              {item.varianteNombre
+                                ? `Lista de precios · ${item.varianteNombre}`
+                                : "Lista de precios"}
+                            </small>
+                          </button>
+                        ) : (
                             <div className="ventas-descripcion-selector ventas-descripcion-selector-clean">
                               <input
                                 value={item.descripcion}
@@ -1336,10 +1756,17 @@ const aplicarProductoSeleccionado = (datosPrecio) => {
           open={modalPrecioAbierto}
           perfil={perfil}
           configMoneda={configMoneda}
-          itemActual={itemPrecioIndex !== null ? items[itemPrecioIndex] : null}
+          itemActual={
+            itemPrecioIndex !== null
+              ? precioContexto === "importacion"
+                ? itemsImportacionPedido[itemPrecioIndex]
+                : items[itemPrecioIndex]
+              : null
+          }
           onClose={() => {
             setModalPrecioAbierto(false);
             setItemPrecioIndex(null);
+            setPrecioContexto("venta");
           }}
           onAplicar={aplicarProductoSeleccionado}
         />       
