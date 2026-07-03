@@ -18,7 +18,8 @@ import {
   where,
   getDocs,
 } from "firebase/firestore";
-import { db } from "../../firebase";
+import { db, storage } from "../../firebase";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import ConfiguracionUsuarios from "./ConfiguracionUsuarios";
 import ConfiguracionSucursales from "./ConfiguracionSucursales";
 
@@ -28,6 +29,7 @@ export default function Configuracion({ modoOscuro, setModoOscuro, perfil, onAct
   );
 
   const [logoUrl, setLogoUrl] = useState("");
+  const [logoFile, setLogoFile] = useState(null);
   const [nombreVisible, setNombreVisible] = useState("");
   const [cuentaSaas, setCuentaSaas] = useState(null);
   const [guardandoConfig, setGuardandoConfig] = useState(false);
@@ -39,6 +41,8 @@ export default function Configuracion({ modoOscuro, setModoOscuro, perfil, onAct
   
   const [guardandoMoneda, setGuardandoMoneda] = useState(false);
   const [mensajeMoneda, setMensajeMoneda] = useState("");
+
+
 
   const [periodosCuenta, setPeriodosCuenta] = useState([]);
   const [periodoPagando, setPeriodoPagando] = useState(null);
@@ -175,43 +179,60 @@ export default function Configuracion({ modoOscuro, setModoOscuro, perfil, onAct
     localStorage.setItem("modoOscuro", nuevoModo ? "true" : "false");
   };
 
-  const handleLogoFile = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+const handleLogoFile = (e) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
 
-    if (!file.type.startsWith("image/")) {
-      setMensajeConfig("Seleccioná un archivo de imagen válido.");
-      return;
+  if (!file.type.startsWith("image/")) {
+    setMensajeConfig("Seleccioná un archivo de imagen válido.");
+    return;
+  }
+
+  if (file.size > 5 * 1024 * 1024) {
+    setMensajeConfig("El logo no puede superar los 5 MB.");
+    return;
+  }
+
+  setLogoFile(file);
+  setLogoUrl(URL.createObjectURL(file)); // solo preview local
+};
+
+const guardarConfigCliente = async () => {
+  try {
+    if (!perfil?.clienteId) return;
+
+    setGuardandoConfig(true);
+    setMensajeConfig("");
+
+    const refCliente = doc(db, "clientes-saas", perfil.clienteId);
+
+    let logoUrlFinal = logoUrl;
+
+    if (logoFile) {
+      const logoRef = ref(
+        storage,
+        `clientes-saas/${perfil.clienteId}/logo/logo-${Date.now()}-${logoFile.name}`
+      );
+
+      await uploadBytes(logoRef, logoFile);
+      logoUrlFinal = await getDownloadURL(logoRef);
     }
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setLogoUrl(reader.result);
-    };
-    reader.readAsDataURL(file);
-  };
+    await updateDoc(refCliente, {
+      nombreVisible,
+      ...(logoFile ? { logoUrl: logoUrlFinal } : {}),
+    });
 
-  const guardarConfigCliente = async () => {
-    try {
-      if (!perfil?.clienteId) return;
-
-      setGuardandoConfig(true);
-      setMensajeConfig("");
-
-      const ref = doc(db, "clientes-saas", perfil.clienteId);
-      await updateDoc(ref, {
-        logoUrl,
-        nombreVisible,
-      });
-
-      setMensajeConfig("Configuración guardada correctamente.");
-    } catch (error) {
-      console.error("Error al guardar configuración:", error);
-      setMensajeConfig("No se pudo guardar la configuración.");
-    } finally {
-      setGuardandoConfig(false);
-    }
-  };
+    setLogoUrl(logoUrlFinal);
+    setLogoFile(null);
+    setMensajeConfig("Configuración guardada correctamente.");
+  } catch (error) {
+    console.error("Error al guardar configuración:", error);
+    setMensajeConfig("No se pudo guardar la configuración.");
+  } finally {
+    setGuardandoConfig(false);
+  }
+};
 
   const guardarConfiguracionMoneda = async () => {
     try {

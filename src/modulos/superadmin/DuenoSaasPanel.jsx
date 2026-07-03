@@ -19,6 +19,9 @@ import {
   obtenerPagosSaas,
   anularMovimientoSaas,
 } from "../../firebase/saasPagos";
+import DuenoSaasEstadisticas from "./DuenoSaasEstadisticas";
+import "./DuenoSaasPanel.css";
+import DuenoSaasSidebar from "./DuenoSaasSidebar";
 
 export default function DuenoSaasPanel() {
   const [clientes, setClientes] = useState([]);
@@ -53,6 +56,11 @@ const [pagosCliente, setPagosCliente] = useState([]);
 const [mostrarPago, setMostrarPago] = useState(false);
 const [mostrarCargoMasivo, setMostrarCargoMasivo] = useState(false);
 const [menuClienteAbierto, setMenuClienteAbierto] = useState(null);
+const [seccionActiva, setSeccionActiva] = useState("clientes");
+
+const [posicionMenuCliente, setPosicionMenuCliente] = useState(null);
+
+
 
 
 
@@ -158,83 +166,38 @@ const obtenerTimestampCliente = (c) => {
 
 const cargarUsoClientes = async () => {
   try {
-    const [pedidosSnap, ventasSnap] = await Promise.all([
-      getDocs(collection(db, "pedidos")),
-      getDocs(collection(db, "ventas")),
-    ]);
+    const usoSnap = await getDocs(collection(db, "clientes-saas-uso"));
 
     const uso = {};
 
-    pedidosSnap.docs.forEach((docu) => {
+    usoSnap.docs.forEach((docu) => {
       const data = docu.data();
-      const clienteId = data.clienteId;
+      const clienteId = data.clienteId || docu.id;
+
       if (!clienteId) return;
 
-      if (!uso[clienteId]) {
-        uso[clienteId] = {
-        pedidos: 0,
-        pedidosUltimos30: 0,
-        ultimoUso: "",
-        };
-      }
-
-      uso[clienteId].pedidos += 1;
-      const hace30Dias = new Date();
-      hace30Dias.setDate(hace30Dias.getDate() - 30);
-
-      const fechaPedido =
-        data.createdAt?.seconds
-          ? new Date(data.createdAt.seconds * 1000)
-          : data.fechaPedido
-          ? new Date(data.fechaPedido)
-          : null;
-
-      if (fechaPedido && fechaPedido >= hace30Dias) {
-        uso[clienteId].pedidosUltimos30 += 1;
-      }
-
-      const fechaUso =
-        data.updatedAt?.seconds
+      const ultimoUso =
+        data.ultimoUsoAt?.seconds
+          ? new Date(data.ultimoUsoAt.seconds * 1000).toISOString().slice(0, 10)
+          : data.updatedAt?.seconds
           ? new Date(data.updatedAt.seconds * 1000).toISOString().slice(0, 10)
-          : data.createdAt?.seconds
-          ? new Date(data.createdAt.seconds * 1000).toISOString().slice(0, 10)
-          : "";
+          : data.ultimoUso || "";
 
-      if (fechaUso && fechaUso > uso[clienteId].ultimoUso) {
-        uso[clienteId].ultimoUso = fechaUso;
-      }
-    });
-
-    ventasSnap.docs.forEach((docu) => {
-      const data = docu.data();
-      const clienteId = data.clienteId;
-      if (!clienteId) return;
-
-      if (!uso[clienteId]) {
-        uso[clienteId] = {
-          pedidos: 0,
-          ventas: 0,
-          ultimoUso: "",
-        };
-      }
-
-      uso[clienteId].ventas += 1;
-
-      const fechaUso =
-        data.updatedAt?.seconds
-          ? new Date(data.updatedAt.seconds * 1000).toISOString().slice(0, 10)
-          : data.createdAt?.seconds
-          ? new Date(data.createdAt.seconds * 1000).toISOString().slice(0, 10)
-          : "";
-
-      if (fechaUso && fechaUso > uso[clienteId].ultimoUso) {
-        uso[clienteId].ultimoUso = fechaUso;
-      }
+      uso[clienteId] = {
+        pedidosUltimos30: Number(data.pedidosUltimos30 || 0),
+        ventasUltimos30: Number(data.ventasUltimos30 || 0),
+        storageUltimos30MB: Number(data.storageUltimos30MB || 0),
+        lecturasUltimos30: Number(data.lecturasUltimos30 || 0),
+        escriturasUltimos30: Number(data.escriturasUltimos30 || 0),
+        pedidos: Number(data.pedidosTotal || data.pedidos || 0),
+        ventas: Number(data.ventasTotal || data.ventas || 0),
+        ultimoUso,
+      };
     });
 
     setUsoClientes(uso);
   } catch (error) {
-    console.error("Error cargando uso por cliente:", error);
+    console.error("Error cargando uso SaaS:", error);
   }
 };
 
@@ -285,6 +248,36 @@ const cargarTodo = async () => {
       cargarInvitaciones(clientes);
     }
   }, [clientes]);
+
+  useEffect(() => {
+  const cerrarMenu = () => {
+    setMenuClienteAbierto(null);
+    setPosicionMenuCliente(null);
+  };
+
+  window.addEventListener("scroll", cerrarMenu, true);
+  window.addEventListener("resize", cerrarMenu);
+
+  return () => {
+    window.removeEventListener("scroll", cerrarMenu, true);
+    window.removeEventListener("resize", cerrarMenu);
+  };
+}, []);
+
+useEffect(() => {
+  const cerrarMenu = () => {
+    setMenuClienteAbierto(null);
+    setPosicionMenuCliente(null);
+  };
+
+  window.addEventListener("scroll", cerrarMenu, true);
+  window.addEventListener("resize", cerrarMenu);
+
+  return () => {
+    window.removeEventListener("scroll", cerrarMenu, true);
+    window.removeEventListener("resize", cerrarMenu);
+  };
+}, []);
 
   const abrirNuevoCliente = () => {
     setClienteEditando(null);
@@ -416,6 +409,7 @@ const pagosPorCliente = pagosSaasActivos.reduce((acc, pago) => {
 
   return acc;
 }, {});
+
 
 const resumenDashboard = {
   totalClientes: clientes.length,
@@ -629,8 +623,14 @@ const emitirCargoMasivo = async () => {
 
 
 
-  return (
-    <div style={{ padding: 30 }}>
+return (
+  <div className="dueno-saas-layout">
+    <DuenoSaasSidebar
+      seccionActiva={seccionActiva}
+      setSeccionActiva={setSeccionActiva}
+    />
+
+    <main className="dueno-saas-main">
       <div style={topbar}>
         <div>
           <h1 style={{ marginBottom: 6 }}>Panel Dueño SaaS</h1>
@@ -656,6 +656,17 @@ const emitirCargoMasivo = async () => {
           </button>
         </div>
       </div>
+
+        {seccionActiva === "estadisticas" && (
+          <DuenoSaasEstadisticas
+            clientes={clientes}
+            movimientosSaas={movimientosSaas}
+            usoClientes={usoClientes}
+            pagosPorCliente={pagosPorCliente}
+            formatearMoneda={formatearMoneda}
+            formatearFecha={formatearFecha}
+          />
+        )}
 
       <div style={dashboardGrid}>
         <div style={dashboardCard}>
@@ -827,95 +838,37 @@ const emitirCargoMasivo = async () => {
                       {formatearFecha(c.fechaVencimiento || c.fechaProximoCargo)}
                     </td>
 
-                    <td style={{ ...td, position: "relative" }}>
+                    <td style={td}>
                       <button
                         type="button"
                         style={btnMenuCliente}
-                        onClick={() =>
-                          setMenuClienteAbierto(
-                            menuClienteAbierto === c.id ? null : c.id
-                          )
-                        }
+                      onClick={(e) => {
+                        e.stopPropagation();
+
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          const altoMenu = 190;
+                          const espacioAbajo = window.innerHeight - rect.bottom;
+
+                          if (menuClienteAbierto === c.id) {
+                            setMenuClienteAbierto(null);
+                            setPosicionMenuCliente(null);
+                            return;
+                          }
+
+                          setPosicionMenuCliente({
+                            top:
+                              espacioAbajo < altoMenu
+                                ? rect.top - altoMenu - 6
+                                : rect.bottom + 6,
+                            left: rect.right - 220,
+                          });
+
+                          setMenuClienteAbierto(c.id);
+                        }}
                       >
                         ⋮
                       </button>
 
-                      {menuClienteAbierto === c.id && (
-                        <div style={dropdownCliente}>
-                          <button
-                            type="button"
-                            style={dropdownItemCliente}
-                            onClick={() => {
-                              abrirEditarCliente(c);
-                              setMenuClienteAbierto(null);
-                            }}
-                          >
-                            Editar cliente
-                          </button>
-
-                          <button
-                            type="button"
-                            style={dropdownItemCliente}
-                            onClick={() => {
-                              setClienteUsuarios(c);
-                              setMenuClienteAbierto(null);
-                            }}
-                          >
-                            Usuarios
-                          </button>
-
-                          <button
-                            type="button"
-                            style={dropdownItemCliente}
-                            onClick={async () => {
-                              setClienteCuentaCorriente(c);
-                              const pagos = await obtenerPagosSaas(c.id);
-                              setPagosCliente(pagos);
-                              setMenuClienteAbierto(null);
-                            }}
-                          >
-                            Cuenta corriente
-                          </button>
-
-                          <div style={dropdownDivider} />
-
-                          <button
-                            type="button"
-                            style={{
-                              ...dropdownItemCliente,
-                              color:
-                                (c.estado || "activo") === "activo"
-                                  ? "#dc2626"
-                                  : "#16a34a",
-                              fontWeight: 700,
-                            }}
-                            onClick={async () => {
-                              const nuevoEstado =
-                                (c.estado || "activo") === "activo"
-                                  ? "suspendido"
-                                  : "activo";
-
-                              await updateDoc(doc(db, "clientes-saas", c.id), {
-                                estado: nuevoEstado,
-                                suspendidoManual: nuevoEstado === "suspendido",
-                                suspendidoPorSistema: false,
-                                motivoSuspension:
-                                  nuevoEstado === "suspendido" ? "manual" : "",
-                                updatedAt: serverTimestamp(),
-                              });
-
-                              await cargarClientes();
-                              await cargarMovimientosSaas();
-                              await cargarUsoClientes();
-                              setMenuClienteAbierto(null);
-                            }}
-                          >
-                            {(c.estado || "activo") === "activo"
-                              ? "Suspender manualmente"
-                              : "Reactivar"}
-                          </button>
-                        </div>
-                      )}
                     </td>
                 </tr>
               ))}
@@ -931,6 +884,111 @@ const emitirCargoMasivo = async () => {
           </table>
         )}
       </div>
+
+      {menuClienteAbierto &&
+        posicionMenuCliente &&
+        clientesFiltrados.find((cliente) => cliente.id === menuClienteAbierto) && (
+          <div
+            style={{
+              ...dropdownCliente,
+              top: posicionMenuCliente.top,
+              left: posicionMenuCliente.left,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {(() => {
+              const c = clientesFiltrados.find(
+                (cliente) => cliente.id === menuClienteAbierto
+              );
+
+              if (!c) return null;
+
+              return (
+                <>
+                  <button
+                    type="button"
+                    style={dropdownItemCliente}
+                    onClick={() => {
+                      abrirEditarCliente(c);
+                      setMenuClienteAbierto(null);
+                      setPosicionMenuCliente(null);
+                    }}
+                  >
+                    Editar cliente
+                  </button>
+
+                  <button
+                    type="button"
+                    style={dropdownItemCliente}
+                    onClick={() => {
+                      setClienteUsuarios(c);
+                      setMenuClienteAbierto(null);
+                      setPosicionMenuCliente(null);
+                    }}
+                  >
+                    Usuarios
+                  </button>
+
+                  <button
+                    type="button"
+                    style={dropdownItemCliente}
+                    onClick={async () => {
+                      setClienteCuentaCorriente(c);
+                      const pagos = await obtenerPagosSaas(c.id);
+                      setPagosCliente(pagos);
+                      setMenuClienteAbierto(null);
+                      setPosicionMenuCliente(null);
+                    }}
+                  >
+                    Cuenta corriente
+                  </button>
+
+                  <div style={dropdownDivider} />
+
+                  <button
+                    type="button"
+                    style={{
+                      ...dropdownItemCliente,
+                      color:
+                        (c.estado || "activo") === "activo"
+                          ? "#dc2626"
+                          : "#16a34a",
+                      fontWeight: 700,
+                    }}
+                    onClick={async () => {
+                      const nuevoEstado =
+                        (c.estado || "activo") === "activo"
+                          ? "suspendido"
+                          : "activo";
+
+                      await updateDoc(doc(db, "clientes-saas", c.id), {
+                        estado: nuevoEstado,
+                        suspendidoManual: nuevoEstado === "suspendido",
+                        suspendidoPorSistema: false,
+                        motivoSuspension:
+                          nuevoEstado === "suspendido" ? "manual" : "",
+                        updatedAt: serverTimestamp(),
+                      });
+
+                      await cargarClientes();
+                      await cargarMovimientosSaas();
+                      await cargarUsoClientes();
+
+                      setMenuClienteAbierto(null);
+                      setPosicionMenuCliente(null);
+                    }}
+                  >
+                    {(c.estado || "activo") === "activo"
+                      ? "Suspender manualmente"
+                      : "Reactivar"}
+                  </button>
+                </>
+              );
+            })()}
+          </div>
+        )}
+
+     
 
       {clienteUsuarios && (
   <div style={overlay}>
@@ -1777,8 +1835,9 @@ const emitirCargoMasivo = async () => {
         </div>
       )}
 
-    </div>
-  );
+    </main>
+  </div>
+);
 }
 
 const dashboardGrid = {
@@ -1811,15 +1870,13 @@ const btnMenuCliente = {
 };
 
 const dropdownCliente = {
-  position: "absolute",
-  right: 10,
-  top: 36,
-  width: 210,
+  position: "fixed",
+  width: 220,
   background: "#fff",
   border: "1px solid #e5e7eb",
-  borderRadius: 10,
-  boxShadow: "0 12px 28px rgba(0,0,0,0.16)",
-  zIndex: 99999,
+  borderRadius: 12,
+  boxShadow: "0 14px 34px rgba(0,0,0,0.18)",
+  zIndex: 999999,
   overflow: "hidden",
 };
 
@@ -1852,6 +1909,7 @@ const card = {
   borderRadius: 14,
   padding: 20,
   boxShadow: "0 4px 18px rgba(0,0,0,0.06)",
+  overflow: "visible",
 };
 
 const cardDetalle = {
@@ -1957,6 +2015,8 @@ const overlay = {
 const modal = {
   width: "100%",
   maxWidth: 520,
+  maxHeight: "88vh",
+  overflowY: "auto",
   background: "#fff",
   borderRadius: 14,
   padding: 24,
@@ -2050,5 +2110,48 @@ const selectFiltro = {
 const filaSuspendida = {
   background: "#f3f4f6",
   color: "#6b7280",
+};
+
+const saasMenu = {
+  display: "flex",
+  gap: 10,
+  marginTop: 18,
+  marginBottom: 18,
+  overflowX: "auto",
+  paddingBottom: 4,
+};
+
+const saasMenuItem = {
+  border: "1px solid #e5e7eb",
+  background: "#fff",
+  color: "#374151",
+  borderRadius: 999,
+  padding: "10px 16px",
+  cursor: "pointer",
+  fontWeight: 700,
+  whiteSpace: "nowrap",
+};
+
+const saasMenuItemActivo = {
+  background: "#111827",
+  color: "#fff",
+  borderColor: "#111827",
+};
+
+const estadisticasLayout = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 18,
+};
+
+const gridEstadisticas = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))",
+  gap: 18,
+};
+
+const tablaScroll = {
+  width: "100%",
+  overflowX: "auto",
 };
 
