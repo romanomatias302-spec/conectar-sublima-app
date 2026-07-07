@@ -5,6 +5,7 @@ import {
   doc,
   updateDoc,
   serverTimestamp,
+  onSnapshot,
 } from "firebase/firestore";
 import { signOut } from "firebase/auth";
 import { auth, db } from "../../firebase";
@@ -20,7 +21,10 @@ import {
   anularMovimientoSaas,
 } from "../../firebase/saasPagos";
 import DuenoSaasEstadisticas from "./DuenoSaasEstadisticas";
-import "./DuenoSaasPanel.css";
+import "./css/DuenoSaasLayout.css";
+import "./css/DuenoSaasSidebar.css";
+import "./css/DuenoSaasClientes.css";
+import "./css/DuenoSaasEstadisticas.css";
 import DuenoSaasSidebar from "./DuenoSaasSidebar";
 
 export default function DuenoSaasPanel() {
@@ -59,6 +63,7 @@ const [menuClienteAbierto, setMenuClienteAbierto] = useState(null);
 const [seccionActiva, setSeccionActiva] = useState("clientes");
 
 const [posicionMenuCliente, setPosicionMenuCliente] = useState(null);
+const [clienteMobileAbierto, setClienteMobileAbierto] = useState(null);
 
 
 
@@ -92,12 +97,21 @@ const [formPago, setFormPago] = useState({
 const formatearFecha = (valor) => {
   if (!valor) return "-";
 
+  if (typeof valor === "string") {
+    const soloFecha = valor.slice(0, 10);
+
+    if (/^\d{4}-\d{2}-\d{2}$/.test(soloFecha)) {
+      const [anio, mes, dia] = soloFecha.split("-");
+      return `${dia}/${mes}/${anio}`;
+    }
+  }
+
   let fecha = null;
 
-  if (typeof valor === "string") {
-    fecha = new Date(valor);
-  } else if (valor.seconds) {
+  if (valor?.seconds) {
     fecha = new Date(valor.seconds * 1000);
+  } else {
+    fecha = new Date(valor);
   }
 
   if (!fecha || isNaN(fecha.getTime())) return "-";
@@ -164,41 +178,38 @@ const obtenerTimestampCliente = (c) => {
   }
 };
 
-const cargarUsoClientes = async () => {
-  try {
-    const usoSnap = await getDocs(collection(db, "clientes-saas-uso"));
+const mapearUsoClientes = (snapshot) => {
+  const uso = {};
 
-    const uso = {};
+  snapshot.docs.forEach((docu) => {
+    const data = docu.data();
+    const clienteId = data.clienteId || docu.id;
 
-    usoSnap.docs.forEach((docu) => {
-      const data = docu.data();
-      const clienteId = data.clienteId || docu.id;
+    if (!clienteId) return;
 
-      if (!clienteId) return;
+    const ultimoUso =
+      data.ultimoUsoAt?.seconds
+        ? new Date(data.ultimoUsoAt.seconds * 1000).toISOString().slice(0, 10)
+        : data.updatedAt?.seconds
+        ? new Date(data.updatedAt.seconds * 1000).toISOString().slice(0, 10)
+        : data.ultimoUso || "";
 
-      const ultimoUso =
-        data.ultimoUsoAt?.seconds
-          ? new Date(data.ultimoUsoAt.seconds * 1000).toISOString().slice(0, 10)
-          : data.updatedAt?.seconds
-          ? new Date(data.updatedAt.seconds * 1000).toISOString().slice(0, 10)
-          : data.ultimoUso || "";
+    uso[clienteId] = {
+      pedidosUltimos30: Number(data.pedidosUltimos30 || 0),
+      ventasUltimos30: Number(data.ventasUltimos30 || 0),
+      imagenesPedidoUltimos30: Number(data.imagenesPedidoUltimos30 || 0),
+      storageUltimos30MB: Number(data.storageUltimos30MB || 0),
 
-      uso[clienteId] = {
-        pedidosUltimos30: Number(data.pedidosUltimos30 || 0),
-        ventasUltimos30: Number(data.ventasUltimos30 || 0),
-        storageUltimos30MB: Number(data.storageUltimos30MB || 0),
-        lecturasUltimos30: Number(data.lecturasUltimos30 || 0),
-        escriturasUltimos30: Number(data.escriturasUltimos30 || 0),
-        pedidos: Number(data.pedidosTotal || data.pedidos || 0),
-        ventas: Number(data.ventasTotal || data.ventas || 0),
-        ultimoUso,
-      };
-    });
+      pedidos: Number(data.pedidosTotal || data.pedidos || 0),
+      ventas: Number(data.ventasTotal || data.ventas || 0),
+      imagenesPedidoTotal: Number(data.imagenesPedidoTotal || 0),
+      storageTotalMB: Number(data.storageTotalMB || 0),
 
-    setUsoClientes(uso);
-  } catch (error) {
-    console.error("Error cargando uso SaaS:", error);
-  }
+      ultimoUso,
+    };
+  });
+
+  setUsoClientes(uso);
 };
 
   const cargarUsuarios = async () => {
@@ -236,12 +247,28 @@ const cargarTodo = async () => {
   await cargarClientes();
   await cargarUsuarios();
   await cargarMovimientosSaas();
-  await cargarUsoClientes();
+  
 };
 
-  useEffect(() => {
-    cargarTodo();
-  }, []);
+useEffect(() => {
+  cargarClientes();
+  cargarUsuarios();
+  cargarMovimientosSaas();
+
+  const unsubUso = onSnapshot(
+    collection(db, "clientes-saas-uso"),
+    (snapshot) => {
+      mapearUsoClientes(snapshot);
+    },
+    (error) => {
+      console.error("Error escuchando uso SaaS:", error);
+    }
+  );
+
+  return () => {
+    unsubUso();
+  };
+}, []);
 
   useEffect(() => {
     if (clientes.length > 0) {
@@ -488,9 +515,15 @@ const clientesFiltrados = clientes
 
 const periodoActual = new Date().toISOString().slice(0, 7);
 
+const fechaPeriodoAnterior = new Date();
+fechaPeriodoAnterior.setMonth(fechaPeriodoAnterior.getMonth() - 1);
+
+const periodoAnterior = fechaPeriodoAnterior.toISOString().slice(0, 7);
+
 const periodosDisponibles = [
   ...new Set([
     periodoActual,
+    periodoAnterior,
     ...pagosCliente
       .filter((p) => p.anulado !== true)
       .map((p) => p.periodoFacturado)
@@ -628,20 +661,21 @@ return (
     <DuenoSaasSidebar
       seccionActiva={seccionActiva}
       setSeccionActiva={setSeccionActiva}
+      onCerrarSesion={cerrarSesion}
     />
 
     <main className="dueno-saas-main">
-      <div style={topbar}>
+
+      {seccionActiva === "clientes" && (
+        <div style={topbar}>
         <div>
           <h1 style={{ marginBottom: 6 }}>Panel Dueño SaaS</h1>
-          <p style={{ marginTop: 0 }}>
-            Administrá clientes, usuarios y vencimientos.
-          </p>
+
         </div>
 
         <div style={{ display: "flex", gap: 10 }}>
           <button onClick={abrirNuevoCliente} style={btnNuevo}>
-            + Nuevo cliente
+            Nuevo cliente
           </button>
 
           <button
@@ -651,11 +685,11 @@ return (
             + Cargo mensual masivo
           </button>
 
-          <button onClick={cerrarSesion} style={btnSalir}>
-            Cerrar sesión
-          </button>
+
         </div>
       </div>
+      )}
+
 
         {seccionActiva === "estadisticas" && (
           <DuenoSaasEstadisticas
@@ -667,6 +701,8 @@ return (
             formatearFecha={formatearFecha}
           />
         )}
+     {seccionActiva === "clientes" && (
+        <>
 
       <div style={dashboardGrid}>
         <div style={dashboardCard}>
@@ -753,13 +789,71 @@ return (
             </select>
 </div>
 
-        {loading ? (
-          <p>Cargando clientes...</p>
-        ) : (
+           <div className="saas-clientes-mobile">
+              {clientesFiltrados.map((c) => {
+                const abierto = clienteMobileAbierto === c.id;
 
+                return (
+                  <div className="saas-cliente-card-mobile" key={c.id}>
+                    <button
+                      type="button"
+                      className="saas-cliente-card-head"
+                      onClick={() =>
+                        setClienteMobileAbierto(abierto ? null : c.id)
+                      }
+                    >
+                      <div>
+                        <strong>{c.nombre || "-"}</strong>
+                        <span>{c.planNombre || c.plan || "-"}</span>
+                      </div>
 
+                      <b>{abierto ? "▲" : "▼"}</b>
+                    </button>
+
+                    {abierto && (
+                      <div className="saas-cliente-card-body">
+                        <p><span>Estado</span><strong>{c.estado || "activo"}</strong></p>
+                        <p><span>Mantenimiento</span><strong>{formatearMoneda(c.planPrecio || c.mantenimientoMensual || 0)}</strong></p>
+                        <p><span>Saldo</span><strong>{formatearMoneda(c.saldoCuentaCorriente || 0)}</strong></p>
+                        <p><span>Pagos</span><strong>{pagosPorCliente[c.id]?.cantidadPagos || 0}</strong></p>
+                        <p><span>Pedidos 30 días</span><strong>{usoClientes[c.id]?.pedidosUltimos30 || 0}</strong></p>
+                        <p><span>Último uso</span><strong>{formatearFecha(usoClientes[c.id]?.ultimoUso)}</strong></p>
+                        <p><span>Vencimiento</span><strong>{formatearFecha(c.fechaVencimiento || c.fechaProximoCargo)}</strong></p>
+
+                        <div className="saas-cliente-card-actions">
+                          <button type="button" onClick={() => abrirEditarCliente(c)}>
+                            Editar
+                          </button>
+
+                          <button type="button" onClick={() => setClienteUsuarios(c)}>
+                            Usuarios
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              setClienteCuentaCorriente(c);
+                              const pagos = await obtenerPagosSaas(c.id);
+                              setPagosCliente(pagos);
+                            }}
+                          >
+                            Cuenta corriente
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>     
+
+          {loading ? (
+            <p>Cargando clientes...</p>
+          ) : (
+
+            
           
-          <table style={table}>
+          <table className="saas-clientes-table-desktop" style={table}>
             <thead>
               <tr>
                 <th style={th}>Empresa</th>
@@ -885,6 +979,9 @@ return (
         )}
       </div>
 
+          </>
+            )}
+
       {menuClienteAbierto &&
         posicionMenuCliente &&
         clientesFiltrados.find((cliente) => cliente.id === menuClienteAbierto) && (
@@ -972,7 +1069,7 @@ return (
 
                       await cargarClientes();
                       await cargarMovimientosSaas();
-                      await cargarUsoClientes();
+                      
 
                       setMenuClienteAbierto(null);
                       setPosicionMenuCliente(null);

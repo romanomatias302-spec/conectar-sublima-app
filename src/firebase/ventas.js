@@ -16,6 +16,7 @@ import {
   writeBatch,
 } from "firebase/firestore";
 import { db } from "../firebase";
+import { registrarUsoSaas } from "./saasUso";
 
 export async function obtenerSiguienteNumeroVenta(clienteId) {
   if (!clienteId) {
@@ -209,6 +210,15 @@ const sucursalNombre = perfil?.sucursalDefaultNombre || "Sucursal principal";
   };
 
   const ventaRef = await addDoc(collection(db, "ventas"), ventaData);
+
+  console.log("USO SAAS venta", {
+    clienteId: perfil?.clienteId,
+  });
+
+  await registrarUsoSaas({
+    clienteId: perfil.clienteId,
+    ventas: 1,
+  });
 
   for (const item of itemsNormalizados) {
       await addDoc(collection(db, "ventas", ventaRef.id, "items"), {

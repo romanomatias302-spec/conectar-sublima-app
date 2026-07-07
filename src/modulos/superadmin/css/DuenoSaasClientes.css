@@ -1,0 +1,86 @@
+.saas-clientes-mobile {
+  display: none;
+}
+
+@media (max-width: 800px) {
+  .saas-clientes-table-desktop {
+    display: none;
+  }
+
+  .saas-clientes-mobile {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .saas-cliente-card-mobile {
+    width: 100%;
+    background: #ffffff;
+    border-radius: 16px;
+    overflow: hidden;
+    border: 1px solid #e5e7eb;
+  }
+
+  .saas-cliente-card-head {
+    width: 100%;
+    border: 0;
+    background: #ffffff;
+    padding: 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    text-align: left;
+  }
+
+  .saas-cliente-card-head strong {
+    display: block;
+    color: #111827;
+    font-size: 15px;
+  }
+
+  .saas-cliente-card-head span {
+    display: block;
+    color: #64748b;
+    font-size: 13px;
+    margin-top: 3px;
+  }
+
+  .saas-cliente-card-body {
+    border-top: 1px solid #e5e7eb;
+    padding: 12px 14px;
+    background: #f8fafc;
+  }
+
+  .saas-cliente-card-body p {
+    margin: 0;
+    padding: 9px 0;
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  .saas-cliente-card-body p span {
+    color: #64748b;
+  }
+
+  .saas-cliente-card-body p strong {
+    color: #111827;
+    text-align: right;
+  }
+
+  .saas-cliente-card-actions {
+    display: grid;
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  .saas-cliente-card-actions button {
+    border: 0;
+    border-radius: 10px;
+    padding: 11px;
+    background: #111827;
+    color: white;
+    font-weight: 800;
+  }
+}

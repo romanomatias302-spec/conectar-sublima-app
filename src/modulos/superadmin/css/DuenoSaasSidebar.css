@@ -1,0 +1,92 @@
+.dueno-saas-sidebar {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 250px;
+  height: 100vh;
+  z-index: 100;
+  background: #0f172a;
+  color: white;
+  padding: 24px 18px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.dueno-saas-brand {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 28px;
+}
+
+.dueno-saas-brand strong {
+  font-size: 24px;
+  letter-spacing: 0.04em;
+}
+
+.dueno-saas-brand span {
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+.dueno-saas-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dueno-saas-nav-item {
+  border: 0;
+  background: transparent;
+  color: #cbd5e1;
+  text-align: left;
+  padding: 12px 14px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.dueno-saas-nav-item.activo {
+  background: linear-gradient(135deg, #2563eb, #7c3aed);
+  color: white;
+}
+
+.dueno-saas-logout {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+  color: #e5e7eb;
+  border-radius: 12px;
+  padding: 12px 14px;
+  cursor: pointer;
+  font-weight: 800;
+  text-align: left;
+}
+
+@media (max-width: 800px) {
+  .dueno-saas-sidebar {
+    position: relative;
+    width: 100%;
+    height: auto;
+    padding: 14px;
+  }
+
+  .dueno-saas-brand {
+    margin-bottom: 12px;
+  }
+
+  .dueno-saas-nav {
+    flex-direction: row;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+
+  .dueno-saas-nav-item {
+    white-space: nowrap;
+    flex: 0 0 auto;
+  }
+
+  .dueno-saas-logout {
+    margin-top: 12px;
+  }
+}

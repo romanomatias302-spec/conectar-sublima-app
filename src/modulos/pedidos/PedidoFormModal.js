@@ -17,6 +17,7 @@ import {
   obtenerColumnaInicialProduccion,
 } from "../../firebase/produccionColumnas";
 import { puedeHacer } from "../../utils/permisos";
+import { registrarUsoSaas } from "../../firebase/saasUso";
 
 export default function PedidoFormModal({ onClose, onPedidoCreado, pedido, perfil }) {
   const [clientes, setClientes] = useState([]);
@@ -351,6 +352,15 @@ const guardarPedido = async () => {
       };
 
       const docRef = await addDoc(pedidosRef, nuevoPedidoData);
+
+      console.log("USO SAAS pedido", {
+        clienteId: perfil?.clienteId,
+      });
+
+      await registrarUsoSaas({
+        clienteId: perfil?.clienteId,
+        pedidos: 1,
+      });
 
       // ✅ Mostrar mensaje de éxito antes de redirigir
       guardadoCorrecto = true;

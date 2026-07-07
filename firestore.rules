@@ -1108,6 +1108,22 @@ function canReadMovimientos(clienteId) {
 
       allow delete: if false;
     }
+
+    // =========================
+    // clientes-saas-uso
+    // =========================
+    match /clientes-saas-uso/{clienteId} {
+      allow read: if isSuperAdmin();
+
+      allow create, update: if signedIn()
+        && isActiveUser()
+        && hasClienteId()
+        && clienteId == profile().clienteId
+        && request.resource.data.clienteId == profile().clienteId
+        && tenantIsActiveById(profile().clienteId);
+
+      allow delete: if false;
+    }
     
     
     // =========================

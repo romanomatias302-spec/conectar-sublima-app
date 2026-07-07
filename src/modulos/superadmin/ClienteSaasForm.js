@@ -8,23 +8,26 @@ export default function ClienteSaasForm({
   onGuardado,
 }) {
 const [formData, setFormData] = useState({
-  nombre: "",
-  estado: "activo",
-  email: "",
-  telefono: "",
+nombre: "",
+nombreCliente: "",
+estado: "activo",
+email: "",
+telefono: "",
 
 
 
   plan: "instalacion",
-  planNombre: "Mensual",
-  planPrecio: 24000,
-  moneda: "ARS",
+  planNombre: "",
+  planPrecio: "",
+  moneda: "",
+  frecuenciaCobro: "mensual",
+  diasCiclo: 30,
 
   pais: "Argentina",
   metodoCobro: "manual",
 
-  costoInstalacion: 300000,
-  mantenimientoMensual: 20000,
+  costoInstalacion: "",
+  mantenimientoMensual: "",
 
   fechaAlta: "",
 
@@ -49,6 +52,7 @@ const [formData, setFormData] = useState({
     if (clienteEditando) {
       setFormData({
         nombre: clienteEditando.nombre || "",
+        nombreCliente: clienteEditando.nombreCliente || "",
         estado: clienteEditando.estado || "activo",
         email: clienteEditando.email || "",
         telefono: clienteEditando.telefono || "",
@@ -56,15 +60,17 @@ const [formData, setFormData] = useState({
 
 
         plan: clienteEditando.plan || "instalacion",
-        planNombre: clienteEditando.planNombre || clienteEditando.plan || "Mensual",
-        planPrecio: clienteEditando.planPrecio || clienteEditando.mantenimientoMensual || 24000,
-        moneda: clienteEditando.moneda || "ARS",
+        planNombre: clienteEditando.planNombre || clienteEditando.plan || "",
+        planPrecio: clienteEditando.planPrecio || clienteEditando.mantenimientoMensual || "",
+        moneda: clienteEditando.moneda || "",
+        frecuenciaCobro: clienteEditando.frecuenciaCobro || "mensual",
+        diasCiclo: clienteEditando.diasCiclo || 30,
 
         pais: clienteEditando.pais || "Argentina",
         metodoCobro: clienteEditando.metodoCobro || "manual",
 
-        costoInstalacion: clienteEditando.costoInstalacion || 300000,
-        mantenimientoMensual: clienteEditando.mantenimientoMensual || 20000,
+        costoInstalacion: clienteEditando.costoInstalacion || "",
+        mantenimientoMensual: clienteEditando.mantenimientoMensual || "",
 
         fechaAlta: clienteEditando.fechaAlta || "",
         fechaProximoCargo: clienteEditando.fechaProximoCargo || "",
@@ -103,6 +109,8 @@ const [formData, setFormData] = useState({
         return `${yyyy}-${mm}-${dd}`;
     };
 
+
+
     const sumarDias = (fechaStr, dias) => {
       if (!fechaStr) return "";
 
@@ -123,6 +131,60 @@ const [formData, setFormData] = useState({
       return `${yyyy}-${mm}-${dd}`;
     };
 
+    const obtenerConfigPlan = (planNombre) => {
+     if (planNombre === "Prueba gratis 7 días") {
+        return {
+          frecuenciaCobro: "prueba",
+          diasCiclo: 7,
+          estadoSuscripcion: "prueba",
+          planPrecio: 0,
+          mantenimientoMensual: 0,
+        };
+      }
+
+      if (planNombre === "Anual") {
+        return {
+          frecuenciaCobro: "anual",
+          diasCiclo: 365,
+          estadoSuscripcion: "activa",
+        };
+      }
+
+      return {
+        frecuenciaCobro: "mensual",
+        diasCiclo: 30,
+        estadoSuscripcion: "activa",
+      };
+    };
+
+    const calcularFechasPorPlan = ({ fechaAlta, planNombre }) => {
+      if (!fechaAlta) {
+        return {
+          fechaProximoCargo: "",
+          fechaVencimiento: "",
+        };
+      }
+
+      const config = obtenerConfigPlan(planNombre);
+
+      if (config.frecuenciaCobro === "prueba") {
+        const vencimientoPrueba = sumarDias(fechaAlta, 7);
+
+        return {
+          fechaProximoCargo: vencimientoPrueba,
+          fechaVencimiento: vencimientoPrueba,
+        };
+      }
+
+      const proximoCargo = sumarDias(fechaAlta, config.diasCiclo);
+      const vencimiento = sumarDias(proximoCargo, 7);
+
+      return {
+        fechaProximoCargo: proximoCargo,
+        fechaVencimiento: vencimiento,
+      };
+    };
+
     const handleChange = (e) => {
         const { name, value } = e.target;
 
@@ -141,23 +203,36 @@ const [formData, setFormData] = useState({
             [name]: nuevoValor,
         };
 
-        if (name === "planNombre" && value === "Prueba gratis 7 días") {
-          nuevoForm.planPrecio = 0;
-          nuevoForm.mantenimientoMensual = 0;
-          nuevoForm.estadoSuscripcion = "prueba";
-        }
+    if (name === "planNombre") {
+      const configPlan = obtenerConfigPlan(value);
 
-        if (name === "fechaAlta") {
-          if (nuevoForm.planNombre === "Prueba gratis 7 días") {
-            nuevoForm.fechaProximoCargo = sumarDias(value, 7);
-            nuevoForm.fechaVencimiento = sumarDias(value, 7);
-            nuevoForm.estadoSuscripcion = "prueba";
-          } else {
-            const proximoCargo = sumarUnMes(value);
-            nuevoForm.fechaProximoCargo = proximoCargo;
-            nuevoForm.fechaVencimiento = sumarDias(proximoCargo, 7);
-          }
-        }
+      nuevoForm.frecuenciaCobro = configPlan.frecuenciaCobro;
+      nuevoForm.diasCiclo = configPlan.diasCiclo;
+      nuevoForm.estadoSuscripcion = configPlan.estadoSuscripcion;
+
+      if (configPlan.frecuenciaCobro === "prueba") {
+        nuevoForm.planPrecio = 0;
+        nuevoForm.mantenimientoMensual = 0;
+      }
+
+      const fechas = calcularFechasPorPlan({
+        fechaAlta: nuevoForm.fechaAlta,
+        planNombre: value,
+      });
+
+      nuevoForm.fechaProximoCargo = fechas.fechaProximoCargo;
+      nuevoForm.fechaVencimiento = fechas.fechaVencimiento;
+    }
+
+    if (name === "fechaAlta") {
+      const fechas = calcularFechasPorPlan({
+        fechaAlta: value,
+        planNombre: nuevoForm.planNombre,
+      });
+
+      nuevoForm.fechaProximoCargo = fechas.fechaProximoCargo;
+      nuevoForm.fechaVencimiento = fechas.fechaVencimiento;
+    }
 
         return nuevoForm;
         });
@@ -170,28 +245,35 @@ const [formData, setFormData] = useState({
     try {
       setLoading(true);
 
-      const esPruebaGratis = formData.planNombre === "Prueba gratis 7 días";
+    const configPlan = obtenerConfigPlan(formData.planNombre);
 
-      const fechaProximoCargo = esPruebaGratis
-        ? sumarDias(formData.fechaAlta, 7)
-        : sumarUnMes(formData.fechaAlta);
+    const fechas = calcularFechasPorPlan({
+      fechaAlta: formData.fechaAlta,
+      planNombre: formData.planNombre,
+    });
 
-      const fechaVencimiento = esPruebaGratis
-        ? sumarDias(formData.fechaAlta, 7)
-        : sumarDias(sumarUnMes(formData.fechaAlta), 7);
+    const esPruebaGratis = configPlan.frecuenciaCobro === "prueba";
 
-      const dataAGuardar = {
-        ...formData,
+    const precioFinal = esPruebaGratis
+      ? 0
+      : Number(formData.planPrecio || 0);
 
-        // compatibilidad con código viejo
-        plan: formData.planNombre,
-        mantenimientoMensual: Number(formData.planPrecio || 0),
-        planPrecio: esPruebaGratis ? 0 : Number(formData.planPrecio || 0),
-        fechaProximoCargo,
-        fechaVencimiento,
-        estado: formData.estado,
-        estadoSuscripcion: esPruebaGratis ? "prueba" : formData.estadoSuscripcion,
-      };
+    const dataAGuardar = {
+      ...formData,
+
+      plan: formData.planNombre,
+      frecuenciaCobro: configPlan.frecuenciaCobro,
+      diasCiclo: configPlan.diasCiclo,
+
+      mantenimientoMensual: precioFinal,
+      planPrecio: precioFinal,
+
+      fechaProximoCargo: fechas.fechaProximoCargo,
+      fechaVencimiento: fechas.fechaVencimiento,
+
+      estado: formData.estado === "suspendido" ? "suspendido" : "activo",
+      estadoSuscripcion: configPlan.estadoSuscripcion,
+    };
 
       if (clienteEditando?.id) {
         await updateDoc(doc(db, "clientes-saas", clienteEditando.id), dataAGuardar);
@@ -216,6 +298,16 @@ const [formData, setFormData] = useState({
         </h2>
 
       <form onSubmit={handleGuardar} style={form}>
+        <div style={campo}>
+          <label style={label}>Nombre del cliente / responsable</label>
+          <input
+            name="nombreCliente"
+            
+            value={formData.nombreCliente}
+            onChange={handleChange}
+            style={input}
+          />
+        </div>
       <div style={campo}>
         <label style={label}>Nombre de la empresa</label>
         <input
@@ -379,24 +471,11 @@ const [formData, setFormData] = useState({
         </div>
 
         <small style={{ color: "#64748b" }}>
-          Se calcula automáticamente: fecha de alta + 1 mes + 7 días de gracia.
+          Se calcula automáticamente según el plan: prueba 7 días, mensual 30 días o anual 365 días + 7 días de gracia.
         </small>
       </div>
 
-      <div style={campo}>
-        <label style={label}>Estado de suscripción</label>
-        <select
-          name="estadoSuscripcion"
-          value={formData.estadoSuscripcion}
-          onChange={handleChange}
-          style={input}
-        >
-          <option value="activo">Suscripción activa</option>
-          <option value="mora">En mora</option>
-          <option value="suspendido">Suspendida</option>
-          <option value="cancelado">Cancelada</option>
-        </select>
-      </div>
+
 
       <div style={campo}>
         <label style={label}>Observaciones</label>

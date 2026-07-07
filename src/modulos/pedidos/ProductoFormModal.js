@@ -13,6 +13,7 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db, storage } from "../../firebase";
 import "./ProductoFormModal.css";
 import { puedeHacer } from "../../utils/permisos";
+import { registrarUsoSaas } from "../../firebase/saasUso";
 
 const MAX_IMAGEN_PRODUCTO_MB = 5;
 const TIPOS_IMAGEN_PERMITIDOS = ["image/png", "image/jpeg", "image/webp"];
@@ -486,6 +487,17 @@ const subirImagenProducto = async (file) => {
 
     await uploadBytes(storageRef, file);
     const url = await getDownloadURL(storageRef);
+
+    console.log("USO SAAS imagen", {
+      clienteId: perfil?.clienteId,
+      mb: file.size / (1024 * 1024),
+    });
+
+    await registrarUsoSaas({
+      clienteId: perfil?.clienteId,
+      imagenesPedido: 1,
+      storageMB: file.size / (1024 * 1024),
+    });
 
     setFormData((prev) => {
       const imagenesPrevias = (prev.imagenes || []).filter((img) => {

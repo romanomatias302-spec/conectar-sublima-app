@@ -1,6 +1,10 @@
 import React from "react";
 
-export default function DuenoSaasSidebar({ seccionActiva, setSeccionActiva }) {
+export default function DuenoSaasSidebar({
+  seccionActiva,
+  setSeccionActiva,
+  onCerrarSesion,
+}) {
   const items = [
     { id: "clientes", label: "Clientes" },
     { id: "estadisticas", label: "Estadísticas" },
@@ -10,27 +14,37 @@ export default function DuenoSaasSidebar({ seccionActiva, setSeccionActiva }) {
 
   return (
     <aside className="dueno-saas-sidebar">
-      <div className="dueno-saas-brand">
-        <strong>ZALFRO</strong>
-        <span>Panel Dueño SaaS</span>
+      <div>
+        <div className="dueno-saas-brand">
+          <strong>ZALFRO</strong>
+          <span>Panel Dueño SaaS</span>
+        </div>
+
+        <nav className="dueno-saas-nav">
+          {items.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => setSeccionActiva(item.id)}
+              className={
+                seccionActiva === item.id
+                  ? "dueno-saas-nav-item activo"
+                  : "dueno-saas-nav-item"
+              }
+            >
+              {item.label}
+            </button>
+          ))}
+        </nav>
       </div>
 
-      <nav className="dueno-saas-nav">
-        {items.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            onClick={() => setSeccionActiva(item.id)}
-            className={
-              seccionActiva === item.id
-                ? "dueno-saas-nav-item activo"
-                : "dueno-saas-nav-item"
-            }
-          >
-            {item.label}
-          </button>
-        ))}
-      </nav>
+      <button
+        type="button"
+        className="dueno-saas-logout"
+        onClick={onCerrarSesion}
+      >
+        Cerrar sesión
+      </button>
     </aside>
   );
 }

@@ -1,34 +1,50 @@
 import { doc, increment, serverTimestamp, setDoc } from "firebase/firestore";
 import { db } from "../firebase";
 
-export const registrarUsoSaas = async ({
+export async function registrarUsoSaas({
   clienteId,
-  pedidos = 0,
   ventas = 0,
+  pedidos = 0,
+  imagenesPedido = 0,
   storageMB = 0,
-  lecturas = 0,
-  escrituras = 0,
-}) => {
-  if (!clienteId) return;
+}) {
+  if (!clienteId) {
+    console.warn("registrarUsoSaas sin clienteId");
+    return;
+  }
 
-  const ref = doc(db, "clientes-saas-uso", clienteId);
+  try {
+    const ref = doc(db, "clientes-saas-uso", clienteId);
 
-  await setDoc(
-    ref,
-    {
+    await setDoc(
+      ref,
+      {
+        clienteId,
+
+        ventasUltimos30: increment(Number(ventas || 0)),
+        pedidosUltimos30: increment(Number(pedidos || 0)),
+        imagenesPedidoUltimos30: increment(Number(imagenesPedido || 0)),
+        storageUltimos30MB: increment(Number(storageMB || 0)),
+
+        ventasTotal: increment(Number(ventas || 0)),
+        pedidosTotal: increment(Number(pedidos || 0)),
+        imagenesPedidoTotal: increment(Number(imagenesPedido || 0)),
+        storageTotalMB: increment(Number(storageMB || 0)),
+
+        ultimoUsoAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true }
+    );
+
+    console.log("registrarUsoSaas OK", {
       clienteId,
-      pedidosUltimos30: increment(pedidos),
-      ventasUltimos30: increment(ventas),
-      storageUltimos30MB: increment(storageMB),
-      lecturasUltimos30: increment(lecturas),
-      escriturasUltimos30: increment(escrituras),
-
-      pedidosTotal: increment(pedidos),
-      ventasTotal: increment(ventas),
-
-      ultimoUsoAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    },
-    { merge: true }
-  );
-};
+      ventas,
+      pedidos,
+      imagenesPedido,
+      storageMB,
+    });
+  } catch (error) {
+    console.error("registrarUsoSaas ERROR", error);
+  }
+}

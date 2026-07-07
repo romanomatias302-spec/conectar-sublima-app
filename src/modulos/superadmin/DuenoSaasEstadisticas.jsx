@@ -255,6 +255,11 @@ const ultimosPagos = pagosFiltrados
         c.storageUltimos30MB ||
         0,
 
+        imagenesPedido30:
+        usoClientes[c.id]?.imagenesPedidoUltimos30 ||
+        c.imagenesPedidoUltimos30 ||
+        0,
+
         lecturas30:
         usoClientes[c.id]?.lecturasUltimos30 ||
         c.lecturasUltimos30 ||
@@ -572,15 +577,18 @@ const ultimosPagos = pagosFiltrados
             </Panel>
 
             <Panel wide title="Últimos usos de la aplicación">
+                <div className="saas-usage-table-scroll">
                 <div className="saas-usage-head">
                 <span>Cliente</span>
                 <span>Pedidos 30d</span>
                 <span>Ventas 30d</span>
-                <span>Storage 30d</span>
+                
+                <span>Imágenes 30d</span>
                 <span>Lecturas</span>
                 <span>Escrituras</span>
                 <span>Último uso</span>
                 </div>
+                
 
             <div className="saas-usage-scroll">
                 {data.uso.map((u) => (
@@ -592,13 +600,14 @@ const ultimosPagos = pagosFiltrados
 
                 <b>{u.pedidos30}</b>
                 <b>{u.ventas30}</b>
-                <b>{u.storage30}</b>
+                <b>{u.imagenesPedido30}</b>
                 <b>{u.lecturas30}</b>
                 <b>{u.escrituras30}</b>
 
                 <span>{formatearFecha(u.ultimoUso)}</span>
                 </div>
             ))}
+          </div>
           </div>
         </Panel>
       </div>

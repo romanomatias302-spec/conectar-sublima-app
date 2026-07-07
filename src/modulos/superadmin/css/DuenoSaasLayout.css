@@ -1,0 +1,26 @@
+.dueno-saas-layout {
+  min-height: 100vh;
+  background: #020617;
+}
+
+.dueno-saas-main {
+  margin-left: 250px;
+  padding: 30px;
+  min-width: 0;
+  background: #020617;
+}
+
+.dueno-saas-main h1 {
+  color: #fff;
+}
+
+.dueno-saas-main p {
+  color: #cbd5e1;
+}
+
+@media (max-width: 800px) {
+  .dueno-saas-main {
+    margin-left: 0;
+    padding: 12px;
+  }
+}
