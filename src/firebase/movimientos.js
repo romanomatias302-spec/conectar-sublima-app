@@ -71,11 +71,31 @@ export async function obtenerMovimientosPaginados({
 
   const snapshot = await getDocs(q);
 
-  return {
-    movimientos: snapshot.docs.map((d) => ({
+  const movimientos = snapshot.docs
+    .map((d) => ({
       firebaseId: d.id,
       ...d.data(),
-    })),
+    }))
+    .filter((m) => {
+      const subtipo = m.subtipo || "";
+
+      const subtiposNoOperativos = [
+        "aporte_capital",
+        "ingreso_capital",
+        "retiro_capital",
+        "egreso_capital",
+        "ajuste_positivo",
+        "ajuste_negativo",
+      ];
+
+      return (
+        m.impactaResultado !== false &&
+        !subtiposNoOperativos.includes(subtipo)
+      );
+    });
+
+  return {
+    movimientos,
     ultimoDoc: snapshot.docs.length
       ? snapshot.docs[snapshot.docs.length - 1]
       : null,

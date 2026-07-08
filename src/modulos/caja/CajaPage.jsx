@@ -589,19 +589,18 @@ const movs = await obtenerMovimientosCajaDia({
   }));
 };
 
-  const opcionesSubtipoManual =
+const opcionesSubtipoManual =
   tipoManual === "ingreso"
     ? [
-        { value: "ingreso_capital", label: "Ingreso de capital" },
-        { value: "ajuste_positivo", label: "Ajuste positivo" },
-        { value: "otro_ingreso", label: "Otro ingreso" },
+        { value: "aporte_capital", label: "Aporte de capital" },
+        { value: "ajuste_positivo", label: "Ajuste positivo de caja" },
+        { value: "otro_ingreso", label: "Otro ingreso de caja" },
       ]
     : [
         { value: "gasto_caja", label: "Gasto de caja" },
-        { value: "descuento_efectivo", label: "Descuento efectivo" },
-        { value: "egreso_capital", label: "Egreso de capital" },
-        { value: "ajuste_negativo", label: "Ajuste negativo" },
-        { value: "otro_egreso", label: "Otro egreso" },
+        { value: "retiro_capital", label: "Retiro de dueño / capital" },
+        { value: "ajuste_negativo", label: "Ajuste negativo de caja" },
+        { value: "otro_egreso", label: "Otro egreso de caja" },
       ];
 
   const resumenPorMedios = useMemo(() => {
@@ -899,11 +898,11 @@ const movs = await obtenerMovimientosCajaDia({
                   const nuevoTipo = e.target.value;
                   setTipoManual(nuevoTipo);
 
-                  if (nuevoTipo === "ingreso") {
-                    setSubtipoManual("ingreso_capital");
-                  } else {
-                    setSubtipoManual("gasto_caja");
-                  }
+                if (nuevoTipo === "ingreso") {
+                  setSubtipoManual("aporte_capital");
+                } else {
+                  setSubtipoManual("gasto_caja");
+                }
                 }}
                 style={input}
               >

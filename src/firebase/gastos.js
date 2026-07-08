@@ -194,6 +194,28 @@ movSnap.docs.forEach((movDoc) => {
   });
 });
 
+
+const movCajaSnap = await getDocs(
+  query(
+    collection(db, "movimientos"),
+    where("clienteId", "==", perfil.clienteId),
+    where("gastoRefId", "==", gastoId)
+  )
+);
+
+movCajaSnap.docs.forEach((movDoc) => {
+  batch.update(doc(db, "movimientos", movDoc.id), {
+    estadoMovimiento: "anulado",
+    activo: false,
+    anuladoAt: serverTimestamp(),
+    anuladoPor: perfil.uid || perfil.firebaseUid || "",
+    anuladoPorNombre: perfil.nombre || perfil.email || "",
+    motivoAnulacion: motivo || "",
+    updatedAt: serverTimestamp(),
+  });
+});
+
+
 await batch.commit();
 }
 

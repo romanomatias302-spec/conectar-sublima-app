@@ -58,29 +58,133 @@ function inicioDia(fecha) {
   return new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate());
 }
 
-function obtenerCicloActual(fechaAltaStr, hoy) {
-  const fechaAlta = normalizarFecha(fechaAltaStr);
+function obtenerCicloActual(cliente, hoy) {
+  const fechaAlta = normalizarFecha(cliente.fechaAlta);
 
   if (!fechaAlta) {
     return null;
   }
 
   const hoyInicio = inicioDia(hoy);
-  let meses = 1;
-  let fechaCobro = sumarMeses(fechaAlta, meses);
+  const frecuenciaCobro = cliente.frecuenciaCobro || "mensual";
+  const diasCiclo = Number(
+    cliente.diasCiclo || (frecuenciaCobro === "anual" ? 365 : 30)
+  );
 
-  while (sumarDias(fechaCobro, 7) < hoyInicio) {
-    meses += 1;
-    fechaCobro = sumarMeses(fechaAlta, meses);
+  // Prueba gratis: no genera cargo automático
+  if (frecuenciaCobro === "prueba") {
+    return null;
   }
 
-  const periodoFacturado = `${fechaCobro.getFullYear()}-${String(
-    fechaCobro.getMonth() + 1
-  ).padStart(2, "0")}`;
+  // Mensual: mantenemos lógica vieja para no romper clientes actuales
+  if (frecuenciaCobro === "mensual") {
+    let meses = 1;
+    let fechaCobro = sumarMeses(fechaAlta, meses);
+
+    while (sumarDias(fechaCobro, 7) < hoyInicio) {
+      meses += 1;
+      fechaCobro = sumarMeses(fechaAlta, meses);
+    }
+
+    const periodoFacturado = `${fechaCobro.getFullYear()}-${String(
+      fechaCobro.getMonth() + 1
+    ).padStart(2, "0")}`;
+
+    return {
+      fechaCobro,
+      periodoFacturado,
+      frecuenciaCobro,
+    };
+  }
+
+  // Anual: nuevo comportamiento, cada 365 días
+  if (frecuenciaCobro === "anual") {
+    let ciclos = 1;
+    let fechaCobro = sumarDias(fechaAlta, diasCiclo);
+
+    while (sumarDias(fechaCobro, 7) < hoyInicio) {
+      ciclos += 1;
+      fechaCobro = sumarDias(fechaAlta, diasCiclo * ciclos);
+    }
+
+    const periodoFacturado = `${fechaCobro.getFullYear()}-ANUAL-${ciclos}`;
+
+    return {
+      fechaCobro,
+      periodoFacturado,
+      frecuenciaCobro,
+    };
+  }
+
+  return null;
+}
+
+async function procesarPruebaGratisVencida({ cliente, docu, hoy, modoPrueba }) {
+  const frecuenciaCobro = cliente.frecuenciaCobro || "";
+  const estadoSuscripcion = cliente.estadoSuscripcion || "";
+
+  const esPrueba =
+    frecuenciaCobro === "prueba" ||
+    estadoSuscripcion === "prueba" ||
+    cliente.planNombre === "Prueba gratis 7 días" ||
+    cliente.plan === "Prueba gratis 7 días";
+
+  if (!esPrueba) {
+    return {
+      procesado: false,
+    };
+  }
+
+  const fechaAlta = normalizarFecha(cliente.fechaAlta);
+
+  const fechaVencimiento =
+    normalizarFecha(cliente.fechaVencimiento) ||
+    normalizarFecha(cliente.fechaProximoCargo) ||
+    (fechaAlta ? sumarDias(fechaAlta, 7) : null);
+
+  if (!fechaVencimiento) {
+    return {
+      procesado: true,
+      accion: "omitido",
+      motivo: "Prueba sin fecha de vencimiento",
+    };
+  }
+
+  if (inicioDia(hoy) <= inicioDia(fechaVencimiento)) {
+    return {
+      procesado: true,
+      accion: "omitido",
+      motivo: "Prueba vigente",
+      fechaVencimiento: fechaISO(fechaVencimiento),
+    };
+  }
+
+  if (cliente.estado === "suspendido" && cliente.suspendidoPorSistema === true) {
+    return {
+      procesado: true,
+      accion: "omitido",
+      motivo: "Prueba ya suspendida",
+      fechaVencimiento: fechaISO(fechaVencimiento),
+    };
+  }
+
+  if (!modoPrueba) {
+    await docu.ref.update({
+      estado: "suspendido",
+      estadoSuscripcion: "suspendida",
+      suspendidoPorSistema: true,
+      suspendidoManual: false,
+      motivoSuspension: "prueba_vencida",
+      fechaSuspension: fechaISO(hoy),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  }
 
   return {
-    fechaCobro,
-    periodoFacturado,
+    procesado: true,
+    accion: modoPrueba ? "simular_suspension_prueba" : "suspender_prueba",
+    motivo: "Prueba gratis vencida",
+    fechaVencimiento: fechaISO(fechaVencimiento),
   };
 }
 
@@ -182,6 +286,7 @@ async function procesarCargosSaas({ modoPrueba = false } = {}) {
   const clientesSnap = await db.collection("clientes-saas").get();
 
 let cargosEmitidos = 0;
+let pruebasSuspendidas = 0;
 const simulados = [];
 const omitidos = [];
 
@@ -190,6 +295,30 @@ const omitidos = [];
       id: docu.id,
       ...docu.data(),
     };
+
+    const resultadoPrueba = await procesarPruebaGratisVencida({
+      cliente,
+      docu,
+      hoy,
+      modoPrueba,
+    });
+
+    if (resultadoPrueba.procesado) {
+      if (resultadoPrueba.accion === "suspender_prueba") {
+        pruebasSuspendidas += 1;
+      }
+
+      if (modoPrueba) {
+        omitidos.push({
+          clienteNombre: cliente.nombre || "",
+          motivo: resultadoPrueba.motivo,
+          accion: resultadoPrueba.accion,
+          fechaVencimiento: resultadoPrueba.fechaVencimiento || null,
+        });
+      }
+
+      continue;
+    }
 
 if (!cliente.fechaAlta) {
   if (modoPrueba) {
@@ -236,40 +365,47 @@ if ((cliente.estadoSuscripcion || "") === "cancelado") {
     const diasAnticipacionCargo = Number(cliente.diasAnticipacionCargo || 10);
     const diasGracia = Number(cliente.diasGracia || 7);
 
-    const ciclo = obtenerCicloActual(cliente.fechaAlta, hoy);
+    const ciclo = obtenerCicloActual(cliente, hoy);
 
     if (!ciclo) {
       if (modoPrueba) {
         omitidos.push({
           clienteNombre: cliente.nombre || "",
-          motivo: "No se pudo calcular ciclo",
+          motivo:
+            (cliente.frecuenciaCobro || "") === "prueba"
+              ? "Cliente en prueba, no genera cargo automático"
+              : "No se pudo calcular ciclo",
           fechaAlta: cliente.fechaAlta,
+          frecuenciaCobro: cliente.frecuenciaCobro || "mensual",
         });
       }
+
+      await recalcularEstadoCuentaCliente(cliente.id);
       continue;
     }
 
-    const {fechaCobro, periodoFacturado} = ciclo;
+    const { fechaCobro, periodoFacturado, frecuenciaCobro } = ciclo;
 
     const fechaEmision = sumarDias(fechaCobro, -diasAnticipacionCargo);
     const fechaVencimiento = sumarDias(fechaCobro, diasGracia);
 
-if (hoy < inicioDia(fechaEmision)) {
-  if (modoPrueba) {
-    omitidos.push({
-      clienteNombre: cliente.nombre || "",
-      motivo: "Todavía no llegó la fecha de emisión",
-      fechaAlta: cliente.fechaAlta,
-      fechaCobro: fechaISO(fechaCobro),
-      fechaEmision: fechaISO(fechaEmision),
-      hoy: fechaISO(hoy),
-      periodoFacturado,
-    });
-  }
+    if (hoy < inicioDia(fechaEmision)) {
+      if (modoPrueba) {
+        omitidos.push({
+          clienteNombre: cliente.nombre || "",
+          motivo: "Todavía no llegó la fecha de emisión",
+          fechaAlta: cliente.fechaAlta,
+          fechaCobro: fechaISO(fechaCobro),
+          fechaEmision: fechaISO(fechaEmision),
+          hoy: fechaISO(hoy),
+          periodoFacturado,
+          frecuenciaCobro,
+        });
+      }
 
-  await recalcularEstadoCuentaCliente(cliente.id);
-  continue;
-}
+      await recalcularEstadoCuentaCliente(cliente.id);
+      continue;
+    }
 
 const cargoExistenteSnap = await db
   .collection("saas_pagos")
@@ -319,8 +455,11 @@ if (yaExisteCargoActivo) {
       fechaCobro: fechaISO(fechaCobro),
       fechaVencimiento: fechaISO(fechaVencimiento),
       medioPago: "",
-      concepto: "mensualidad",
-      observacion: `Cargo automático mensual - período ${periodoFacturado}`,
+      concepto: frecuenciaCobro === "anual" ? "anualidad" : "mensualidad",
+      observacion:
+        frecuenciaCobro === "anual"
+          ? `Cargo automático anual - período ${periodoFacturado}`
+          : `Cargo automático mensual - período ${periodoFacturado}`,
       periodoFacturado,
       origen: "automatico",
       anulado: false,
@@ -351,6 +490,7 @@ if (yaExisteCargoActivo) {
 return {
   modoPrueba,
   cargosEmitidos,
+  pruebasSuspendidas,
   simulados,
   omitidos,
 };
@@ -375,6 +515,95 @@ exports.probarCargosSaasAutomaticos = onRequest(async (req, res) => {
     console.error(error);
     res.status(500).json({
       error: error.message || "Error ejecutando prueba",
+    });
+  }
+});
+
+exports.probarCargoClienteSaas = onRequest(async (req, res) => {
+  try {
+    const clienteId = req.query.id;
+
+    if (!clienteId) {
+      res.status(400).json({ error: "Falta id del cliente SaaS" });
+      return;
+    }
+
+    const hoy = inicioDia(new Date());
+    const docu = await db.collection("clientes-saas").doc(clienteId).get();
+
+    if (!docu.exists) {
+      res.status(404).json({ error: "Cliente SaaS no encontrado" });
+      return;
+    }
+
+    const cliente = {
+      id: docu.id,
+      ...docu.data(),
+    };
+
+    const resultadoPrueba = await procesarPruebaGratisVencida({
+      cliente,
+      docu,
+      hoy,
+      modoPrueba: true,
+    });
+
+    if (resultadoPrueba.procesado) {
+      res.json({
+        clienteId,
+        clienteNombre: cliente.nombre || "",
+        tipo: "prueba",
+        resultado: resultadoPrueba,
+      });
+      return;
+    }
+
+    const diasAnticipacionCargo = Number(cliente.diasAnticipacionCargo || 10);
+    const diasGracia = Number(cliente.diasGracia || 7);
+
+    const ciclo = obtenerCicloActual(cliente, hoy);
+
+    if (!ciclo) {
+      res.json({
+        clienteId,
+        clienteNombre: cliente.nombre || "",
+        resultado: "omitido",
+        motivo: "No se pudo calcular ciclo",
+        frecuenciaCobro: cliente.frecuenciaCobro || "mensual",
+        fechaAlta: cliente.fechaAlta || null,
+      });
+      return;
+    }
+
+    const { fechaCobro, periodoFacturado, frecuenciaCobro } = ciclo;
+
+    const fechaEmision = sumarDias(fechaCobro, -diasAnticipacionCargo);
+    const fechaVencimiento = sumarDias(fechaCobro, diasGracia);
+
+    const monto = Number(cliente.planPrecio || cliente.mantenimientoMensual || 0);
+
+    res.json({
+      clienteId,
+      clienteNombre: cliente.nombre || "",
+      frecuenciaCobro,
+      monto,
+      fechaAlta: cliente.fechaAlta || null,
+      fechaCobro: fechaISO(fechaCobro),
+      fechaEmision: fechaISO(fechaEmision),
+      fechaVencimiento: fechaISO(fechaVencimiento),
+      periodoFacturado,
+      generaCargoHoy: hoy >= inicioDia(fechaEmision) && monto > 0,
+      motivo:
+        hoy < inicioDia(fechaEmision)
+          ? "Todavía no llegó la fecha de emisión"
+          : monto <= 0
+          ? "Monto cero o inválido"
+          : "Generaría cargo",
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      error: error.message || "Error probando cliente SaaS",
     });
   }
 });

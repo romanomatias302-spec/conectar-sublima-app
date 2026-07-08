@@ -222,6 +222,25 @@ const movimientoEstaAnulado = (m) => {
   );
 };
 
+const movimientoImpactaInforme = (m) => {
+  const subtipo = m?.subtipo || "";
+
+  const subtiposNoOperativos = [
+    "aporte_capital",
+    "ingreso_capital",
+    "retiro_capital",
+    "egreso_capital",
+    "ajuste_positivo",
+    "ajuste_negativo",
+  ];
+
+  return (
+    !movimientoEstaAnulado(m) &&
+    m?.impactaResultado !== false &&
+    !subtiposNoOperativos.includes(subtipo)
+  );
+};
+
 const aplicarRangoRapidoFinanzas = (rango) => {
   setRangoFinanzasActivo(rango);
 
@@ -328,7 +347,7 @@ useEffect(() => {
 }, [vistaActiva, vistaFinanzas, perfil]);
 
   const resumen = useMemo(() => {
-    const movimientosActivos = movimientos.filter((m) => !movimientoEstaAnulado(m));
+    const movimientosActivos = movimientos.filter((m) => movimientoImpactaInforme(m));
 
     const ingresos = movimientosActivos.filter((m) => m.tipo === "ingreso");
     const egresos = movimientosActivos.filter((m) => m.tipo === "egreso");
@@ -617,7 +636,7 @@ useEffect(() => {
       {!loading && vistaActiva === "finanzas" && (
         <>
         {(() => {
-          const movimientosActivos = movimientos.filter((m) => !movimientoEstaAnulado(m));
+          const movimientosActivos = movimientos.filter((m) => movimientoImpactaInforme(m));
 
           const ingresos = movimientosActivos
             .filter((m) => (m.tipo || "").toLowerCase() === "ingreso")
@@ -946,7 +965,7 @@ useEffect(() => {
               </tr>
             </thead>
             <tbody>
-              {movimientos.map((m) => (
+              {movimientos.filter((m) => movimientoImpactaInforme(m)).map((m) => (
                 <tr
                   key={m.firebaseId}
                   onClick={() => abrirAuditoriaMovimiento(m)}

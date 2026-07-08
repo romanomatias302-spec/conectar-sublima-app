@@ -24,6 +24,8 @@ export function fechaHoyInput(timezone = "America/Argentina/Buenos_Aires") {
   }).format(new Date());
 }
 
+
+
 const SUCURSAL_PRINCIPAL_ID = "principal";
 
 function normalizarSucursal(sucursal) {
@@ -411,7 +413,20 @@ export async function crearMovimientoManualCaja({
   const montoNum = Number(monto || 0);
   if (montoNum <= 0) throw new Error("El monto debe ser mayor a 0.");
 
-  const impactaResultado = ["gasto_caja", "descuento_efectivo"].includes(subtipo);
+  const subtiposQueImpactanResultado = ["gasto_caja", "otro_egreso", "otro_ingreso"];
+
+const impactaResultado = subtiposQueImpactanResultado.includes(subtipo);
+
+const tipoFinanciero =
+  subtipo === "gasto_caja"
+    ? "gasto_operativo"
+    : subtipo === "aporte_capital"
+    ? "aporte_capital"
+    : subtipo === "retiro_capital"
+    ? "retiro_capital"
+    : subtipo === "ajuste_positivo" || subtipo === "ajuste_negativo"
+    ? "ajuste_caja"
+    : "otro";
 
   const movimientoRef = await addDoc(collection(db, "movimientos"), {
   clienteId: perfil.clienteId,
@@ -432,22 +447,28 @@ export async function crearMovimientoManualCaja({
   monto: montoNum,
   medioPago,
 
-  impactaCaja: true,
-  impactaResultado,
-  estadoMovimiento: "activo",
+impactaCaja: true,
+impactaResultado,
+tipoFinanciero,
+estadoMovimiento: "activo",
 
   creadoPor: perfil?.email || "",
   createdAt: serverTimestamp(),
   updatedAt: serverTimestamp(),
 });
 
-if (tipo === "egreso") {
-  await addDoc(collection(db, "gastos"), {
+if (tipo === "egreso" && impactaResultado) {
+  const gastoRef = await addDoc(collection(db, "gastos"), {
     clienteId: perfil.clienteId,
     fecha: caja.fechaCaja,
+
+    origen: "caja",
+    origenRefId: movimientoRef.id,
+    movimientoRefId: movimientoRef.id,
     sucursalId: caja.sucursalId || SUCURSAL_PRINCIPAL_ID,
     sucursalNombre: caja.sucursalNombre || "Sucursal principal",
-    categoria: "Gasto de caja",
+    categoria: subtipo === "otro_egreso" ? "Otro egreso de caja" : "Gasto de caja",
+    tipoFinanciero,
     proveedor: "",
     comprobanteNumero: "",
     comprobantes: [],
@@ -486,7 +507,13 @@ if (tipo === "egreso") {
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
+
+  await updateDoc(doc(db, "movimientos", movimientoRef.id), {
+    gastoRefId: gastoRef.id,
+    updatedAt: serverTimestamp(),
+  });
 }
+
 }
 
 export async function crearCambioTurnoCaja({
