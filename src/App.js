@@ -1,6 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { onAuthStateChanged, signOut } from "firebase/auth";
-import { doc, getDoc, onSnapshot } from "firebase/firestore";
+import {
+  doc,
+  getDoc,
+  onSnapshot,
+  collection,
+  query,
+  where,
+  getDocs,
+} from "firebase/firestore";
 import { auth, db } from "./firebase";
 import Login from "./modulos/auth/Login";
 import ActivarCuenta from "./modulos/auth/ActivarCuenta";
@@ -39,6 +47,11 @@ export default function App() {
   const [perfil, setPerfil] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [mensajeBloqueo, setMensajeBloqueo] = useState("");
+  const [clienteBloqueado, setClienteBloqueado] = useState(null);
+  const [pagandoCuentaBloqueada, setPagandoCuentaBloqueada] = useState(false);
+
+  const URL_CREAR_PREFERENCIA_MP =
+    "https://us-central1-conectarsublimados-7881e.cloudfunctions.net/crearPreferenciaMercadoPago";
   const [errorConexionPerfil, setErrorConexionPerfil] = useState(false);
 
   const [vista, setVista] = useState(() => {
@@ -279,8 +292,13 @@ useEffect(() => {
                 : "";
 
             if (["suspendido", "bloqueado", "inactivo"].includes(estadoCliente)) {
+              setClienteBloqueado({
+                id: dataPerfil.clienteId,
+                nombre: clienteSaasData.nombre || "",
+              });
+
               setPerfil(null);
-              setMensajeBloqueo("Tu cuenta se encuentra suspendida. Contactá al administrador.");
+              setMensajeBloqueo("Tu cuenta se encuentra suspendida.");
               setAuthLoading(false);
               return;
             }
@@ -517,6 +535,89 @@ irAVista("venta-detalle", {
   }
 };
 
+    const iniciarPagoCuentaBloqueada = async () => {
+      try {
+        if (!clienteBloqueado?.id) return;
+
+        setPagandoCuentaBloqueada(true);
+
+        const pagosRef = collection(db, "saas_pagos");
+        const pagosQuery = query(
+          pagosRef,
+          where("clienteSaasId", "==", clienteBloqueado.id)
+        );
+
+        const pagosSnap = await getDocs(pagosQuery);
+
+        const periodos = Object.values(
+          pagosSnap.docs
+            .map((docu) => docu.data())
+            .filter((mov) => mov.anulado !== true && mov.periodoFacturado)
+            .reduce((acc, mov) => {
+              const periodo = mov.periodoFacturado;
+              const monto = Number(mov.monto || 0);
+              const tipo = mov.tipoMovimiento || "pago";
+
+              if (!acc[periodo]) {
+                acc[periodo] = {
+                  periodo,
+                  cargos: 0,
+                  pagos: 0,
+                  saldo: 0,
+                };
+              }
+
+              if (tipo === "cargo" || tipo === "ajuste") {
+                acc[periodo].cargos += monto;
+              }
+
+              if (tipo === "pago" || tipo === "credito") {
+                acc[periodo].pagos += monto;
+              }
+
+              acc[periodo].saldo = acc[periodo].cargos - acc[periodo].pagos;
+
+              return acc;
+            }, {})
+        )
+          .filter((p) => Number(p.saldo || 0) > 0)
+          .sort((a, b) => (a.periodo > b.periodo ? 1 : -1));
+
+        const periodoPendiente = periodos[0];
+
+        if (!periodoPendiente) {
+          alert("No encontramos un período pendiente para pagar. Contactá a soporte.");
+          return;
+        }
+
+        const response = await fetch(URL_CREAR_PREFERENCIA_MP, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            clienteSaasId: clienteBloqueado.id,
+            periodoFacturado: periodoPendiente.periodo,
+            monto: Number(periodoPendiente.saldo || 0),
+          }),
+        });
+
+        const data = await response.json();
+        const urlPago = data.sandbox_init_point || data.init_point;
+
+        if (!urlPago) {
+          throw new Error("No se recibió URL de pago");
+        }
+
+        window.location.href = urlPago;
+      } catch (error) {
+        console.error(error);
+        alert("No se pudo iniciar el pago.");
+      } finally {
+        setPagandoCuentaBloqueada(false);
+      }
+    };
+
     if (esRutaActivacion) {
       return <ActivarCuenta />;
     }
@@ -563,12 +664,33 @@ if (!perfil) {
 }
 
     if (mensajeBloqueo) {
-      console.log("SE ESTÁ MOSTRANDO BLOQUEO:", mensajeBloqueo);
       return (
-        <div style={{ padding: 30 }}>
-          <h2>Acceso bloqueado</h2>
-          <p>{mensajeBloqueo}</p>
-          <button onClick={() => signOut(auth)}>Cerrar sesión</button>
+        <div className="saas-bloqueo-page">
+          <div className="saas-bloqueo-card">
+            <h2>Cuenta suspendida</h2>
+
+            <p>
+              Tu cuenta se encuentra suspendida. Podés regularizar el acceso desde
+              el botón de pago.
+            </p>
+
+            <button
+              type="button"
+              className="saas-bloqueo-pagar"
+              onClick={iniciarPagoCuentaBloqueada}
+              disabled={pagandoCuentaBloqueada}
+            >
+              {pagandoCuentaBloqueada ? "Abriendo pago..." : "Pagar y reactivar"}
+            </button>
+
+            <button
+              type="button"
+              className="saas-bloqueo-salir"
+              onClick={() => signOut(auth)}
+            >
+              Cerrar sesión
+            </button>
+          </div>
         </div>
       );
     }
