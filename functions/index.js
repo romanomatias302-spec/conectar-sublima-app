@@ -304,9 +304,12 @@ const omitidos = [];
     });
 
     if (resultadoPrueba.procesado) {
-      if (resultadoPrueba.accion === "suspender_prueba") {
-        pruebasSuspendidas += 1;
-      }
+    if (
+      resultadoPrueba.accion === "suspender_prueba" ||
+      resultadoPrueba.accion === "simular_suspension_prueba"
+    ) {
+      pruebasSuspendidas += 1;
+    }
 
       if (modoPrueba) {
         omitidos.push({
