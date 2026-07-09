@@ -345,11 +345,15 @@ export async function obtenerMovimientosCajaDia({
       firebaseId: d.id,
       ...d.data(),
     }))
-    .filter((m) =>
-      todasSucursales
+    .filter((m) => {
+      const impactaCaja = m.impactaCaja === true;
+
+      const perteneceSucursal = todasSucursales
         ? true
-        : movimientoPerteneceASucursal(m, sucursalData.sucursalId)
-    )
+        : movimientoPerteneceASucursal(m, sucursalData.sucursalId);
+
+      return impactaCaja && perteneceSucursal;
+    })
     .sort((a, b) => {
       const fechaA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0;
       const fechaB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0;
@@ -381,7 +385,11 @@ export function escucharMovimientosCajaDia({
           firebaseId: d.id,
           ...d.data(),
         }))
-        .filter((m) => movimientoPerteneceASucursal(m, sucursalId))
+        .filter(
+            (m) =>
+              m.impactaCaja === true &&
+              movimientoPerteneceASucursal(m, sucursalId)
+          )
         .sort((a, b) => {
           const fechaA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0;
           const fechaB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0;

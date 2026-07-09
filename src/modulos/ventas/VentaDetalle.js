@@ -22,6 +22,7 @@ import {
   anularVenta,
 } from "../../firebase/ventas";
 import { formatearMoneda, obtenerConfigMonedaDesdePerfil } from "../../utils/moneda";
+import { fechaHoyNegocio } from "../../utils/fechas";
 import "./VentasPage.css";
 import { puedeHacer } from "../../utils/permisos";
 
@@ -47,13 +48,13 @@ const [guardandoPedido, setGuardandoPedido] = useState(false);
     precioUnitario: 0,
   });
 
-  const [nuevoPago, setNuevoPago] = useState({
-    monto: 0,
-    medioPago: "efectivo",
-    fechaPago: new Date().toISOString().split("T")[0],
-    observacion: "",
-    fechaComprobanteReal: "",
-  });
+const [nuevoPago, setNuevoPago] = useState(() => ({
+  monto: 0,
+  medioPago: "efectivo",
+  fechaPago: fechaHoyNegocio(perfil),
+  observacion: "",
+  fechaComprobanteReal: "",
+}));
 
   const [guardandoItem, setGuardandoItem] = useState(false);
   const [guardandoPago, setGuardandoPago] = useState(false);
@@ -365,7 +366,7 @@ const puedeAnularVentas =
       setNuevoPago({
         monto: 0,
         medioPago: "efectivo",
-        fechaPago: new Date().toISOString().split("T")[0],
+        fechaPago: fechaHoyNegocio(perfil),
         observacion: "",
         fechaComprobanteReal: "",
       });

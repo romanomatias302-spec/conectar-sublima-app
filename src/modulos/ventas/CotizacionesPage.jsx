@@ -17,6 +17,7 @@ import {
   escucharCotizacionesRecientes,
 } from "../../firebase/cotizaciones";
 import { formatearMoneda, obtenerConfigMonedaDesdePerfil } from "../../utils/moneda";
+import { fechaHoyNegocio } from "../../utils/fechas";
 import { puedeHacer } from "../../utils/permisos";
 import { obtenerUsuariosPorCliente } from "../../firebase/usuariosConfig";
 import "./VentasPage.css";
@@ -68,9 +69,9 @@ export default function CotizacionesPage({ perfil, onVerCotizacion }) {
   const [mostrarDropdownCliente, setMostrarDropdownCliente] = useState(false);
   const [clienteRefId, setClienteRefId] = useState("");
 
-  const [fechaCotizacion, setFechaCotizacion] = useState(
-    new Date().toISOString().split("T")[0]
-  );
+const [fechaCotizacion, setFechaCotizacion] = useState(() =>
+  fechaHoyNegocio(perfil)
+);
 
 const [fechaValidez, setFechaValidez] = useState("");
 const [configNegocio, setConfigNegocio] = useState({
@@ -349,7 +350,7 @@ const cotizacionesFiltradas = useMemo(() => {
     setBusquedaCliente("");
     setClienteRefId("");
     setMostrarDropdownCliente(false);
-    setFechaCotizacion(new Date().toISOString().split("T")[0]);
+    setFechaCotizacion(fechaHoyNegocio(perfil));
     setFechaValidez("");
     setItems([itemVacio()]);
     setDescuento(0);

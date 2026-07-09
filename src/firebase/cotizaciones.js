@@ -17,6 +17,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { crearVenta } from "./ventas";
+import { fechaHoyNegocio } from "../utils/fechas";
 
 export async function obtenerSiguienteNumeroCotizacion(clienteId) {
   if (!clienteId) {
@@ -292,7 +293,7 @@ export async function convertirCotizacionAVenta({
   const nuevaVenta = await crearVenta({
     perfil,
     cliente,
-    fechaVenta: new Date().toISOString().split("T")[0],
+    fechaVenta: fechaHoyNegocio(perfil),
     items,
     descuento: Number(cotizacion.descuento || 0),
     pedidoAsociado: null,

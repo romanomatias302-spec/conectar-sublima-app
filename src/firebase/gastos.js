@@ -21,6 +21,7 @@ import {
   uploadBytes,
 } from "firebase/storage";
 import { db, storage } from "../firebase";
+import { fechaHoyNegocio } from "../utils/fechas";
 
 const GASTOS_COLLECTION = "gastos";
 async function obtenerSiguienteNumeroGasto(clienteId) {
@@ -107,11 +108,11 @@ export async function crearGasto({ perfil, gasto }) {
 
   const refDoc = await addDoc(collection(db, GASTOS_COLLECTION), data);
 
- await addDoc(collection(db, "movimientos"), {
-    clienteId: perfil.clienteId,
-    sucursalId,
-    sucursalNombre,
-    tipo: "egreso",
+await addDoc(collection(db, "movimientos"), {
+  clienteId: perfil.clienteId,
+  sucursalId,
+  sucursalNombre,
+  tipo: "egreso",
   subtipo: "gasto",
   origen: "gasto",
   origenRefId: refDoc.id,
@@ -128,6 +129,37 @@ export async function crearGasto({ perfil, gasto }) {
   createdAt: serverTimestamp(),
   updatedAt: serverTimestamp(),
 });
+
+const pagosCaja = (gasto.pagos || []).filter(
+  (pago) =>
+    pago.medioPago === "efectivo_caja" &&
+    Number(pago.monto || 0) > 0
+);
+
+for (const pago of pagosCaja) {
+  await addDoc(collection(db, "movimientos"), {
+    clienteId: perfil.clienteId,
+    sucursalId,
+    sucursalNombre,
+    tipo: "egreso",
+    subtipo: "gasto_caja",
+    origen: "gasto_pago",
+    origenRefId: refDoc.id,
+    gastoRefId: refDoc.id,
+    descripcion: `Pago de caja - Gasto #${numeroGasto} - ${gasto.descripcion || ""}`,
+    monto: Number(pago.monto || 0),
+    medioPago: "efectivo_caja",
+    fecha: gasto.fecha,
+
+    impactaCaja: true,
+    impactaResultado: false,
+    estadoMovimiento: "activo",
+    activo: true,
+
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+}
 
   return {
     firebaseId: refDoc.id,
@@ -155,6 +187,80 @@ await updateDoc(doc(db, GASTOS_COLLECTION, gastoId), {
     "Sucursal principal",
   updatedAt: serverTimestamp(),
 });
+
+const nuevoMonto = Number(gasto.total || gasto.monto || 0);
+const nuevaDescripcion = `Gasto - ${gasto.categoria || ""} - ${gasto.descripcion || ""}`;
+
+const movGastoSnap = await getDocs(
+  query(
+    collection(db, "movimientos"),
+    where("clienteId", "==", perfil.clienteId),
+    where("origen", "==", "gasto"),
+    where("origenRefId", "==", gastoId)
+  )
+);
+
+for (const movDoc of movGastoSnap.docs) {
+  await updateDoc(doc(db, "movimientos", movDoc.id), {
+    monto: nuevoMonto,
+    descripcion: nuevaDescripcion,
+    medioPago: gasto.pagos?.[0]?.medioPago || gasto.medioPago || "",
+    fecha: gasto.fecha,
+    impactaCaja: false,
+    impactaResultado: true,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+const movCajaSnap = await getDocs(
+  query(
+    collection(db, "movimientos"),
+    where("clienteId", "==", perfil.clienteId),
+    where("gastoRefId", "==", gastoId)
+  )
+);
+
+for (const movDoc of movCajaSnap.docs) {
+  await updateDoc(doc(db, "movimientos", movDoc.id), {
+    estadoMovimiento: "anulado",
+    activo: false,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+const pagosCaja = (gasto.pagos || []).filter(
+  (pago) =>
+    pago.medioPago === "efectivo_caja" &&
+    Number(pago.monto || 0) > 0
+);
+
+for (const pago of pagosCaja) {
+  await addDoc(collection(db, "movimientos"), {
+    clienteId: perfil.clienteId,
+    sucursalId: gasto.sucursalId || perfil?.sucursalDefaultId || "principal",
+    sucursalNombre:
+      gasto.sucursalNombre ||
+      perfil?.sucursalDefaultNombre ||
+      "Sucursal principal",
+    tipo: "egreso",
+    subtipo: "gasto_caja",
+    origen: "gasto_pago",
+    origenRefId: gastoId,
+    gastoRefId: gastoId,
+    descripcion: `Pago de caja - ${gasto.descripcion || ""}`,
+    monto: Number(pago.monto || 0),
+    medioPago: "efectivo_caja",
+    fecha: gasto.fecha,
+
+    impactaCaja: true,
+    impactaResultado: false,
+    estadoMovimiento: "activo",
+    activo: true,
+
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+}
 }
 
 export async function anularGasto({ perfil, gastoId, motivo = "" }) {
@@ -222,7 +328,7 @@ await batch.commit();
 export async function duplicarGasto({ perfil, gasto }) {
   const copia = {
     ...gasto,
-    fecha: new Date().toISOString().split("T")[0],
+    fecha: fechaHoyNegocio(perfil),
     comprobantes: [],
     estado: "activo",
     activo: true,

@@ -12,6 +12,7 @@ import {
 import { db } from "../../firebase";
 import { crearVenta } from "../../firebase/ventas";
 import { formatearMoneda, obtenerConfigMonedaDesdePerfil } from "../../utils/moneda";
+import { fechaHoyNegocio } from "../../utils/fechas";
 import "./VentasPage.css";
 import ProductoSelectorModal from "../../components/ProductoSelectorModal/ProductoSelectorModal";
 import {
@@ -384,7 +385,7 @@ const [busquedaPedido, setBusquedaPedido] = useState("");
 const [mostrarDropdownPedido, setMostrarDropdownPedido] = useState(false);
 const [pedidoRefId, setPedidoRefId] = useState("");
 
-  const [fechaVenta, setFechaVenta] = useState(new Date().toISOString().split("T")[0]);
+  const [fechaVenta, setFechaVenta] = useState(() => fechaHoyNegocio(perfil));
   const [items, setItems] = useState([itemVacio()]);
   const [descuento, setDescuento] = useState(0);
   const [pagosIniciales, setPagosIniciales] = useState([
@@ -727,7 +728,7 @@ const total = useMemo(
     setMostrarDropdownCliente(false);
     setBusquedaPedido("");
     setMostrarDropdownPedido(false);
-    setFechaVenta(new Date().toISOString().split("T")[0]);
+    setFechaVenta(fechaHoyNegocio(perfil));
     setItems([itemVacio()]);
     setDescuento(0);
     setPagosIniciales([{ monto: 0, medioPago: "efectivo" }]);

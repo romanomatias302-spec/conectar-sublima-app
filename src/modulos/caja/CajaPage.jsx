@@ -288,7 +288,9 @@ const movimientoEstaAnulado = (m) => {
 };
 
   const resumen = useMemo(() => {
-const activos = movimientos.filter((m) => !movimientoEstaAnulado(m));
+  const activos = movimientos.filter(
+    (m) => !movimientoEstaAnulado(m) && m.impactaCaja === true
+  );
 
     const totalPorMedio = {
       efectivo: 0,
@@ -312,7 +314,11 @@ const activos = movimientos.filter((m) => !movimientoEstaAnulado(m));
       .reduce((acc, m) => acc + Number(m.monto || 0), 0);
 
     const egresosEfectivo = activos
-      .filter((m) => m.tipo === "egreso" && m.medioPago === "efectivo")
+      .filter(
+        (m) =>
+          m.tipo === "egreso" &&
+          (m.medioPago === "efectivo" || m.medioPago === "efectivo_caja")
+      )
       .reduce((acc, m) => acc + Number(m.monto || 0), 0);
 
     const efectivoEsperado =

@@ -12,6 +12,7 @@ import {
 } from "../../firebase/gastos";
 import { puedeHacer } from "../../utils/permisos";
 import { escucharProveedores } from "../../firebase/proveedores";
+import { fechaHoyNegocio } from "../../utils/fechas";
 
 const categoriasBase = [
   "Gasto fijo",
@@ -38,7 +39,7 @@ const pagoVacio = () => ({
 });
 
 const gastoInicial = {
-  fecha: new Date().toISOString().split("T")[0],
+  fecha: "",
   categoria: "",
   proveedor: "",
     proveedorId: "",
@@ -210,8 +211,9 @@ useEffect(() => {
     setModalSoloLectura(false);
     setForm({
       ...gastoInicial,
-      fecha: new Date().toISOString().split("T")[0],
+      fecha: fechaHoyNegocio(perfil),
       items: [itemVacio()],
+      pagos: [pagoVacio()],
     });
     setModalAbierto(true);
   };
@@ -221,8 +223,9 @@ useEffect(() => {
     setGastoEditando(null);
     setForm({
       ...gastoInicial,
-      fecha: new Date().toISOString().split("T")[0],
+      fecha: fechaHoyNegocio(perfil),
       items: [itemVacio()],
+      pagos: [pagoVacio()],
     });
     setMostrarNuevaCategoria(false);
     setNuevaCategoria("");
@@ -721,7 +724,8 @@ const duplicarGastoLocal = async (gasto) => {
             )}
       </div>
 
-      <div className="container-secundaria">
+      {!modalAbierto && (
+        <div className="container-secundaria">
         <h3 style={{ marginTop: 0 }}>Listado de gastos</h3>
 
         <button
@@ -1061,7 +1065,7 @@ const duplicarGastoLocal = async (gasto) => {
             </div>
       </div>
 
-      
+      )}
 
       {modalAbierto && (
         <div className="modal-overlay">
@@ -1599,6 +1603,7 @@ const duplicarGastoLocal = async (gasto) => {
                             disabled={modalSoloLectura}
                         >
                             <option value="efectivo">Efectivo</option>
+                            <option value="efectivo_caja">Efectivo de caja</option>
                             <option value="transferencia">Transferencia</option>
                             <option value="debito">Débito</option>
                             <option value="credito">Crédito</option>

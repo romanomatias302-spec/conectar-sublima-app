@@ -281,16 +281,17 @@ const sucursalNombre = perfil?.sucursalDefaultNombre || "Sucursal principal";
         sucursalId,
         sucursalNombre,
         tipo: "ingreso",
-        subtipo: "venta",
-        origen: "venta",
+        subtipo: "cobro_venta",
+        origen: "venta_pago",
         origenRefId: ventaRef.id,
-        descripcion: `Pago venta #${numeroVenta} - ${cliente.nombre || ""}`,
+        pagoRefId: "",
+        descripcion: `Cobro venta #${numeroVenta} - ${cliente.nombre || ""}`,
         monto: Number(pago.monto || 0),
         medioPago: pago.medioPago || "efectivo",
         fecha: pago.fechaPago || fechaVenta,
 
-        impactaCaja: true,
-        impactaResultado: true,
+        impactaCaja: (pago.medioPago || "efectivo") === "efectivo",
+        impactaResultado: false,
         estadoMovimiento: "activo",
         activo: true,
 
@@ -299,6 +300,28 @@ const sucursalNombre = perfil?.sucursalDefaultNombre || "Sucursal principal";
       });
     }
   }
+
+  await addDoc(collection(db, "movimientos"), {
+    clienteId: perfil.clienteId,
+    sucursalId,
+    sucursalNombre,
+    tipo: "ingreso",
+    subtipo: "venta",
+    origen: "venta",
+    origenRefId: ventaRef.id,
+    descripcion: `Venta #${numeroVenta} - ${cliente.nombre || ""}`,
+    monto: Number(total || 0),
+    medioPago: "cuenta_corriente",
+    fecha: fechaVenta,
+
+    impactaCaja: false,
+    impactaResultado: true,
+    estadoMovimiento: "activo",
+    activo: true,
+
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
 
   if (pedidoAsociado?.firebaseId) {
     await updateDoc(doc(db, "pedidos", pedidoAsociado.firebaseId), {
@@ -356,16 +379,16 @@ await addDoc(collection(db, "movimientos"), {
   sucursalId,
   sucursalNombre,
   tipo: "ingreso",
-  subtipo: "venta",
-  origen: "venta",
+  subtipo: "cobro_venta",
+  origen: "venta_pago",
   origenRefId: venta.firebaseId,
-  descripcion: `Pago venta #${venta.numeroVenta} - ${venta.clienteNombre || ""}`,
+  descripcion: `Cobro venta #${venta.numeroVenta} - ${venta.clienteNombre || ""}`,
   monto: montoNum,
   medioPago: medioPago || "efectivo",
   fecha: fechaPago,
 
-  impactaCaja: true,
-  impactaResultado: true,
+  impactaCaja: (medioPago || "efectivo") === "efectivo",
+  impactaResultado: false,
   estadoMovimiento: "activo",
   activo: true,
 
@@ -601,6 +624,23 @@ async function recalcularTotalesVenta(ventaId) {
     estadoPago,
     updatedAt: serverTimestamp(),
   });
+
+  const movVentaSnap = await getDocs(
+    query(
+      collection(db, "movimientos"),
+      where("clienteId", "==", ventaData.clienteId),
+      where("origen", "==", "venta"),
+      where("origenRefId", "==", ventaId),
+      where("subtipo", "==", "venta")
+    )
+  );
+
+  for (const movDoc of movVentaSnap.docs) {
+    await updateDoc(doc(db, "movimientos", movDoc.id), {
+      monto: Number(total || 0),
+      updatedAt: serverTimestamp(),
+    });
+  }
 }
 
 export async function anularItemDeVenta({
