@@ -316,7 +316,7 @@ const pagarPeriodoMercadoPago = async (periodo) => {
 
     const data = await response.json();
 
-    const urlPago = data.sandbox_init_point || data.init_point;
+    const urlPago = data.init_point; 
 
     if (!urlPago) {
       throw new Error("No se recibió URL de pago");

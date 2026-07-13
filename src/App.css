@@ -382,3 +382,61 @@ body.dark-mode .alert-error {
   border: 1px solid rgba(248, 113, 113, 0.35);
 }
 
+/**/
+
+.saas-bloqueo-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(circle at top, rgba(14, 165, 233, 0.16), transparent 34%),
+    #020617;
+  padding: 20px;
+}
+
+.saas-bloqueo-card {
+  width: 100%;
+  max-width: 420px;
+  background: #ffffff;
+  border-radius: 22px;
+  padding: 28px;
+  text-align: center;
+  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.28);
+}
+
+.saas-bloqueo-card h2 {
+  margin: 0 0 10px;
+  color: #0f172a;
+}
+
+.saas-bloqueo-card p {
+  color: #64748b;
+  line-height: 1.5;
+}
+
+.saas-bloqueo-pagar {
+  width: 100%;
+  border: 0;
+  background: linear-gradient(135deg, #0ea5e9, #2563eb);
+  color: white;
+  border-radius: 14px;
+  padding: 14px;
+  font-weight: 900;
+  cursor: pointer;
+  margin-top: 12px;
+}
+
+.saas-bloqueo-pagar:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.saas-bloqueo-salir {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: #64748b;
+  padding: 12px;
+  cursor: pointer;
+  margin-top: 8px;
+}

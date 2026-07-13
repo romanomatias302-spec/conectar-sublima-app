@@ -7,10 +7,18 @@ const sharp = require("sharp");
 
 const admin = require("firebase-admin");
 
+const {
+  WebhookSignatureValidator,
+  InvalidWebhookSignatureError,
+} = require("mercadopago");
+
 admin.initializeApp();
 
 const db = admin.firestore();
 const MP_ACCESS_TOKEN_TEST = defineSecret("MP_ACCESS_TOKEN_TEST");
+
+const MP_ACCESS_TOKEN_PROD = defineSecret("MP_ACCESS_TOKEN_PROD");
+const MP_WEBHOOK_SECRET_PROD = defineSecret("MP_WEBHOOK_SECRET_PROD");
 
 function fechaISO(date) {
   return date.toISOString().slice(0, 10);
@@ -185,6 +193,101 @@ async function procesarPruebaGratisVencida({ cliente, docu, hoy, modoPrueba }) {
     accion: modoPrueba ? "simular_suspension_prueba" : "suspender_prueba",
     motivo: "Prueba gratis vencida",
     fechaVencimiento: fechaISO(fechaVencimiento),
+  };
+}
+
+async function registrarPagoSaas({
+  clienteSaasId,
+  periodoFacturado,
+  monto,
+  medioPago = "manual",
+  origen = "manual",
+  observacion = "",
+  referenciaExterna = "",
+  mercadoPagoPaymentId = "",
+  hotmartTransactionId = "",
+}) {
+  if (!clienteSaasId || !periodoFacturado || Number(monto || 0) <= 0) {
+    throw new Error("Datos inválidos para registrar pago SaaS");
+  }
+
+  const clienteRef = db.collection("clientes-saas").doc(clienteSaasId);
+  const clienteSnap = await clienteRef.get();
+
+  if (!clienteSnap.exists) {
+    throw new Error("Cliente SaaS no encontrado");
+  }
+
+  const cliente = clienteSnap.data();
+
+  const pagoBase = {
+    clienteSaasId,
+    clienteNombre: cliente.nombre || "",
+    tipoMovimiento: "pago",
+    monto: Number(monto || 0),
+    fechaPago: fechaISO(new Date()),
+    medioPago,
+    concepto:
+      cliente.frecuenciaCobro === "anual" ? "anualidad" : "mensualidad",
+    periodoFacturado,
+    observacion,
+    referenciaExterna,
+    mercadoPagoPaymentId,
+    hotmartTransactionId,
+    origen,
+    anulado: false,
+    estado: "activo",
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  };
+
+ if (medioPago === "mercadopago" && mercadoPagoPaymentId) {
+  const pagoRef = db
+    .collection("saas_pagos")
+    .doc(`mp_${String(mercadoPagoPaymentId)}`);
+
+  await db.runTransaction(async (transaction) => {
+    const pagoSnap = await transaction.get(pagoRef);
+
+    if (pagoSnap.exists) {
+      return;
+    }
+
+    transaction.set(pagoRef, pagoBase);
+  });
+} else {
+  await db.collection("saas_pagos").add(pagoBase);
+}
+
+  await clienteRef.update({
+    ultimoPago: pagoBase.fechaPago,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  await recalcularEstadoCuentaCliente(clienteSaasId);
+
+  const clienteActualizadoSnap = await clienteRef.get();
+  const clienteActualizado = clienteActualizadoSnap.data() || {};
+
+  if (
+    Number(clienteActualizado.saldoCuentaCorriente || 0) <= 0 &&
+    clienteActualizado.suspendidoManual !== true
+  ) {
+    await clienteRef.update({
+      estado: "activo",
+      estadoSuscripcion: "activa",
+      suspendidoPorSistema: false,
+      motivoSuspension: "",
+      fechaReactivacion: fechaISO(new Date()),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  }
+
+  return {
+    ok: true,
+    clienteSaasId,
+    periodoFacturado,
+    monto: Number(monto || 0),
   };
 }
 
@@ -634,7 +737,7 @@ exports.ejecutarCargosSaasAhora = onRequest(async (req, res) => {
 
 exports.crearPreferenciaMercadoPago = onRequest(
   {
-    secrets: [MP_ACCESS_TOKEN_TEST],
+    secrets: [MP_ACCESS_TOKEN_PROD],
   },
   async (req, res) => {
     try {
@@ -653,14 +756,14 @@ exports.crearPreferenciaMercadoPago = onRequest(
         return;
       }
 
-      const { clienteSaasId, periodoFacturado, monto } = req.body || {};
+        const { clienteSaasId, periodoFacturado } = req.body || {};
 
-      if (!clienteSaasId || !periodoFacturado || Number(monto || 0) <= 0) {
-        res.status(400).json({
-          error: "Faltan datos para crear la preferencia.",
-        });
-        return;
-      }
+        if (!clienteSaasId || !periodoFacturado) {
+          res.status(400).json({
+            error: "Faltan datos para crear la preferencia.",
+          });
+          return;
+        }
 
       const clienteSnap = await db
         .collection("clientes-saas")
@@ -675,6 +778,41 @@ exports.crearPreferenciaMercadoPago = onRequest(
       }
 
       const cliente = clienteSnap.data();
+
+      const movimientosSnap = await db
+        .collection("saas_pagos")
+        .where("clienteSaasId", "==", clienteSaasId)
+        .where("periodoFacturado", "==", periodoFacturado)
+        .get();
+
+      let cargosPeriodo = 0;
+      let pagosPeriodo = 0;
+
+      movimientosSnap.forEach((docu) => {
+        const movimiento = docu.data();
+
+        if (movimiento.anulado === true) return;
+
+        const valor = Number(movimiento.monto || 0);
+        const tipo = movimiento.tipoMovimiento || "pago";
+
+        if (tipo === "cargo" || tipo === "ajuste") {
+          cargosPeriodo += valor;
+        }
+
+        if (tipo === "pago" || tipo === "credito") {
+          pagosPeriodo += valor;
+        }
+      });
+
+      const monto = cargosPeriodo - pagosPeriodo;
+
+      if (monto <= 0) {
+        res.status(409).json({
+          error: "El período ya no tiene saldo pendiente.",
+        });
+        return;
+      }
 
       const preferenceBody = {
         items: [
@@ -694,11 +832,17 @@ exports.crearPreferenciaMercadoPago = onRequest(
           clienteSaasId,
           periodoFacturado,
         },
-        back_urls: {
-          success: "https://app.zalfro.com",
-          failure: "https://app.zalfro.com",
-          pending: "https://app.zalfro.com",
-        },
+      back_urls: {
+        success: `https://app.zalfro.com/?pago=aprobado&periodo=${encodeURIComponent(
+          periodoFacturado
+        )}`,
+        failure: `https://app.zalfro.com/?pago=rechazado&periodo=${encodeURIComponent(
+          periodoFacturado
+        )}`,
+        pending: `https://app.zalfro.com/?pago=pendiente&periodo=${encodeURIComponent(
+          periodoFacturado
+        )}`,
+      },
         auto_return: "approved",
         notification_url:
         "https://us-central1-conectarsublimados-7881e.cloudfunctions.net/webhookMercadoPagoSaas",
@@ -709,7 +853,7 @@ exports.crearPreferenciaMercadoPago = onRequest(
         {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${MP_ACCESS_TOKEN_TEST.value()}`,
+            Authorization: `Bearer ${MP_ACCESS_TOKEN_PROD.value()}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify(preferenceBody),
@@ -743,7 +887,7 @@ exports.crearPreferenciaMercadoPago = onRequest(
 
 exports.webhookMercadoPagoSaas = onRequest(
   {
-    secrets: [MP_ACCESS_TOKEN_TEST],
+    secrets: [MP_ACCESS_TOKEN_PROD, MP_WEBHOOK_SECRET_PROD],
   },
   async (req, res) => {
     try {
@@ -754,26 +898,75 @@ exports.webhookMercadoPagoSaas = onRequest(
         req.body?.id;
 
       if (!paymentId) {
-        res.status(200).json({ ok: true, mensaje: "Sin paymentId" });
+        res.status(200).json({
+          ok: true,
+          mensaje: "Notificación sin paymentId",
+        });
         return;
+      }
+
+      const xSignature = req.headers["x-signature"];
+      const xRequestId = req.headers["x-request-id"];
+
+      if (!xSignature || !xRequestId) {
+        console.warn("Webhook Mercado Pago sin firma", {
+          paymentId: String(paymentId),
+        });
+
+        res.status(401).json({
+          ok: false,
+          error: "Firma de webhook ausente",
+        });
+        return;
+      }
+
+      try {
+        WebhookSignatureValidator.validate({
+          xSignature,
+          xRequestId,
+          dataId: String(paymentId),
+          secret: MP_WEBHOOK_SECRET_PROD.value(),
+        });
+      } catch (errorFirma) {
+        if (errorFirma instanceof InvalidWebhookSignatureError) {
+          console.warn("Firma Mercado Pago inválida", {
+            paymentId: String(paymentId),
+          });
+
+          res.status(401).json({
+            ok: false,
+            error: "Firma de webhook inválida",
+          });
+          return;
+        }
+
+        throw errorFirma;
       }
 
       const mpResponse = await fetch(
         `https://api.mercadopago.com/v1/payments/${paymentId}`,
         {
           headers: {
-            Authorization: `Bearer ${MP_ACCESS_TOKEN_TEST.value()}`,
+            Authorization: `Bearer ${MP_ACCESS_TOKEN_PROD.value()}`,
           },
         }
       );
 
       const pago = await mpResponse.json();
 
-      if (!mpResponse.ok) {
-        console.error("Error consultando pago MP:", pago);
-        res.status(200).json({ ok: false });
-        return;
-      }
+    if (!mpResponse.ok) {
+      console.error("Error consultando pago MP:", {
+        paymentId: String(paymentId),
+        status: mpResponse.status,
+        respuesta: pago,
+      });
+
+      res.status(500).json({
+        ok: false,
+        error: "No se pudo consultar el pago en Mercado Pago",
+      });
+      return;
+    }
 
       if (pago.status !== "approved") {
         res.status(200).json({
@@ -811,42 +1004,26 @@ exports.webhookMercadoPagoSaas = onRequest(
         return;
       }
 
-      const clienteSnap = await db
-        .collection("clientes-saas")
-        .doc(clienteSaasId)
-        .get();
-
-      const cliente = clienteSnap.exists ? clienteSnap.data() : {};
-
       const monto = Number(pago.transaction_amount || 0);
-      const fechaPago = pago.date_approved
-        ? pago.date_approved.slice(0, 10)
-        : fechaISO(new Date());
 
-      await db.collection("saas_pagos").add({
-        clienteSaasId,
-        clienteNombre: cliente.nombre || "",
-        tipoMovimiento: "pago",
-        monto,
-        fechaPago,
-        medioPago: "mercadopago",
-        concepto: "mensualidad",
-        periodoFacturado,
-        observacion: `Pago Mercado Pago - paymentId ${paymentId}`,
-        mercadoPagoPaymentId: String(paymentId),
-        origen: "mercadopago",
-        anulado: false,
-        estado: "activo",
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
+      if (monto <= 0) {
+        res.status(400).json({
+          ok: false,
+          error: "El pago aprobado tiene un monto inválido",
+        });
+        return;
+      }
 
-      await db.collection("clientes-saas").doc(clienteSaasId).update({
-        ultimoPago: fechaPago,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-
-      await recalcularEstadoCuentaCliente(clienteSaasId);
+    await registrarPagoSaas({
+      clienteSaasId,
+      periodoFacturado,
+      monto,
+      medioPago: "mercadopago",
+      origen: "mercadopago",
+      observacion: `Pago Mercado Pago - paymentId ${paymentId}`,
+      referenciaExterna: String(paymentId),
+      mercadoPagoPaymentId: String(paymentId),
+    });
 
       res.status(200).json({
         ok: true,
@@ -856,9 +1033,10 @@ exports.webhookMercadoPagoSaas = onRequest(
       });
     } catch (error) {
       console.error("Error webhook Mercado Pago:", error);
-      res.status(200).json({
+
+      res.status(500).json({
         ok: false,
-        error: error.message,
+        error: error.message || "Error procesando webhook Mercado Pago",
       });
     }
   }

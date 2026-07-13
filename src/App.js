@@ -236,8 +236,10 @@ useEffect(() => {
       setUsuario(null);
       setPerfil(null);
       setMensajeBloqueo("");
+      setClienteBloqueado(null);
       setErrorConexionPerfil(false);
       setAuthLoading(false);
+      
       return;
     }
 
@@ -603,7 +605,7 @@ irAVista("venta-detalle", {
         });
 
         const data = await response.json();
-        const urlPago = data.sandbox_init_point || data.init_point;
+        const urlPago = data.init_point;
 
         if (!urlPago) {
           throw new Error("No se recibió URL de pago");
@@ -653,47 +655,51 @@ if (!perfil && errorConexionPerfil) {
   );
 }
 
-if (!perfil) {
-  return (
-    <div style={{ padding: 30 }}>
-      <h2>Usuario sin perfil</h2>
-      <p>No existe un perfil en Firestore para este usuario.</p>
-      <button onClick={() => signOut(auth)}>Cerrar sesión</button>
-    </div>
-  );
-}
+      if (mensajeBloqueo) {
+        return (
+          <div className="saas-bloqueo-page">
+            <div className="saas-bloqueo-card">
+              <h2>Cuenta suspendida</h2>
 
-    if (mensajeBloqueo) {
-      return (
-        <div className="saas-bloqueo-page">
-          <div className="saas-bloqueo-card">
-            <h2>Cuenta suspendida</h2>
+              <p>
+                Tu cuenta se encuentra suspendida. Podés regularizar el acceso desde
+                el botón de pago.
+              </p>
 
-            <p>
-              Tu cuenta se encuentra suspendida. Podés regularizar el acceso desde
-              el botón de pago.
-            </p>
+              {clienteBloqueado?.id && (
+                <button
+                  type="button"
+                  className="saas-bloqueo-pagar"
+                  onClick={iniciarPagoCuentaBloqueada}
+                  disabled={pagandoCuentaBloqueada}
+                >
+                  {pagandoCuentaBloqueada
+                    ? "Abriendo pago..."
+                    : "Pagar y reactivar"}
+                </button>
+              )}
 
-            <button
-              type="button"
-              className="saas-bloqueo-pagar"
-              onClick={iniciarPagoCuentaBloqueada}
-              disabled={pagandoCuentaBloqueada}
-            >
-              {pagandoCuentaBloqueada ? "Abriendo pago..." : "Pagar y reactivar"}
-            </button>
-
-            <button
-              type="button"
-              className="saas-bloqueo-salir"
-              onClick={() => signOut(auth)}
-            >
-              Cerrar sesión
-            </button>
+              <button
+                type="button"
+                className="saas-bloqueo-salir"
+                onClick={() => signOut(auth)}
+              >
+                Cerrar sesión
+              </button>
+            </div>
           </div>
-        </div>
-      );
-    }
+        );
+      }
+
+      if (!perfil) {
+        return (
+          <div style={{ padding: 30 }}>
+            <h2>Usuario sin perfil</h2>
+            <p>No existe un perfil en Firestore para este usuario.</p>
+            <button onClick={() => signOut(auth)}>Cerrar sesión</button>
+          </div>
+        );
+      }
 
     if (perfil.rol === "superadmin") {
       return <DuenoSaasPanel perfil={perfil} />;
