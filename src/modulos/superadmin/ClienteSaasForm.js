@@ -16,12 +16,12 @@ telefono: "",
 
 
 
-  plan: "instalacion",
-  planNombre: "",
-  planPrecio: "",
-  moneda: "",
-  frecuenciaCobro: "mensual",
-  diasCiclo: 30,
+plan: "Prueba gratis 7 días",
+planNombre: "Prueba gratis 7 días",
+planPrecio: 0,
+moneda: "ARS",
+frecuenciaCobro: "prueba",
+diasCiclo: 7,
 
   pais: "Argentina",
   metodoCobro: "manual",
@@ -239,8 +239,22 @@ telefono: "",
     };
 
   const handleGuardar = async (e) => {
-    e.preventDefault();
-    if (!formData.nombre.trim()) return;
+  e.preventDefault();
+
+  if (!formData.nombre.trim()) {
+    alert("Ingresá el nombre de la empresa.");
+    return;
+  }
+
+  if (!formData.planNombre) {
+    alert("Seleccioná un plan.");
+    return;
+  }
+
+  if (!formData.fechaAlta) {
+    alert("Ingresá la fecha de alta.");
+    return;
+  }
 
     try {
       setLoading(true);
@@ -261,9 +275,10 @@ telefono: "",
     const dataAGuardar = {
       ...formData,
 
-      plan: formData.planNombre,
-      frecuenciaCobro: configPlan.frecuenciaCobro,
-      diasCiclo: configPlan.diasCiclo,
+    plan: formData.planNombre,
+    planNombre: formData.planNombre,
+    frecuenciaCobro: configPlan.frecuenciaCobro,
+    diasCiclo: configPlan.diasCiclo,
 
       mantenimientoMensual: precioFinal,
       planPrecio: precioFinal,
