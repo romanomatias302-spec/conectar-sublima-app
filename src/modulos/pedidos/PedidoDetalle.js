@@ -161,14 +161,24 @@ useEffect(() => {
     setMostrarModal(true);
   };
 
-    const resumirZonas = (producto) => {
-    const zonas = producto?.zonas || {};
-    const usadas = Object.entries(zonas)
-      .filter(([, valor]) => String(valor || "").trim() !== "")
-      .map(([codigo, valor]) => `${codigo}: ${valor}`);
+const obtenerZonasUsadas = (producto) => {
+  const zonas = producto?.zonas || {};
 
-    return usadas.length ? usadas.join(" | ") : "-";
-  };
+  return Object.entries(zonas)
+    .filter(([, valor]) => String(valor || "").trim() !== "")
+    .map(([codigo, valor]) => ({
+      codigo,
+      valor: String(valor).trim(),
+    }));
+};
+
+const resumirZonas = (producto) => {
+  const usadas = obtenerZonasUsadas(producto);
+
+  return usadas.length
+    ? usadas.map((zona) => `${zona.codigo}: ${zona.valor}`).join(" | ")
+    : "-";
+};
 
   const resumirTalles = (producto) => {
     const talles = producto?.talles || {};
@@ -417,6 +427,227 @@ case "tallesResumen": {
 
   const columnasVisibles = columnasDetalle.filter((col) => col.visible);
 
+const columnasImprimiblesBase = columnasVisibles.filter(
+  (col) => col.key !== "acciones" && col.key !== "imagenesResumen"
+);
+
+const columnaTieneContenido = (columnaKey) => {
+  // Estas columnas deben permanecer aunque algún pedido puntual no tenga datos.
+  if (columnaKey === "producto" || columnaKey === "cantidad") {
+    return true;
+  }
+
+  return productos.some((producto) => {
+    switch (columnaKey) {
+      case "color":
+        return String(producto?.color || "").trim() !== "";
+
+      case "detalle":
+        return String(producto?.detalle || "").trim() !== "";
+
+      case "observaciones": {
+        const observaciones = obtenerObservaciones(producto);
+        return String(observaciones || "").trim() !== "" && observaciones !== "-";
+      }
+
+      case "zonasResumen": {
+        const zonas = resumirZonas(producto);
+        return String(zonas || "").trim() !== "" && zonas !== "-";
+      }
+
+      case "tallesResumen":
+        return resumirTalles(producto).length > 0;
+
+      case "detallesCosturaResumen":
+        return resumirDetallesCostura(producto).length > 0;
+
+      default:
+        return true;
+    }
+  });
+};
+
+const columnasImprimibles =
+  productos.length === 0
+    ? columnasImprimiblesBase
+    : columnasImprimiblesBase.filter((col) =>
+        columnaTieneContenido(col.key)
+      );
+
+      const obtenerTextoColumnaImpresion = (producto, columnaKey) => {
+  switch (columnaKey) {
+    case "producto":
+      return String(
+        producto?.productoNombre ||
+        producto?.producto ||
+        ""
+      );
+
+    case "color":
+      return String(producto?.color || "");
+
+    case "detalle":
+      return String(producto?.detalle || "");
+
+    case "observaciones": {
+      const valor = obtenerObservaciones(producto);
+      return valor === "-" ? "" : String(valor || "");
+    }
+
+    case "zonasResumen": {
+      const valor = resumirZonas(producto);
+      return valor === "-" ? "" : String(valor || "");
+    }
+
+    case "tallesResumen":
+      return resumirTalles(producto)
+        .map((t) => `${t.talle} ${t.qty} ${t.detalle || ""}`)
+        .join(" ");
+
+    case "detallesCosturaResumen":
+      return resumirDetallesCostura(producto)
+        .map((d) => `${d.nombre} ${d.valor}`)
+        .join(" ");
+
+    case "cantidad":
+      return String(
+        producto?.totalTalles ||
+        producto?.cantidad ||
+        ""
+      );
+
+    default:
+      return "";
+  }
+};
+
+const limitesColumnasImpresion = {
+  producto: {
+    minimo: 11,
+    maximo: 18,
+    base: 12,
+  },
+
+  color: {
+    minimo: 6,
+    maximo: 9,
+    base: 6,
+  },
+
+  detalle: {
+    minimo: 10,
+    maximo: 24,
+    base: 12,
+  },
+
+  observaciones: {
+    minimo: 11,
+    maximo: 24,
+    base: 13,
+  },
+
+  zonasResumen: {
+    minimo: 9,
+    maximo: 18,
+    base: 11,
+  },
+
+  tallesResumen: {
+    minimo: 16,
+    maximo: 34,
+    base: 20,
+  },
+
+  detallesCosturaResumen: {
+    minimo: 11,
+    maximo: 23,
+    base: 14,
+  },
+
+cantidad: {
+  minimo: 10,
+  maximo: 11,
+  base: 10,
+},
+};
+
+const calcularPesoColumnaImpresion = (columnaKey) => {
+  const limites =
+    limitesColumnasImpresion[columnaKey] || {
+      minimo: 9,
+      maximo: 20,
+      base: 11,
+    };
+
+  if (columnaKey === "cantidad") {
+    return limites.base;
+  }
+
+  const longitudes = productos.map((producto) => {
+    const texto = obtenerTextoColumnaImpresion(
+      producto,
+      columnaKey
+    );
+
+    return texto.trim().length;
+  });
+
+  const longitudMaxima = longitudes.length
+    ? Math.max(...longitudes)
+    : 0;
+
+  const promedio = longitudes.length
+    ? longitudes.reduce((total, valor) => total + valor, 0) /
+      longitudes.length
+    : 0;
+
+  /*
+   * Usamos logaritmo para que un texto enorme aumente el ancho,
+   * pero no se quede con toda la hoja.
+   */
+  const intensidadContenido =
+    Math.log2(1 + promedio) * 1.4 +
+    Math.log2(1 + longitudMaxima) * 0.8;
+
+  const pesoCalculado =
+    limites.base + intensidadContenido;
+
+  return Math.min(
+    limites.maximo,
+    Math.max(limites.minimo, pesoCalculado)
+  );
+};
+
+const anchoPortadaImpresion = 10;
+
+const pesosColumnasImpresion =
+  columnasImprimibles.map((col) => ({
+    key: col.key,
+    peso: calcularPesoColumnaImpresion(col.key),
+  }));
+
+const pesoTotalColumnas = pesosColumnasImpresion.reduce(
+  (total, columna) => total + columna.peso,
+  0
+);
+
+const espacioDisponibleColumnas =
+  100 - anchoPortadaImpresion;
+
+const anchosColumnasImpresion =
+  pesosColumnasImpresion.reduce(
+    (resultado, columna) => {
+      resultado[columna.key] =
+        pesoTotalColumnas > 0
+          ? (columna.peso / pesoTotalColumnas) *
+            espacioDisponibleColumnas
+          : espacioDisponibleColumnas /
+            Math.max(columnasImprimibles.length, 1);
+
+      return resultado;
+    },
+    {}
+  );
 
   
 
@@ -427,7 +658,9 @@ if (!pedido) {
 
   return (
       <div className="pedido-detalle">
-    <h1>Detalles del Pedido #{pedido.id}</h1>
+    <h1>
+      Pedido #{pedido?.id || pedido?.numeroPedido || pedido?.visibleId || "-"}
+    </h1>
 
 
       {/* 🔹 Contenedor gris claro para datos del pedido */}
@@ -560,74 +793,164 @@ if (!pedido) {
         )}
       </div>
 
-          <div className="pedido-print-area">
-            <h2>Productos del pedido</h2>
+      {/* 🔹 Área exclusiva para impresión */}
+      <div className="pedido-print-area">
+        <section className="pedido-print-products">
+          <h2 className="pedido-print-section-title">
+            Productos del pedido
+          </h2>
 
-            <table className="pedido-print-table">
-              <thead>
-                <tr>
-                  {columnasVisibles
-                    .filter((col) => col.key !== "acciones" && col.key !== "imagenesResumen")
-                    .map((col) => (
-                      <th key={col.key} className={`pedido-print-col-${col.key}`}>
-                        {col.label}
-                      </th>
-                    ))}
-                </tr>
-              </thead>
+        <table className="pedido-print-table">
+          <colgroup>
+            <col
+              className="pedido-print-col-portada"
+              style={{ width: `${anchoPortadaImpresion}%` }}
+            />
 
-              <tbody>
-                {productos.map((p) => (
-                  <tr key={p.id}>
-                    {columnasVisibles
-                      .filter((col) => col.key !== "acciones" && col.key !== "imagenesResumen")
-                      .map((col) => (
-                        <td key={col.key} className={`pedido-print-col-${col.key}`}>
-                          {col.key === "producto" && (p.productoNombre || p.producto || "-")}
-                          {col.key === "color" && (p.color || "-")}
-                          {col.key === "detalle" && (p.detalle || "-")}
-                          {col.key === "observaciones" && obtenerObservaciones(p)}
-                          {col.key === "zonasResumen" && resumirZonas(p)}
-                          {col.key === "tallesResumen" &&
-                            (resumirTalles(p).length ? (
-                              <div
-                                className={`pedido-print-talles-list ${
-                                  resumirTalles(p).length > 10
-                                    ? "pedido-print-talles-list-2cols"
-                                    : ""
-                                }`}
-                              >
-                                {resumirTalles(p).map((t, index) => (
-                                  <div key={`${t.talle}-${index}`} className="pedido-print-talle-item">
-                                    <strong>{t.talle}:</strong> {t.qty}
-                                    {t.detalle ? <span> — {t.detalle}</span> : null}
-                                  </div>
-                                ))}
-                              </div>
-                            ) : (
-                              "-"
-                            ))}
+            {columnasImprimibles.map((col) => (
+              <col
+                key={col.key}
+                className={`pedido-print-col-${col.key}`}
+                style={{
+                  width: `${anchosColumnasImpresion[col.key]}%`,
+                }}
+              />
+            ))}
+          </colgroup>
 
-                          {col.key === "detallesCosturaResumen" &&
-                            (resumirDetallesCostura(p).length ? (
-                              <div className="pedido-print-costura-list">
-                                {resumirDetallesCostura(p).map((d, index) => (
-                                  <div key={`${d.nombre}-${index}`} className="pedido-print-costura-item">
-                                    <strong>{d.nombre}:</strong> {d.valor}
-                                  </div>
-                                ))}
-                              </div>
-                            ) : (
-                              "-"
-                            ))}
-                          {col.key === "cantidad" && (p.totalTalles || p.cantidad || "-")}
-                        </td>
-                      ))}
-                  </tr>
+          <thead>
+            <tr>
+              <th className="pedido-print-col-portada">
+                Imagen
+              </th>
+
+              {columnasImprimibles.map((col) => (
+                  <th
+                    key={col.key}
+                    className={`pedido-print-col-${col.key}`}
+                  >
+                    {col.label}
+                  </th>
                 ))}
-              </tbody>
-            </table>
-          </div>
+              </tr>
+            </thead>
+
+            <tbody>
+              {productos.map((p) => {
+                const tallesImpresion = resumirTalles(p);
+                const costurasImpresion = resumirDetallesCostura(p);
+                const portadaImpresion = obtenerImagenPortada(p);
+                const zonasImpresion = obtenerZonasUsadas(p);
+
+                return (
+                  <tr key={p.id}>
+                    <td className="pedido-print-col-portada">
+                      {portadaImpresion ? (
+                        <img
+                          src={portadaImpresion}
+                          alt=""
+                          className="pedido-print-portada-img"
+                        />
+                      ) : (
+                        <span className="pedido-print-sin-portada">-</span>
+                      )}
+                    </td>
+
+                    {columnasImprimibles.map((col) => (
+                      <td
+                        key={col.key}
+                        className={`pedido-print-col-${col.key}`}
+                      >
+                        {col.key === "producto" &&
+                          (p.productoNombre || p.producto || "-")}
+
+                        {col.key === "color" && (p.color || "-")}
+
+                        {col.key === "detalle" && (p.detalle || "-")}
+
+                        {col.key === "observaciones" &&
+                          obtenerObservaciones(p)}
+
+                        {col.key === "zonasResumen" &&
+                          (zonasImpresion.length ? (
+                            <div className="pedido-print-zonas-list">
+                              {zonasImpresion.map((zona, index) => (
+                                <div
+                                  key={`${zona.codigo}-${index}`}
+                                  className="pedido-print-zona-item"
+                                >
+                                  <strong className="pedido-print-zona-codigo">
+                                    {zona.codigo}:
+                                  </strong>{" "}
+                                  <span className="pedido-print-zona-valor">
+                                    {zona.valor}
+                                  </span>
+
+                                  {index < zonasImpresion.length - 1 ? (
+                                    <span className="pedido-print-zona-separador">
+                                      {" "}|
+                                    </span>
+                                  ) : null}
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            "-"
+                          ))}
+
+                        {col.key === "tallesResumen" &&
+                          (tallesImpresion.length ? (
+                            <div
+                              className={`pedido-print-talles-list ${
+                                tallesImpresion.length > 10
+                                  ? "pedido-print-talles-list-2cols"
+                                  : ""
+                              }`}
+                            >
+                              {tallesImpresion.map((t, index) => (
+                                <div
+                                  key={`${t.talle}-${index}`}
+                                  className="pedido-print-talle-item"
+                                >
+                                  <strong>{t.talle}:</strong> {t.qty}
+
+                                  {t.detalle ? (
+                                    <span> — {t.detalle}</span>
+                                  ) : null}
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            "-"
+                          ))}
+
+                        {col.key === "detallesCosturaResumen" &&
+                          (costurasImpresion.length ? (
+                            <div className="pedido-print-costura-list">
+                              {costurasImpresion.map((d, index) => (
+                                <div
+                                  key={`${d.nombre}-${index}`}
+                                  className="pedido-print-costura-item"
+                                >
+                                  <strong>{d.nombre}:</strong> {d.valor}
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            "-"
+                          ))}
+
+                        {col.key === "cantidad" &&
+                          (p.totalTalles || p.cantidad || "-")}
+                      </td>
+                    ))}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </section>
+      </div>
 
       {/* 🔹 Acciones principales */}
       <div className="acciones-detalle">

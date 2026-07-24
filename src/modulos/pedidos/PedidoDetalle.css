@@ -1231,36 +1231,7 @@ padding-bottom:14px;
     width: 100% !important;
   }
 
-  .pedido-print-table th:nth-child(1),
-  .pedido-print-table td:nth-child(1) {
-    width: 13% !important; /* Producto */
-  }
 
-  .pedido-print-table th:nth-child(2),
-  .pedido-print-table td:nth-child(2) {
-    width: 16% !important; /* Observaciones */
-  }
-
-  .pedido-print-table th:nth-child(3),
-  .pedido-print-table td:nth-child(3) {
-    width: 31% !important; /* Talles */
-  }
-
-  .pedido-print-table th:nth-child(4),
-  .pedido-print-table td:nth-child(4) {
-    width: 22% !important; /* Costura */
-  }
-
-  .pedido-print-table th:nth-child(5),
-  .pedido-print-table td:nth-child(5) {
-    width: 13% !important; /* Detalle */
-  }
-
-  .pedido-print-table th:nth-child(6),
-  .pedido-print-table td:nth-child(6) {
-    width: 5% !important; /* Cantidad */
-    text-align: center !important;
-  }
 
   .pedido-print-table th,
   .pedido-print-table td {
@@ -1311,38 +1282,6 @@ padding-bottom:14px;
     padding: 5px !important;
   }
 
-  .pedido-print-col-producto {
-    width: 11% !important;
-  }
-
-  .pedido-print-col-color {
-    width: 7% !important;
-  }
-
-  .pedido-print-col-observaciones {
-    width: 13% !important;
-  }
-
-  .pedido-print-col-zonasResumen {
-    width: 15% !important;
-  }
-
-  .pedido-print-col-tallesResumen {
-    width: 26% !important;
-  }
-
-  .pedido-print-col-detallesCosturaResumen {
-    width: 17% !important;
-  }
-
-  .pedido-print-col-detalle {
-    width: 8% !important;
-  }
-
-  .pedido-print-col-cantidad {
-    width: 3% !important;
-    text-align: center !important;
-  }
 }
 
 .pedido-cliente-link {
@@ -1421,5 +1360,277 @@ padding-bottom:14px;
 @media (max-width: 600px) {
   .cliente-detalle-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+/* =====================================================
+   MEDIA PRINT - HEADER ORIGINAL DEL PEDIDO
+   Rama: mejora-media-print
+   ===================================================== */
+
+@media print {
+  .pedido-detalle > h1 {
+    margin: 0 0 10px !important;
+    color: #0096d1 !important;
+    font-size: 19px !important;
+    font-weight: 800 !important;
+    line-height: 1.2 !important;
+  }
+
+  .pedido-header-bar {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1.6fr) minmax(120px, 0.7fr) !important;
+    gap: 10px 20px !important;
+
+    margin: 0 0 15px !important;
+    padding: 15px 17px !important;
+
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 9px !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
+
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  .pedido-header-item {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    gap: 5px !important;
+    min-width: 0 !important;
+  }
+
+  .pedido-header-label {
+    flex: 0 0 auto !important;
+    margin: 0 !important;
+    color: #475569 !important;
+    font-size: 13px !important;
+    font-weight: 700 !important;
+    line-height: 1.25 !important;
+    white-space: nowrap !important;
+  }
+
+  .pedido-header-value {
+    display: inline-block !important;
+    flex: 0 1 auto !important;
+    margin: 0 !important;
+    color: #111827 !important;
+    font-size: 14px !important;
+    font-weight: 800 !important;
+    line-height: 1.25 !important;
+    white-space: nowrap !important;
+  }
+
+  .pedido-cliente-link {
+    display: inline-block !important;
+    visibility: visible !important;
+
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+
+    border: 0 !important;
+    background: transparent !important;
+    color: #111827 !important;
+
+    font-family: inherit !important;
+    font-size: 14px !important;
+    font-weight: 800 !important;
+    line-height: 1.25 !important;
+
+    text-align: left !important;
+    text-decoration: none !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+  }
+
+  .pedido-status-badge {
+    display: inline-flex !important;
+    align-items: center !important;
+
+    margin: 0 !important;
+    padding: 5px 10px !important;
+
+    border: 1px solid #94a3b8 !important;
+    border-radius: 999px !important;
+    background: #f8fafc !important;
+    color: #111827 !important;
+
+    font-size: 11px !important;
+    font-weight: 800 !important;
+    line-height: 1 !important;
+    white-space: nowrap !important;
+  }
+
+  .pedido-print-area {
+    margin-top: 0 !important;
+  }
+
+  .pedido-print-section-title {
+    margin: 0 0 6px !important;
+    color: #111827 !important;
+    font-size: 14px !important;
+    font-weight: 800 !important;
+  }
+
+  .pedido-print-table thead {
+    display: table-header-group !important;
+  }
+
+  .pedido-print-table tr {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+}
+
+@media print {
+  .pedido-print-col-portada {
+    width: 10% !important;
+    min-width: 66px !important;
+    max-width: 78px !important;
+    text-align: center !important;
+    vertical-align: middle !important;
+    overflow: hidden !important;
+  }
+
+  .pedido-print-table th.pedido-print-col-portada,
+  .pedido-print-table td.pedido-print-col-portada {
+    padding: 2px !important;
+  }
+
+  .pedido-print-portada-img {
+    display: block !important;
+
+    width: 65px !important;
+    height: 65px !important;
+    max-width: 65px !important;
+    max-height: 65px !important;
+
+    margin: 0 auto !important;
+
+    object-fit: cover !important;
+    object-position: center center !important;
+
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 4px !important;
+    background: #ffffff !important;
+
+    transform: scale(1.05) !important;
+    transform-origin: center center !important;
+  }
+}
+
+@media print {
+  .pedido-print-table {
+    width: 100% !important;
+    table-layout: fixed !important;
+  }
+
+  .pedido-print-table th {
+    font-size: 13px !important;
+    line-height: 1.25 !important;
+    padding: 6px 5px !important;
+    font-weight: 800 !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+    word-break: normal !important;
+  }
+
+  .pedido-print-table td {
+    min-width: 0 !important;
+    font-size: 13px !important;
+    line-height: 1.35 !important;
+    padding: 6px 5px !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+    word-break: normal !important;
+  }
+
+  .pedido-print-talles-list,
+  .pedido-print-costura-list {
+    min-width: 0 !important;
+    font-size: 13px !important;
+    line-height: 1.35 !important;
+  }
+
+  .pedido-print-col-cantidad {
+    text-align: center !important;
+    white-space: nowrap !important;
+  }
+
+  .pedido-print-col-producto,
+  .pedido-print-col-detalle,
+  .pedido-print-col-observaciones,
+  .pedido-print-col-zonasResumen,
+  .pedido-print-col-tallesResumen,
+  .pedido-print-col-detallesCosturaResumen {
+    min-width: 0 !important;
+    text-align: left !important;
+  }
+
+  .pedido-print-col-cantidad {
+  text-align: center !important;
+  white-space: nowrap !important;
+}
+.pedido-print-table th.pedido-print-col-cantidad {
+  overflow-wrap: normal !important;
+  word-break: keep-all !important;
+  white-space: nowrap !important;
+}
+}
+
+@media print {
+  .pedido-print-table th.pedido-print-col-cantidad {
+    min-width: 62px !important;
+    padding-left: 3px !important;
+    padding-right: 3px !important;
+    white-space: nowrap !important;
+    overflow-wrap: normal !important;
+    word-break: keep-all !important;
+    text-align: center !important;
+  }
+
+  .pedido-print-table td.pedido-print-col-cantidad {
+    white-space: nowrap !important;
+    text-align: center !important;
+  }
+}
+
+@media print {
+  .pedido-print-zonas-list {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 3px !important;
+    min-width: 0 !important;
+    font-size: 13px !important;
+    line-height: 1.35 !important;
+  }
+
+  .pedido-print-zona-item {
+    display: block !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    white-space: normal !important;
+    word-break: normal !important;
+    overflow-wrap: anywhere !important;
+  }
+
+  .pedido-print-zona-codigo {
+    font-weight: 800 !important;
+    white-space: nowrap !important;
+  }
+
+  .pedido-print-zona-valor {
+    font-weight: 400 !important;
+  }
+
+  .pedido-print-zona-separador {
+    font-weight: 400 !important;
+    color: #64748b !important;
+    white-space: nowrap !important;
   }
 }
