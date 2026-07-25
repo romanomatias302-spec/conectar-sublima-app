@@ -652,12 +652,15 @@ const descargarImagen = (url) => {
     const productoNombreFinal =
       formData.productoNombre || getProductoNombreById(formData.producto) || "";
 
-    const datosAGuardar = {
-      ...formData,
-      productoNombre: productoNombreFinal,
-      totalTalles,
-      clienteId: perfil?.clienteId || "",
-    };
+const ordenTallesActual = resolveTallesToRender();
+
+const datosAGuardar = {
+  ...formData,
+  productoNombre: productoNombreFinal,
+  totalTalles,
+  ordenTalles: ordenTallesActual,
+  clienteId: perfil?.clienteId || "",
+};
 
     setLoading(true);
     setError("");
@@ -1409,14 +1412,27 @@ const countZonas = (z) => {
         className="pfm-modal scrollable-modal"
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div className="pfm-header">
+      <div className="pfm-header">
+        <div className="pfm-header-title-wrap">
           <h2 className="pfm-title">
             {productoEditando
               ? modoVistaEstatica
-                ? "Detalle del Producto"
+                ? `Pedido #${
+                    pedido?.id ||
+                    pedido?.numeroPedido ||
+                    pedido?.visibleId ||
+                    "-"
+                  }`
                 : "Editar Producto"
               : "Agregar Producto"}
           </h2>
+
+          {modoVistaEstatica ? (
+            <div className="pfm-header-cliente">
+              {pedido?.cliente || "Cliente sin nombre"}
+            </div>
+          ) : null}
+        </div>
 
           {modoVistaEstatica && (
             <button

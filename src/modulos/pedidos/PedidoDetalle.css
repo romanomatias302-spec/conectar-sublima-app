@@ -1634,3 +1634,215 @@ padding-bottom:14px;
     white-space: nowrap !important;
   }
 }
+
+/* =====================================================
+   TABLA DETALLE PEDIDO - VISUAL DESKTOP CONTROLADA
+   No afecta Media Print ni Mobile
+   ===================================================== */
+
+@media (min-width: 769px) {
+  .tabla-productos-scroll {
+    width: 100%;
+    max-width: 100%;
+    max-height: 62vh;
+
+    overflow-x: auto;
+    overflow-y: auto;
+
+    border: 1px solid #d7dee8;
+    border-radius: 10px;
+  }
+
+  .tabla-productos-desktop {
+    width: 100%;
+
+    /*
+     * Con pocas columnas ocupa todo el contenedor.
+     * Con muchas columnas habilita un scroll razonable.
+     */
+    min-width: max(
+      100%,
+      calc(var(--cantidad-columnas, 6) * 145px)
+    );
+
+    table-layout: fixed;
+    border-collapse: collapse;
+  }
+
+  .tabla-productos-desktop th,
+  .tabla-productos-desktop td {
+    min-width: 0;
+    max-width: none;
+
+    border-right: 1px solid #edf1f5;
+    border-bottom: 1px solid #edf1f5;
+
+    overflow: hidden;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: normal;
+  }
+
+  .tabla-productos-desktop th:last-child,
+  .tabla-productos-desktop td:last-child {
+    border-right: none;
+  }
+
+.tabla-productos-desktop thead th {
+  padding: 10px 9px;
+  text-align: center;
+  vertical-align: middle;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+  .tabla-productos-desktop tbody td {
+    padding: 10px 9px;
+
+    vertical-align: top;
+
+    font-size: 13px;
+    line-height: 1.35;
+  }
+
+  /*
+   * Columnas compactas.
+   * Las columnas de texto restantes comparten el espacio disponible.
+   */
+
+ .tabla-productos-desktop .tabla-col-imagenesResumen {
+  width: 92px;
+  min-width: 92px;
+  max-width: 92px;
+  text-align: center;
+}
+
+  .tabla-productos-desktop .tabla-col-cantidad {
+    width: 76px;
+    min-width: 76px;
+    max-width: 76px;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  .tabla-productos-desktop .tabla-col-acciones {
+    width: 60px;
+    min-width: 60px;
+    max-width: 60px;
+    text-align: center;
+  }
+
+  .tabla-productos-desktop .tabla-col-color {
+    width: 90px;
+  }
+
+  /*
+   * Sobrescribe los mínimos históricos de 320/340px y 220px.
+   */
+
+  .tabla-productos-desktop .td-talles-resumen,
+  .tabla-productos-desktop .td-costura-resumen {
+    min-width: 0 !important;
+    max-width: none !important;
+    white-space: normal;
+    vertical-align: top;
+  }
+
+  /*
+   * Detalle, Observaciones y Zonas:
+   * hasta cuatro líneas y texto completo disponible con hover.
+   */
+
+  .celda-texto-controlado {
+    display: -webkit-box;
+
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+
+    overflow: hidden;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: normal;
+
+    line-height: 1.35;
+
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 4;
+  }
+
+  /*
+   * Talles no debe ensanchar la tabla.
+   */
+
+  .tabla-productos-desktop .detalle-talles-resumen {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .tabla-productos-desktop .detalle-talle-chip {
+    max-width: 100%;
+  }
+
+  /*
+   * Costura puede ocupar varias líneas.
+   * Actualmente el CSS anterior usa nowrap + ellipsis.
+   */
+
+  .tabla-productos-desktop .detalle-costura-resumen {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .tabla-productos-desktop .detalle-costura-item {
+    min-width: 0;
+    max-width: 100%;
+
+    overflow: visible;
+    text-overflow: initial;
+
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: normal;
+  }
+}
+
+.tabla-productos-desktop .detalle-costura-item {
+  font-size: 13px;
+  line-height: 1.35;
+}
+.tabla-productos-desktop .detalle-costura-nombre {
+  font-weight: 800;
+}
+
+.celda-texto-controlado {
+  display: -webkit-box;
+
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+
+  overflow: hidden;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: normal;
+
+  line-height: 1.35;
+  max-height: calc(1.35em * 4);
+
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+}
+
+@media print {
+  .pedido-print-talle-cantidad {
+    white-space: nowrap !important;
+    font-weight: 600 !important;
+  }
+}

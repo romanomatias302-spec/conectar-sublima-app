@@ -42,6 +42,7 @@ export default function PedidoDetalle({
   const [clienteDetalle, setClienteDetalle] = useState(null);
 const [mostrandoClienteDetalle, setMostrandoClienteDetalle] = useState(false);
 
+
   const esAdmin = perfil?.rol === "admin" || perfil?.rol === "superadmin";
   const puedeEditarPedidos = puedeHacer(perfil, "pedidos", "editar");
 
@@ -180,30 +181,53 @@ const resumirZonas = (producto) => {
     : "-";
 };
 
-  const resumirTalles = (producto) => {
-    const talles = producto?.talles || {};
-    const detallePorTalle = producto?.detallePorTalle || {};
+const resumirTalles = (producto) => {
+  const talles = producto?.talles || {};
+  const detallePorTalle = producto?.detallePorTalle || {};
 
-const usados = Object.entries(talles)
-  .filter(([talle, cantidad]) => {
-    const qty = Number(cantidad) || 0;
-    const detalle = String(detallePorTalle[talle] || "").trim();
-    return qty > 0 || detalle !== "";
-  })
-  .map(([talle, cantidad]) => {
-    const qty = Number(cantidad) || 0;
-    const detalle = String(detallePorTalle[talle] || "").trim();
+  const ordenTalles = Array.isArray(producto?.ordenTalles)
+    ? producto.ordenTalles
+    : [];
 
-    return {
-      talle,
-      qty,
-      detalle,
-    };
-  });
+  const indiceOrden = new Map(
+    ordenTalles.map((talle, index) => [talle, index])
+  );
 
-return usados.length ? usados : [];
+  const usados = Object.entries(talles)
+    .filter(([talle, cantidad]) => {
+      const qty = Number(cantidad) || 0;
+      const detalle = String(detallePorTalle[talle] || "").trim();
 
-  };
+      return qty > 0 || detalle !== "";
+    })
+    .map(([talle, cantidad]) => {
+      const qty = Number(cantidad) || 0;
+      const detalle = String(detallePorTalle[talle] || "").trim();
+
+      return {
+        talle,
+        qty,
+        detalle,
+      };
+    })
+    .sort((a, b) => {
+      const indiceA = indiceOrden.has(a.talle)
+        ? indiceOrden.get(a.talle)
+        : Number.MAX_SAFE_INTEGER;
+
+      const indiceB = indiceOrden.has(b.talle)
+        ? indiceOrden.get(b.talle)
+        : Number.MAX_SAFE_INTEGER;
+
+      if (indiceA !== indiceB) {
+        return indiceA - indiceB;
+      }
+
+      return 0;
+    });
+
+  return usados;
+};
 
   const manejarCrearVentaDesdePedido = () => {
   if (!pedido?.firebaseId) return;
@@ -317,14 +341,44 @@ return usados.length ? usados : [];
       case "color":
         return producto.color || "-";
 
-      case "detalle":
-        return <div className="celda-texto-resumen">{producto.detalle || "-"}</div>;
+case "detalle": {
+  const detalle = producto?.detalle || "-";
 
-      case "observaciones":
-        return <div className="celda-texto-resumen">{obtenerObservaciones(producto)}</div>;
+  return (
+    <div
+      className="celda-texto-controlado"
+      title={detalle !== "-" ? detalle : ""}
+    >
+      {detalle}
+    </div>
+  );
+}
 
-      case "zonasResumen":
-        return <div className="celda-texto-resumen">{resumirZonas(producto)}</div>;
+case "observaciones": {
+  const observaciones = obtenerObservaciones(producto);
+
+  return (
+    <div
+      className="celda-texto-controlado"
+      title={observaciones !== "-" ? observaciones : ""}
+    >
+      {observaciones}
+    </div>
+  );
+}
+
+case "zonasResumen": {
+  const zonas = resumirZonas(producto);
+
+  return (
+    <div
+      className="celda-texto-controlado"
+      title={zonas !== "-" ? zonas : ""}
+    >
+      {zonas}
+    </div>
+  );
+}
 
 case "tallesResumen": {
   const talles = resumirTalles(producto);
@@ -351,9 +405,7 @@ case "tallesResumen": {
             ) : null}
           </span>
 
-          {index < talles.length - 1 ? (
-            <span className="detalle-talle-divider">|</span>
-          ) : null}
+
         </React.Fragment>
       ))}
     </div>
@@ -909,15 +961,18 @@ if (!pedido) {
                             >
                               {tallesImpresion.map((t, index) => (
                                 <div
-                                  key={`${t.talle}-${index}`}
-                                  className="pedido-print-talle-item"
-                                >
-                                  <strong>{t.talle}:</strong> {t.qty}
+                                key={`${t.talle}-${index}`}
+                                className="pedido-print-talle-item"
+                              >
+                                <strong>{t.talle}:</strong>{" "}
+                                <span className="pedido-print-talle-cantidad">
+                                  ({t.qty} uni.)
+                                </span>
 
-                                  {t.detalle ? (
-                                    <span> — {t.detalle}</span>
-                                  ) : null}
-                                </div>
+                                {t.detalle ? (
+                                  <span> — {t.detalle}</span>
+                                ) : null}
+                              </div>
                               ))}
                             </div>
                           ) : (
@@ -1105,11 +1160,24 @@ if (!pedido) {
   <>
     {/* 🔹 Tabla de productos */}
     <div className="tabla-productos-scroll">
-    <table className="tabla-productos tabla-productos-desktop">
+    <table
+      className="tabla-productos tabla-productos-desktop"
+      style={{
+        "--cantidad-columnas": columnasVisibles.length,
+      }}
+    >
         <thead>
           <tr>
             {columnasVisibles.map((col) => (
-              <th key={col.key}>{col.label}</th>
+              <th
+                key={col.key}
+                className={[
+                  "tabla-col",
+                  `tabla-col-${col.key}`,
+                ].join(" ")}
+              >
+                {col.label}
+              </th>
             ))}
           </tr>
         </thead>
@@ -1131,13 +1199,15 @@ if (!pedido) {
               {columnasVisibles.map((col) => (
                 <td
                   key={col.key}
-                  className={[
-                    col.key === "imagenesResumen" ? "td-imagenes-resumen" : "",
-                    col.key === "tallesResumen" ? "td-talles-resumen" : "",
-                    col.key === "detallesCosturaResumen" ? "td-costura-resumen" : "",
-                    col.key === "cantidad" ? "td-cantidad" : "",
-                    col.key === "acciones" ? "td-acciones" : "",
-                  ].join(" ").trim()}
+                    className={[
+                      "tabla-col",
+                      `tabla-col-${col.key}`,
+                      col.key === "imagenesResumen" ? "td-imagenes-resumen" : "",
+                      col.key === "tallesResumen" ? "td-talles-resumen" : "",
+                      col.key === "detallesCosturaResumen" ? "td-costura-resumen" : "",
+                      col.key === "cantidad" ? "td-cantidad" : "",
+                      col.key === "acciones" ? "td-acciones" : "",
+                    ].join(" ").trim()}
                   onClick={col.key === "acciones" ? (e) => e.stopPropagation() : undefined}
                 >
                   {renderCeldaProducto(p, col.key)}

@@ -1884,6 +1884,22 @@ body.dark-mode .pfm-producto-search-option:hover {
   }
 }
 
+.pfm-header-title-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
 
+.pfm-header-cliente {
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 
