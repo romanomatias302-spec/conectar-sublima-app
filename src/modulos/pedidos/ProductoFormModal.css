@@ -1903,3 +1903,639 @@ body.dark-mode .pfm-producto-search-option:hover {
 }
 
 
+/* =========================================================
+   SELECTOR DE FORMATO - PRODUCTO
+   ========================================================= */
+
+.pfm-print-format-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 110000;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 16px;
+  background: rgba(15, 23, 42, 0.52);
+}
+
+.pfm-print-format-modal {
+  width: min(460px, 96vw);
+  padding: 18px;
+
+  border: 1px solid #dbe3ec;
+  border-radius: 16px;
+  background: #ffffff;
+
+  box-shadow: 0 22px 60px rgba(15, 23, 42, 0.28);
+}
+
+.pfm-print-format-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+
+  margin-bottom: 18px;
+}
+
+.pfm-print-format-header h3 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.pfm-print-format-header p {
+  margin: 4px 0 0;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.pfm-print-format-close {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+
+  border: 0;
+  border-radius: 10px;
+  background: #f1f5f9;
+  color: #475569;
+
+  cursor: pointer;
+  font-weight: 900;
+}
+
+.pfm-print-format-field {
+  display: grid;
+  gap: 6px;
+}
+
+.pfm-print-format-field label {
+  color: #334155;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.pfm-print-format-field select,
+.pfm-print-format-field input {
+  width: 100%;
+  min-height: 42px;
+
+  padding: 9px 11px;
+
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #0f172a;
+
+  font-size: 14px;
+  outline: none;
+}
+
+.pfm-print-format-field select:focus,
+.pfm-print-format-field input:focus {
+  border-color: #0096d1;
+  box-shadow: 0 0 0 3px rgba(0, 150, 209, 0.12);
+}
+
+.pfm-print-format-medidas {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+
+  margin-top: 14px;
+}
+
+.pfm-print-format-medida {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 7px;
+}
+
+.pfm-print-format-medida span {
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.pfm-print-format-info {
+  margin-top: 14px;
+  padding: 10px 12px;
+
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  background: #eff6ff;
+  color: #1e3a8a;
+
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.pfm-print-format-error {
+  margin-top: 12px;
+  padding: 10px 12px;
+
+  border: 1px solid rgba(220, 38, 38, 0.28);
+  border-radius: 10px;
+  background: rgba(220, 38, 38, 0.08);
+  color: #b91c1c;
+
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.pfm-print-format-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+
+  margin-top: 18px;
+}
+
+.pfm-print-format-actions button {
+  min-height: 40px;
+  padding: 9px 13px;
+
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.pfm-print-format-cancelar {
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+}
+
+.pfm-print-format-confirmar {
+  border: 1px solid #0096d1;
+  background: #0096d1;
+  color: #ffffff;
+}
+
+body.dark-mode .pfm-print-format-modal {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: #252525;
+}
+
+body.dark-mode .pfm-print-format-header h3,
+body.dark-mode .pfm-print-format-field label {
+  color: #f1f5f9;
+}
+
+body.dark-mode .pfm-print-format-header p {
+  color: #cbd5e1;
+}
+
+body.dark-mode .pfm-print-format-field select,
+body.dark-mode .pfm-print-format-field input {
+  border-color: rgba(255, 255, 255, 0.16);
+  background: #1f1f1f;
+  color: #f1f5f9;
+}
+
+body.dark-mode .pfm-print-format-close {
+  background: #333333;
+  color: #e5e7eb;
+}
+
+@media (max-width: 520px) {
+  .pfm-print-format-medidas {
+    grid-template-columns: 1fr;
+  }
+
+  .pfm-print-format-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* =========================================================
+   TICKET INDIVIDUAL DEL PRODUCTO
+   ========================================================= */
+
+.pfm-producto-ticket-print {
+  display: none;
+}
+
+@media print {
+  /*
+   * El ticket debe ocultar toda la ficha A4 y la interfaz.
+   */
+
+  body.printing-producto-ticket .pfm-header,
+  body.printing-producto-ticket .pfm-static,
+  body.printing-producto-ticket .pfm-actions,
+  body.printing-producto-ticket .pfm-print-format-overlay,
+  body.printing-producto-ticket .pfm-image-preview-overlay {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  body.printing-producto-ticket .pfm-overlay {
+    display: block !important;
+    position: static !important;
+
+    margin: 0 !important;
+    padding: 0 !important;
+
+    background: #ffffff !important;
+  }
+
+  body.printing-producto-ticket .pfm-modal {
+    display: block !important;
+    position: static !important;
+
+    width: 100% !important;
+    max-width: none !important;
+    max-height: none !important;
+
+    margin: 0 !important;
+    padding: 0 !important;
+
+    overflow: visible !important;
+
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
+
+    color: #000000 !important;
+  }
+
+  body.printing-producto-ticket .pfm-producto-ticket-print,
+  body.printing-producto-ticket .pfm-producto-ticket-print * {
+    visibility: visible !important;
+  }
+
+  body.printing-producto-ticket .pfm-producto-ticket-print {
+    display: block !important;
+
+    width: 100% !important;
+    max-width: 100% !important;
+
+    margin: 0 !important;
+    padding: 0 !important;
+
+    background: #ffffff !important;
+    color: #000000 !important;
+
+    font-family: Arial, Helvetica, sans-serif !important;
+  }
+
+  body.printing-producto-ticket
+    .pfm-producto-ticket-header {
+    text-align: center !important;
+
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  body.printing-producto-ticket
+    .pfm-producto-ticket-pedido {
+    font-size: 17px !important;
+    font-weight: 900 !important;
+    line-height: 1.15 !important;
+  }
+
+  body.printing-producto-ticket
+    .pfm-producto-ticket-cliente {
+    margin-top: 3px !important;
+
+    font-size: 14px !important;
+    font-weight: 800 !important;
+    line-height: 1.2 !important;
+
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+  }
+
+  body.printing-producto-ticket
+    .pfm-producto-ticket-entrega {
+    margin-top: 3px !important;
+
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    line-height: 1.2 !important;
+  }
+
+  body.printing-producto-ticket
+    .pfm-producto-ticket-separador {
+    width: 100% !important;
+    height: 0 !important;
+
+    margin: 7px 0 !important;
+
+    border-top: 1px dashed #000000 !important;
+  }
+
+  body.printing-producto-ticket
+    .pfm-producto-ticket-nombre {
+    text-align: center !important;
+
+    font-size: 16px !important;
+    font-weight: 900 !important;
+    line-height: 1.2 !important;
+
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+  }
+
+  body.printing-producto-ticket
+    .pfm-producto-ticket-cantidad-total {
+    display: flex !important;
+    align-items: baseline !important;
+    justify-content: space-between !important;
+    gap: 8px !important;
+
+    margin-top: 5px !important;
+
+    font-size: 13px !important;
+    font-weight: 800 !important;
+    line-height: 1.2 !important;
+  }
+
+  body.printing-producto-ticket
+    .pfm-producto-ticket-cantidad-total strong {
+    white-space: nowrap !important;
+    font-size: 15px !important;
+    font-weight: 900 !important;
+  }
+
+body.printing-producto-ticket
+  .pfm-producto-ticket-talles-title {
+  margin-bottom: 4px !important;
+
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  line-height: 1.15 !important;
+  text-transform: uppercase !important;
+}
+
+  body.printing-producto-ticket
+  .pfm-producto-ticket-talles {
+  display: grid !important;
+  gap: 3px 8px !important;
+}
+
+body.printing-producto-ticket
+  .pfm-producto-ticket-print-cols-1
+  .pfm-producto-ticket-talles {
+  grid-template-columns: 1fr !important;
+}
+
+body.printing-producto-ticket
+  .pfm-producto-ticket-print-cols-2
+  .pfm-producto-ticket-talles {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+}
+
+body.printing-producto-ticket
+  .pfm-producto-ticket-print-cols-3
+  .pfm-producto-ticket-talles {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+
+body.printing-producto-ticket
+  .pfm-producto-ticket-talle {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  align-items: baseline !important;
+  gap: 4px !important;
+
+  min-width: 0 !important;
+
+  font-size: 11px !important;
+  line-height: 1.15 !important;
+
+  break-inside: avoid !important;
+  page-break-inside: avoid !important;
+}
+
+body.printing-producto-ticket
+  .pfm-producto-ticket-talle span {
+  min-width: 0 !important;
+  font-weight: 500 !important;
+
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+body.printing-producto-ticket
+  .pfm-producto-ticket-talle strong {
+  white-space: nowrap !important;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+}
+
+body.printing-producto-ticket
+  .pfm-producto-ticket-restantes {
+  margin-top: 4px !important;
+
+  text-align: center !important;
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  line-height: 1.15 !important;
+}
+}
+
+/*
+ * En rollos muy angostos dejamos los talles en una columna.
+ */
+@media print {
+  body.printing-producto-ticket
+    .pfm-producto-ticket-print {
+    container-type: inline-size;
+  }
+
+  @container (max-width: 65mm) {
+    .pfm-producto-ticket-talles {
+      grid-template-columns: 1fr !important;
+    }
+  }
+}
+
+/* =========================================================
+   FIX AISLAMIENTO TICKET INDIVIDUAL
+   Evita imprimir el PedidoDetalle A4 que está detrás del modal
+   ========================================================= */
+
+@media print {
+  /*
+   * ProductoFormModal está renderizado dentro de PedidoDetalle.
+   * Ocultamos todos los hijos de PedidoDetalle excepto el modal.
+   */
+  body.printing-producto-ticket
+    .pedido-detalle
+    > *:not(.pfm-overlay) {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  body.printing-producto-ticket .pedido-detalle {
+    position: static !important;
+    left: auto !important;
+    top: auto !important;
+
+    width: 100% !important;
+    max-width: none !important;
+
+    margin: 0 !important;
+    padding: 0 !important;
+
+    background: #ffffff !important;
+    box-shadow: none !important;
+  }
+
+  /*
+   * Restauramos únicamente el contenedor del modal.
+   */
+  body.printing-producto-ticket .pfm-overlay {
+    display: block !important;
+    visibility: visible !important;
+
+    position: static !important;
+    inset: auto !important;
+
+    width: 100% !important;
+    min-height: 0 !important;
+
+    margin: 0 !important;
+    padding: 0 !important;
+
+    background: #ffffff !important;
+  }
+
+  body.printing-producto-ticket .pfm-overlay,
+  body.printing-producto-ticket .pfm-overlay * {
+    visibility: visible !important;
+  }
+
+  /*
+   * Ocultamos nuevamente todo lo interno del modal
+   * excepto la plantilla específica del ticket.
+   */
+  body.printing-producto-ticket .pfm-modal > * {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  body.printing-producto-ticket
+    .pfm-modal
+    > .pfm-producto-ticket-print {
+    display: block !important;
+    visibility: visible !important;
+  }
+
+  body.printing-producto-ticket
+    .pfm-producto-ticket-print,
+  body.printing-producto-ticket
+    .pfm-producto-ticket-print * {
+    visibility: visible !important;
+  }
+}
+
+/* =========================================================
+   AJUSTE FINAL - TALLES EN TICKET INDIVIDUAL
+   ========================================================= */
+
+@media print {
+  body.printing-producto-ticket
+    .pfm-producto-ticket-talles {
+    display: grid !important;
+
+    row-gap: 4px !important;
+    column-gap: 18px !important;
+
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  body.printing-producto-ticket
+    .pfm-producto-ticket-print-cols-1
+    .pfm-producto-ticket-talles {
+    grid-template-columns: 1fr !important;
+  }
+
+  body.printing-producto-ticket
+    .pfm-producto-ticket-print-cols-2
+    .pfm-producto-ticket-talles {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  body.printing-producto-ticket
+    .pfm-producto-ticket-print-cols-3
+    .pfm-producto-ticket-talles {
+    grid-template-columns:
+      repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  body.printing-producto-ticket
+    .pfm-producto-ticket-talle {
+    display: flex !important;
+    align-items: baseline !important;
+    justify-content: flex-start !important;
+
+    gap: 5px !important;
+    min-width: 0 !important;
+
+    font-size: 10.5px !important;
+    line-height: 1.1 !important;
+  }
+
+  body.printing-producto-ticket
+    .pfm-producto-ticket-talle-nombre {
+    flex: 0 1 auto !important;
+    min-width: 0 !important;
+
+    font-weight: 800 !important;
+
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  body.printing-producto-ticket
+    .pfm-producto-ticket-talle-cantidad {
+    flex: 0 0 auto !important;
+
+    font-weight: 400 !important;
+    white-space: nowrap !important;
+  }
+
+  body.printing-producto-ticket
+    .pfm-producto-ticket-talles-title {
+    margin-bottom: 4px !important;
+
+    font-size: 10.5px !important;
+    line-height: 1.1 !important;
+  }
+
+  body.printing-producto-ticket
+    .pfm-producto-ticket-restantes {
+    margin-top: 5px !important;
+
+    font-size: 9.5px !important;
+    font-weight: 700 !important;
+    line-height: 1.1 !important;
+  }
+}
+
+@media print {
+  body.printing-producto-ticket
+    .pfm-producto-ticket-talle
+    .pfm-producto-ticket-talle-nombre {
+    font-weight: 900 !important;
+  }
+
+  body.printing-producto-ticket
+    .pfm-producto-ticket-talle
+    .pfm-producto-ticket-talle-cantidad {
+    font-weight: 400 !important;
+  }
+}

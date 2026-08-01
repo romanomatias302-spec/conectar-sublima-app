@@ -22,6 +22,44 @@ limit,
 } from "firebase/firestore";
 
 
+const FORMATOS_IMPRESION = {
+  a4: {
+    label: "A4",
+    tipo: "a4",
+    ancho: 210,
+    alto: 297,
+  },
+
+  ticket58: {
+    label: "Ticket 58 × 100 mm",
+    tipo: "ticket",
+    ancho: 58,
+    alto: 100,
+  },
+
+  ticket80: {
+    label: "Ticket 80 × 100 mm",
+    tipo: "ticket",
+    ancho: 80,
+    alto: 100,
+  },
+
+  ticket100: {
+    label: "Ticket 100 × 100 mm",
+    tipo: "ticket",
+    ancho: 100,
+    alto: 100,
+  },
+
+  personalizado: {
+    label: "Formato personalizado",
+    tipo: "ticket",
+    ancho: 100,
+    alto: 100,
+  },
+};
+
+
 export default function PedidoDetalle({
   pedido,
   onVolver,
@@ -41,6 +79,11 @@ export default function PedidoDetalle({
   const [imagenPreviewTabla, setImagenPreviewTabla] = useState(null);
   const [clienteDetalle, setClienteDetalle] = useState(null);
 const [mostrandoClienteDetalle, setMostrandoClienteDetalle] = useState(false);
+const [mostrarModalImpresion, setMostrarModalImpresion] = useState(false);
+const [formatoImpresion, setFormatoImpresion] = useState("a4");
+const [anchoPersonalizado, setAnchoPersonalizado] = useState(100);
+const [altoPersonalizado, setAltoPersonalizado] = useState(100);
+const [errorImpresion, setErrorImpresion] = useState("");
 
 
   const esAdmin = perfil?.rol === "admin" || perfil?.rol === "superadmin";
@@ -116,14 +159,24 @@ useEffect(() => {
 useEffect(() => {
   const tituloOriginal = document.title;
 
-  const restaurarTitulo = () => {
+  const limpiarImpresion = () => {
     document.title = tituloOriginal;
+
+    document.body.classList.remove(
+      "printing-pedido-a4",
+      "printing-pedido-ticket"
+    );
+
+    document
+      .getElementById("zalfro-pedido-print-size")
+      ?.remove();
   };
 
-  window.addEventListener("afterprint", restaurarTitulo);
+  window.addEventListener("afterprint", limpiarImpresion);
 
   return () => {
-    window.removeEventListener("afterprint", restaurarTitulo);
+    window.removeEventListener("afterprint", limpiarImpresion);
+    limpiarImpresion();
   };
 }, []);
 
@@ -701,7 +754,213 @@ const anchosColumnasImpresion =
     {}
   );
 
-  
+const obtenerCantidadProducto = (producto) => {
+  const totalTalles = Number(producto?.totalTalles) || 0;
+  const cantidad = Number(producto?.cantidad) || 0;
+
+  return totalTalles > 0 ? totalTalles : cantidad;
+};
+
+const cantidadTotalPedido = productos.reduce(
+  (total, producto) => total + obtenerCantidadProducto(producto),
+  0
+);
+
+const obtenerNombreProducto = (producto) =>
+  String(
+    producto?.productoNombre ||
+      producto?.producto ||
+      "Producto"
+  ).trim();
+
+const obtenerLimiteLineasTicket = (anchoMm, altoMm) => {
+  const ancho = Number(anchoMm) || 100;
+  const alto = Number(altoMm) || 100;
+
+  /*
+   * Espacio reservado para:
+   * pedido, cliente, entrega, separadores y cantidad total.
+   */
+  const altoUtil = Math.max(alto - 40, 20);
+
+  let altoPorLinea = 5.8;
+  let limiteMaximo = 16;
+
+  if (ancho <= 60) {
+    altoPorLinea = 5.9;
+    limiteMaximo = 10;
+  } else if (ancho <= 80) {
+    altoPorLinea = 5.8;
+    limiteMaximo = 12;
+  }
+
+  const lineasPorAlto = Math.floor(
+    altoUtil / altoPorLinea
+  );
+
+  return Math.max(
+    3,
+    Math.min(lineasPorAlto, limiteMaximo)
+  );
+};
+
+const estimarLineasProductoTicket = (producto, anchoMm) => {
+  const nombre = obtenerNombreProducto(producto);
+
+  let caracteresPorLinea = 30;
+
+  if (Number(anchoMm) <= 60) {
+    caracteresPorLinea = 18;
+  } else if (Number(anchoMm) <= 80) {
+    caracteresPorLinea = 24;
+  }
+
+  return Math.max(
+    1,
+    Math.ceil(nombre.length / caracteresPorLinea)
+  );
+};
+
+const obtenerProductosTicket = (anchoMm, altoMm) => {
+  const limiteLineas = obtenerLimiteLineasTicket(
+    anchoMm,
+    altoMm
+  );
+
+  const visibles = [];
+  let lineasOcupadas = 0;
+
+  for (const producto of productos) {
+    const lineasProducto = estimarLineasProductoTicket(
+      producto,
+      anchoMm
+    );
+
+    if (
+      visibles.length > 0 &&
+      lineasOcupadas + lineasProducto > limiteLineas
+    ) {
+      break;
+    }
+
+    visibles.push(producto);
+    lineasOcupadas += lineasProducto;
+  }
+
+  return {
+    visibles,
+    restantes: Math.max(
+      productos.length - visibles.length,
+      0
+    ),
+  };
+};
+
+const formatoSeleccionado =
+  FORMATOS_IMPRESION[formatoImpresion] ||
+  FORMATOS_IMPRESION.a4;
+
+const medidasTicket =
+  formatoImpresion === "personalizado"
+    ? {
+        ancho: Number(anchoPersonalizado),
+        alto: Number(altoPersonalizado),
+      }
+    : {
+        ancho: formatoSeleccionado.ancho,
+        alto: formatoSeleccionado.alto,
+      };
+
+const resumenProductosTicket = obtenerProductosTicket(
+  medidasTicket.ancho,
+  medidasTicket.alto
+);
+
+const abrirSelectorImpresion = () => {
+  setFormatoImpresion("a4");
+  setErrorImpresion("");
+  setMostrarModalImpresion(true);
+};
+
+const cerrarSelectorImpresion = () => {
+  setMostrarModalImpresion(false);
+  setErrorImpresion("");
+};
+
+const confirmarImpresion = () => {
+  const cliente =
+    pedido?.cliente
+      ?.replace(/[\\/:*?"<>|]/g, "")
+      ?.trim() || "Cliente";
+
+  const numeroPedido =
+    pedido?.id ||
+    pedido?.numeroPedido ||
+    pedido?.visibleId ||
+    "Pedido";
+
+  document.body.classList.remove(
+    "printing-pedido-a4",
+    "printing-pedido-ticket"
+  );
+
+  document
+    .getElementById("zalfro-pedido-print-size")
+    ?.remove();
+
+  if (formatoImpresion === "a4") {
+    document.title = `Pedido ${numeroPedido} - ${cliente}`;
+    document.body.classList.add("printing-pedido-a4");
+
+    setMostrarModalImpresion(false);
+
+    requestAnimationFrame(() => {
+      window.print();
+    });
+
+    return;
+  }
+
+  const ancho = Number(medidasTicket.ancho);
+  const alto = Number(medidasTicket.alto);
+
+  if (!Number.isFinite(ancho) || ancho < 40 || ancho > 300) {
+    setErrorImpresion(
+      "El ancho debe estar entre 40 y 300 mm."
+    );
+    return;
+  }
+
+  if (!Number.isFinite(alto) || alto < 40 || alto > 1000) {
+    setErrorImpresion(
+      "El alto debe estar entre 40 y 1000 mm."
+    );
+    return;
+  }
+
+  const printStyle = document.createElement("style");
+
+  printStyle.id = "zalfro-pedido-print-size";
+  printStyle.innerHTML = `
+    @media print {
+      @page {
+        size: ${ancho}mm ${alto}mm;
+        margin: 3mm;
+      }
+    }
+  `;
+
+  document.head.appendChild(printStyle);
+
+  document.title = `Ticket Pedido ${numeroPedido} - ${cliente}`;
+  document.body.classList.add("printing-pedido-ticket");
+
+  setMostrarModalImpresion(false);
+
+  requestAnimationFrame(() => {
+    window.print();
+  });
+}; 
 
 if (!pedido) {
   return null;
@@ -1007,6 +1266,62 @@ if (!pedido) {
         </section>
       </div>
 
+      {/* Área exclusiva para impresión ticket */}
+        <div className="pedido-ticket-print-area">
+          <div className="pedido-ticket-header">
+            <div className="pedido-ticket-numero">
+              Pedido #
+              {pedido?.id ||
+                pedido?.numeroPedido ||
+                pedido?.visibleId ||
+                "-"}
+            </div>
+
+            <div className="pedido-ticket-cliente">
+              {pedido?.cliente || "Cliente sin nombre"}
+            </div>
+
+            <div className="pedido-ticket-entrega">
+              Entrega: {pedido?.fechaEntrega || "-"}
+            </div>
+          </div>
+
+          <div className="pedido-ticket-separador" />
+
+          <div className="pedido-ticket-productos">
+            {resumenProductosTicket.visibles.map((producto) => (
+              <div
+                key={producto.id}
+                className="pedido-ticket-producto"
+              >
+                <span className="pedido-ticket-producto-nombre">
+                  {obtenerNombreProducto(producto)}
+                </span>
+
+                <strong className="pedido-ticket-producto-cantidad">
+                  {obtenerCantidadProducto(producto)} uni.
+                </strong>
+              </div>
+            ))}
+
+            {resumenProductosTicket.restantes > 0 ? (
+              <div className="pedido-ticket-restantes">
+                + {resumenProductosTicket.restantes}{" "}
+                {resumenProductosTicket.restantes === 1
+                  ? "producto más"
+                  : "productos más"}
+              </div>
+            ) : null}
+          </div>
+
+          <div className="pedido-ticket-separador" />
+
+          <div className="pedido-ticket-total">
+            <span>Cantidad total</span>
+            <strong>{cantidadTotalPedido} uni.</strong>
+          </div>
+        </div>
+
       {/* 🔹 Acciones principales */}
       <div className="acciones-detalle">
         {puedeEditarPedidos && (
@@ -1025,28 +1340,13 @@ if (!pedido) {
           </button>
         )}
 
-      <button
-        className="btn-imprimir-pedido"
-        type="button"
-        onClick={() => {
-          const cliente =
-            pedido?.cliente
-              ?.replace(/[\\/:*?"<>|]/g, "")
-              ?.trim() || "Cliente";
-
-          const numeroPedido =
-            pedido?.id ||
-            pedido?.numeroPedido ||
-            pedido?.visibleId ||
-            "Pedido";
-
-          document.title = `Pedido ${numeroPedido} - ${cliente}`;
-
-          window.print();
-        }}
-      >
-        Imprimir Detalle
-      </button>
+        <button
+          className="btn-imprimir-pedido"
+          type="button"
+          onClick={abrirSelectorImpresion}
+        >
+          Imprimir Detalle
+        </button>
 
         <button className="btn-volver" onClick={onVolver}>
           Volver
@@ -1340,6 +1640,132 @@ if (!pedido) {
               <span>Provincia</span>
               <strong>{clienteDetalle?.provincia || "-"}</strong>
             </div>
+          </div>
+        </div>
+      </div>
+
+    )}
+
+    {mostrarModalImpresion && (
+      <div
+        className="pedido-print-modal-overlay"
+        onMouseDown={cerrarSelectorImpresion}
+      >
+        <div
+          className="pedido-print-modal"
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <div className="pedido-print-modal-header">
+            <div>
+              <h3>Imprimir detalle</h3>
+              <p>Elegí el formato de papel.</p>
+            </div>
+
+            <button
+              type="button"
+              className="pedido-print-modal-close"
+              onClick={cerrarSelectorImpresion}
+              aria-label="Cerrar"
+            >
+              ✕
+            </button>
+          </div>
+
+          <div className="pedido-print-modal-field">
+            <label htmlFor="formato-impresion-pedido">
+              Formato
+            </label>
+
+            <select
+              id="formato-impresion-pedido"
+              value={formatoImpresion}
+              onChange={(e) => {
+                setFormatoImpresion(e.target.value);
+                setErrorImpresion("");
+              }}
+            >
+              {Object.entries(FORMATOS_IMPRESION).map(
+                ([value, formato]) => (
+                  <option key={value} value={value}>
+                    {formato.label}
+                  </option>
+                )
+              )}
+            </select>
+          </div>
+
+          {formatoImpresion === "personalizado" ? (
+            <div className="pedido-print-medidas-grid">
+              <div className="pedido-print-modal-field">
+                <label htmlFor="pedido-print-ancho">
+                  Ancho
+                </label>
+
+                <div className="pedido-print-medida-control">
+                  <input
+                    id="pedido-print-ancho"
+                    type="number"
+                    min="40"
+                    max="300"
+                    step="0.1"
+                    value={anchoPersonalizado}
+                    onChange={(e) => {
+                      setAnchoPersonalizado(e.target.value);
+                      setErrorImpresion("");
+                    }}
+                  />
+                  <span>mm</span>
+                </div>
+              </div>
+
+              <div className="pedido-print-modal-field">
+                <label htmlFor="pedido-print-alto">
+                  Alto
+                </label>
+
+                <div className="pedido-print-medida-control">
+                  <input
+                    id="pedido-print-alto"
+                    type="number"
+                    min="40"
+                    max="1000"
+                    step="0.1"
+                    value={altoPersonalizado}
+                    onChange={(e) => {
+                      setAltoPersonalizado(e.target.value);
+                      setErrorImpresion("");
+                    }}
+                  />
+                  <span>mm</span>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+
+
+          {errorImpresion ? (
+            <div className="pedido-print-modal-error">
+              {errorImpresion}
+            </div>
+          ) : null}
+
+          <div className="pedido-print-modal-actions">
+            <button
+              type="button"
+              className="pedido-print-modal-cancelar"
+              onClick={cerrarSelectorImpresion}
+            >
+              Cancelar
+            </button>
+
+            <button
+              type="button"
+              className="pedido-print-modal-confirmar"
+              onClick={confirmarImpresion}
+            >
+              Aceptar e imprimir
+            </button>
           </div>
         </div>
       </div>
