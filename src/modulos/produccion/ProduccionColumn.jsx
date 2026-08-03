@@ -31,6 +31,11 @@ export default function ProduccionColumn({
   resaltada = false,
   pedidoNuevoResaltadoId = null,
   puedeGestionarOrdenManual = false,
+  sectorNombre = "",
+  sectorSeleccionadoNombre = "",
+  perteneceSectorSeleccionado = false,
+  esContextoEntrada = false,
+  esContextoSalida = false,
 
 }) {
   const { setNodeRef } = useDroppable({
@@ -90,7 +95,23 @@ useEffect(() => {
   return (
     <div
       ref={setNodeRef}
-      className={`produccion-column ${estaContraida ? "contraida" : ""} ${resaltada ? "drop-confirmado" : ""} ${ordenManualActivo ? "orden-manual-activo" : ""}`}
+      className={[
+        "produccion-column",
+        estaContraida ? "contraida" : "",
+        resaltada ? "drop-confirmado" : "",
+        ordenManualActivo ? "orden-manual-activo" : "",
+        perteneceSectorSeleccionado
+          ? "sector-seleccionado"
+          : "",
+        esContextoEntrada
+          ? "sector-contexto sector-contexto-entrada"
+          : "",
+        esContextoSalida
+          ? "sector-contexto sector-contexto-salida"
+          : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
       style={{
         background: "#f6f7f9",
         borderColor: "#d9dee8",
@@ -98,6 +119,37 @@ useEffect(() => {
     >
       <div className="produccion-column-header">
         <div className="produccion-column-header-main">
+          {!estaContraida && (
+            <div className="produccion-column-sector-meta">
+              {esContextoEntrada ? (
+                <span className="produccion-column-sector-badge contexto">
+                  Entrada
+                </span>
+              ) : esContextoSalida ? (
+                <span className="produccion-column-sector-badge contexto">
+                  Salida
+                </span>
+              ) : sectorNombre ? (
+                <span
+                  className={`produccion-column-sector-badge ${
+                    perteneceSectorSeleccionado
+                      ? "activo"
+                      : ""
+                  }`}
+                  title={`Sector: ${sectorNombre}`}
+                >
+                  {sectorNombre}
+                </span>
+              ) : null}
+
+              {(esContextoEntrada || esContextoSalida) &&
+                sectorSeleccionadoNombre && (
+                  <span className="produccion-column-contexto-texto">
+                    {sectorSeleccionadoNombre}
+                  </span>
+                )}
+            </div>
+          )}
           {esEditando && !estaContraida ? (
             <div className="produccion-columna-editar-box">
               <input

@@ -12,6 +12,15 @@ import { useState } from "react";
 
 export default function ProduccionBoard({
   columnas,
+  columnasGlobales = [],
+
+  sectores = [],
+  sectorSeleccionadoId = "",
+  sectorSeleccionadoNombre = "",
+  columnaEntradaId = "",
+  columnaSalidaId = "",
+  columnasSectorIds = [],
+
   pedidosPorColumna,
   onMoverPedido,
   onReordenarPedidoManual,
@@ -110,7 +119,14 @@ const pedidoObjetivoId = overData.pedidoId || null;
 
 if (!pedidoId || !columnaDestinoId) return;
 
-const columnaDestino = columnas.find((c) => c.id === columnaDestinoId);
+const columnasReferencia =
+  columnasGlobales.length > 0
+    ? columnasGlobales
+    : columnas;
+
+const columnaDestino = columnasReferencia.find(
+  (c) => c.id === columnaDestinoId
+);
 const ordenManualActivo =
   columnaDestino?.ordenManualActivo === true ||
   columnaDestino?.tipoOrden === "manual";
@@ -163,7 +179,14 @@ onMoverPedido?.(pedidoId, columnaDestinoId);
     >
       <div className="produccion-board">
         {columnas.map((columna) => {
-          const intermedias = columnas.filter((c) => !c.esInicial && !c.esFinal);
+          const columnasReferencia =
+            columnasGlobales.length > 0
+              ? columnasGlobales
+              : columnas;
+
+          const intermedias = columnasReferencia.filter(
+            (c) => !c.esInicial && !c.esFinal
+          );
           const indexIntermedia = intermedias.findIndex((c) => c.id === columna.id);
 
           const puedeMoverIzquierda =
@@ -177,11 +200,28 @@ onMoverPedido?.(pedidoId, columnaDestinoId);
             indexIntermedia !== -1 &&
             indexIntermedia < intermedias.length - 1;
 
+          const sectorColumna =
+            sectores.find(
+              (sector) =>
+                String(sector.id) ===
+                String(columna.sectorId || "")
+            ) || null;
+
+          const perteneceSectorSeleccionado =
+            !!sectorSeleccionadoId &&
+            columnasSectorIds.includes(columna.id);
+
+          const esContextoEntrada =
+            columna.id === columnaEntradaId;
+
+          const esContextoSalida =
+            columna.id === columnaSalidaId;  
+
           return (
             <ProduccionColumn
               key={columna.id}
               columna={columna}
-              columnas={columnas}
+              columnas={columnasReferencia}
               onMoverPedido={onMoverPedido}
               ordenManualActivo={
                 columna.ordenManualActivo === true || columna.tipoOrden === "manual"
@@ -211,6 +251,18 @@ onMoverPedido?.(pedidoId, columnaDestinoId);
               resaltada={columnaResaltadaId === columna.id}
               pedidoNuevoResaltadoId={pedidoNuevoResaltadoId}
               puedeGestionarOrdenManual={puedeGestionarOrdenManual}
+              sectorNombre={sectorColumna?.nombre || ""}
+
+              sectorSeleccionadoNombre={
+                sectorSeleccionadoNombre
+              }
+
+              perteneceSectorSeleccionado={
+                perteneceSectorSeleccionado
+              }
+
+              esContextoEntrada={esContextoEntrada}
+              esContextoSalida={esContextoSalida}
             />
           );
         })}

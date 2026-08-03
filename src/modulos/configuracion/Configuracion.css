@@ -301,3 +301,20 @@ body.dark-mode .tab-btn.activo {
   }
 }
 
+/* =========================================
+   CONFIGURACIÓN - PRODUCCIÓN
+   ========================================= */
+
+.config-section-produccion {
+  min-width: 0;
+}
+
+.config-section-produccion > .config-produccion {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+/* =========================================
+   CONFIGURACIÓN - PRODUCCIÓN fin
+   ========================================= */

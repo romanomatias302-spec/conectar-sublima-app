@@ -8,6 +8,7 @@ import {
   doc,
   onSnapshot,
   addDoc,
+  writeBatch,
 } from "firebase/firestore";
 import { db } from "../firebase";
 import {
@@ -271,8 +272,22 @@ export async function sincronizarPedidoDesdeEstadoManual({
   await updateDoc(ref, payload);
 }
 
-export async function recalcularPedidosPorCambioDeColumnas(clienteId) {
-  const columnasOrdenadas = await obtenerColumnasProduccion(clienteId);
+export async function recalcularPedidosPorCambioDeColumnas(
+  clienteId
+) {
+  if (!clienteId) {
+    throw new Error("Falta clienteId.");
+  }
+
+  const columnasOrdenadas =
+    await obtenerColumnasProduccion(clienteId);
+
+  if (!columnasOrdenadas.length) {
+    return {
+      revisados: 0,
+      actualizados: 0,
+    };
+  }
 
   const q = query(
     collection(db, PEDIDOS_COLLECTION),
@@ -281,42 +296,99 @@ export async function recalcularPedidosPorCambioDeColumnas(clienteId) {
 
   const snapshot = await getDocs(q);
 
-  for (const d of snapshot.docs) {
-    const pedido = { firebaseId: d.id, ...d.data() };
+  const actualizaciones = [];
 
-    if (!pedido.columnaProduccionId) continue;
-    if (pedido.estado === "Cancelado") continue;
+  snapshot.docs.forEach((documento) => {
+    const pedido = {
+      firebaseId: documento.id,
+      ...documento.data(),
+    };
+
+    if (!pedido.columnaProduccionId) return;
+    if (pedido.estado === "Cancelado") return;
 
     const columnaActual = columnasOrdenadas.find(
-      (c) => c.id === pedido.columnaProduccionId
+      (columna) =>
+        columna.id === pedido.columnaProduccionId
     );
 
-    if (!columnaActual) continue;
+    if (!columnaActual) return;
 
-    const progresoProduccion = calcularProgresoPorColumna(
-      columnasOrdenadas,
-      columnaActual.id
-    );
+    const progresoProduccion =
+      calcularProgresoPorColumna(
+        columnasOrdenadas,
+        columnaActual.id
+      );
 
-    const estadoProduccion = calcularEstadoProduccion(columnaActual);
-    const produccionFinalizada = calcularProduccionFinalizada(columnaActual);
+    const estadoProduccion =
+      calcularEstadoProduccion(columnaActual);
 
-    const estado =
-      columnaActual.esFinal
-        ? "Terminado"
-        : columnaActual.esInicial
-        ? "Pendiente"
-        : "En proceso";
+    const produccionFinalizada =
+      calcularProduccionFinalizada(columnaActual);
 
-    await updateDoc(doc(db, PEDIDOS_COLLECTION, d.id), {
-      progresoProduccion,
-      estadoProduccion,
-      produccionFinalizada,
-      estado,
-      produccionActualizadoAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
+    const estado = columnaActual.esFinal
+      ? "Terminado"
+      : columnaActual.esInicial
+      ? "Pendiente"
+      : "En proceso";
+
+    const necesitaActualizar =
+      Number(pedido.progresoProduccion ?? -1) !==
+        Number(progresoProduccion) ||
+      String(pedido.estadoProduccion || "") !==
+        String(estadoProduccion) ||
+      Boolean(pedido.produccionFinalizada) !==
+        Boolean(produccionFinalizada) ||
+      String(pedido.estado || "") !== String(estado);
+
+    if (!necesitaActualizar) return;
+
+    actualizaciones.push({
+      ref: doc(
+        db,
+        PEDIDOS_COLLECTION,
+        documento.id
+      ),
+      data: {
+        progresoProduccion,
+        estadoProduccion,
+        produccionFinalizada,
+        estado,
+        produccionActualizadoAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      },
     });
+  });
+
+  /*
+   * Firestore admite hasta 500 operaciones por batch.
+   * Utilizamos 400 para dejar margen de seguridad.
+   */
+  const TAMANO_BATCH = 400;
+
+  for (
+    let inicio = 0;
+    inicio < actualizaciones.length;
+    inicio += TAMANO_BATCH
+  ) {
+    const lote = actualizaciones.slice(
+      inicio,
+      inicio + TAMANO_BATCH
+    );
+
+    const batch = writeBatch(db);
+
+    lote.forEach(({ ref, data }) => {
+      batch.update(ref, data);
+    });
+
+    await batch.commit();
   }
+
+  return {
+    revisados: snapshot.size,
+    actualizados: actualizaciones.length,
+  };
 }
 
 export async function moverPedidosDeColumnaEliminadaAAnterior({

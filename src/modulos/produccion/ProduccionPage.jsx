@@ -1,4 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { collection, getDocs, query, where, doc, updateDoc, writeBatch } from "firebase/firestore";
 import { db } from "../../firebase";
 import {
@@ -24,8 +29,14 @@ import {
 
   
 } from "../../firebase/produccionPedidos";
+import {
+  crearSectorProduccion,
+  escucharSectoresProduccion,
+} from "../../firebase/produccionSectores";
 import { agruparPedidosPorColumna } from "./produccionUtils";
 import ProduccionBoard from "./ProduccionBoard";
+import ProduccionHeader from "./ProduccionHeader";
+import ProduccionVistaSectores from "./ProduccionVistaSectores";
 import PedidoFormModal from "../pedidos/PedidoFormModal";
 import {
   escucharEtiquetasProduccion,
@@ -35,6 +46,8 @@ import {
 } from "../../firebase/produccionEtiquetas";
 import "./produccion.css";
 import { puedeHacer } from "../../utils/permisos";
+import SearchableSelect from "../../comunes/componentes/SearchableSelect";
+
 
 function getProduccionUIStorageKey(perfil) {
   const clienteId = perfil?.clienteId || "sin-cliente";
@@ -81,6 +94,13 @@ export default function ProduccionPage({ perfil, onVerPedido = () => {} }) {
   const [nombreNuevaColumna, setNombreNuevaColumna] = useState("");
   const [guardandoColumna, setGuardandoColumna] = useState(false);
 
+const [sectoresProduccion, setSectoresProduccion] = useState([]);
+const [sectorNuevaColumnaId, setSectorNuevaColumnaId] = useState("");
+
+ 
+
+  const [errorNuevaColumna, setErrorNuevaColumna] = useState("");
+
   const [columnaEditandoId, setColumnaEditandoId] = useState(null);
   const [nombreEditarColumna, setNombreEditarColumna] = useState("");
   const [guardandoEdicionColumna, setGuardandoEdicionColumna] = useState(false);
@@ -90,6 +110,29 @@ export default function ProduccionPage({ perfil, onVerPedido = () => {} }) {
   const [ordenTarjetas, setOrdenTarjetas] = useState("normal");
   const [filtroAsignado, setFiltroAsignado] = useState("todos");
   const [busquedaProduccion, setBusquedaProduccion] = useState("");
+
+  const [sectorVistaSeleccionadoId, setSectorVistaSeleccionadoId] =
+    useState("");
+
+  const [
+    mostrarVistaGeneralSectores,
+    setMostrarVistaGeneralSectores,
+  ] = useState(false);
+
+  /*
+  * Preparado para planes.
+  * Hoy queda habilitado para todos para poder desarrollar
+  * y validar la función.
+  *
+  * Más adelante vendrá desde las capacidades del plan.
+  */
+  const vistaSectoresDisponible = true;
+
+  const [mostrarFiltrosProduccion, setMostrarFiltrosProduccion] =
+   useState(false);
+
+   const filtrosProduccionRef = useRef(null);
+   const botonFiltrosProduccionRef = useRef(null);
   
 
  const [pedidoEditandoDetalle, setPedidoEditandoDetalle] = useState(null);
@@ -133,9 +176,25 @@ const [pedidoNuevoResaltadoId, setPedidoNuevoResaltadoId] = useState(null);
   const [archivosProduccion, setArchivosProduccion] = useState([]);
   const [subiendoArchivoProduccion, setSubiendoArchivoProduccion] = useState(false);
   const [imagenesPedido,setImagenesPedido]=useState([]);
-  const [subiendoPortada,setSubiendoPortada]=
+  const [subiendoPortada, setSubiendoPortada] = useState(false);
 
-  useState(false);
+
+  const [mostrarModalNuevoSector, setMostrarModalNuevoSector] =
+    useState(false);
+
+  const [nombreNuevoSector, setNombreNuevoSector] =
+    useState("");
+
+  const [guardandoNuevoSector, setGuardandoNuevoSector] =
+    useState(false);
+
+  const [errorNuevoSector, setErrorNuevoSector] =
+    useState("");
+
+  const [
+    posicionNuevaColumnaEnSector,
+    setPosicionNuevaColumnaEnSector,
+  ] = useState("fin");
 
   const puedeHacerEnProduccion = (accion = "ver") => {
     return puedeHacer(perfil, "produccion", accion);
@@ -166,6 +225,23 @@ const uidActual =
     if (unsubscribe) unsubscribe();
   };
 }, [perfil?.clienteId]);
+
+  useEffect(() => {
+    if (!perfil?.clienteId) return undefined;
+
+    const unsubscribe = escucharSectoresProduccion(
+      perfil.clienteId,
+      (sectores) => {
+        setSectoresProduccion(sectores || []);
+      }
+    );
+
+    return () => {
+      if (typeof unsubscribe === "function") {
+        unsubscribe();
+      }
+    };
+  }, [perfil?.clienteId]);
 
   useEffect(() => {
     let unsubscribeColumnas = null;
@@ -274,6 +350,100 @@ const uidActual =
 
         return () => clearInterval(interval);
         }, []);    
+
+
+    useEffect(() => {
+      if (!mostrarFiltrosProduccion) return undefined;
+
+      function cerrarFiltrosAlHacerClickFuera(event) {
+        const dentroPopover =
+          filtrosProduccionRef.current?.contains(event.target);
+
+        const dentroBoton =
+          botonFiltrosProduccionRef.current?.contains(event.target);
+
+        if (!dentroPopover && !dentroBoton) {
+          setMostrarFiltrosProduccion(false);
+        }
+      }
+
+      function cerrarFiltrosConEscape(event) {
+        if (event.key === "Escape") {
+          setMostrarFiltrosProduccion(false);
+        }
+      }
+
+      document.addEventListener(
+        "mousedown",
+        cerrarFiltrosAlHacerClickFuera
+      );
+
+      document.addEventListener(
+        "touchstart",
+        cerrarFiltrosAlHacerClickFuera
+      );
+
+      document.addEventListener(
+        "keydown",
+        cerrarFiltrosConEscape
+      );
+
+      return () => {
+        document.removeEventListener(
+          "mousedown",
+          cerrarFiltrosAlHacerClickFuera
+        );
+
+        document.removeEventListener(
+          "touchstart",
+          cerrarFiltrosAlHacerClickFuera
+        );
+
+        document.removeEventListener(
+          "keydown",
+          cerrarFiltrosConEscape
+        );
+      };
+    }, [mostrarFiltrosProduccion]);    
+
+  useEffect(() => {
+    if (!sectorVistaSeleccionadoId) return;
+
+    const sigueExistiendo =
+      sectoresProduccion.some(
+        (sector) =>
+          sector.id === sectorVistaSeleccionadoId
+      );
+
+    if (!sigueExistiendo) {
+      setSectorVistaSeleccionadoId("");
+    }
+  }, [
+    sectoresProduccion,
+    sectorVistaSeleccionadoId,
+  ]);  
+
+  useEffect(() => {
+  if (!mostrarVistaGeneralSectores) return undefined;
+
+  function cerrarVistaGeneralConEscape(event) {
+    if (event.key === "Escape") {
+      setMostrarVistaGeneralSectores(false);
+    }
+  }
+
+  document.addEventListener(
+    "keydown",
+    cerrarVistaGeneralConEscape
+  );
+
+  return () => {
+    document.removeEventListener(
+      "keydown",
+      cerrarVistaGeneralConEscape
+    );
+  };
+}, [mostrarVistaGeneralSectores]);
 
 
   function normalizarFechaOrden(fecha) {
@@ -400,7 +570,100 @@ function filtrarPedidosPorAsignado(lista, filtro, perfil, forzarSoloAsignados = 
   return lista.filter((p) => p.produccionAsignadoUid === filtro);
 }
 
+  const columnasGlobalesOrdenadas = useMemo(() => {
+    return [...columnas].sort(
+      (a, b) =>
+        Number(a?.orden ?? 0) -
+        Number(b?.orden ?? 0)
+    );
+  }, [columnas]);
 
+  const datosVistaSector = useMemo(() => {
+  if (!sectorVistaSeleccionadoId) {
+    return {
+      columnasVisibles: columnasGlobalesOrdenadas,
+      columnaEntradaId: "",
+      columnaSalidaId: "",
+      columnasSectorIds: [],
+    };
+  }
+
+  const columnasSector =
+    columnasGlobalesOrdenadas.filter(
+      (columna) =>
+        String(columna.sectorId || "") ===
+        String(sectorVistaSeleccionadoId)
+    );
+
+  if (columnasSector.length === 0) {
+    return {
+      columnasVisibles: columnasGlobalesOrdenadas,
+      columnaEntradaId: "",
+      columnaSalidaId: "",
+      columnasSectorIds: [],
+    };
+  }
+
+  const primeraColumnaSector = columnasSector[0];
+  const ultimaColumnaSector =
+    columnasSector[columnasSector.length - 1];
+
+  const indicePrimera =
+    columnasGlobalesOrdenadas.findIndex(
+      (columna) =>
+        columna.id === primeraColumnaSector.id
+    );
+
+  const indiceUltima =
+    columnasGlobalesOrdenadas.findIndex(
+      (columna) =>
+        columna.id === ultimaColumnaSector.id
+    );
+
+  const columnaEntrada =
+    indicePrimera > 0
+      ? columnasGlobalesOrdenadas[indicePrimera - 1]
+      : null;
+
+  const columnaSalida =
+    indiceUltima !== -1 &&
+    indiceUltima <
+      columnasGlobalesOrdenadas.length - 1
+      ? columnasGlobalesOrdenadas[indiceUltima + 1]
+      : null;
+
+  const idsVisibles = new Set([
+    ...(columnaEntrada ? [columnaEntrada.id] : []),
+    ...columnasSector.map((columna) => columna.id),
+    ...(columnaSalida ? [columnaSalida.id] : []),
+  ]);
+
+  return {
+    columnasVisibles:
+      columnasGlobalesOrdenadas.filter((columna) =>
+        idsVisibles.has(columna.id)
+      ),
+
+    columnaEntradaId: columnaEntrada?.id || "",
+    columnaSalidaId: columnaSalida?.id || "",
+
+    columnasSectorIds: columnasSector.map(
+      (columna) => columna.id
+    ),
+  };
+}, [
+  columnasGlobalesOrdenadas,
+  sectorVistaSeleccionadoId,
+]);
+
+const columnasVisibles =
+  datosVistaSector.columnasVisibles;
+
+const sectorVistaSeleccionado =
+  sectoresProduccion.find(
+    (sector) =>
+      sector.id === sectorVistaSeleccionadoId
+  ) || null;
 
   const pedidosPorColumna = useMemo(() => {
   const pedidosFiltrados = filtrarPedidosPorAsignado(
@@ -676,28 +939,105 @@ const animadosFiltradosPorBusqueda = filtrarPedidosPorBusqueda(
 
 async function manejarCrearColumna() {
   try {
-    const nombre = (nombreNuevaColumna || "").trim();
+    const nombre = String(nombreNuevaColumna || "").trim();
 
-    if (!nombre) return;
-    if (!perfil?.clienteId) return;
+    if (!nombre) {
+      setErrorNuevaColumna(
+        "Ingresá un nombre para la columna."
+      );
+      return;
+    }
+
+    if (!perfil?.clienteId) {
+      setErrorNuevaColumna(
+        "No se encontró la empresa asociada."
+      );
+      return;
+    }
 
     setGuardandoColumna(true);
+    setErrorNuevaColumna("");
 
     await crearColumnaIntermediaProduccion({
-     clienteId: perfil.clienteId,
-     nombre,
+      clienteId: perfil.clienteId,
+      nombre,
+      sectorId: sectorNuevaColumnaId || "",
+      posicionEnSector:
+        sectorNuevaColumnaId
+          ? posicionNuevaColumnaEnSector
+          : "fin",
     });
 
-    await recalcularPedidosPorCambioDeColumnas(perfil.clienteId);
+    await recalcularPedidosPorCambioDeColumnas(
+      perfil.clienteId
+    );
 
     setNombreNuevaColumna("");
+    setSectorNuevaColumnaId("");
+    setPosicionNuevaColumnaEnSector("fin");
+    setErrorNuevaColumna("");
     setMostrarNuevaColumna(false);
-
-    
   } catch (error) {
-    console.error("Error creando columna de producción:", error);
+    console.error(
+      "Error creando columna de producción:",
+      error
+    );
+
+    setErrorNuevaColumna(
+      error?.message ||
+        "No se pudo crear la columna."
+    );
   } finally {
     setGuardandoColumna(false);
+  }
+}
+
+async function manejarCrearNuevoSector() {
+  try {
+    const nombre = String(nombreNuevoSector || "").trim();
+
+    if (!nombre) {
+      setErrorNuevoSector(
+        "Ingresá un nombre para el sector."
+      );
+      return;
+    }
+
+    if (!perfil?.clienteId) return;
+
+    setGuardandoNuevoSector(true);
+    setErrorNuevoSector("");
+
+    const sectorId = await crearSectorProduccion({
+      clienteId: perfil.clienteId,
+      nombre,
+
+      // Todo sector nuevo se agrega al final.
+      orden:
+        Math.max(
+          0,
+          ...sectoresProduccion.map((sector) =>
+            Number(sector.orden || 0)
+          )
+        ) + 1000,
+    });
+
+    setSectorNuevaColumnaId(sectorId);
+    setNombreNuevoSector("");
+    setErrorNuevoSector("");
+    setMostrarModalNuevoSector(false);
+
+    // Todo sector nuevo se incorpora al final.
+    setPosicionNuevaColumnaEnSector("fin");
+  } catch (error) {
+    console.error("Error creando sector:", error);
+
+    setErrorNuevoSector(
+      error?.message ||
+        "No se pudo crear el sector."
+    );
+  } finally {
+    setGuardandoNuevoSector(false);
   }
 }
 
@@ -1126,6 +1466,18 @@ const puedeGestionarColumnas = puedeHacerEnProduccion("gestionarColumnas");
 const puedeGestionarOrdenManual = puedeHacerEnProduccion("ordenManual");
 const puedeCambiarColorTarjeta = puedeHacerEnProduccion("cambiarColorTarjeta");
 
+const cantidadFiltrosProduccionActivos = [
+  ordenTarjetas !== "normal",
+  filtroAsignado !== "todos",
+  filtroEtiquetaId !== "todas",
+].filter(Boolean).length;
+
+const puedeCrearPedidoDesdeProduccion =
+  puedeHacer(perfil, "pedidos", "crear");
+
+const puedeGestionarEtiquetasProduccion =
+  puedeHacerEnProduccion("editarDetalle");
+
   async function manejarMoverColumna(columna, direccion) {
     try {
         if (!perfil?.clienteId) return;
@@ -1274,7 +1626,36 @@ async function manejarReordenManualPedido({ pedidoId, pedidoObjetivoId, columnaI
 
 
 
+  function enfocarTableroProduccion() {
+    window.requestAnimationFrame(() => {
+      const wrapper = document.querySelector(
+        ".produccion-board-wrapper"
+      );
 
+      if (!wrapper) return;
+
+      wrapper.scrollTo({
+        left: 0,
+        behavior: "smooth",
+      });
+    });
+  }
+
+  function manejarSeleccionarVistaSector(sectorId) {
+    if (!vistaSectoresDisponible) return;
+
+    setSectorVistaSeleccionadoId(sectorId);
+    setMostrarVistaGeneralSectores(false);
+    enfocarTableroProduccion();
+  }
+
+  function manejarVistaCompletaProduccion() {
+    if (!vistaSectoresDisponible) return;
+
+    setSectorVistaSeleccionadoId("");
+    setMostrarVistaGeneralSectores(false);
+    enfocarTableroProduccion();
+  }
 
 
 
@@ -1282,134 +1663,255 @@ async function manejarReordenManualPedido({ pedidoId, pedidoObjetivoId, columnaI
 
   return (
     <div className="produccion-page">
-      <div className="produccion-page-header">
-        <div className="produccion-page-header-top">
-            <div className="produccion-titulo-row">
-              <h2>Producción</h2>
+      <ProduccionHeader
+        busqueda={busquedaProduccion}
+        onCambiarBusqueda={setBusquedaProduccion}
 
-            
+        cantidadFiltrosActivos={cantidadFiltrosProduccionActivos}
+        filtrosAbiertos={mostrarFiltrosProduccion}
+        filtrosTriggerRef={botonFiltrosProduccionRef}
+        onToggleFiltros={() =>
+          setMostrarFiltrosProduccion((prev) => !prev)
+        }
+
+        puedeCrearPedido={puedeCrearPedidoDesdeProduccion}
+        onCrearPedido={() =>
+          setMostrarNuevoPedidoProduccion(true)
+        }
+
+        puedeGestionarColumnas={puedeGestionarColumnas}
+        onCrearColumna={() => {
+          setErrorNuevaColumna("");
+          setMostrarFiltrosProduccion(false);
+          setMostrarNuevaColumna(true);
+        }}
+
+        onAbrirHistorial={() =>
+          setMostrarHistorialGeneral(true)
+        }
+
+        puedeGestionarEtiquetas={
+          puedeGestionarEtiquetasProduccion
+        }
+        onGestionarEtiquetas={() => {
+          setMostrarFiltrosProduccion(false);
+
+          if (!pedidoEditandoDetalle) {
+            setMensajeMenuDetalle(
+              "Las etiquetas se gestionan desde el detalle de una tarjeta."
+            );
+          }
+        }}
+
+        puedeUsarVistaSectores={
+          sectoresProduccion.length > 0
+        }
+
+        vistaSectoresDisponible={
+          vistaSectoresDisponible
+        }
+
+        sectorVistaNombre={
+          sectorVistaSeleccionado?.nombre || ""
+        }
+
+        onAbrirVistaSectores={() => {
+          setMostrarFiltrosProduccion(false);
+          setMostrarVistaGeneralSectores(true);
+        }}
+      />
+
+      {mostrarFiltrosProduccion && (
+        <div
+          ref={filtrosProduccionRef}
+          className="produccion-filtros-popover"
+        >
+          <div className="produccion-filtro-campo">
+            <label>Orden</label>
+
+            <select
+              value={ordenTarjetas}
+              onChange={(e) =>
+                setOrdenTarjetas(e.target.value)
+              }
+            >
+              <option value="normal">Orden actual</option>
+              <option value="entrega-asc">
+                Entrega más próxima
+              </option>
+              <option value="entrega-desc">
+                Entrega más lejana
+              </option>
+            </select>
+          </div>
+
+          {!debeVerSoloAsignados && (
+            <div className="produccion-filtro-campo">
+              <label>Asignado</label>
+
+            <SearchableSelect
+              value={filtroAsignado}
+              onChange={setFiltroAsignado}
+              placeholder="Todos los usuarios"
+              searchPlaceholder="Buscar usuario..."
+              allowClear={false}
+              options={[
+                {
+                  value: "todos",
+                  label: "Todos los usuarios",
+                },
+                ...(uidActual
+                  ? [
+                      {
+                        value: "mios",
+                        label: "Mis pedidos",
+                      },
+                    ]
+                  : []),
+                {
+                  value: "sin_asignar",
+                  label: "Sin asignar",
+                },
+                ...usuariosProduccion.map((usuario) => ({
+                  value: usuario.uid,
+                  label:
+                    usuario.nombre ||
+                    usuario.email ||
+                    "Usuario",
+                })),
+              ]}
+            />
+            </div>
+          )}
+
+          <div className="produccion-filtro-campo">
+            <label>Etiqueta</label>
+
+            <SearchableSelect
+              value={filtroEtiquetaId}
+              onChange={setFiltroEtiquetaId}
+              placeholder="Todas las etiquetas"
+              searchPlaceholder="Buscar etiqueta..."
+              options={[
+                {
+                  value: "todas",
+                  label: "Todas las etiquetas",
+                },
+                {
+                  value: "sin_etiqueta",
+                  label: "Sin etiqueta",
+                },
+                ...etiquetasProduccion.map((etiqueta) => ({
+                  value: etiqueta.id,
+                  label: etiqueta.nombre,
+                })),
+              ]}
+            />
+          </div>
+
+          {cantidadFiltrosProduccionActivos > 0 && (
+            <button
+              type="button"
+              className="produccion-filtros-limpiar"
+              onClick={() => {
+                setOrdenTarjetas("normal");
+                setFiltroAsignado("todos");
+                setFiltroEtiquetaId("todas");
+              }}
+            >
+              Limpiar filtros
+            </button>
+          )}
+        </div>
+      )}
+
+      {mostrarVistaGeneralSectores && (
+        <div
+          className="produccion-vista-modal-overlay"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setMostrarVistaGeneralSectores(false);
+            }
+          }}
+        >
+          <div
+            className="produccion-vista-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="produccion-vista-modal-titulo"
+            onMouseDown={(event) => {
+              event.stopPropagation();
+            }}
+          >
+            <div className="produccion-vista-modal-header">
+              <div>
+                <span className="produccion-vista-modal-kicker">
+                  Flujo de producción
+                </span>
+
+                <h3 id="produccion-vista-modal-titulo">
+                  Visión general por sectores
+                </h3>
+
+              
+              </div>
 
               <button
                 type="button"
-                className="btn-produccion-secundario"
-                onClick={() => setMostrarHistorialGeneral(true)}
+                className="produccion-vista-modal-cerrar"
+                onClick={() => {
+                  setMostrarVistaGeneralSectores(false);
+                }}
+                aria-label="Cerrar visión general"
               >
-                Historial
+                ×
               </button>
-              {puedeHacer(perfil, "pedidos", "crear") && (
-                <button
-                  type="button"
-                  className="btn-produccion-primario"
-                  onClick={() => setMostrarNuevoPedidoProduccion(true)}
-                >
-                  Crear Pedido
-                </button>
-              )}
             </div>
 
-            <div className="produccion-page-header-actions">
-
-                <select
-                  value={ordenTarjetas}
-                  onChange={(e) => setOrdenTarjetas(e.target.value)}
-                  className="produccion-select-orden"
-                >
-                  <option value="normal">Orden normal</option>
-                  <option value="entrega-asc">Entrega más próxima</option>
-                  <option value="entrega-desc">Entrega más lejana</option>
-                </select>
-
-                <select
-                  value={filtroEtiquetaId}
-                  onChange={(e) => setFiltroEtiquetaId(e.target.value)}
-                  className="produccion-select-orden"
-                >
-                  <option value="todas">Todas las etiquetas</option>
-                  <option value="sin_etiqueta">Sin etiqueta</option>
-
-                  {etiquetasProduccion.map((etiqueta) => (
-                    <option key={etiqueta.id} value={etiqueta.id}>
-                      {etiqueta.nombre}
-                    </option>
-                  ))}
-                </select>
-
-              {!debeVerSoloAsignados ? (
-                <select
-                  value={filtroAsignado}
-                  onChange={(e) => setFiltroAsignado(e.target.value)}
-                  className="produccion-select-orden"
-                >
-                  <option value="todos">Todos los asignados</option>
-                  <option value="sin_asignar">Sin asignar</option>
-                  <option value="mios">Solo mis pedidos</option>
-
-                  {usuariosProduccion.map((usuario) => (
-                    <option key={usuario.uid} value={usuario.uid}>
-                      {usuario.nombre || usuario.email || usuario.uid}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <div className="produccion-select-orden">
-                  Solo mis pedidos asignados
-                </div>
-              )}
-
-                {puedeGestionarColumnas && (
-                    <button
-                        className="btn-produccion-secundario"
-                        onClick={() => setMostrarNuevaColumna((prev) => !prev)}
-                    >
-                        Crear Columna
-                    </button>
-                    )}
-            </div>
-            <div className="produccion-busqueda-wrapper">
-              <input
-                type="text"
-                value={busquedaProduccion}
-                onChange={(e) => setBusquedaProduccion(e.target.value)}
-                className="produccion-busqueda-input"
-                placeholder="Buscar pedido o cliente..."
+            <div className="produccion-vista-modal-body">
+              <ProduccionVistaSectores
+                sectores={sectoresProduccion}
+                columnas={columnasGlobalesOrdenadas}
+                pedidosPorColumna={pedidosPorColumna}
+                sectorSeleccionadoId={
+                  sectorVistaSeleccionadoId
+                }
+                onSeleccionarSector={
+                  manejarSeleccionarVistaSector
+                }
+                onVistaCompleta={
+                  manejarVistaCompletaProduccion
+                }
+                disponible={vistaSectoresDisponible}
+                motivoBloqueo="Disponible a partir del plan Pro"
               />
             </div>
+          </div>
         </div>
+      )}
 
-  {mostrarNuevaColumna && (
-    <div className="produccion-nueva-columna-box">
-      <input
-        type="text"
-        placeholder="Nombre de la nueva etapa..."
-        value={nombreNuevaColumna}
-        onChange={(e) => setNombreNuevaColumna(e.target.value)}
-        className="produccion-input-columna"
-      />
+      <div className="produccion-board-wrapper">
+        <ProduccionBoard
+    columnas={columnasVisibles}
+    columnasGlobales={columnasGlobalesOrdenadas}
 
-      <button
-        className="btn-produccion-primario"
-        onClick={manejarCrearColumna}
-        disabled={guardandoColumna}
-      >
-        {guardandoColumna ? "Guardando..." : "Guardar"}
-      </button>
+    sectores={sectoresProduccion}
+    sectorSeleccionadoId={sectorVistaSeleccionadoId}
+    sectorSeleccionadoNombre={
+      sectorVistaSeleccionado?.nombre || ""
+    }
 
-      <button
-        className="btn-produccion-cancelar"
-        onClick={() => {
-          setMostrarNuevaColumna(false);
-          setNombreNuevaColumna("");
-        }}
-      >
-        Cancelar
-      </button>
-    </div>
-  )}
-</div>
+    columnaEntradaId={
+      datosVistaSector.columnaEntradaId
+    }
 
-<div className="produccion-board-wrapper">
-  <ProduccionBoard
-  columnas={columnas}
+    columnaSalidaId={
+      datosVistaSector.columnaSalidaId
+    }
+
+    columnasSectorIds={
+      datosVistaSector.columnasSectorIds
+    }
   pedidosPorColumna={pedidosPorColumna}
   onMoverPedido={manejarMoverPedido}
   puedeGestionarOrdenManual={puedeGestionarOrdenManual}
@@ -2038,6 +2540,297 @@ async function manejarReordenManualPedido({ pedidoId, pedidoObjetivoId, columnaI
     </div>
   </div>
 )}
+
+
+
+    {mostrarNuevaColumna && (
+      <div
+        className="produccion-mini-modal-overlay"
+        onMouseDown={(e) => {
+          if (e.target === e.currentTarget) {
+            setMostrarNuevaColumna(false);
+            setNombreNuevaColumna("");
+            setSectorNuevaColumnaId("");
+            setPosicionNuevaColumnaEnSector("fin");
+            setErrorNuevaColumna("");
+          }
+        }}
+      >
+        <div
+          className="produccion-mini-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="titulo-nueva-columna"
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <div className="produccion-mini-modal-header">
+            <div>
+              <h3 id="titulo-nueva-columna">
+                Nueva columna
+              </h3>
+
+              <p>
+                Definí su nombre, sector y ubicación en el flujo.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              className="produccion-mini-modal-cerrar"
+              onClick={() => {
+                setMostrarNuevaColumna(false);
+                setNombreNuevaColumna("");
+                setSectorNuevaColumnaId("");
+                setPosicionNuevaColumnaEnSector("fin");
+                setErrorNuevaColumna("");
+              }}
+              aria-label="Cerrar"
+            >
+              ×
+            </button>
+          </div>
+
+          <div className="produccion-mini-modal-body">
+            <div className="produccion-mini-modal-campo">
+              <label htmlFor="produccion-columna-nombre">
+                Nombre de la columna
+              </label>
+
+              <input
+                id="produccion-columna-nombre"
+                type="text"
+                value={nombreNuevaColumna}
+                onChange={(e) =>
+                  setNombreNuevaColumna(e.target.value)
+                }
+                placeholder="Ej: Control de calidad"
+                autoFocus
+              />
+            </div>
+
+            <div className="produccion-mini-modal-campo">
+              <label>Sector</label>
+
+              <SearchableSelect
+                value={sectorNuevaColumnaId}
+                onChange={(nuevoSectorId) => {
+                  setSectorNuevaColumnaId(nuevoSectorId);
+
+                  if (!nuevoSectorId) {
+                    setPosicionNuevaColumnaEnSector("fin");
+                  }
+                }}
+                placeholder="Seleccionar sector"
+                searchPlaceholder="Buscar sector..."
+                allowClear
+                clearLabel="Sin sector"
+                options={sectoresProduccion.map((sector) => ({
+                  value: sector.id,
+                  label: sector.nombre,
+                }))}
+                footer={
+                  <button
+                    type="button"
+                    className="produccion-sector-crear-desde-select"
+                    onClick={() => {
+                      setErrorNuevoSector("");
+                      setNombreNuevoSector("");
+                      setMostrarModalNuevoSector(true);
+                    }}
+                  >
+                    Crear nuevo sector
+                  </button>
+                }
+              />
+            </div>
+
+            {sectorNuevaColumnaId && (
+              <div className="produccion-mini-modal-campo">
+                <label>Ubicación dentro del sector</label>
+
+                <div className="produccion-posicion-sector">
+                  <button
+                    type="button"
+                    className={
+                      posicionNuevaColumnaEnSector === "inicio"
+                        ? "activo"
+                        : ""
+                    }
+                    onClick={() =>
+                      setPosicionNuevaColumnaEnSector("inicio")
+                    }
+                  >
+                    Al principio
+                  </button>
+
+                  <button
+                    type="button"
+                    className={
+                      posicionNuevaColumnaEnSector === "fin"
+                        ? "activo"
+                        : ""
+                    }
+                    onClick={() =>
+                      setPosicionNuevaColumnaEnSector("fin")
+                    }
+                  >
+                    Al final
+                  </button>
+                </div>
+
+                <small>
+                  La nueva columna se agregará dentro del bloque de este
+                  sector.
+                </small>
+              </div>
+            )}
+
+            {errorNuevaColumna && (
+              <div className="produccion-mini-modal-error">
+                {errorNuevaColumna}
+              </div>
+            )}
+          </div>
+
+          <div className="produccion-mini-modal-footer">
+            <button
+              type="button"
+              className="produccion-mini-modal-btn-cancelar"
+              onClick={() => {
+                setMostrarNuevaColumna(false);
+                setNombreNuevaColumna("");
+                setSectorNuevaColumnaId("");
+                setPosicionNuevaColumnaEnSector("fin");
+                setErrorNuevaColumna("");
+              }}
+              disabled={guardandoColumna}
+            >
+              Cancelar
+            </button>
+
+            <button
+              type="button"
+              className="produccion-mini-modal-btn-guardar"
+              onClick={manejarCrearColumna}
+              disabled={
+                guardandoColumna ||
+                !nombreNuevaColumna.trim()
+              }
+            >
+              {guardandoColumna
+                ? "Creando..."
+                : "Crear columna"}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {mostrarModalNuevoSector && (
+      <div
+        className="produccion-mini-modal-overlay produccion-sector-modal-overlay"
+        onMouseDown={(e) => {
+          if (e.target === e.currentTarget) {
+            setMostrarModalNuevoSector(false);
+            setNombreNuevoSector("");
+            setErrorNuevoSector("");
+          }
+        }}
+      >
+        <div
+          className="produccion-mini-modal produccion-sector-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="titulo-nuevo-sector"
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <div className="produccion-mini-modal-header">
+            <div>
+              <h3 id="titulo-nuevo-sector">
+                Nuevo sector
+              </h3>
+
+              <p>
+                Los sectores agrupan columnas consecutivas dentro
+                del flujo de producción.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              className="produccion-mini-modal-cerrar"
+              onClick={() => {
+                setMostrarModalNuevoSector(false);
+                setNombreNuevoSector("");
+                setErrorNuevoSector("");
+              }}
+              aria-label="Cerrar"
+            >
+              ×
+            </button>
+          </div>
+
+          <div className="produccion-mini-modal-body">
+            <div className="produccion-mini-modal-campo">
+              <label htmlFor="produccion-sector-nombre">
+                Nombre del sector
+              </label>
+
+              <input
+                id="produccion-sector-nombre"
+                type="text"
+                value={nombreNuevoSector}
+                onChange={(e) =>
+                  setNombreNuevoSector(e.target.value)
+                }
+                placeholder="Ej: Diseño, Impresión o Confección"
+                autoFocus
+              />
+            </div>
+
+            <div className="produccion-sector-info">
+              El nuevo sector se agregará al final del flujo.
+              La nueva columna quedará dentro de ese sector.
+            </div>
+
+            {errorNuevoSector && (
+              <div className="produccion-mini-modal-error">
+                {errorNuevoSector}
+              </div>
+            )}
+          </div>
+
+          <div className="produccion-mini-modal-footer">
+            <button
+              type="button"
+              className="produccion-mini-modal-btn-cancelar"
+              onClick={() => {
+                setMostrarModalNuevoSector(false);
+                setNombreNuevoSector("");
+                setErrorNuevoSector("");
+              }}
+              disabled={guardandoNuevoSector}
+            >
+              Cancelar
+            </button>
+
+            <button
+              type="button"
+              className="produccion-mini-modal-btn-guardar"
+              onClick={manejarCrearNuevoSector}
+              disabled={
+                guardandoNuevoSector ||
+                !nombreNuevoSector.trim()
+              }
+            >
+              {guardandoNuevoSector
+                ? "Creando..."
+                : "Crear sector"}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
 
     {mostrarHistorialGeneral && (
       <div

@@ -874,6 +874,32 @@ function canReadMovimientos(clienteId) {
       allow delete: if canDeletePedidos(resource.data.clienteId);
     }
     
+
+    // =========================
+    // produccion_sectores
+    // =========================
+    match /produccion_sectores/{sectorId} {
+      allow read: if canReadProduccionColumnas(
+        resource.data.clienteId
+      );
+
+      allow create: if canGestionarColumnasProduccion(
+        request.resource.data.clienteId
+      )
+      && request.resource.data.clienteId is string
+      && request.resource.data.clienteId != ""
+      && request.resource.data.nombre is string
+      && request.resource.data.nombre != ""
+      && request.resource.data.activo == true;
+
+      allow update: if canGestionarColumnasProduccion(
+        resource.data.clienteId
+      )
+      && request.resource.data.clienteId ==
+        resource.data.clienteId;
+
+      allow delete: if false;
+    }
     
     
     // =========================

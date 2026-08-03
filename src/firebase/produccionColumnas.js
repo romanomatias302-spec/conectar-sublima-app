@@ -4,12 +4,11 @@ import {
   getDocs,
   query,
   where,
-  orderBy,
   serverTimestamp,
   updateDoc,
   doc,
-  limit,
   onSnapshot,
+  writeBatch,
 } from "firebase/firestore";
 import { db } from "../firebase";
 
@@ -40,6 +39,37 @@ function obtenerColorSiguiente(columnas) {
   );
 
   return libre || PALETA_COLUMNAS[columnas.length % PALETA_COLUMNAS.length];
+}
+
+function ordenarColumnasPorFlujo(columnas = []) {
+  return [...columnas].sort(
+    (a, b) =>
+      Number(a?.orden ?? 0) -
+      Number(b?.orden ?? 0)
+  );
+}
+
+function calcularOrdenEntreColumnas(
+  columnaAnterior,
+  columnaSiguiente
+) {
+  const ordenAnterior = Number(
+    columnaAnterior?.orden ?? 0
+  );
+
+  const ordenSiguiente = Number(
+    columnaSiguiente?.orden ??
+      ordenAnterior + 1000
+  );
+
+  if (ordenSiguiente > ordenAnterior) {
+    return (
+      ordenAnterior +
+      (ordenSiguiente - ordenAnterior) / 2
+    );
+  }
+
+  return ordenAnterior + 0.5;
 }
 
 export async function obtenerColumnasProduccion(clienteId) {
@@ -150,6 +180,7 @@ export async function actualizarColumnaProduccion(columnaId, data) {
   });
 }
 
+
 export async function desactivarColumnaProduccion(columnaId) {
   const ref = doc(db, PRODUCCION_COLUMNAS_COLLECTION, columnaId);
   await updateDoc(ref, {
@@ -158,35 +189,242 @@ export async function desactivarColumnaProduccion(columnaId) {
   });
 }
 
-export async function crearColumnaIntermediaProduccion({ clienteId, nombre }) {
+export async function crearColumnaIntermediaProduccion({
+  clienteId,
+  nombre,
+  sectorId = "",
+  posicionEnSector = "fin",
+}) {
+  if (!clienteId) {
+    throw new Error("Falta clienteId.");
+  }
+
+  const nombreLimpio = String(nombre || "").trim();
+
+  if (!nombreLimpio) {
+    throw new Error("Ingresá un nombre para la columna.");
+  }
+
   const columnas = await obtenerColumnasProduccion(clienteId);
 
-  const columnasIntermedias = columnas
-    .filter((c) => !c.esInicial && !c.esFinal)
-    .sort((a, b) => a.orden - b.orden);
+  const columnasOrdenadas =
+    ordenarColumnasPorFlujo(columnas);
 
-  let nuevoOrden = 1;
+  const columnaInicial =
+    columnasOrdenadas.find((columna) => columna.esInicial) ||
+    null;
 
-  if (columnasIntermedias.length > 0) {
-    nuevoOrden = columnasIntermedias[columnasIntermedias.length - 1].orden + 1;
+  const columnaFinal =
+    columnasOrdenadas.find((columna) => columna.esFinal) ||
+    null;
+
+  const columnasIntermedias = columnasOrdenadas.filter(
+    (columna) =>
+      !columna.esInicial && !columna.esFinal
+  );
+
+  let columnaAnterior = null;
+  let columnaSiguiente = null;
+
+  if (sectorId) {
+    const columnasSector = columnasIntermedias
+      .filter((columna) => columna.sectorId === sectorId)
+      .sort(
+        (a, b) =>
+          Number(a.orden || 0) - Number(b.orden || 0)
+      );
+
+    if (columnasSector.length > 0) {
+      if (posicionEnSector === "inicio") {
+        const primeraColumnaSector = columnasSector[0];
+
+        const indicePrimera = columnasOrdenadas.findIndex(
+          (columna) =>
+            columna.id === primeraColumnaSector.id
+        );
+
+        columnaAnterior =
+          columnasOrdenadas[indicePrimera - 1] ||
+          columnaInicial;
+
+        columnaSiguiente = primeraColumnaSector;
+      } else {
+        const ultimaColumnaSector =
+          columnasSector[columnasSector.length - 1];
+
+        const indiceUltima = columnasOrdenadas.findIndex(
+          (columna) =>
+            columna.id === ultimaColumnaSector.id
+        );
+
+        columnaAnterior = ultimaColumnaSector;
+
+        columnaSiguiente =
+          columnasOrdenadas[indiceUltima + 1] ||
+          columnaFinal;
+      }
+    }
   }
+
+  /*
+   * Sector nuevo, sector vacío o columna sin sector:
+   * se agrega al final de las etapas intermedias,
+   * antes de la columna final.
+   */
+  if (!columnaAnterior || !columnaSiguiente) {
+    columnaAnterior =
+      columnasIntermedias[
+        columnasIntermedias.length - 1
+      ] ||
+      columnaInicial;
+
+    columnaSiguiente = columnaFinal;
+  }
+
+  const nuevoOrden = calcularOrdenEntreColumnas(
+    columnaAnterior,
+    columnaSiguiente
+  );
 
   const color = obtenerColorSiguiente(columnas);
 
-  const ref = await addDoc(collection(db, PRODUCCION_COLUMNAS_COLLECTION), {
-    clienteId,
-    nombre: nombre?.trim() || "Nueva columna",
-    orden: nuevoOrden,
-    esInicial: false,
-    esFinal: false,
-    activo: true,
-    colorFondo: color.colorFondo,
-    colorBorde: color.colorBorde,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  });
+  const ref = await addDoc(
+    collection(db, PRODUCCION_COLUMNAS_COLLECTION),
+    {
+      clienteId,
+      nombre: nombreLimpio,
+      orden: nuevoOrden,
+
+      sectorId: sectorId || "",
+
+      esInicial: false,
+      esFinal: false,
+      activo: true,
+
+      colorFondo: color.colorFondo,
+      colorBorde: color.colorBorde,
+
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    }
+  );
 
   return ref.id;
+}
+
+export async function moverColumnaASectorProduccion({
+  clienteId,
+  columnaId,
+  sectorId = "",
+}) {
+  if (!clienteId) {
+    throw new Error("Falta clienteId.");
+  }
+
+  if (!columnaId) {
+    throw new Error("Falta columnaId.");
+  }
+
+  const columnas = await obtenerColumnasProduccion(clienteId);
+
+  const columnaActual = columnas.find(
+    (columna) => columna.id === columnaId
+  );
+
+  if (!columnaActual) {
+    throw new Error(
+      "No se encontró la columna seleccionada."
+    );
+  }
+
+  if (
+    columnaActual.esInicial === true ||
+    columnaActual.esFinal === true
+  ) {
+    throw new Error(
+      "Las columnas inicial y final no pueden asignarse a un sector."
+    );
+  }
+
+  /*
+   * IMPORTANTE:
+   * Asociar una columna a un sector no debe modificar
+   * su posición dentro del flujo productivo.
+   *
+   * El orden original de Producción se conserva.
+   */
+  await updateDoc(
+    doc(
+      db,
+      PRODUCCION_COLUMNAS_COLLECTION,
+      columnaId
+    ),
+    {
+      sectorId: sectorId || "",
+      updatedAt: serverTimestamp(),
+    }
+  );
+
+  return {
+    columnaId,
+    sectorId: sectorId || "",
+    ordenConservado: columnaActual.orden,
+  };
+}
+
+export function validarContinuidadSectoresProduccion(
+  columnas = []
+) {
+  const columnasOrdenadas = ordenarColumnasPorFlujo(
+    columnas
+  ).filter(
+    (columna) =>
+      columna.activo !== false &&
+      !columna.esInicial &&
+      !columna.esFinal
+  );
+
+  const posicionesPorSector = new Map();
+
+  columnasOrdenadas.forEach((columna, index) => {
+    const sectorId = String(
+      columna.sectorId || ""
+    ).trim();
+
+    if (!sectorId) return;
+
+    if (!posicionesPorSector.has(sectorId)) {
+      posicionesPorSector.set(sectorId, []);
+    }
+
+    posicionesPorSector.get(sectorId).push(index);
+  });
+
+  const sectoresFragmentados = [];
+
+  posicionesPorSector.forEach(
+    (posiciones, sectorId) => {
+      if (posiciones.length <= 1) return;
+
+      const primera = Math.min(...posiciones);
+      const ultima = Math.max(...posiciones);
+
+      const cantidadEsperada =
+        ultima - primera + 1;
+
+      if (cantidadEsperada !== posiciones.length) {
+        sectoresFragmentados.push({
+          sectorId,
+          posiciones,
+        });
+      }
+    }
+  );
+
+  return {
+    valido: sectoresFragmentados.length === 0,
+    sectoresFragmentados,
+  };
 }
 
 export function escucharColumnasProduccion(clienteId, callback) {

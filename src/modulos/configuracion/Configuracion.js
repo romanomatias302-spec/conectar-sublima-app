@@ -7,6 +7,7 @@ import {
   FaBoxOpen,
   FaUserCog,
   FaStore,
+  FaIndustry,
 } from "react-icons/fa";
 import ConfiguracionProductos from "./ConfiguracionProductos";
 import {
@@ -22,6 +23,7 @@ import { db, storage } from "../../firebase";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import ConfiguracionUsuarios from "./ConfiguracionUsuarios";
 import ConfiguracionSucursales from "./ConfiguracionSucursales";
+import ConfiguracionProduccion from "./ConfiguracionProduccion";
 
 export default function Configuracion({ modoOscuro, setModoOscuro, perfil, onActualizarPerfil, }) {
   const [pestañaActiva, setPestañaActiva] = useState(
@@ -368,6 +370,13 @@ const pagarPeriodoMercadoPago = async (periodo) => {
         </button>
 
         <button
+          className={`tab-btn ${pestañaActiva === "produccion" ? "activo" : ""}`}
+          onClick={() => setPestañaActiva("produccion")}
+        >
+          <FaIndustry /> Producción
+        </button>
+
+        <button
           className={`tab-btn ${pestañaActiva === "cuenta" ? "activo" : ""}`}
           onClick={() => setPestañaActiva("cuenta")}
         >
@@ -537,6 +546,12 @@ const pagarPeriodoMercadoPago = async (periodo) => {
             Administrá los locales o puntos de trabajo del negocio.
           </p>
           <ConfiguracionSucursales perfil={perfil} />
+        </section>
+      )}
+
+      {pestañaActiva === "produccion" && (
+        <section className="config-section config-section-produccion">
+          <ConfiguracionProduccion perfil={perfil} />
         </section>
       )}
 

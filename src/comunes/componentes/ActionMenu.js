@@ -10,6 +10,9 @@ import {
 import "./ActionMenu.css";
 
 export default function ActionMenu({
+  items = null,
+
+  // Compatibilidad con usos actuales
   onVer,
   onEditar,
   onRenombrar,
@@ -17,6 +20,9 @@ export default function ActionMenu({
   onEliminar,
   onCambiarEstado,
   labelCambiarEstado = "Cambiar estado",
+
+  title = "Acciones",
+  triggerClassName = "",
 }) {
   const [abierto, setAbierto] = useState(false);
   const [pos, setPos] = useState({ top: 0, left: 0 });
@@ -110,6 +116,7 @@ export default function ActionMenu({
     setPos({ top, left });
   }, [
     abierto,
+    items,
     onVer,
     onEditar,
     onRenombrar,
@@ -146,65 +153,116 @@ export default function ActionMenu({
     setAbierto(false);
   };
 
-  return (
-    <div className="action-menu-root" onClick={(e) => e.stopPropagation()}>
+    const itemsCompatibles = [
+    onVer
+      ? {
+          id: "ver",
+          label: "Ver",
+          icon: <FaEye className="icono" />,
+          onClick: onVer,
+        }
+      : null,
+
+    onEditar
+      ? {
+          id: "editar",
+          label: "Editar",
+          icon: <FaEdit className="icono" />,
+          onClick: onEditar,
+        }
+      : null,
+
+    onRenombrar
+      ? {
+          id: "renombrar",
+          label: "Renombrar",
+          icon: <FaEdit className="icono" />,
+          onClick: onRenombrar,
+        }
+      : null,
+
+    onDuplicar
+      ? {
+          id: "duplicar",
+          label: "Duplicar",
+          icon: <FaCopy className="icono" />,
+          onClick: onDuplicar,
+        }
+      : null,
+
+    onCambiarEstado
+      ? {
+          id: "cambiar-estado",
+          label: labelCambiarEstado,
+          icon: <FaToggleOn className="icono" />,
+          onClick: onCambiarEstado,
+        }
+      : null,
+
+    onEliminar
+      ? {
+          id: "eliminar",
+          label: "Eliminar",
+          icon: <FaTrash className="icono" />,
+          onClick: onEliminar,
+          danger: true,
+        }
+      : null,
+  ].filter(Boolean);
+
+  const itemsFinales = Array.isArray(items)
+    ? items.filter((item) => item && item.visible !== false)
+    : itemsCompatibles;
+
+   return (
+    <div
+      className="action-menu-root"
+      onClick={(e) => e.stopPropagation()}
+    >
       <button
         ref={btnRef}
         type="button"
-        className={`action-menu-trigger ${abierto ? "active" : ""}`}
+        className={`action-menu-trigger ${
+          abierto ? "active" : ""
+        } ${triggerClassName}`}
         onClick={abrirCerrar}
-        title="Acciones"
+        title={title}
+        aria-label={title}
+        aria-expanded={abierto}
+        aria-haspopup="menu"
       >
         <FaEllipsisV />
       </button>
 
-      {abierto && (
+      {abierto && itemsFinales.length > 0 && (
         <div
           ref={menuRef}
           className="action-menu-dropdown fixed"
-          style={{ top: pos.top, left: pos.left }}
+          style={{
+            top: pos.top,
+            left: pos.left,
+          }}
           onClick={(e) => e.stopPropagation()}
+          role="menu"
         >
-          {onVer && (
-            <button type="button" onClick={(e) => ejecutar(onVer, e)}>
-              <FaEye className="icono" />
-              <span>Ver</span>
-            </button>
-          )}
+          {itemsFinales.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              className={item.danger ? "danger" : ""}
+              disabled={item.disabled === true}
+              onClick={(e) => ejecutar(item.onClick, e)}
+              role="menuitem"
+            >
+              {item.icon && (
+                <span className="action-menu-item-icon">
+                  {item.icon}
+                </span>
+              )}
 
-          {onEditar && (
-            <button type="button" onClick={(e) => ejecutar(onEditar, e)}>
-              <FaEdit className="icono" />
-              <span>Editar</span>
+              <span>{item.label}</span>
             </button>
-          )}
-          {onRenombrar && (
-            <button type="button" onClick={(e) => ejecutar(onRenombrar, e)}>
-              <FaEdit className="icono" />
-              <span>Renombrar</span>
-            </button>
-          )}
-
-          {onDuplicar && (
-            <button type="button" onClick={(e) => ejecutar(onDuplicar, e)}>
-              <FaCopy className="icono" />
-              <span>Duplicar</span>
-            </button>
-          )}
-
-          {onCambiarEstado && (
-            <button type="button" onClick={(e) => ejecutar(onCambiarEstado, e)}>
-              <FaToggleOn className="icono" />
-              <span>{labelCambiarEstado}</span>
-            </button>
-          )}
-
-          {onEliminar && (
-            <button type="button" onClick={(e) => ejecutar(onEliminar, e)}>
-              <FaTrash className="icono" />
-              <span>Eliminar</span>
-            </button>
-          )}
+          ))}
         </div>
       )}
     </div>
