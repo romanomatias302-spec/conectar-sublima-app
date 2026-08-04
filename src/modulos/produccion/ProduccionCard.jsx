@@ -160,6 +160,7 @@ export default function ProduccionCard({
   indiceOrdenManual = null,
 }) {
   const id = pedido.firebaseId || pedido.id;
+
   const dropId = `pedido-drop-${id}`;
   const esMobile = window.innerWidth <= 768;
 

@@ -8,12 +8,13 @@ import { collection, getDocs, query, where, doc, updateDoc, writeBatch } from "f
 import { db } from "../../firebase";
 import {
   asegurarColumnasBaseProduccion,
-limpiarColumnasBaseDuplicadasProduccion,
+  limpiarColumnasBaseDuplicadasProduccion,
   crearColumnaIntermediaProduccion,
   actualizarColumnaProduccion,
   desactivarColumnaProduccion,
   escucharColumnasProduccion,
   moverColumnaProduccion,
+  reordenarColumnaDesdeMapaProduccion,
 } from "../../firebase/produccionColumnas";
 import {
   moverPedidoProduccion,
@@ -30,13 +31,14 @@ import {
   
 } from "../../firebase/produccionPedidos";
 import {
-  crearSectorProduccion,
+  
   escucharSectoresProduccion,
 } from "../../firebase/produccionSectores";
 import { agruparPedidosPorColumna } from "./produccionUtils";
 import ProduccionBoard from "./ProduccionBoard";
 import ProduccionHeader from "./ProduccionHeader";
 import ProduccionVistaSectores from "./ProduccionVistaSectores";
+import NuevoSectorProduccionModal from "./NuevoSectorProduccionModal";
 import PedidoFormModal from "../pedidos/PedidoFormModal";
 import {
   escucharEtiquetasProduccion,
@@ -47,6 +49,9 @@ import {
 import "./produccion.css";
 import { puedeHacer } from "../../utils/permisos";
 import SearchableSelect from "../../comunes/componentes/SearchableSelect";
+import {
+  construirRepresentacionesProduccion,
+} from "./produccionRepresentaciones";
 
 
 function getProduccionUIStorageKey(perfil) {
@@ -119,6 +124,11 @@ const [sectorNuevaColumnaId, setSectorNuevaColumnaId] = useState("");
     setMostrarVistaGeneralSectores,
   ] = useState(false);
 
+  const [
+  reordenandoColumnasMapa,
+  setReordenandoColumnasMapa,
+] = useState(false);
+
   /*
   * Preparado para planes.
   * Hoy queda habilitado para todos para poder desarrollar
@@ -182,14 +192,7 @@ const [pedidoNuevoResaltadoId, setPedidoNuevoResaltadoId] = useState(null);
   const [mostrarModalNuevoSector, setMostrarModalNuevoSector] =
     useState(false);
 
-  const [nombreNuevoSector, setNombreNuevoSector] =
-    useState("");
 
-  const [guardandoNuevoSector, setGuardandoNuevoSector] =
-    useState(false);
-
-  const [errorNuevoSector, setErrorNuevoSector] =
-    useState("");
 
   const [
     posicionNuevaColumnaEnSector,
@@ -665,6 +668,8 @@ const sectorVistaSeleccionado =
       sector.id === sectorVistaSeleccionadoId
   ) || null;
 
+
+
   const pedidosPorColumna = useMemo(() => {
   const pedidosFiltrados = filtrarPedidosPorAsignado(
     pedidos,
@@ -694,7 +699,21 @@ const pedidosFiltradosPorBusqueda = filtrarPedidosPorBusqueda(
   busquedaProduccion
 );
 
-  const agrupadoBase = agruparPedidosPorColumna(columnas, pedidosFiltradosPorBusqueda);
+  /*
+ * Los filtros siguen trabajando con pedidos reales.
+ * Recién después construimos las representaciones
+ * que recibe el tablero.
+ */
+const representacionesProduccion =
+  construirRepresentacionesProduccion({
+    pedidos: pedidosFiltradosPorBusqueda,
+    etapasVinculadas: [],
+  });
+
+const agrupadoBase = agruparPedidosPorColumna(
+  columnas,
+  representacionesProduccion
+);
 
   const columnaFinal = columnas.find((c) => c.esFinal);
   if (!columnaFinal) {
@@ -992,54 +1011,7 @@ async function manejarCrearColumna() {
   }
 }
 
-async function manejarCrearNuevoSector() {
-  try {
-    const nombre = String(nombreNuevoSector || "").trim();
 
-    if (!nombre) {
-      setErrorNuevoSector(
-        "Ingresá un nombre para el sector."
-      );
-      return;
-    }
-
-    if (!perfil?.clienteId) return;
-
-    setGuardandoNuevoSector(true);
-    setErrorNuevoSector("");
-
-    const sectorId = await crearSectorProduccion({
-      clienteId: perfil.clienteId,
-      nombre,
-
-      // Todo sector nuevo se agrega al final.
-      orden:
-        Math.max(
-          0,
-          ...sectoresProduccion.map((sector) =>
-            Number(sector.orden || 0)
-          )
-        ) + 1000,
-    });
-
-    setSectorNuevaColumnaId(sectorId);
-    setNombreNuevoSector("");
-    setErrorNuevoSector("");
-    setMostrarModalNuevoSector(false);
-
-    // Todo sector nuevo se incorpora al final.
-    setPosicionNuevaColumnaEnSector("fin");
-  } catch (error) {
-    console.error("Error creando sector:", error);
-
-    setErrorNuevoSector(
-      error?.message ||
-        "No se pudo crear el sector."
-    );
-  } finally {
-    setGuardandoNuevoSector(false);
-  }
-}
 
 async function manejarToggleOrdenManualColumna(columna) {
   try {
@@ -1623,7 +1595,62 @@ async function manejarReordenManualPedido({ pedidoId, pedidoObjetivoId, columnaI
 }
 
 
+  async function manejarReordenarColumnaMapa({
+  columnaId,
+  sectorDestinoId,
+  columnaObjetivoId,
+  posicion,
+}) {
+  try {
+    if (!perfil?.clienteId) return;
 
+    if (!puedeGestionarColumnas) {
+      return;
+    }
+
+    if (!vistaSectoresDisponible) {
+      return;
+    }
+
+    if (reordenandoColumnasMapa) {
+      return;
+    }
+
+    setReordenandoColumnasMapa(true);
+
+    await reordenarColumnaDesdeMapaProduccion({
+      clienteId: perfil.clienteId,
+      columnaId,
+      sectorDestinoId: sectorDestinoId || "",
+      columnaObjetivoId:
+        columnaObjetivoId || "",
+      posicion:
+        posicion === "despues"
+          ? "despues"
+          : "antes",
+    });
+
+    /*
+     * El porcentaje depende de la posición global.
+     * Utilizamos la versión optimizada con batches.
+     */
+    await recalcularPedidosPorCambioDeColumnas(
+      perfil.clienteId
+    );
+  } catch (error) {
+    console.error(
+      "Error reordenando columnas desde el mapa:",
+      error
+    );
+
+    window.alert(
+      error?.message ||
+        "No se pudo cambiar el orden de la columna."
+    );
+  } finally {
+    setReordenandoColumnasMapa(false);
+  }
+}
 
 
   function enfocarTableroProduccion() {
@@ -1873,6 +1900,18 @@ async function manejarReordenManualPedido({ pedidoId, pedidoObjetivoId, columnaI
                 sectores={sectoresProduccion}
                 columnas={columnasGlobalesOrdenadas}
                 pedidosPorColumna={pedidosPorColumna}
+                  puedeReordenarColumnas={
+                  puedeGestionarColumnas &&
+                  vistaSectoresDisponible
+                }
+
+                reordenandoColumnas={
+                  reordenandoColumnasMapa
+                }
+
+                onReordenarColumna={
+                  manejarReordenarColumnaMapa
+                }
                 sectorSeleccionadoId={
                   sectorVistaSeleccionadoId
                 }
@@ -2633,8 +2672,6 @@ async function manejarReordenManualPedido({ pedidoId, pedidoObjetivoId, columnaI
                     type="button"
                     className="produccion-sector-crear-desde-select"
                     onClick={() => {
-                      setErrorNuevoSector("");
-                      setNombreNuevoSector("");
                       setMostrarModalNuevoSector(true);
                     }}
                   >
@@ -2726,111 +2763,34 @@ async function manejarReordenManualPedido({ pedidoId, pedidoObjetivoId, columnaI
       </div>
     )}
 
-    {mostrarModalNuevoSector && (
-      <div
-        className="produccion-mini-modal-overlay produccion-sector-modal-overlay"
-        onMouseDown={(e) => {
-          if (e.target === e.currentTarget) {
-            setMostrarModalNuevoSector(false);
-            setNombreNuevoSector("");
-            setErrorNuevoSector("");
-          }
-        }}
-      >
-        <div
-          className="produccion-mini-modal produccion-sector-modal"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="titulo-nuevo-sector"
-          onMouseDown={(e) => e.stopPropagation()}
-        >
-          <div className="produccion-mini-modal-header">
-            <div>
-              <h3 id="titulo-nuevo-sector">
-                Nuevo sector
-              </h3>
+    <NuevoSectorProduccionModal
+      abierto={mostrarModalNuevoSector}
 
-              <p>
-                Los sectores agrupan columnas consecutivas dentro
-                del flujo de producción.
-              </p>
-            </div>
+      clienteId={perfil?.clienteId || ""}
 
-            <button
-              type="button"
-              className="produccion-mini-modal-cerrar"
-              onClick={() => {
-                setMostrarModalNuevoSector(false);
-                setNombreNuevoSector("");
-                setErrorNuevoSector("");
-              }}
-              aria-label="Cerrar"
-            >
-              ×
-            </button>
-          </div>
+      ultimoOrdenSector={Math.max(
+        0,
+        ...sectoresProduccion.map((sector) =>
+          Number(sector?.orden || 0)
+        )
+      )}
 
-          <div className="produccion-mini-modal-body">
-            <div className="produccion-mini-modal-campo">
-              <label htmlFor="produccion-sector-nombre">
-                Nombre del sector
-              </label>
+      onCerrar={() => {
+        setMostrarModalNuevoSector(false);
+      }}
 
-              <input
-                id="produccion-sector-nombre"
-                type="text"
-                value={nombreNuevoSector}
-                onChange={(e) =>
-                  setNombreNuevoSector(e.target.value)
-                }
-                placeholder="Ej: Diseño, Impresión o Confección"
-                autoFocus
-              />
-            </div>
+      onSectorCreado={(sectorCreado) => {
+        /*
+        * Seleccionamos inmediatamente el sector nuevo
+        * en el modal de creación de columna.
+        */
+        setSectorNuevaColumnaId(
+          sectorCreado?.id || ""
+        );
 
-            <div className="produccion-sector-info">
-              El nuevo sector se agregará al final del flujo.
-              La nueva columna quedará dentro de ese sector.
-            </div>
-
-            {errorNuevoSector && (
-              <div className="produccion-mini-modal-error">
-                {errorNuevoSector}
-              </div>
-            )}
-          </div>
-
-          <div className="produccion-mini-modal-footer">
-            <button
-              type="button"
-              className="produccion-mini-modal-btn-cancelar"
-              onClick={() => {
-                setMostrarModalNuevoSector(false);
-                setNombreNuevoSector("");
-                setErrorNuevoSector("");
-              }}
-              disabled={guardandoNuevoSector}
-            >
-              Cancelar
-            </button>
-
-            <button
-              type="button"
-              className="produccion-mini-modal-btn-guardar"
-              onClick={manejarCrearNuevoSector}
-              disabled={
-                guardandoNuevoSector ||
-                !nombreNuevoSector.trim()
-              }
-            >
-              {guardandoNuevoSector
-                ? "Creando..."
-                : "Crear sector"}
-            </button>
-          </div>
-        </div>
-      </div>
-    )}
+        setPosicionNuevaColumnaEnSector("fin");
+      }}
+    />
 
     {mostrarHistorialGeneral && (
       <div

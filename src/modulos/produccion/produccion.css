@@ -6360,3 +6360,585 @@ body.dark-mode
 /* =========================================================
    FIN - TIPOGRAFÍA NORMALIZADA
    ========================================================= */
+
+   /* =========================================================
+   PRODUCCIÓN - TABLERO GENERAL - TIPOGRAFÍA NORMALIZADA
+   ========================================================= */
+
+/*
+ * Evita que el navegador fabrique pesos tipográficos
+ * que la fuente real no posee.
+ */
+.produccion-board,
+.produccion-board button,
+.produccion-board input,
+.produccion-board select {
+  font-family: inherit !important;
+  font-synthesis: none;
+}
+
+/* Título principal de cada columna */
+.produccion-board .produccion-column-title {
+  font-family: inherit !important;
+
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  line-height: 1.28 !important;
+  letter-spacing: -0.005em !important;
+
+  color: #2f3a49;
+}
+
+/*
+ * Pastilla que muestra el sector:
+ * Diseño, Producción textil, Control de calidad, etc.
+ */
+.produccion-board .produccion-column-sector-badge {
+  font-family: inherit !important;
+
+  height: 18px !important;
+  padding: 0 7px !important;
+
+  font-size: 8.5px !important;
+  font-weight: 600 !important;
+  line-height: 1 !important;
+  letter-spacing: 0.035em !important;
+
+  text-transform: uppercase;
+}
+
+/* Pastilla activa al mirar un sector específico */
+.produccion-board
+  .produccion-column-sector-badge.activo {
+  font-weight: 600 !important;
+}
+
+/* Pastillas Entrada / Salida */
+.produccion-board
+  .produccion-column-sector-badge.contexto {
+  font-weight: 600 !important;
+  letter-spacing: 0.03em !important;
+}
+
+/*
+ * Texto que acompaña a Entrada / Salida
+ * y muestra el nombre del sector enfocado.
+ */
+.produccion-board .produccion-column-contexto-texto {
+  font-family: inherit !important;
+
+  font-size: 8.5px !important;
+  font-weight: 500 !important;
+  line-height: 1.2 !important;
+  letter-spacing: 0 !important;
+}
+
+/* Cantidad de pedidos de la columna */
+.produccion-board .produccion-column-count {
+  font-family: inherit !important;
+
+  font-weight: 600 !important;
+  letter-spacing: 0 !important;
+}
+
+/* Columnas contraídas */
+.produccion-board
+  .produccion-column.contraida
+  .produccion-column-title {
+  font-weight: 600 !important;
+}
+
+/* DARK MODE */
+
+body.dark-mode
+  .produccion-board
+  .produccion-column-title {
+  color: #e5e7eb;
+}
+
+body.dark-mode
+  .produccion-board
+  .produccion-column-sector-badge {
+  font-weight: 600 !important;
+}
+
+body.dark-mode
+  .produccion-board
+  .produccion-column-contexto-texto {
+  color: #aeb7c3;
+}
+
+/* MOBILE */
+
+@media (max-width: 768px) {
+  .produccion-board .produccion-column-title {
+    font-size: 13.5px !important;
+  }
+
+  .produccion-board
+    .produccion-column-sector-badge {
+    font-size: 8px !important;
+  }
+}
+
+/* =========================================================
+   FIN - TABLERO GENERAL - TIPOGRAFÍA NORMALIZADA
+   ========================================================= */
+
+/* =========================================================
+   PRODUCCIÓN - MAPA DE SECTORES - DRAG DE COLUMNAS
+   ========================================================= */
+
+/*
+ * El droppable exterior no agrega ancho invisible.
+ */
+.produccion-vista-modal-overlay
+  .produccion-vista-flujo-grid
+  .produccion-vista-sector-wrap {
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+
+  margin: 0 !important;
+  padding: 0 !important;
+
+  display: block !important;
+
+  flex: 0 0 auto !important;
+}
+
+/*
+ * El ancho calculado pertenece al contenedor visible.
+ */
+.produccion-vista-modal-overlay
+  .produccion-vista-sector-wrap-inner {
+  --ancho-sector-calculado: clamp(
+    270px,
+    calc(
+      175px +
+      var(--cantidad-columnas-sector, 2) * 52px
+    ),
+    760px
+  );
+
+  width: var(--ancho-sector-calculado);
+  min-width: var(--ancho-sector-calculado);
+  max-width: min(
+    var(--ancho-sector-calculado),
+    100%
+  );
+
+  box-sizing: border-box;
+}
+
+/* Ayuda superior */
+.produccion-vista-orden-ayuda {
+  margin: 0 0 14px;
+  padding: 9px 11px;
+
+  border: 1px solid rgba(7, 159, 211, 0.18);
+  border-radius: 9px;
+
+  background: rgba(7, 159, 211, 0.055);
+  color: #477080;
+
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+/* Mini columna arrastrable */
+.produccion-vista-modal-overlay
+  .produccion-vista-mini-columna.arrastrable {
+  cursor: grab;
+  touch-action: none;
+
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease;
+}
+
+.produccion-vista-modal-overlay
+  .produccion-vista-mini-columna.arrastrable:active {
+  cursor: grabbing;
+}
+
+.produccion-vista-modal-overlay
+  .produccion-vista-mini-columna.arrastrando {
+  opacity: 0.22;
+}
+
+/* Destino antes/después de una mini columna */
+.produccion-vista-modal-overlay
+  .produccion-vista-mini-columna.destino-activo
+  .produccion-vista-mini-columna-cuerpo {
+  border-color: rgba(0, 190, 255, 0.82) !important;
+
+  background:
+    linear-gradient(
+      180deg,
+      rgba(0, 190, 255, 0.22),
+      rgba(0, 190, 255, 0.07)
+    ) !important;
+
+  box-shadow:
+    0 0 0 2px rgba(0, 190, 255, 0.13),
+    0 0 20px rgba(0, 190, 255, 0.22);
+}
+
+/* Sector destino */
+.produccion-vista-modal-overlay
+  .produccion-vista-sector-wrap.sector-destino-activo
+  .produccion-vista-sector {
+  border-color: rgba(0, 190, 255, 0.75) !important;
+
+  box-shadow:
+    0 0 0 2px rgba(0, 190, 255, 0.1),
+    0 0 24px rgba(0, 190, 255, 0.18) !important;
+}
+
+/* Overlay flotante durante el drag */
+.produccion-vista-drag-overlay {
+  min-width: 120px;
+  max-width: 210px;
+
+  padding: 9px 11px;
+
+  display: flex;
+  align-items: center;
+  gap: 9px;
+
+  border: 1px solid rgba(0, 190, 255, 0.55);
+  border-radius: 10px;
+
+  background: rgba(255, 255, 255, 0.96);
+  color: #243244;
+
+  box-shadow:
+    0 14px 38px rgba(15, 23, 42, 0.2),
+    0 0 22px rgba(0, 190, 255, 0.17);
+}
+
+.produccion-vista-drag-overlay
+  .produccion-vista-mini-columna-cuerpo {
+  width: 32px;
+  min-width: 32px;
+  height: 52px;
+
+  flex: 0 0 auto;
+}
+
+.produccion-vista-drag-overlay strong {
+  min-width: 0;
+
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.25;
+
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Guardando */
+.produccion-vista-guardando {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: inherit;
+
+  background: rgba(248, 250, 252, 0.68);
+  backdrop-filter: blur(1.5px);
+
+  color: #067fa9;
+
+  font-size: 13px;
+  font-weight: 600;
+
+  cursor: wait;
+}
+
+/* Dark mode */
+body.dark-mode
+  .produccion-vista-drag-overlay {
+  background: rgba(39, 40, 43, 0.98);
+  color: #f1f5f9;
+}
+
+body.dark-mode
+  .produccion-vista-orden-ayuda {
+  border-color: rgba(0, 190, 255, 0.2);
+  background: rgba(0, 190, 255, 0.08);
+  color: #a8d9e8;
+}
+
+body.dark-mode
+  .produccion-vista-guardando {
+  background: rgba(32, 33, 36, 0.74);
+  color: #70d7f4;
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+  .produccion-vista-modal-overlay
+    .produccion-vista-flujo-grid
+    .produccion-vista-sector-wrap {
+    width: 100% !important;
+    max-width: 100% !important;
+
+    flex: 0 0 100% !important;
+  }
+
+  .produccion-vista-modal-overlay
+    .produccion-vista-sector-wrap-inner {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+}
+
+/* =========================================================
+   FIN - MAPA DE SECTORES - DRAG DE COLUMNAS
+   ========================================================= */
+
+   /* =========================================================
+   PRODUCCIÓN - MAPA - NOMBRE VERTICAL EN MINI COLUMNAS
+   ========================================================= */
+
+/*
+ * El número de pedidos interno deja de mostrarse.
+ * Se conserva la clase por compatibilidad con estilos viejos.
+ */
+.produccion-vista-modal-overlay
+  .produccion-vista-mini-columna-numero {
+  display: none !important;
+}
+
+/*
+ * El nombre anterior situado debajo de la columna
+ * ya no se utiliza.
+ */
+.produccion-vista-modal-overlay
+  .produccion-vista-mini-columna-nombre {
+  display: none !important;
+}
+
+/*
+ * Cuerpo de la mini columna.
+ * Centra el título vertical y evita desbordamientos.
+ */
+.produccion-vista-modal-overlay
+  .produccion-vista-mini-columna-cuerpo {
+  position: relative !important;
+
+  padding: 7px 4px !important;
+
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  overflow: hidden !important;
+
+  box-sizing: border-box !important;
+}
+
+/*
+ * Nombre leído desde abajo hacia arriba.
+ *
+ * writing-mode crea el recorrido vertical.
+ * rotate(180deg) hace que se lea de abajo hacia arriba.
+ */
+.produccion-vista-modal-overlay
+  .produccion-vista-mini-columna-titulo {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+
+  /*
+   * El ancho horizontal del texto se convierte visualmente
+   * en la altura disponible después de rotarlo.
+   */
+  width: calc(100% + 34px);
+  max-width: 92px;
+
+  transform:
+    translate(-50%, -50%)
+    rotate(-90deg);
+
+  transform-origin: center;
+
+  font-family: inherit !important;
+  font-size: 10.5px !important;
+  font-weight: 600 !important;
+  line-height: 1.1 !important;
+  letter-spacing: 0 !important;
+
+  color: #087fa8;
+
+  text-align: center;
+
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+
+  user-select: none;
+  pointer-events: none;
+}
+
+/*
+ * Columna neutra: "sin sector".
+ */
+.produccion-vista-modal-overlay
+  .produccion-vista-mini-columna.neutral
+  .produccion-vista-mini-columna-titulo {
+  color: #667085;
+}
+
+/*
+ * Al posar el mouse mejora ligeramente la lectura.
+ */
+.produccion-vista-modal-overlay
+  .produccion-vista-mini-columna:hover
+  .produccion-vista-mini-columna-titulo {
+  color: #056f95;
+}
+
+/*
+ * Destino activo durante el drag.
+ */
+.produccion-vista-modal-overlay
+  .produccion-vista-mini-columna.destino-activo
+  .produccion-vista-mini-columna-titulo {
+  color: #036f98;
+  font-weight: 650 !important;
+}
+
+/* =========================================================
+   OVERLAY DE ARRASTRE
+   ========================================================= */
+
+.produccion-vista-drag-columna {
+  width: 38px;
+  min-width: 38px;
+  height: 72px;
+
+  padding: 7px 4px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border: 1px solid rgba(0, 190, 255, 0.55);
+  border-radius: 6px;
+
+  background:
+    linear-gradient(
+      180deg,
+      rgba(0, 190, 255, 0.18),
+      rgba(0, 190, 255, 0.05)
+    );
+
+  overflow: hidden;
+
+  box-sizing: border-box;
+}
+
+.produccion-vista-drag-columna
+  .produccion-vista-mini-columna-titulo {
+  max-width: 100%;
+  max-height: 100%;
+
+  font-family: inherit;
+  font-size: 9.5px;
+  font-weight: 600;
+  line-height: 1.05;
+
+  color: #087fa8;
+
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+
+  transform: rotate(180deg);
+
+  overflow: hidden;
+
+  user-select: none;
+}
+
+.produccion-vista-drag-info {
+  min-width: 0;
+
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.produccion-vista-drag-info strong {
+  min-width: 0;
+
+  font-family: inherit !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  line-height: 1.25 !important;
+
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.produccion-vista-drag-info span {
+  color: #7a8492;
+
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 500;
+}
+
+/* DARK MODE */
+
+body.dark-mode
+  .produccion-vista-modal-overlay
+  .produccion-vista-mini-columna-titulo {
+  color: #7bd9f5;
+}
+
+body.dark-mode
+  .produccion-vista-drag-columna
+  .produccion-vista-mini-columna-titulo {
+  color: #7bd9f5;
+}
+
+/* =========================================================
+   FIN - NOMBRE VERTICAL EN MINI COLUMNAS
+   ========================================================= */
+
+   /* =========================================================
+   PRODUCCIÓN - MODAL DE SECTOR AISLADO
+   ========================================================= */
+
+.produccion-sector-modal-overlay {
+  z-index: 990000 !important;
+}
+
+.produccion-sector-modal {
+  contain: layout paint;
+}
+
+/*
+ * El input se mantiene fluido y no hereda
+ * transiciones globales costosas.
+ */
+.produccion-sector-modal input {
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease !important;
+}
+
+/* =========================================================
+   FIN - MODAL DE SECTOR AISLADO
+   ========================================================= */

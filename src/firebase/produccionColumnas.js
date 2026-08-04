@@ -503,3 +503,218 @@ export async function limpiarColumnasBaseDuplicadasProduccion(clienteId) {
     });
   }
 }
+
+export async function reordenarColumnaDesdeMapaProduccion({
+  clienteId,
+  columnaId,
+  sectorDestinoId = "",
+  columnaObjetivoId = "",
+  posicion = "antes",
+}) {
+  if (!clienteId) {
+    throw new Error("Falta clienteId.");
+  }
+
+  if (!columnaId) {
+    throw new Error("Falta columnaId.");
+  }
+
+  const columnas =
+    await obtenerColumnasProduccion(clienteId);
+
+  const columnasOrdenadas =
+    ordenarColumnasPorFlujo(columnas);
+
+  const columnaMovida = columnasOrdenadas.find(
+    (columna) => columna.id === columnaId
+  );
+
+  if (!columnaMovida) {
+    throw new Error(
+      "No se encontró la columna que querés mover."
+    );
+  }
+
+  if (
+    columnaMovida.esInicial === true ||
+    columnaMovida.esFinal === true
+  ) {
+    throw new Error(
+      "Las columnas inicial y final no pueden reordenarse desde el mapa."
+    );
+  }
+
+  const columnaObjetivo = columnaObjetivoId
+    ? columnasOrdenadas.find(
+        (columna) =>
+          columna.id === columnaObjetivoId
+      )
+    : null;
+
+  if (
+    columnaObjetivo &&
+    (columnaObjetivo.esInicial === true ||
+      columnaObjetivo.esFinal === true)
+  ) {
+    throw new Error(
+      "No podés insertar una columna dentro de las etapas inicial o final."
+    );
+  }
+
+  if (
+    columnaObjetivo &&
+    columnaObjetivo.id === columnaMovida.id
+  ) {
+    return {
+      sinCambios: true,
+    };
+  }
+
+  const columnaInicial =
+    columnasOrdenadas.find(
+      (columna) => columna.esInicial
+    ) || null;
+
+  const columnaFinal =
+    columnasOrdenadas.find(
+      (columna) => columna.esFinal
+    ) || null;
+
+  /*
+   * Trabajamos sólo con etapas intermedias.
+   * Pendiente y Producción finalizada conservan sus extremos.
+   */
+  const intermediasSinMovida =
+    columnasOrdenadas.filter(
+      (columna) =>
+        !columna.esInicial &&
+        !columna.esFinal &&
+        columna.id !== columnaMovida.id
+    );
+
+  const columnaMovidaActualizada = {
+    ...columnaMovida,
+    sectorId: sectorDestinoId || "",
+  };
+
+  let indiceInsercion = -1;
+
+  /*
+   * Si se soltó sobre una columna concreta,
+   * la insertamos antes o después de ella.
+   */
+  if (columnaObjetivo) {
+    const indiceObjetivo =
+      intermediasSinMovida.findIndex(
+        (columna) =>
+          columna.id === columnaObjetivo.id
+      );
+
+    if (indiceObjetivo !== -1) {
+      indiceInsercion =
+        posicion === "despues"
+          ? indiceObjetivo + 1
+          : indiceObjetivo;
+    }
+  }
+
+  /*
+   * Si se soltó sobre el sector, pero no sobre
+   * una columna concreta, va al final del sector.
+   */
+  if (indiceInsercion === -1) {
+    const indicesSectorDestino =
+      intermediasSinMovida
+        .map((columna, index) => ({
+          columna,
+          index,
+        }))
+        .filter(
+          ({ columna }) =>
+            String(columna.sectorId || "") ===
+            String(sectorDestinoId || "")
+        )
+        .map(({ index }) => index);
+
+    if (indicesSectorDestino.length > 0) {
+      indiceInsercion =
+        Math.max(...indicesSectorDestino) + 1;
+    } else {
+      /*
+       * Sector vacío o zona sin sector sin columnas:
+       * se ubica al final de las etapas intermedias.
+       */
+      indiceInsercion =
+        intermediasSinMovida.length;
+    }
+  }
+
+  const intermediasReordenadas = [
+    ...intermediasSinMovida,
+  ];
+
+  intermediasReordenadas.splice(
+    indiceInsercion,
+    0,
+    columnaMovidaActualizada
+  );
+
+  const flujoCompleto = [
+    ...(columnaInicial ? [columnaInicial] : []),
+    ...intermediasReordenadas,
+    ...(columnaFinal ? [columnaFinal] : []),
+  ];
+
+  /*
+   * Una empresa con 100 columnas entra ampliamente
+   * dentro del límite de un batch de Firestore.
+   *
+   * Dejamos margen por seguridad.
+   */
+  if (flujoCompleto.length > 450) {
+    throw new Error(
+      "El flujo tiene demasiadas columnas para reordenarlo en una sola operación."
+    );
+  }
+
+  const batch = writeBatch(db);
+
+  flujoCompleto.forEach((columna, index) => {
+    let nuevoOrden;
+
+    if (columna.esInicial === true) {
+      nuevoOrden = 0;
+    } else {
+      nuevoOrden = index * 1000;
+    }
+
+    const datosActualizacion = {
+      orden: nuevoOrden,
+      updatedAt: serverTimestamp(),
+    };
+
+    if (columna.id === columnaMovida.id) {
+      datosActualizacion.sectorId =
+        sectorDestinoId || "";
+    }
+
+    batch.update(
+      doc(
+        db,
+        PRODUCCION_COLUMNAS_COLLECTION,
+        columna.id
+      ),
+      datosActualizacion
+    );
+  });
+
+  await batch.commit();
+
+  return {
+    columnaId,
+    sectorDestinoId: sectorDestinoId || "",
+    columnaObjetivoId: columnaObjetivoId || "",
+    posicion,
+    columnasActualizadas: flujoCompleto.length,
+  };
+}

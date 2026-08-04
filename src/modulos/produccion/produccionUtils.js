@@ -21,18 +21,36 @@ export function calcularProduccionFinalizada(columna) {
   return !!columna?.esFinal;
 }
 
-export function agruparPedidosPorColumna(columnas, pedidos) {
+export function agruparPedidosPorColumna(
+  columnas,
+  representaciones
+) {
   const agrupado = {};
 
-  columnas.forEach((col) => {
-    agrupado[col.id] = [];
+  columnas.forEach((columna) => {
+    agrupado[columna.id] = [];
   });
 
-  pedidos.forEach((pedido) => {
-    const colId = pedido.columnaProduccionId;
-    if (agrupado[colId]) {
-      agrupado[colId].push(pedido);
-    }
+  representaciones.forEach((representacion) => {
+    /*
+     * Primero utiliza la columna específica de la
+     * representación.
+     *
+     * El fallback mantiene compatibilidad con todos
+     * los pedidos históricos actuales.
+     */
+    const columnaId =
+      representacion.columnaRepresentacionId ||
+      representacion.columnaProduccionId ||
+      "";
+
+    if (!columnaId) return;
+
+    if (!agrupado[columnaId]) return;
+
+    agrupado[columnaId].push(
+      representacion
+    );
   });
 
   return agrupado;
