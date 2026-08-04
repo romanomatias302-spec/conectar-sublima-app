@@ -37,11 +37,12 @@ import GastosPage from "./modulos/gastos/GastosPage";
 import { puedeHacer as puedeHacerPerfil } from "./utils/permisos";
 import ProveedoresPage from "./modulos/proveedores/ProveedoresPage";
 import ListasPreciosPage from "./modulos/listasPrecios/ListasPreciosPage";
+import FeedbackProviders from "./comunes/feedback/FeedbackProviders";
 
 
 
 
-export default function App() {
+function AppContent() {
   
   const [usuario, setUsuario] = useState(null);
   const [perfil, setPerfil] = useState(null);
@@ -953,5 +954,13 @@ if (!perfil && errorConexionPerfil) {
         }}
       />
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <FeedbackProviders>
+      <AppContent />
+    </FeedbackProviders>
   );
 }

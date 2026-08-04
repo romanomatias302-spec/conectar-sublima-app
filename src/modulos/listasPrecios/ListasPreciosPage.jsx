@@ -1,4 +1,9 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   collection,
   onSnapshot,
@@ -34,8 +39,10 @@ import {
   duplicarListaPrecio,
   subirImagenProductoBase,
 } from "../../firebase/listasPrecios";
-
+import useToast from "../../comunes/hooks/useToast";
+import useDialog from "../../comunes/hooks/useDialog";
 import "./ListasPreciosPage.css";
+
 
 const varianteVacia = () => ({
   id: crypto.randomUUID(),
@@ -97,6 +104,31 @@ const normalizarVariantesProducto = (producto = {}) => {
 };
 
 export default function ListasPreciosPage({ perfil }) {
+  const toast = useToast();
+  const { confirm, openFormDialog } = useDialog();
+  const accionesEnCursoRef = useRef(new Set());
+
+  const ejecutarUnaVez = async (clave, operacion) => {
+    if (accionesEnCursoRef.current.has(clave)) {
+      return {
+        ejecutada: false,
+        resultado: undefined,
+      };
+    }
+
+    accionesEnCursoRef.current.add(clave);
+
+    try {
+      const resultado = await operacion();
+
+      return {
+        ejecutada: true,
+        resultado,
+      };
+    } finally {
+      accionesEnCursoRef.current.delete(clave);
+    }
+  };
   const puedeCrear = perfil?.rol === "admin" || perfil?.rol === "superadmin" || perfil?.permisos?.listasPrecios?.crear === true;
   const puedeEditar = perfil?.rol === "admin" || perfil?.rol === "superadmin" || perfil?.permisos?.listasPrecios?.editar === true;
   const puedeEliminar = perfil?.rol === "admin" || perfil?.rol === "superadmin" || perfil?.permisos?.listasPrecios?.eliminar === true;  
@@ -152,11 +184,16 @@ export default function ListasPreciosPage({ perfil }) {
       }
     } catch (error) {
       console.error("Error cargando listas de precios:", error);
-      alert("No se pudieron cargar las listas de precios.");
+
+      toast.error("No se pudieron cargar las listas de precios.", {
+        accionId: "listasPrecios.cargar",
+      });
     } finally {
       setCargando(false);
     }
   };
+
+
 
 useEffect(() => {
   if (!perfil?.clienteId) return;
@@ -186,6 +223,15 @@ const qListas = query(
     },
     (error) => {
       console.error("Error escuchando listas de precios:", error);
+
+      toast.error(
+        "Se perdió la conexión con las listas de precios. Verificá internet y volvé a intentar.",
+        {
+          accionId: "listasPrecios.listenerListas",
+          duracion: 7000,
+        }
+      );
+
       setCargando(false);
     }
   );
@@ -202,6 +248,14 @@ const qListas = query(
     },
     (error) => {
       console.error("Error escuchando productos base:", error);
+
+      toast.error(
+        "No se pudieron actualizar los productos disponibles.",
+        {
+          accionId: "listasPrecios.listenerProductos",
+          duracion: 7000,
+        }
+      );
     }
   );
 
@@ -365,119 +419,317 @@ const productosGlobalesFiltrados = useMemo(() => {
     setModalLista(true);
   };
 
-  const guardarLista = async () => {
-    try {
-      const nombre = formLista.nombre.trim();
+const guardarLista = async () => {
+  const claveAccion = listaEditando?.firebaseId
+    ? `listasPrecios.guardarLista.${listaEditando.firebaseId}`
+    : "listasPrecios.crearLista";
 
-      if (!nombre) {
-        alert("Ingresá un nombre para la lista.");
-        return;
-      }
+  const ejecucion = await ejecutarUnaVez(
+    claveAccion,
+    async () => {
+      try {
+        const nombre = formLista.nombre.trim();
 
-      if (listaEditando?.firebaseId) {
-        await actualizarListaPrecio(listaEditando.firebaseId, {
-          nombre,
-          descripcion: formLista.descripcion || "",
+        if (!nombre) {
+          toast.warning("Ingresá un nombre para la lista.", {
+            accionId: "listasPrecios.validarNombre",
+          });
+
+          return false;
+        }
+
+        if (listaEditando?.firebaseId) {
+          await actualizarListaPrecio(
+            listaEditando.firebaseId,
+            {
+              nombre,
+              descripcion:
+                formLista.descripcion || "",
+            }
+          );
+        } else {
+          await crearListaPrecio(perfil, {
+            nombre,
+            descripcion:
+              formLista.descripcion || "",
+          });
+        }
+
+        setModalLista(false);
+        await cargarDatos();
+
+        toast.success(
+          listaEditando
+            ? "Lista actualizada correctamente."
+            : "Lista creada correctamente.",
+          {
+            accionId: listaEditando
+              ? "listasPrecios.actualizar"
+              : "listasPrecios.crear",
+          }
+        );
+
+        return true;
+      } catch (error) {
+        console.error("Error guardando lista:", error);
+
+        toast.error("No se pudo guardar la lista.", {
+          accionId: "listasPrecios.guardar",
         });
-      } else {
-        await crearListaPrecio(perfil, {
-          nombre,
-          descripcion: formLista.descripcion || "",
-        });
-      }
 
-      setModalLista(false);
-      await cargarDatos();
-    } catch (error) {
-      console.error("Error guardando lista:", error);
-      alert("No se pudo guardar la lista.");
+        return false;
+      }
     }
-  };
+  );
 
-  const desactivarLista = async (lista) => {
+  if (!ejecucion.ejecutada) {
+    toast.info(
+      "La lista ya se está guardando. Esperá un momento.",
+      {
+        accionId:
+          "listasPrecios.guardarDuplicado",
+      }
+    );
+  }
+};
+
+ const desactivarLista = async (lista) => {
+  try {
     if (!lista?.firebaseId) return;
 
-    const confirmar = window.confirm(
-      `¿Querés ${lista.activa === false ? "activar" : "desactivar"} la lista "${lista.nombre}"?`
-    );
+    const vaAActivar = lista.activa === false;
 
-    if (!confirmar) return;
+    const confirmado = await confirm({
+      titulo: vaAActivar ? "Activar lista" : "Desactivar lista",
+      mensaje: vaAActivar
+        ? `¿Querés activar la lista "${lista.nombre}"? Volverá a estar disponible para su uso.`
+        : `¿Querés desactivar la lista "${lista.nombre}"? La lista dejará de estar disponible hasta que vuelvas a activarla.`,
+      textoConfirmar: vaAActivar ? "Activar" : "Desactivar",
+      textoCancelar: "Cancelar",
+      variante: vaAActivar ? "success" : "warning",
+      cerrarConEscape: true,
+      cerrarAlHacerClickFuera: false,
+      accionId: vaAActivar
+        ? "listasPrecios.activar"
+        : "listasPrecios.desactivar",
+    });
+
+    if (!confirmado) return;
 
     await actualizarListaPrecio(lista.firebaseId, {
-      activa: lista.activa === false,
+      activa: vaAActivar,
     });
 
     await cargarDatos();
 
     if (listaSeleccionada?.firebaseId === lista.firebaseId) {
-      setListaSeleccionada({
-        ...listaSeleccionada,
-        activa: lista.activa === false,
-      });
+      setListaSeleccionada((prev) => ({
+        ...prev,
+        activa: vaAActivar,
+      }));
     }
-  };
 
-  const borrarLista = async (lista) => {
-    if (lista.activa !== false) {
-        alert(
-            "Solo se pueden eliminar listas inactivas. Primero desactivá la lista."
-        );
-        return;
+    toast.success(
+      vaAActivar
+        ? "Lista activada correctamente."
+        : "Lista desactivada correctamente.",
+      {
+        accionId: vaAActivar
+          ? "listasPrecios.activar"
+          : "listasPrecios.desactivar",
+      }
+    );
+  } catch (error) {
+    console.error("Error cambiando estado de la lista:", error);
+
+    toast.error(
+      lista?.activa === false
+        ? "No se pudo activar la lista."
+        : "No se pudo desactivar la lista.",
+      {
+        accionId:
+          lista?.activa === false
+            ? "listasPrecios.activar"
+            : "listasPrecios.desactivar",
+      }
+    );
+  }
+};
+
+const borrarLista = async (lista) => {
+  try {
+    if (lista?.activa !== false) {
+      toast.warning(
+        "Solo se pueden eliminar listas inactivas. Primero desactivá la lista.",
+        {
+          accionId: "listasPrecios.eliminarListaActiva",
+        }
+      );
+
+      return;
     }
+
     if (!lista?.firebaseId) return;
 
-    const confirmar = window.confirm(
-      `¿Seguro querés eliminar la lista "${lista.nombre}"?`
-    );
+    const confirmado = await confirm({
+      titulo: "Eliminar lista",
+      mensaje: `¿Seguro querés eliminar la lista "${lista.nombre}"? Esta acción no se puede deshacer.`,
+      textoConfirmar: "Eliminar",
+      textoCancelar: "Cancelar",
+      variante: "danger",
+      cerrarConEscape: true,
+      cerrarAlHacerClickFuera: false,
+      accionId: "listasPrecios.eliminar",
+    });
 
-    if (!confirmar) return;
+    if (!confirmado) return;
 
     await eliminarListaPrecio(lista.firebaseId);
 
-    if (listaSeleccionada?.firebaseId === lista.firebaseId) {
+    if (
+      listaSeleccionada?.firebaseId === lista.firebaseId
+    ) {
       setListaSeleccionada(null);
       setProductoSeleccionadoIndex(null);
     }
 
     await cargarDatos();
-  };
 
-    const marcarComoPredeterminada = async (lista) => {
-    try {
-      if (!perfil?.clienteId || !lista?.firebaseId) return;
+    toast.success("Lista eliminada correctamente.", {
+      accionId: "listasPrecios.eliminar",
+    });
+  } catch (error) {
+    console.error("Error eliminando lista:", error);
 
-      await marcarListaPrecioPredeterminada(perfil.clienteId, lista.firebaseId);
+    toast.error("No se pudo eliminar la lista.", {
+      accionId: "listasPrecios.eliminar",
+    });
+  }
+};
 
-      const listasActualizadas = listas.map((l) => ({
-        ...l,
-        predeterminada: l.firebaseId === lista.firebaseId,
-      }));
+const marcarComoPredeterminada = async (lista) => {
+  try {
+    if (!perfil?.clienteId || !lista?.firebaseId) {
+      return;
+    }
 
-      setListas(listasActualizadas);
+    const claveAccion =
+      `listasPrecios.predeterminada.${lista.firebaseId}`;
 
-      setListaSeleccionada((prev) =>
-        prev?.firebaseId === lista.firebaseId
-          ? { ...prev, predeterminada: true }
-          : prev
+    const ejecucion = await ejecutarUnaVez(
+      claveAccion,
+      async () => {
+        await marcarListaPrecioPredeterminada(
+          perfil.clienteId,
+          lista.firebaseId
+        );
+
+        const listasActualizadas = listas.map(
+          (item) => ({
+            ...item,
+            predeterminada:
+              item.firebaseId === lista.firebaseId,
+          })
+        );
+
+        setListas(listasActualizadas);
+
+        setListaSeleccionada((prev) =>
+          prev?.firebaseId === lista.firebaseId
+            ? {
+                ...prev,
+                predeterminada: true,
+              }
+            : prev
+        );
+
+        toast.success(
+          "Lista marcada como predeterminada.",
+          {
+            accionId:
+              "listasPrecios.marcarPredeterminada",
+          }
+        );
+
+        return true;
+      }
+    );
+
+    if (!ejecucion.ejecutada) {
+      toast.info(
+        "La lista ya se está actualizando.",
+        {
+          accionId:
+            "listasPrecios.predeterminadaDuplicada",
+        }
       );
-    } catch (error) {
-      console.error("Error marcando lista predeterminada:", error);
-      alert("No se pudo marcar la lista como predeterminada.");
     }
-  };
+  } catch (error) {
+    console.error(
+      "Error marcando lista predeterminada:",
+      error
+    );
 
-  const duplicarLista = async (lista) => {
-    try {
-      if (!lista) return;
+    toast.error(
+      "No se pudo marcar la lista como predeterminada.",
+      {
+        accionId:
+          "listasPrecios.marcarPredeterminada",
+      }
+    );
+  }
+};
 
-      await duplicarListaPrecio(perfil, lista);
+const duplicarLista = async (lista) => {
+  if (!lista?.firebaseId) return;
 
-      await cargarDatos();
-    } catch (error) {
-      console.error("Error duplicando lista:", error);
-      alert("No se pudo duplicar la lista.");
+  const claveAccion =
+    `listasPrecios.duplicar.${lista.firebaseId}`;
+
+  const ejecucion = await ejecutarUnaVez(
+    claveAccion,
+    async () => {
+      try {
+        await duplicarListaPrecio(perfil, lista);
+        await cargarDatos();
+
+        toast.success(
+          "Lista duplicada correctamente.",
+          {
+            accionId: "listasPrecios.duplicar",
+          }
+        );
+
+        return true;
+      } catch (error) {
+        console.error(
+          "Error duplicando lista:",
+          error
+        );
+
+        toast.error(
+          "No se pudo duplicar la lista.",
+          {
+            accionId:
+              "listasPrecios.duplicar",
+          }
+        );
+
+        return false;
+      }
     }
-  };
+  );
+
+  if (!ejecucion.ejecutada) {
+    toast.info(
+      "La lista ya se está duplicando.",
+      {
+        accionId:
+          "listasPrecios.duplicarDuplicado",
+      }
+    );
+  }
+};
 
   const abrirDetalleLista = (lista) => {
     setListaSeleccionada(lista);
@@ -532,68 +784,204 @@ const abrirEditarProducto = (producto, index) => {
     }));
   };
 
-const agregarVariante = () => {
-  const variantesActuales = normalizarVariantesProducto(formProducto);
+const agregarVariante = async () => {
+  try {
+    const variantesActuales =
+      normalizarVariantesProducto(formProducto);
 
-  const nombre = prompt("Nombre de la nueva variante:", "Nueva variante");
-  if (!nombre) return;
+    const resultado = await openFormDialog({
+      titulo: "Nueva variante",
+      mensaje:
+        "Ingresá el nombre de la variante y elegí si querés copiar una configuración existente.",
+      textoConfirmar: "Crear variante",
+      textoCancelar: "Cancelar",
+      cerrarConEscape: true,
+      cerrarAlHacerClickFuera: false,
+      accionId: "listasPrecios.crearVariante",
 
-  let varianteBase = null;
+      valoresIniciales: {
+        nombre: "Nueva variante",
+        copiarConfiguracion:
+          variantesActuales.length > 0,
+        varianteOrigenId:
+          variantesActuales[0]?.id || "",
+      },
 
-  if (variantesActuales.length > 0) {
-    const copiar = window.confirm(
-      "¿Querés copiar reglas y adicionales desde una variante existente?"
-    );
+      campos: [
+        {
+          nombre: "nombre",
+          tipo: "text",
+          etiqueta: "Nombre",
+          placeholder: "Ej: Adulto",
+          requerido: true,
+          mensajeRequerido:
+            "Ingresá un nombre para la variante.",
+          maxLength: 80,
+          autoFocus: true,
+        },
+        {
+          nombre: "copiarConfiguracion",
+          tipo: "checkbox",
+          etiqueta:
+            "Copiar configuración desde otra variante",
+          disabled: variantesActuales.length === 0,
+        },
+        {
+          nombre: "varianteOrigenId",
+          tipo: "select",
+          etiqueta: "Variante de origen",
+          placeholder: "Seleccioná una variante",
+          requerido: true,
+          opciones: variantesActuales.map(
+            (variante, index) => ({
+              valor:
+                variante.id ||
+                `variante-origen-${index}`,
+              etiqueta:
+                variante.nombre || "General",
+            })
+          ),
 
-    if (copiar) {
-      const opciones = variantesActuales
-        .map((v, index) => `${index + 1}. ${v.nombre || "General"}`)
-        .join("\n");
+          ocultoCuando: (valores) =>
+            valores.copiarConfiguracion !== true,
+        },
+      ],
 
-      const seleccion = prompt(
-        `Elegí la variante a copiar:\n\n${opciones}\n\nIngresá el número:`,
-        "1"
+      validar: (valores) => {
+        const errores = {};
+        const nombreNormalizado =
+          String(valores.nombre || "").trim();
+
+        const nombreRepetido =
+          variantesActuales.some(
+            (variante) =>
+              String(variante.nombre || "")
+                .trim()
+                .toLowerCase() ===
+              nombreNormalizado.toLowerCase()
+          );
+
+        if (nombreRepetido) {
+          errores.nombre =
+            "Ya existe una variante con ese nombre.";
+        }
+
+        if (
+          valores.copiarConfiguracion === true &&
+          !valores.varianteOrigenId
+        ) {
+          errores.varianteOrigenId =
+            "Seleccioná la variante que querés copiar.";
+        }
+
+        return errores;
+      },
+    });
+
+    if (!resultado.confirmado) return;
+
+    const nombre =
+      String(resultado.valores?.nombre || "").trim();
+
+    if (!nombre) {
+      toast.warning(
+        "Ingresá un nombre para la variante.",
+        {
+          accionId:
+            "listasPrecios.validarNuevaVariante",
+        }
       );
 
-      const indexSeleccionado = Number(seleccion) - 1;
+      return;
+    }
 
-      if (
-        Number.isInteger(indexSeleccionado) &&
-        variantesActuales[indexSeleccionado]
-      ) {
-        varianteBase = variantesActuales[indexSeleccionado];
+    let varianteBase = null;
+
+    if (
+      resultado.valores?.copiarConfiguracion === true
+    ) {
+      varianteBase = variantesActuales.find(
+        (variante, index) =>
+          (
+            variante.id ||
+            `variante-origen-${index}`
+          ) === resultado.valores.varianteOrigenId
+      );
+
+      if (!varianteBase) {
+        toast.error(
+          "No se encontró la variante seleccionada para copiar.",
+          {
+            accionId:
+              "listasPrecios.varianteOrigenNoEncontrada",
+          }
+        );
+
+        return;
       }
     }
-  }
 
-  const nuevaVariante = varianteBase
-    ? {
-        ...varianteBase,
-        id: crypto.randomUUID(),
-        nombre: nombre.trim(),
-        precioBase: "",
-        reglasCantidad: (varianteBase.reglasCantidad || []).map((r) => ({
-          ...r,
-          precio: "",
-        })),
-        adicionales: (varianteBase.adicionales || []).map((a) => ({
-          ...a,
+    const nuevaVariante = varianteBase
+      ? {
+          ...varianteBase,
           id: crypto.randomUUID(),
-        })),
+          nombre,
+          precioBase: "",
+          reglasCantidad: (
+            varianteBase.reglasCantidad || []
+          ).map((regla) => ({
+            ...regla,
+            precio: "",
+          })),
+          adicionales: (
+            varianteBase.adicionales || []
+          ).map((adicional) => ({
+            ...adicional,
+            id: crypto.randomUUID(),
+          })),
+        }
+      : {
+          ...varianteVacia(),
+          nombre,
+        };
+
+    const nuevasVariantes = [
+      ...variantesActuales,
+      nuevaVariante,
+    ];
+
+    setFormProducto((prev) => ({
+      ...prev,
+      variantes: nuevasVariantes,
+    }));
+
+    setVarianteEditandoIndex(
+      nuevasVariantes.length - 1
+    );
+
+    toast.success(
+      varianteBase
+        ? `Variante "${nombre}" creada copiando la configuración de "${varianteBase.nombre || "General"}".`
+        : `Variante "${nombre}" creada correctamente.`,
+      {
+        accionId:
+          "listasPrecios.crearVariante",
       }
-    : {
-        ...varianteVacia(),
-        nombre: nombre.trim(),
-      };
+    );
+  } catch (error) {
+    console.error(
+      "Error creando variante:",
+      error
+    );
 
-  const nuevasVariantes = [...variantesActuales, nuevaVariante];
-
-  setFormProducto((prev) => ({
-    ...prev,
-    variantes: nuevasVariantes,
-  }));
-
-  setVarianteEditandoIndex(nuevasVariantes.length - 1);
+    toast.error(
+      "No se pudo crear la variante.",
+      {
+        accionId:
+          "listasPrecios.crearVariante",
+      }
+    );
+  }
 };
 
 const actualizarVariante = (index, campo, valor) => {
@@ -639,24 +1027,70 @@ const toggleTalleVariante = (indexVariante, talle) => {
   });
 };
 
-const quitarVariante = (index) => {
-  setFormProducto((prev) => {
-    const variantes = normalizarVariantesProducto(prev);
+const quitarVariante = async (index) => {
+  const variantes = normalizarVariantesProducto(formProducto);
+  const variante = variantes[index];
 
-    if (index === 0 || variantes[index]?.id === "general") {
-      alert("La variante General no se puede eliminar.");
-      return prev;
+  if (!variante) {
+    toast.error("No se encontró la variante seleccionada.", {
+      accionId: "listasPrecios.varianteNoEncontrada",
+    });
+
+    return;
+  }
+
+  if (index === 0 || variante.id === "general") {
+    toast.warning("La variante General no se puede eliminar.", {
+      accionId: "listasPrecios.varianteGeneral",
+    });
+
+    return;
+  }
+
+  if (variantes.length <= 1) {
+    toast.warning("El producto debe tener al menos una variante.", {
+      accionId: "listasPrecios.minimoVariantes",
+    });
+
+    return;
+  }
+
+  const confirmado = await confirm({
+    titulo: "Eliminar variante",
+    mensaje: `¿Querés eliminar la variante "${variante.nombre || "Sin nombre"}"? También se quitarán sus precios, reglas por cantidad y adicionales.`,
+    textoConfirmar: "Eliminar variante",
+    textoCancelar: "Cancelar",
+    variante: "danger",
+    cerrarConEscape: true,
+    cerrarAlHacerClickFuera: false,
+    accionId: "listasPrecios.eliminarVariante",
+  });
+
+  if (!confirmado) return;
+
+  const nuevasVariantes = variantes.filter(
+    (_, i) => i !== index
+  );
+
+  setFormProducto((prev) => ({
+    ...prev,
+    variantes: nuevasVariantes,
+  }));
+
+  setVarianteEditandoIndex((indiceActual) => {
+    if (indiceActual === index) {
+      return Math.max(0, index - 1);
     }
 
-    if (variantes.length <= 1) {
-      alert("El producto debe tener al menos una variante.");
-      return prev;
+    if (indiceActual > index) {
+      return indiceActual - 1;
     }
 
-    return {
-      ...prev,
-      variantes: variantes.filter((_, i) => i !== index),
-    };
+    return indiceActual;
+  });
+
+  toast.success("Variante eliminada correctamente.", {
+    accionId: "listasPrecios.eliminarVariante",
   });
 };
 
@@ -777,7 +1211,10 @@ const quitarAdicional = (indexAdicional) => {
       if (!listaSeleccionada?.firebaseId) return;
 
       if (!formProducto.nombre.trim()) {
-        alert("Seleccioná o ingresá un producto.");
+        toast.warning("Seleccioná o ingresá un producto.", {
+          accionId: "listasPrecios.validarProducto",
+        });
+
         return;
       }
 
@@ -785,9 +1222,14 @@ const quitarAdicional = (indexAdicional) => {
         formProducto.productoBaseId &&
         productoYaExisteEnLista(formProducto.productoBaseId)
       ) {
-        alert(
-          "Este producto ya está agregado en esta lista. Si necesitás otra configuración de precio, creá una lista alternativa."
+        toast.info(
+          "Este producto ya está agregado en esta lista. Si necesitás otra configuración de precio, creá una lista alternativa.",
+          {
+            accionId: "listasPrecios.productoDuplicado",
+            duracion: 7000,
+          }
         );
+
         return;
       }
 
@@ -866,39 +1308,98 @@ const quitarAdicional = (indexAdicional) => {
       setModalProducto(false);
       setListaSeleccionada(listaActualizada);
       setProductoSeleccionadoIndex(
-        productoEditandoIndex !== null ? productoEditandoIndex : nuevosProductos.length - 1
+        productoEditandoIndex !== null
+          ? productoEditandoIndex
+          : nuevosProductos.length - 1
       );
 
       await cargarDatos();
+
+      toast.success(
+        productoEditandoIndex !== null
+          ? "Producto actualizado correctamente."
+          : "Producto agregado correctamente.",
+        {
+          accionId:
+            productoEditandoIndex !== null
+              ? "listasPrecios.actualizarProducto"
+              : "listasPrecios.agregarProducto",
+        }
+      );
     } catch (error) {
       console.error("Error guardando producto en lista:", error);
-      alert("No se pudo guardar el producto.");
+
+      toast.error("No se pudo guardar el producto.", {
+        accionId: "listasPrecios.guardarProducto",
+      });
     }
   };
 
-  const quitarProductoDeLista = async (indexProducto) => {
+const quitarProductoDeLista = async (indexProducto) => {
+  try {
     if (!listaSeleccionada?.firebaseId) return;
 
-    const confirmar = window.confirm("¿Querés quitar este producto de la lista?");
-    if (!confirmar) return;
+    const producto =
+      (listaSeleccionada.productos || [])[indexProducto];
 
-    const nuevosProductos = (listaSeleccionada.productos || []).filter(
-      (_, index) => index !== indexProducto
+    if (!producto) {
+      toast.error("No se encontró el producto seleccionado.", {
+        accionId: "listasPrecios.quitarProductoNoEncontrado",
+      });
+
+      return;
+    }
+
+    const confirmado = await confirm({
+      titulo: "Quitar producto",
+      mensaje: `¿Querés quitar "${producto.nombre || "este producto"}" de la lista "${listaSeleccionada.nombre}"? Se eliminará su configuración de precios dentro de esta lista.`,
+      textoConfirmar: "Quitar producto",
+      textoCancelar: "Cancelar",
+      variante: "danger",
+      cerrarConEscape: true,
+      cerrarAlHacerClickFuera: false,
+      accionId: "listasPrecios.quitarProducto",
+    });
+
+    if (!confirmado) return;
+
+    const nuevosProductos = (
+      listaSeleccionada.productos || []
+    ).filter((_, index) => index !== indexProducto);
+
+    await actualizarListaPrecio(
+      listaSeleccionada.firebaseId,
+      {
+        productos: nuevosProductos,
+      }
     );
 
-    await actualizarListaPrecio(listaSeleccionada.firebaseId, {
+    setListaSeleccionada((prev) => ({
+      ...prev,
       productos: nuevosProductos,
-    });
-
-    setListaSeleccionada({
-      ...listaSeleccionada,
-      productos: nuevosProductos,
-    });
+    }));
 
     setProductoSeleccionadoIndex(null);
+    setVarianteSeleccionadaIndex(0);
+    setReglaSeleccionadaIndex(null);
+    setAdicionalesSimulados([]);
 
     await cargarDatos();
-  };
+
+    toast.success("Producto quitado de la lista correctamente.", {
+      accionId: "listasPrecios.quitarProducto",
+    });
+  } catch (error) {
+    console.error(
+      "Error quitando producto de la lista:",
+      error
+    );
+
+    toast.error("No se pudo quitar el producto de la lista.", {
+      accionId: "listasPrecios.quitarProducto",
+    });
+  }
+};
 
   const formatearMoneda = (valor) => {
     return new Intl.NumberFormat(perfil?.localeMoneda || "es-AR", {
@@ -1010,7 +1511,10 @@ const composicionPrecioSeleccionado = useMemo(() => {
     if (!archivo) return;
 
     if (!productoSeleccionado?.productoBaseId) {
-      alert("Este producto no está vinculado a un producto base.");
+      toast.warning("Este producto no está vinculado a un producto base.", {
+        accionId: "listasPrecios.imagenSinProductoBase",
+      });
+
       return;
     }
 
@@ -1023,9 +1527,16 @@ const composicionPrecioSeleccionado = useMemo(() => {
     );
 
     await cargarDatos();
+
+    toast.success("Imagen actualizada correctamente.", {
+      accionId: "listasPrecios.subirImagen",
+    });
   } catch (error) {
     console.error("Error subiendo imagen:", error);
-    alert("No se pudo subir la imagen.");
+
+    toast.error("No se pudo subir la imagen.", {
+      accionId: "listasPrecios.subirImagen",
+    });
   } finally {
     setSubiendoImagen(false);
     e.target.value = "";
@@ -1777,10 +2288,7 @@ const composicionPrecioSeleccionado = useMemo(() => {
                   <button
                     type="button"
                     className="lp-icon-danger"
-                    onClick={() => {
-                      quitarVariante(varianteEditandoIndex);
-                      setVarianteEditandoIndex(0);
-                    }}
+                    onClick={() => quitarVariante(varianteEditandoIndex)}
                     disabled={
                       varianteEditandoIndex === 0 ||
                       normalizarVariantesProducto(formProducto)[varianteEditandoIndex]?.id === "general" ||
