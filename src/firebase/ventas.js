@@ -692,8 +692,13 @@ export async function anularVenta({
   ventaId,
   motivoAnulacion = "",
 }) {
-  if (!perfil?.clienteId) throw new Error("Perfil inválido.");
-  if (!ventaId) throw new Error("Falta ventaId.");
+  if (!perfil?.clienteId) {
+    throw new Error("Perfil inválido.");
+  }
+
+  if (!ventaId) {
+    throw new Error("Falta ventaId.");
+  }
 
   const ventaRef = doc(db, "ventas", ventaId);
   const ventaSnap = await getDoc(ventaRef);
@@ -704,50 +709,133 @@ export async function anularVenta({
 
   const ventaData = ventaSnap.data();
 
+  if (ventaData.clienteId !== perfil.clienteId) {
+    throw new Error(
+      "La venta no pertenece a la empresa del usuario autenticado."
+    );
+  }
+
   if ((ventaData.estadoVenta || "activa") === "anulada") {
     throw new Error("La venta ya está anulada.");
   }
 
-const batch = writeBatch(db);
+  /*
+   * Buscamos TODOS los movimientos vinculados a la venta.
+   *
+   * Esto incluye:
+   * - movimiento comercial de la venta;
+   * - cobros iniciales;
+   * - cobros posteriores;
+   * - movimientos de efectivo que impactaron Caja.
+   */
+  const movSnap = await getDocs(
+    query(
+      collection(db, "movimientos"),
+      where("clienteId", "==", perfil.clienteId),
+      where("origenRefId", "==", ventaId)
+    )
+  );
 
-batch.update(ventaRef, {
-  estadoVenta: "anulada",
-  motivoAnulacion,
-  anuladaAt: serverTimestamp(),
-  anuladaPor: perfil?.email || "",
-  anuladaPorNombre: perfil?.nombre || perfil?.email || "",
-  updatedAt: serverTimestamp(),
-});
+  /*
+   * También anulamos los registros de pago de la subcolección
+   * para mantener consistencia y auditoría.
+   */
+  const pagosSnap = await getDocs(
+    collection(db, "ventas", ventaId, "pagos")
+  );
 
-const movSnap = await getDocs(
-  query(
-    collection(db, "movimientos"),
-    where("clienteId", "==", perfil.clienteId),
-    where("origen", "==", "venta"),
-    where("origenRefId", "==", ventaId)
-  )
-);
+  const batch = writeBatch(db);
 
-movSnap.docs.forEach((movDoc) => {
-  batch.update(doc(db, "movimientos", movDoc.id), {
-    estadoMovimiento: "anulado",
-    activo: false,
-    anuladoAt: serverTimestamp(),
-    anuladoPor: perfil?.uid || perfil?.firebaseUid || perfil?.email || "",
-    anuladoPorNombre: perfil?.nombre || perfil?.email || "",
+  batch.update(ventaRef, {
+    estadoVenta: "anulada",
     motivoAnulacion,
+    anuladaAt: serverTimestamp(),
+    anuladaPor:
+      perfil?.uid ||
+      perfil?.firebaseUid ||
+      perfil?.email ||
+      "",
+    anuladaPorNombre: perfil?.nombre || perfil?.email || "",
     updatedAt: serverTimestamp(),
   });
-});
 
-if (ventaData.pedidoRefId) {
-  batch.update(doc(db, "pedidos", ventaData.pedidoRefId), {
-    ventaEstado: "anulada",
-    updatedAt: serverTimestamp(),
+  movSnap.docs.forEach((movDoc) => {
+    batch.update(doc(db, "movimientos", movDoc.id), {
+      estadoMovimiento: "anulado",
+      activo: false,
+      anuladoAt: serverTimestamp(),
+      anuladoPor:
+        perfil?.uid ||
+        perfil?.firebaseUid ||
+        perfil?.email ||
+        "",
+      anuladoPorNombre: perfil?.nombre || perfil?.email || "",
+      motivoAnulacion,
+      updatedAt: serverTimestamp(),
+    });
   });
-}
 
-await batch.commit();
+  pagosSnap.docs.forEach((pagoDoc) => {
+    const pagoData = pagoDoc.data();
+
+    if ((pagoData.estadoPagoRegistro || "activo") !== "activo") {
+      return;
+    }
+
+    batch.update(
+      doc(db, "ventas", ventaId, "pagos", pagoDoc.id),
+      {
+        estadoPagoRegistro: "anulado",
+        motivoAnulacion,
+        anuladoAt: serverTimestamp(),
+        anuladoPor:
+          perfil?.uid ||
+          perfil?.firebaseUid ||
+          perfil?.email ||
+          "",
+        anuladoPorNombre: perfil?.nombre || perfil?.email || "",
+        updatedAt: serverTimestamp(),
+      }
+    );
+  });
+
+  /*
+   * Primero anulamos la venta, sus pagos y sus movimientos.
+   *
+   * El pedido NO forma parte de este batch porque puede haber
+   * sido eliminado y no debe bloquear la anulación de la venta.
+   */
+  await batch.commit();
+
+  /*
+   * Si todavía existe un pedido asociado, intentamos actualizarlo.
+   *
+   * Es una operación secundaria:
+   * si el pedido fue eliminado o no puede actualizarse, la venta
+   * ya quedó anulada correctamente y no debemos revertirla.
+   */
+  if (ventaData.pedidoRefId) {
+    try {
+      await updateDoc(
+        doc(db, "pedidos", ventaData.pedidoRefId),
+        {
+          ventaEstado: "anulada",
+          updatedAt: serverTimestamp(),
+        }
+      );
+    } catch (pedidoError) {
+      console.warn(
+        "La venta fue anulada, pero el pedido asociado no pudo actualizarse.",
+        {
+          ventaId,
+          numeroVenta: ventaData.numeroVenta || "",
+          pedidoRefId: ventaData.pedidoRefId,
+          code: pedidoError?.code || "",
+          message: pedidoError?.message || "",
+        }
+      );
+    }
+  }
 }
 
 export function escucharVentasRecientes({

@@ -346,13 +346,17 @@ export async function obtenerMovimientosCajaDia({
       ...d.data(),
     }))
     .filter((m) => {
-      const impactaCaja = m.impactaCaja === true;
-
       const perteneceSucursal = todasSucursales
         ? true
         : movimientoPerteneceASucursal(m, sucursalData.sucursalId);
 
-      return impactaCaja && perteneceSucursal;
+      const esMovimientoCaja = m.impactaCaja === true;
+
+      const esCobroVenta =
+        m.origen === "venta_pago" &&
+        m.tipo === "ingreso";
+
+      return perteneceSucursal && (esMovimientoCaja || esCobroVenta);
     })
     .sort((a, b) => {
       const fechaA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0;
@@ -385,11 +389,18 @@ export function escucharMovimientosCajaDia({
           firebaseId: d.id,
           ...d.data(),
         }))
-        .filter(
-            (m) =>
-              m.impactaCaja === true &&
-              movimientoPerteneceASucursal(m, sucursalId)
-          )
+          .filter((m) => {
+            const perteneceSucursal =
+              movimientoPerteneceASucursal(m, sucursalId);
+
+            const esMovimientoCaja = m.impactaCaja === true;
+
+            const esCobroVenta =
+              m.origen === "venta_pago" &&
+              m.tipo === "ingreso";
+
+            return perteneceSucursal && (esMovimientoCaja || esCobroVenta);
+          })
         .sort((a, b) => {
           const fechaA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0;
           const fechaB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0;
@@ -622,16 +633,30 @@ const activos = movimientos.filter(
   (m) =>
     (m.estadoMovimiento || "activo") === "activo" &&
     m.activo !== false &&
-    m.impactaCaja !== false
+    m.impactaCaja === true
 );
 
-  const ingresosEfectivo = activos
-    .filter((m) => m.tipo === "ingreso" && m.medioPago === "efectivo")
-    .reduce((acc, m) => acc + Number(m.monto || 0), 0);
+const ingresosEfectivo = activos
+  .filter(
+    (m) =>
+      m.tipo === "ingreso" &&
+      (
+        m.medioPago === "efectivo" ||
+        m.medioPago === "efectivo_caja"
+      )
+  )
+  .reduce((acc, m) => acc + Number(m.monto || 0), 0);
 
-  const egresosEfectivo = activos
-    .filter((m) => m.tipo === "egreso" && m.medioPago === "efectivo")
-    .reduce((acc, m) => acc + Number(m.monto || 0), 0);
+const egresosEfectivo = activos
+  .filter(
+    (m) =>
+      m.tipo === "egreso" &&
+      (
+        m.medioPago === "efectivo" ||
+        m.medioPago === "efectivo_caja"
+      )
+  )
+  .reduce((acc, m) => acc + Number(m.monto || 0), 0);
 
   const esperado =
     Number(caja.saldoAperturaEfectivo || 0) + ingresosEfectivo - egresosEfectivo;

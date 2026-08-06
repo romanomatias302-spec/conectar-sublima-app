@@ -435,7 +435,7 @@ const puedeAnularVentas =
               <button
                 className="btn btn-secondary btn-xs"
                 onClick={handleAnularVenta}
-                disabled={anulandoVenta || !puedeEditarVentas}
+                disabled={anulandoVenta || !puedeAnularVentas}
               >
                 {anulandoVenta ? "Anulando..." : "Anular venta"}
               </button>
