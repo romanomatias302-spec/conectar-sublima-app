@@ -53,6 +53,13 @@ const puedeConvertirCotizacion = puedeHacer(perfil, "ventas", "convertirCotizaci
 const puedeOtorgarDescuentoCotizacion =
   puedeHacer(perfil, "ventas", "otorgarDescuentoCotizacion");
 
+const puedeUsarListaPrecios =
+  perfil?.rol === "admin" ||
+  perfil?.rol === "superadmin" ||
+  puedeHacer(perfil, "listasPrecios", "ver") ||
+  puedeHacer(perfil, "ventas", "crear") ||
+  puedeHacer(perfil, "ventas", "crearCotizacion");
+
   const cargarDetalle = async () => {
     try {
       setError("");
@@ -271,6 +278,8 @@ const actualizarItemEdicion = (index, campo, valor) => {
 };
 
 const abrirSelectorPrecioEdicion = (index) => {
+  if (!puedeUsarListaPrecios) return;
+
   setItemPrecioEdicionIndex(index);
   setModalPrecioEdicionAbierto(true);
   setError("");
@@ -983,12 +992,14 @@ const itemsVenta = items
                             }
                           />
 
+                        {puedeUsarListaPrecios && (
                           <button
                             type="button"
                             className="ventas-selector-precio-btn"
                             onClick={() => abrirSelectorPrecioEdicion(index)}
                             title="Agregar desde lista de precios"
                           />
+                        )}
                         </div>
                       </td>
 
@@ -1111,21 +1122,21 @@ const itemsVenta = items
         </div>
         )}
 
-        <ProductoSelectorModal
-          open={modalPrecioEdicionAbierto}
-          perfil={perfil}
-          configMoneda={configMoneda}
-          itemActual={
-            itemPrecioEdicionIndex !== null
-              ? editItems[itemPrecioEdicionIndex]
-              : null
-          }
-          onClose={() => {
-            setModalPrecioEdicionAbierto(false);
-            setItemPrecioEdicionIndex(null);
-          }}
-          onAplicar={aplicarProductoSeleccionadoEdicion}
-        />  
+        {puedeUsarListaPrecios &&
+          modalPrecioEdicionAbierto &&
+          itemPrecioEdicionIndex !== null && (
+            <ProductoSelectorModal
+              open={true}
+              perfil={perfil}
+              configMoneda={configMoneda}
+              itemActual={editItems[itemPrecioEdicionIndex]}
+              onClose={() => {
+                setModalPrecioEdicionAbierto(false);
+                setItemPrecioEdicionIndex(null);
+              }}
+              onAplicar={aplicarProductoSeleccionadoEdicion}
+            />
+          )} 
 
     </div>
   );
