@@ -1,3 +1,1253 @@
+### Ultima version funcionando 06-08-2026
+
+rules_version = '2';
+service cloud.firestore {
+match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function userRef() {
+      return /databases/$(database)/documents/usuarios/$(request.auth.uid);
+    }
+
+    function hasProfile() {
+      return signedIn() && exists(userRef());
+    }
+
+    function profile() {
+      return get(userRef()).data;
+    }
+
+    function isSuperAdmin() {
+      return hasProfile() && profile().rol == "superadmin";
+    }
+
+    function isAdmin() {
+      return hasProfile() && profile().rol == "admin";
+    }
+
+    function isActiveUser() {
+      return hasProfile() && profile().activo == true;
+    }
+
+    function hasClienteId() {
+      return hasProfile()
+        && profile().clienteId is string
+        && profile().clienteId != "";
+    }
+
+    function sameTenant(clienteId) {
+      return isActiveUser()
+        && hasClienteId()
+        && clienteId == profile().clienteId;
+    }
+
+    function tenantIsActiveById(clienteId) {
+      return exists(/databases/$(database)/documents/clientes-saas/$(clienteId))
+        && get(/databases/$(database)/documents/clientes-saas/$(clienteId)).data.estado == "activo";
+    }
+
+    function canReadTenantDoc(clienteId) {
+      return isSuperAdmin() || sameTenant(clienteId);
+    }
+
+    function canCreateTenantDoc() {
+      return isSuperAdmin()
+        || (
+          isAdmin()
+          && isActiveUser()
+          && request.resource.data.clienteId == profile().clienteId
+          && tenantIsActiveById(profile().clienteId)
+        );
+    }
+
+    function canUpdateTenantDoc() {
+      return isSuperAdmin()
+        || (
+          isAdmin()
+          && isActiveUser()
+          && resource.data.clienteId == profile().clienteId
+          && request.resource.data.clienteId == profile().clienteId
+          && tenantIsActiveById(profile().clienteId)
+        );
+    }
+
+    function canDeleteTenantDoc() {
+      return isSuperAdmin()
+        || (
+          isAdmin()
+          && isActiveUser()
+          && resource.data.clienteId == profile().clienteId
+          && tenantIsActiveById(profile().clienteId)
+        );
+    }
+
+    function pedidoParentClienteId(pedidoId) {
+      return get(/databases/$(database)/documents/pedidos/$(pedidoId)).data.clienteId;
+    }
+
+    function invitacionDocByToken(token) {
+      return /databases/$(database)/documents/invitaciones_usuarios/$(token);
+    }
+
+    function invitacionValidaParaActivacion() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/invitaciones_usuarios/$(request.resource.data.invitacionId))
+        && get(/databases/$(database)/documents/invitaciones_usuarios/$(request.resource.data.invitacionId)).data.estado == "pendiente"
+        && get(/databases/$(database)/documents/invitaciones_usuarios/$(request.resource.data.invitacionId)).data.email == request.resource.data.email
+        && get(/databases/$(database)/documents/invitaciones_usuarios/$(request.resource.data.invitacionId)).data.clienteId == request.resource.data.clienteId
+        && get(/databases/$(database)/documents/invitaciones_usuarios/$(request.resource.data.invitacionId)).data.rol == request.resource.data.rol;
+    }
+
+    function puedeLeerInvitacion(clienteId) {
+      return isSuperAdmin()
+        || (
+          isAdmin()
+          && isActiveUser()
+          && clienteId == profile().clienteId
+        );
+    }
+
+    function puedeCrearInvitacion() {
+      return isSuperAdmin()
+        || (
+          isAdmin()
+          && isActiveUser()
+          && request.resource.data.clienteId == profile().clienteId
+          && tenantIsActiveById(profile().clienteId)
+        );
+    }
+
+    function puedeActualizarInvitacion(clienteId) {
+      return isSuperAdmin()
+        || (
+          isAdmin()
+          && isActiveUser()
+          && clienteId == profile().clienteId
+          && tenantIsActiveById(profile().clienteId)
+        );
+    }
+
+    function ventaParentClienteId(ventaId) {
+      return get(/databases/$(database)/documents/ventas/$(ventaId)).data.clienteId;
+    }
+
+        function hasPermisos() {
+      return hasProfile() && profile().permisos is map;
+    }
+
+    function permisosModuloExiste(modulo) {
+      return hasPermisos() && profile().permisos[modulo] is map;
+    }
+
+    function permisoModuloAccion(modulo, accion) {
+      return permisosModuloExiste(modulo)
+        && profile().permisos[modulo][accion] == true;
+    }
+
+    function tenantUserBase(clienteId) {
+      return sameTenant(clienteId)
+        && isActiveUser()
+        && tenantIsActiveById(clienteId);
+    }
+
+    function canModulo(clienteId, modulo, accion) {
+      return isSuperAdmin()
+        || (
+          tenantUserBase(clienteId)
+          && (
+            isAdmin()
+            || permisoModuloAccion(modulo, accion)
+          )
+        );
+    }
+
+    function changedKeys() {
+      return request.resource.data.diff(resource.data).affectedKeys();
+    }
+
+    function onlyChangesAllowed(allowedKeys) {
+      return changedKeys().hasOnly(allowedKeys);
+    }
+
+function canReadClientes(clienteId) {
+return canModulo(clienteId, "clientes", "ver")
+|| (
+tenantUserBase(clienteId)
+&& (
+permisoModuloAccion("inicio", "verClientes")
+|| permisoModuloAccion("ventas", "crear")
+|| permisoModuloAccion("ventas", "editar")
+|| permisoModuloAccion("ventas", "ver")
+|| permisoModuloAccion("ventas", "cotizaciones")
+|| permisoModuloAccion("ventas", "crearCotizacion")
+)
+);
+}
+
+    function canCreateClientes(clienteId) {
+      return canModulo(clienteId, "clientes", "crear");
+    }
+
+    function canUpdateClientes(clienteId) {
+      return canModulo(clienteId, "clientes", "editar");
+    }
+
+    function canDeleteClientes(clienteId) {
+      return canModulo(clienteId, "clientes", "eliminar");
+    }
+
+function canReadPedidos(clienteId) {
+return isSuperAdmin()
+|| (
+tenantUserBase(clienteId)
+&& (
+isAdmin()
+|| permisoModuloAccion("pedidos", "ver")
+|| permisoModuloAccion("produccion", "ver")
+|| permisoModuloAccion("ventas", "crear")
+|| permisoModuloAccion("ventas", "editar")
+|| permisoModuloAccion("ventas", "ver")
+|| permisoModuloAccion("inicio", "verPedidos")
+|| permisoModuloAccion("inicio", "verProduccion")
+|| permisoModuloAccion("inicio", "verAtrasados")
+|| permisoModuloAccion("inicio", "verGrafico")
+)
+);
+}
+
+    function canCreatePedidos(clienteId) {
+      return canModulo(clienteId, "pedidos", "crear");
+    }
+
+    function canDeletePedidos(clienteId) {
+      return canModulo(clienteId, "pedidos", "eliminar");
+    }
+
+    function canEditPedidoGeneral(clienteId) {
+      return canModulo(clienteId, "pedidos", "editar");
+    }
+
+    function canMoverProduccion(clienteId) {
+      return canModulo(clienteId, "produccion", "mover");
+    }
+
+    function canEditarDetalleProduccion(clienteId) {
+      return canModulo(clienteId, "produccion", "editarDetalle");
+    }
+
+    function canAsignarUsuarioProduccion(clienteId) {
+      return canModulo(clienteId, "produccion", "asignarUsuario");
+    }
+
+function canUpdatePedidoProduccion(clienteId) {
+return canMoverProduccion(clienteId)
+&& onlyChangesAllowed([
+"columnaProduccionId",
+"progresoProduccion",
+"estadoProduccion",
+"produccionFinalizada",
+"estado",
+"produccionActualizadoAt",
+"updatedAt",
+"ultimaAccionProduccionPor",
+"ultimaAccionProduccionPorNombre",
+"ultimaAccionProduccionAt",
+"produccionSortOrder"
+]);
+}
+
+    function canUpdatePedidoDetalleProduccion(clienteId) {
+      return canEditarDetalleProduccion(clienteId)
+        && onlyChangesAllowed([
+          "produccionNotaCorta",
+          "produccionNotaLarga",
+          "produccionMetros",
+
+          "produccionImagenPortada",
+          "produccionImagenPortadaOrigen",
+
+          "produccionArchivos",
+
+          "produccionEtiquetas",
+          "produccionEtiquetaId",
+          "produccionEtiquetaNombre",
+          "produccionEtiquetaColor",
+
+          "updatedAt"
+        ]);
+    }
+
+    function canUpdatePedidoAsignacion(clienteId) {
+      return canAsignarUsuarioProduccion(clienteId)
+        && onlyChangesAllowed([
+          "produccionAsignadoUid",
+          "produccionAsignadoNombre",
+          "produccionAsignadoEmail",
+          "produccionAsignadoAt",
+          "produccionAsignadoPorUid",
+          "produccionAsignadoPorNombre",
+          "updatedAt"
+        ]);
+    }
+
+    function canUpdatePedidoColorTarjeta(clienteId) {
+      return canModulo(clienteId, "produccion", "cambiarColorTarjeta")
+        && onlyChangesAllowed([
+          "produccionColorTarjeta"
+        ]);
+    }
+
+    function canUpdatePedidoOrdenManual(clienteId) {
+      return canMoverProduccion(clienteId)
+        && onlyChangesAllowed([
+          "produccionSortOrder"
+        ]);
+    }
+
+    function canUpdatePedidos(clienteId) {
+      return isSuperAdmin()
+        || (
+          tenantUserBase(clienteId)
+          && (
+            isAdmin()
+            || canEditPedidoGeneral(clienteId)
+            || canUpdatePedidoProduccion(clienteId)
+            || canUpdatePedidoDetalleProduccion(clienteId)
+            || canUpdatePedidoAsignacion(clienteId)
+            || canUpdatePedidoColorTarjeta(clienteId)
+            || canUpdatePedidoOrdenManual(clienteId)
+          )
+        );
+    }
+
+    function canReadProduccionColumnas(clienteId) {
+      return isSuperAdmin()
+        || (
+          tenantUserBase(clienteId)
+          && (
+            isAdmin()
+            || permisoModuloAccion("produccion", "ver")
+            || permisoModuloAccion("pedidos", "ver")
+          )
+        );
+    }
+
+function canGestionarColumnasProduccion(clienteId) {
+return canModulo(clienteId, "produccion", "gestionarColumnas");
+}
+
+function canGestionarOrdenManualProduccion(clienteId) {
+return canModulo(clienteId, "produccion", "ordenManual");
+}
+
+function canManageProduccionColumnas(clienteId) {
+return canGestionarColumnasProduccion(clienteId);
+}
+
+function canReadVentas(clienteId) {
+return canModulo(clienteId, "ventas", "ver")
+|| (
+tenantUserBase(clienteId)
+&& permisoModuloAccion("inicio", "verIngresos")
+);
+}
+
+    function canCreateVentas(clienteId) {
+      return canModulo(clienteId, "ventas", "crear");
+    }
+
+    function canUpdateVentas(clienteId) {
+      return canModulo(clienteId, "ventas", "editar");
+    }
+
+function canReadMovimientos(clienteId) {
+return isSuperAdmin()
+|| (
+tenantUserBase(clienteId)
+&& (
+isAdmin()
+|| permisoModuloAccion("movimientos","ver")
+|| permisoModuloAccion("informes","ver")
+|| permisoModuloAccion("gastos","ver")
+|| permisoModuloAccion("ventas","ver")
+|| permisoModuloAccion("ventas","crear")
+|| permisoModuloAccion("ventas","editar")
+|| permisoModuloAccion("caja","ver")
+)
+);
+}
+
+      function canReadCaja(clienteId) {
+        return isSuperAdmin()
+          || (
+            tenantUserBase(clienteId)
+            && (
+              isAdmin()
+              || permisoModuloAccion("caja", "ver")
+              || permisoModuloAccion("caja", "historial")
+            )
+          );
+      }
+
+    function canCreateCaja(clienteId) {
+      return isSuperAdmin()
+        || (
+          tenantUserBase(clienteId)
+          && (
+            isAdmin()
+            || permisoModuloAccion("caja", "abrirCerrar")
+          )
+        );
+    }
+
+    function canUpdateCaja(clienteId) {
+      return isSuperAdmin()
+        || (
+          tenantUserBase(clienteId)
+          && (
+            isAdmin()
+            || permisoModuloAccion("caja", "abrirCerrar")
+            || permisoModuloAccion("caja", "corregirApertura")
+          )
+        );
+    }
+
+    function canCreateMovimientos(clienteId) {
+      return isSuperAdmin()
+        || (
+          tenantUserBase(clienteId)
+          && (
+            isAdmin()
+            || canCreateVentas(clienteId)
+            || canUpdateVentas(clienteId)
+            || canCreateCaja(clienteId)
+            || canUpdateCaja(clienteId)
+            || permisoModuloAccion("caja", "crearMovimiento")
+            || permisoModuloAccion("gastos", "crear")
+          )
+        );
+    }
+
+
+
+    function canUpdateMovimientos(clienteId) {
+      return isSuperAdmin()
+        || (
+          tenantUserBase(clienteId)
+          && (
+            isAdmin()
+            || canCreateVentas(clienteId)
+            || canUpdateVentas(clienteId)
+            || canUpdateCaja(clienteId)
+          )
+        );
+    }
+
+        function canTouchUltimoNumeroVenta(clienteId) {
+      return isSuperAdmin()
+        || (
+          tenantUserBase(clienteId)
+          && (
+            isAdmin()
+            || permisoModuloAccion("ventas", "crear")
+          )
+        );
+    }
+
+        function canTouchUltimoNumeroCotizacion(clienteId) {
+      return isSuperAdmin()
+        || (
+          tenantUserBase(clienteId)
+          && (
+            isAdmin()
+            || permisoModuloAccion("ventas", "crearCotizacion")
+          )
+        );
+    }
+
+    function canReadCotizaciones(clienteId) {
+      return canModulo(clienteId, "ventas", "cotizaciones");
+    }
+
+    function canCreateCotizaciones(clienteId) {
+      return canModulo(clienteId, "ventas", "crearCotizacion");
+    }
+
+    function canUpdateCotizaciones(clienteId) {
+      return canModulo(clienteId, "ventas", "editarCotizacion")
+        || canModulo(clienteId, "ventas", "convertirCotizacion")
+        || canModulo(clienteId, "ventas", "anularCotizacion");
+    }
+
+    function canTouchUltimoNumeroPedido(clienteId) {
+      return isSuperAdmin()
+        || (
+          tenantUserBase(clienteId)
+          && (
+            isAdmin()
+            || permisoModuloAccion("pedidos", "crear")
+          )
+        );
+    }
+
+        function canReadGastos(clienteId) {
+      return canModulo(clienteId, "gastos", "ver")
+        || canModulo(clienteId, "informes", "ver");
+    }
+
+    function canCreateGastos(clienteId) {
+      return canModulo(clienteId, "gastos", "crear");
+    }
+
+    function canUpdateGastos(clienteId) {
+      return canModulo(clienteId, "gastos", "editar")
+        || canModulo(clienteId, "gastos", "anular");
+    }
+
+    function canReadProveedores(clienteId) {
+      return canModulo(clienteId, "proveedores", "ver")
+        || canModulo(clienteId, "gastos", "ver")
+        || canModulo(clienteId, "gastos", "crear")
+        || canModulo(clienteId, "gastos", "editar");
+    }
+
+    function canCreateProveedores(clienteId) {
+      return canModulo(clienteId, "proveedores", "crear");
+    }
+
+    function canUpdateProveedores(clienteId) {
+      return canModulo(clienteId, "proveedores", "editar")
+        || canModulo(clienteId, "proveedores", "anular");
+    }
+
+        function canReadListasPrecios(clienteId) {
+      return canModulo(clienteId, "listasPrecios", "ver")
+        || canModulo(clienteId, "ventas", "crear")
+        || canModulo(clienteId, "ventas", "crearCotizacion");
+    }
+
+    function canCreateListasPrecios(clienteId) {
+      return canModulo(clienteId, "listasPrecios", "crear");
+    }
+
+    function canUpdateListasPrecios(clienteId) {
+      return canModulo(clienteId, "listasPrecios", "editar");
+    }
+
+    function canDeleteListasPrecios(clienteId) {
+      return canModulo(clienteId, "listasPrecios", "eliminar");
+    }
+
+    // =========================
+    // usuarios
+    // =========================
+    match /usuarios/{uid} {
+    allow read: if isSuperAdmin()
+      || (signedIn() && request.auth.uid == uid)
+      || (
+        isAdmin()
+        && isActiveUser()
+        && resource.data.clienteId == profile().clienteId
+      )
+      || (
+        isActiveUser()
+        && resource.data.clienteId == profile().clienteId
+        && tenantIsActiveById(profile().clienteId)
+        && (
+          permisoModuloAccion("produccion", "asignarUsuario")
+          || permisoModuloAccion("ventas", "crear")
+          || permisoModuloAccion("ventas", "editar")
+          || permisoModuloAccion("ventas", "ver")
+        )
+      );
+
+      allow create: if isSuperAdmin()
+        || (
+          signedIn()
+          && request.auth.uid == uid
+          && request.resource.data.activo == true
+          && request.resource.data.clienteId is string
+          && request.resource.data.clienteId != ""
+          && (
+            request.resource.data.rol == "admin"
+            || (
+              request.resource.data.rol == "usuario"
+              && request.resource.data.invitacionId is string
+              && request.resource.data.invitacionId != ""
+              && invitacionValidaParaActivacion()
+            )
+          )
+        );
+
+      allow update: if isSuperAdmin()
+        || (
+          signedIn()
+          && request.auth.uid == uid
+          && resource.data.rol == request.resource.data.rol
+          && resource.data.clienteId == request.resource.data.clienteId
+        )
+        || (
+          isAdmin()
+          && isActiveUser()
+          && resource.data.clienteId == profile().clienteId
+          && request.resource.data.clienteId == resource.data.clienteId
+          && request.resource.data.rol == resource.data.rol
+          && request.resource.data.email == resource.data.email
+        );
+
+      allow delete: if isSuperAdmin();
+    }
+
+    // =========================
+    // clientes-saas
+    // =========================
+    match /clientes-saas/{clienteId} {
+      allow read: if isSuperAdmin() || sameTenant(clienteId);
+
+      allow update: if isSuperAdmin()
+        || (
+          isAdmin()
+          && isActiveUser()
+          && clienteId == profile().clienteId
+        )
+        || (
+          canTouchUltimoNumeroVenta(clienteId)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            "ultimoNumeroVenta",
+            "updatedAt"
+          ])
+        )
+        || (
+          canTouchUltimoNumeroPedido(clienteId)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            "ultimoNumeroPedido",
+            "updatedAt"
+          ])
+        )
+      || (
+        signedIn()
+        && isActiveUser()
+        && clienteId == profile().clienteId
+        && (
+          isAdmin()
+          || permisoModuloAccion("ventas", "crearCotizacion")
+        )
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          "ultimoNumeroCotizacion",
+          "updatedAt"
+        ])
+      );
+
+      allow create, delete: if isSuperAdmin();
+    }
+
+
+    // =========================
+    // clientes-saas/{clienteId}/configuracion
+    // =========================
+    match /clientes-saas/{clienteId}/configuracion/{docId} {
+      allow read: if isSuperAdmin()
+        || (
+          sameTenant(clienteId)
+          && isActiveUser()
+        );
+
+      allow create, update: if isSuperAdmin()
+        || (
+          isAdmin()
+          && isActiveUser()
+          && clienteId == profile().clienteId
+          && tenantIsActiveById(profile().clienteId)
+        );
+
+      allow delete: if isSuperAdmin();
+    }
+
+    // =========================
+    // clientes-saas/{clienteId}/produccion_etiquetas
+    // =========================
+    match /clientes-saas/{clienteId}/produccion_etiquetas/{etiquetaId} {
+      allow read: if isSuperAdmin()
+        || (
+          sameTenant(clienteId)
+          && isActiveUser()
+          && (
+            isAdmin()
+            || permisoModuloAccion("produccion", "ver")
+            || permisoModuloAccion("pedidos", "ver")
+          )
+        );
+
+      allow create: if isSuperAdmin()
+        || (
+          sameTenant(clienteId)
+          && isActiveUser()
+          && tenantIsActiveById(clienteId)
+          && (
+            isAdmin()
+            || permisoModuloAccion("produccion", "editarDetalle")
+          )
+        );
+
+      allow update: if isSuperAdmin()
+        || (
+          sameTenant(clienteId)
+          && isActiveUser()
+          && tenantIsActiveById(clienteId)
+          && (
+            isAdmin()
+            || permisoModuloAccion("produccion", "editarDetalle")
+          )
+        );
+
+      allow delete: if false;
+    }
+
+
+    // =========================
+    // invitaciones_usuarios
+    // =========================
+    match /invitaciones_usuarios/{invitacionId} {
+      // lectura directa por token para activar cuenta
+      allow get: if (
+          resource.data.token == invitacionId
+          && resource.data.estado == "pendiente"
+        )
+        || isSuperAdmin()
+        || (
+          isAdmin()
+          && isActiveUser()
+          && resource.data.clienteId == profile().clienteId
+        );
+
+      // no permitir listar anónimamente
+      allow list: if isSuperAdmin()
+        || (
+          isAdmin()
+          && isActiveUser()
+          && resource.data.clienteId == profile().clienteId
+        );
+
+      allow create: if puedeCrearInvitacion()
+        && request.resource.data.clienteId is string
+        && request.resource.data.clienteId != ""
+        && request.resource.data.email is string
+        && request.resource.data.email != ""
+        && request.resource.data.nombre is string
+        && request.resource.data.nombre != ""
+        && request.resource.data.rol in ["admin", "usuario"]
+        && request.resource.data.estado == "pendiente"
+        && request.resource.data.token == invitacionId;
+
+      allow update: if (
+          puedeActualizarInvitacion(resource.data.clienteId)
+          && request.resource.data.clienteId == resource.data.clienteId
+          && request.resource.data.email == resource.data.email
+          && request.resource.data.token == resource.data.token
+          && request.resource.data.createdAt == resource.data.createdAt
+        )
+        || (
+          request.auth != null
+          && resource.data.estado == "pendiente"
+          && request.resource.data.estado == "usada"
+          && request.resource.data.email == resource.data.email
+          && request.resource.data.clienteId == resource.data.clienteId
+          && request.resource.data.token == resource.data.token
+          && request.resource.data.createdAt == resource.data.createdAt
+          && request.resource.data.usuarioCreadoUid == request.auth.uid
+        );
+
+      allow delete: if false;
+    }
+
+
+    // =========================
+    // sucursales
+    // =========================
+    match /sucursales/{sucursalId} {
+      allow read: if isSuperAdmin()
+        || (
+          resource.data.clienteId is string
+          && tenantUserBase(resource.data.clienteId)
+          && (
+            isAdmin()
+            || permisoModuloAccion("configuracion", "ver")
+            || permisoModuloAccion("caja", "ver")
+            || permisoModuloAccion("caja", "abrirCerrar")
+            || permisoModuloAccion("ventas", "ver")
+            || permisoModuloAccion("ventas", "crear")
+            || permisoModuloAccion("pedidos", "ver")
+            || permisoModuloAccion("pedidos", "crear")
+          )
+        );
+
+      allow create: if isSuperAdmin()
+        || (
+          request.resource.data.clienteId is string
+          && tenantUserBase(request.resource.data.clienteId)
+          && isAdmin()
+        );
+
+      allow update: if isSuperAdmin()
+        || (
+          resource.data.clienteId is string
+          && tenantUserBase(resource.data.clienteId)
+          && isAdmin()
+          && request.resource.data.clienteId == resource.data.clienteId
+        );
+
+      allow delete: if false;
+    }
+
+    // =========================
+    // clientes
+    // =========================
+    match /clientes/{docId} {
+      allow read: if canReadClientes(resource.data.clienteId);
+      allow create: if canCreateClientes(request.resource.data.clienteId);
+      allow update: if canUpdateClientes(resource.data.clienteId)
+        && request.resource.data.clienteId == resource.data.clienteId;
+      allow delete: if canDeleteClientes(resource.data.clienteId);
+    }
+
+
+    // =========================
+    // pedidos
+    // =========================
+    match /pedidos/{pedidoId} {
+      allow read: if canReadPedidos(resource.data.clienteId);
+
+      allow create: if canCreatePedidos(request.resource.data.clienteId);
+
+      allow update: if canUpdatePedidos(resource.data.clienteId)
+        && request.resource.data.clienteId == resource.data.clienteId;
+
+      allow delete: if canDeletePedidos(resource.data.clienteId);
+
+      match /productos/{productoId} {
+        allow read: if canReadPedidos(pedidoParentClienteId(pedidoId));
+
+        allow create: if (
+            canCreatePedidos(pedidoParentClienteId(pedidoId))
+            || canEditPedidoGeneral(pedidoParentClienteId(pedidoId))
+          )
+          && request.resource.data.clienteId == pedidoParentClienteId(pedidoId);
+
+        allow update: if canEditPedidoGeneral(pedidoParentClienteId(pedidoId))
+          && request.resource.data.clienteId == pedidoParentClienteId(pedidoId);
+
+        allow delete: if canEditPedidoGeneral(pedidoParentClienteId(pedidoId));
+      }
+
+        match /historial_produccion/{movimientoId} {
+          allow read: if canReadPedidos(pedidoParentClienteId(pedidoId));
+
+          allow create: if isSuperAdmin()
+            || canMoverProduccion(pedidoParentClienteId(pedidoId))
+            || canEditPedidoGeneral(pedidoParentClienteId(pedidoId))
+            || canEditarDetalleProduccion(pedidoParentClienteId(pedidoId))
+            || canAsignarUsuarioProduccion(pedidoParentClienteId(pedidoId));
+
+          allow update, delete: if false;
+        }
+      }
+
+    // =========================
+    // productosBase
+    // =========================
+    match /productosBase/{productoId} {
+      allow read: if canReadPedidos(resource.data.clienteId)
+        || canReadListasPrecios(resource.data.clienteId);
+      allow create: if canCreatePedidos(request.resource.data.clienteId);
+      allow update: if canEditPedidoGeneral(resource.data.clienteId)
+        && request.resource.data.clienteId == resource.data.clienteId;
+      allow delete: if canDeletePedidos(resource.data.clienteId);
+    }
+
+    // =========================
+    // productos_config
+    // =========================
+    match /productos_config/{configId} {
+      allow read: if canReadPedidos(resource.data.clienteId);
+      allow create: if canCreatePedidos(request.resource.data.clienteId);
+      allow update: if canEditPedidoGeneral(resource.data.clienteId)
+        && request.resource.data.clienteId == resource.data.clienteId;
+      allow delete: if canDeletePedidos(resource.data.clienteId);
+    }
+
+// =========================
+// produccion_sectores
+// =========================
+match /produccion_sectores/{sectorId} {
+
+/\*
+
+- Lectura:
+- - superadmin;
+- - admin activo del mismo tenant;
+- - usuarios del tenant con Producción o Pedidos visible.
+-
+- La consulta del frontend debe incluir:
+- where("clienteId", "==", perfil.clienteId)
+  \*/
+  allow read: if canReadProduccionColumnas(
+  resource.data.clienteId
+  );
+
+/\*
+
+- Creación:
+- solamente administradores o usuarios con
+- produccion.gestionarColumnas.
+  \*/
+  allow create: if
+  canGestionarColumnasProduccion(
+  request.resource.data.clienteId
+  )
+  && request.resource.data.keys().hasOnly([
+  "clienteId",
+  "nombre",
+  "orden",
+  "activo",
+  "createdAt",
+  "updatedAt"
+  ])
+  && request.resource.data.clienteId is string
+  && request.resource.data.clienteId != ""
+  && request.resource.data.nombre is string
+  && request.resource.data.nombre != ""
+  && request.resource.data.orden is number
+  && request.resource.data.activo == true;
+
+/\*
+
+- Actualización:
+- - clienteId no puede cambiar;
+- - createdAt no puede cambiar;
+- - sólo se modifican campos previstos.
+    \*/
+    allow update: if
+    canGestionarColumnasProduccion(
+    resource.data.clienteId
+    )
+    && request.resource.data.clienteId ==
+    resource.data.clienteId
+    && request.resource.data.createdAt ==
+    resource.data.createdAt
+    && onlyChangesAllowed([
+    "nombre",
+    "orden",
+    "activo",
+    "updatedAt"
+    ])
+    && request.resource.data.nombre is string
+    && request.resource.data.nombre != ""
+    && request.resource.data.orden is number
+    && request.resource.data.activo is bool;
+
+/\*
+
+- Los sectores se desactivan con activo:false.
+- No se eliminan físicamente.
+  \*/
+  allow delete: if false;
+  }
+
+  // =========================
+  // produccion_columnas
+  // =========================
+  match /produccion_columnas/{columnaId} {
+  allow read: if canReadProduccionColumnas(resource.data.clienteId);
+
+        allow create: if canManageProduccionColumnas(request.resource.data.clienteId);
+
+        allow update: if (
+            canManageProduccionColumnas(resource.data.clienteId)
+            && request.resource.data.clienteId == resource.data.clienteId
+          )
+          || (
+            canGestionarOrdenManualProduccion(resource.data.clienteId)
+            && request.resource.data.clienteId == resource.data.clienteId
+            && onlyChangesAllowed([
+              "ordenManualActivo",
+              "tipoOrden",
+              "updatedAt"
+            ])
+          );
+
+        allow delete: if canManageProduccionColumnas(resource.data.clienteId);
+      }
+
+  // =========================
+  // ventas
+  // =========================
+  match /ventas/{ventaId} {
+  allow read: if canReadVentas(resource.data.clienteId);
+
+      allow create: if canCreateVentas(request.resource.data.clienteId);
+
+      allow update: if canUpdateVentas(resource.data.clienteId)
+        && request.resource.data.clienteId == resource.data.clienteId;
+
+      // por ahora NO permitimos borrar ventas
+      allow delete: if false;
+
+      // =========================
+      // ventas/{ventaId}/items
+      // =========================
+      match /items/{itemId} {
+        allow read: if canReadVentas(ventaParentClienteId(ventaId));
+
+        allow create: if (
+            canCreateVentas(ventaParentClienteId(ventaId))
+            || canUpdateVentas(ventaParentClienteId(ventaId))
+          )
+          && request.resource.data.clienteId == ventaParentClienteId(ventaId);
+
+        allow update: if canUpdateVentas(ventaParentClienteId(ventaId))
+          && request.resource.data.clienteId == ventaParentClienteId(ventaId);
+
+        // por ahora no borramos items directamente
+        allow delete: if false;
+      }
+
+      // =========================
+      // ventas/{ventaId}/pagos
+      // =========================
+      match /pagos/{pagoId} {
+        allow read: if canReadVentas(ventaParentClienteId(ventaId));
+
+        allow create: if (
+            canCreateVentas(ventaParentClienteId(ventaId))
+            || canUpdateVentas(ventaParentClienteId(ventaId))
+          )
+          && request.resource.data.clienteId == ventaParentClienteId(ventaId);
+
+        allow update: if canUpdateVentas(ventaParentClienteId(ventaId))
+          && request.resource.data.clienteId == ventaParentClienteId(ventaId);
+
+        // por ahora no borramos pagos
+        allow delete: if false;
+      }
+
+  }
+
+  // =========================
+  // cajas
+  // =========================
+  match /cajas/{cajaId} {
+  allow read: if canReadCaja(resource.data.clienteId);
+
+      allow create: if canCreateCaja(request.resource.data.clienteId);
+
+      allow update: if canUpdateCaja(resource.data.clienteId)
+        && request.resource.data.clienteId == resource.data.clienteId;
+
+      allow delete: if false;
+
+  }
+
+        // =========================
+
+  // cotizaciones
+  // =========================
+  match /cotizaciones/{cotizacionId} {
+  allow read: if canReadCotizaciones(resource.data.clienteId);
+
+      allow create: if canCreateCotizaciones(request.resource.data.clienteId);
+
+      allow update: if canUpdateCotizaciones(resource.data.clienteId)
+        && request.resource.data.clienteId == resource.data.clienteId;
+
+      allow delete: if false;
+
+      match /items/{itemId} {
+        allow read: if canReadCotizaciones(
+          get(/databases/$(database)/documents/cotizaciones/$(cotizacionId)).data.clienteId
+        );
+
+        allow create: if canCreateCotizaciones(
+          get(/databases/$(database)/documents/cotizaciones/$(cotizacionId)).data.clienteId
+        )
+        && request.resource.data.clienteId ==
+          get(/databases/$(database)/documents/cotizaciones/$(cotizacionId)).data.clienteId;
+
+        allow update: if canUpdateCotizaciones(
+          get(/databases/$(database)/documents/cotizaciones/$(cotizacionId)).data.clienteId
+        )
+        && request.resource.data.clienteId ==
+          get(/databases/$(database)/documents/cotizaciones/$(cotizacionId)).data.clienteId;
+
+        allow delete: if false;
+      }
+
+  }
+
+  // =========================
+  // historial_produccion - collectionGroup informes
+  // =========================
+  match /{path=\*\*}/historial_produccion/{movimientoId} {
+  allow read: if isSuperAdmin()
+  || (
+  isActiveUser()
+  && resource.data.clienteId == profile().clienteId
+  && tenantIsActiveById(profile().clienteId)
+  && (
+  isAdmin()
+  || permisoModuloAccion("produccion", "ver")
+  || permisoModuloAccion("pedidos", "ver")
+  )
+  );
+
+      allow write: if false;
+
+  }
+
+  // =========================
+  // contadores
+  // =========================
+  match /contadores/{clienteId} {
+  allow read: if isSuperAdmin()
+  || (
+  tenantUserBase(clienteId)
+  && (
+  isAdmin()
+  || permisoModuloAccion("ventas", "crear")
+  || permisoModuloAccion("pedidos", "crear")
+  || permisoModuloAccion("gastos", "crear")
+  )
+  );
+
+      allow create, update: if isSuperAdmin()
+        || (
+          tenantUserBase(clienteId)
+          && (
+            isAdmin()
+            || permisoModuloAccion("ventas", "crear")
+            || permisoModuloAccion("pedidos", "crear")
+            || permisoModuloAccion("gastos", "crear")
+          )
+        );
+
+      allow delete: if false;
+
+  }
+
+  // =========================
+  // proveedores
+  // =========================
+  match /proveedores/{proveedorId} {
+  allow read: if canReadProveedores(resource.data.clienteId);
+
+      allow create: if canCreateProveedores(request.resource.data.clienteId);
+
+      allow update: if canUpdateProveedores(resource.data.clienteId)
+        && request.resource.data.clienteId == resource.data.clienteId;
+
+      allow delete: if false;
+
+  }
+
+  // =========================
+  // listasPrecios
+  // =========================
+  match /listasPrecios/{listaId} {
+  allow read: if canReadListasPrecios(resource.data.clienteId);
+
+      allow create: if canCreateListasPrecios(request.resource.data.clienteId)
+        && request.resource.data.clienteId is string
+        && request.resource.data.clienteId != "";
+
+      allow update: if canUpdateListasPrecios(resource.data.clienteId)
+        && request.resource.data.clienteId == resource.data.clienteId;
+
+      allow delete: if canDeleteListasPrecios(resource.data.clienteId);
+
+  }
+
+  // =========================
+  // gastos
+  // =========================
+  match /gastos/{gastoId} {
+  allow read: if canReadGastos(resource.data.clienteId);
+
+      allow create: if canCreateGastos(request.resource.data.clienteId);
+
+      allow update: if canUpdateGastos(resource.data.clienteId)
+        && request.resource.data.clienteId == resource.data.clienteId;
+
+      allow delete: if false;
+
+  }
+
+  // =========================
+  // movimientos
+  // =========================
+  match /movimientos/{movimientoId} {
+  allow read: if canReadMovimientos(resource.data.clienteId);
+
+      allow create: if canCreateMovimientos(request.resource.data.clienteId);
+
+      allow update: if canUpdateMovimientos(resource.data.clienteId)
+        && request.resource.data.clienteId == resource.data.clienteId;
+
+      allow delete: if false;
+
+  }
+
+  // =========================
+  // clientes-saas-uso
+  // =========================
+  match /clientes-saas-uso/{clienteId} {
+  allow read: if isSuperAdmin();
+
+      allow create, update: if signedIn()
+        && isActiveUser()
+        && hasClienteId()
+        && clienteId == profile().clienteId
+        && request.resource.data.clienteId == profile().clienteId
+        && tenantIsActiveById(profile().clienteId);
+
+      allow delete: if false;
+
+  }
+
+  // =========================
+  // saas_pagos
+  // =========================
+  match /saas_pagos/{pagoId} {
+  allow read: if isSuperAdmin()
+  || (
+  isAdmin()
+  && isActiveUser()
+  && resource.data.clienteSaasId == profile().clienteId
+  );
+
+      allow create: if isSuperAdmin()
+        && request.resource.data.clienteSaasId is string
+        && request.resource.data.clienteSaasId != "";
+
+      allow update: if isSuperAdmin();
+
+      allow delete: if false;
+
+  }
+
+  // =========================
+  // fallback
+  // =========================
+  match /{document=\*\*} {
+  allow read, write: if false;
+  }
+
+}
+}
+
+---
+
 ##historial reglas store 25-05-2026##
 
 ---

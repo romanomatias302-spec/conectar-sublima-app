@@ -1,4 +1,9 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, {
+  memo,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import {
   abrirCaja,
   cerrarCaja,
@@ -71,12 +76,31 @@ const [cajaHistorialAbiertaId, setCajaHistorialAbiertaId] = useState(null);
 const [movimientosHistorial, setMovimientosHistorial] = useState({});
   const [filtroTipoMovimiento, setFiltroTipoMovimiento] = useState("");
 
-  const configMoneda = obtenerConfigMonedaDesdePerfil(perfil);
+  const configMoneda = useMemo(
+    () => obtenerConfigMonedaDesdePerfil(perfil),
+    [
+      perfil?.moneda,
+      perfil?.localeMoneda,
+      perfil?.pais,
+    ]
+  );
   const puedeAbrirCerrarCaja =
   puedeHacer(perfil, "caja", "abrirCerrar");
 
 const puedeCrearMovimientoCaja =
   puedeHacer(perfil, "caja", "crearMovimiento");
+
+const puedeCrearAporteCapital =
+  puedeHacer(perfil, "caja", "crearAporteCapital");
+
+const puedeCrearRetiroCapital =
+  puedeHacer(perfil, "caja", "crearRetiroCapital");
+
+const puedeCrearAjustePositivo =
+  puedeHacer(perfil, "caja", "crearAjustePositivo");
+
+const puedeCrearAjusteNegativo =
+  puedeHacer(perfil, "caja", "crearAjusteNegativo");  
 
 const puedeCorregirAperturaCaja =
   puedeHacer(perfil, "caja", "corregirApertura");
@@ -612,14 +636,47 @@ const toggleDetalleCajaHistorial = async (cajaHist) => {
 const opcionesSubtipoManual =
   tipoManual === "ingreso"
     ? [
-        { value: "aporte_capital", label: "Aporte de capital" },
-        { value: "ajuste_positivo", label: "Ajuste positivo de caja" },
+        ...(puedeCrearAporteCapital
+          ? [
+              {
+                value: "aporte_capital",
+                label: "Aporte de capital",
+              },
+            ]
+          : []),
+
+        ...(puedeCrearAjustePositivo
+          ? [
+              {
+                value: "ajuste_positivo",
+                label: "Ajuste positivo de caja",
+              },
+            ]
+          : []),
+
         { value: "otro_ingreso", label: "Otro ingreso de caja" },
       ]
     : [
         { value: "gasto_caja", label: "Gasto de caja" },
-        { value: "retiro_capital", label: "Retiro de dueño / capital" },
-        { value: "ajuste_negativo", label: "Ajuste negativo de caja" },
+
+        ...(puedeCrearRetiroCapital
+          ? [
+              {
+                value: "retiro_capital",
+                label: "Retiro de dueño / capital",
+              },
+            ]
+          : []),
+
+        ...(puedeCrearAjusteNegativo
+          ? [
+              {
+                value: "ajuste_negativo",
+                label: "Ajuste negativo de caja",
+              },
+            ]
+          : []),
+
         { value: "otro_egreso", label: "Otro egreso de caja" },
       ];
 
@@ -647,6 +704,53 @@ const opcionesSubtipoManual =
 
   return resumen;
 }, [movimientos]);
+
+  const AYUDA_SUBTIPOS_CAJA = {
+    gasto_caja: {
+      tipo: "operativo",
+      texto:
+        "Disminuye el efectivo y también se registra como gasto operativo en Gastos e Informes.",
+    },
+
+    aporte_capital: {
+      tipo: "patrimonial",
+      texto:
+        "Aumenta el efectivo de caja, pero no se considera una venta ni un ingreso operativo en Informes.",
+    },
+
+    retiro_capital: {
+      tipo: "patrimonial",
+      texto:
+        "Disminuye el efectivo de caja, pero no se registra como gasto operativo ni afecta el resultado en Informes.",
+    },
+
+    ajuste_positivo: {
+      tipo: "ajuste",
+      texto:
+        "Corrige el saldo físico aumentando la caja. No genera un ingreso operativo en Informes.",
+    },
+
+    ajuste_negativo: {
+      tipo: "ajuste",
+      texto:
+        "Corrige el saldo físico disminuyendo la caja. No genera un gasto operativo en Informes.",
+    },
+
+    otro_ingreso: {
+      tipo: "operativo",
+      texto:
+        "Aumenta el efectivo y se registra como ingreso operativo en Informes.",
+    },
+
+    otro_egreso: {
+      tipo: "operativo",
+      texto:
+        "Disminuye el efectivo y se registra como egreso operativo en Gastos e Informes.",
+    },
+  };
+
+  const ayudaSubtipoCaja =
+    AYUDA_SUBTIPOS_CAJA[subtipoManual] || null;
 
   return (
     <div className="clientes-lista">
@@ -940,6 +1044,46 @@ const opcionesSubtipoManual =
                     </option>
                   ))}
                 </select>
+                {ayudaSubtipoCaja && (
+                  <div
+                    style={{
+                      marginTop: 8,
+                      padding: "10px 12px",
+                      borderRadius: 10,
+                      background:
+                        ayudaSubtipoCaja.tipo === "operativo"
+                          ? "#f0fdf4"
+                          : ayudaSubtipoCaja.tipo === "ajuste"
+                          ? "#fff7ed"
+                          : "#eff6ff",
+                      border:
+                        ayudaSubtipoCaja.tipo === "operativo"
+                          ? "1px solid #bbf7d0"
+                          : ayudaSubtipoCaja.tipo === "ajuste"
+                          ? "1px solid #fed7aa"
+                          : "1px solid #bfdbfe",
+                      color: "#475569",
+                      fontSize: 13,
+                      lineHeight: 1.45,
+                    }}
+                  >
+                    <strong
+                      style={{
+                        display: "block",
+                        marginBottom: 3,
+                        color: "#334155",
+                      }}
+                    >
+                      {ayudaSubtipoCaja.tipo === "operativo"
+                        ? "Movimiento operativo"
+                        : ayudaSubtipoCaja.tipo === "ajuste"
+                        ? "Ajuste de caja"
+                        : "Movimiento de capital"}
+                    </strong>
+
+                    {ayudaSubtipoCaja.texto}
+                  </div>
+                )}
 
               <input
                 type="number"
@@ -1342,7 +1486,11 @@ const opcionesSubtipoManual =
   );
 }
 
-function MovimientoTabla({ movimientos, configMoneda, onVerVenta }) {
+const MovimientoTabla = memo(function MovimientoTabla({
+  movimientos,
+  configMoneda,
+  onVerVenta,
+}) {
   return (
     <div style={tablaMovCard}>
       <table>
@@ -1464,12 +1612,65 @@ function MovimientoTabla({ movimientos, configMoneda, onVerVenta }) {
                     )}
                   </div>
 
-                  {esControl && (
-                    <small style={{ color: "#64748b" }}>
+                {esControl && m.subtipo === "cambio_turno" && (
+                  <div
+                    style={{
+                      marginTop: 6,
+                      display: "flex",
+                      gap: 12,
+                      flexWrap: "wrap",
+                      fontSize: 12,
+                      color: "#475569",
+                    }}
+                  >
+                    <span>
+                      Esperado:{" "}
+                      <strong>
+                        {formatearMoneda(
+                          Number(m.efectivoEsperado || 0),
+                          configMoneda.moneda,
+                          configMoneda.localeMoneda
+                        )}
+                      </strong>
+                    </span>
+
+                    <span>
+                      Contado:{" "}
+                      <strong>
+                        {formatearMoneda(
+                          Number(m.efectivoContado || 0),
+                          configMoneda.moneda,
+                          configMoneda.localeMoneda
+                        )}
+                      </strong>
+                    </span>
+
+                    <span>
+                      Diferencia:{" "}
+                      <strong
+                        style={{
+                          color:
+                            Number(m.diferenciaTurno || 0) === 0
+                              ? "#15803d"
+                              : "#dc2626",
+                        }}
+                      >
+                        {formatearMoneda(
+                          Number(m.diferenciaTurno || 0),
+                          configMoneda.moneda,
+                          configMoneda.localeMoneda
+                        )}
+                      </strong>
+                    </span>
+
+                    <span>
                       Usuario:{" "}
-                      {m.creadoPorNombre || m.creadoPor || "-"}
-                    </small>
-                  )}
+                      <strong>
+                        {m.creadoPorNombre || m.creadoPor || "-"}
+                      </strong>
+                    </span>
+                  </div>
+                )}
                 </td>
 
                 <td>{mostrarMontoMedio("efectivo")}</td>
@@ -1500,16 +1701,20 @@ function MovimientoTabla({ movimientos, configMoneda, onVerVenta }) {
       </table>
     </div>
   );
-}
+});
 
-function Kpi({ label, value, color = "#111827" }) {
+const Kpi = memo(function Kpi({
+  label,
+  value,
+  color = "#111827",
+}) {
   return (
     <div style={kpiCard}>
       <span>{label}</span>
       <strong style={{ color }}>{value}</strong>
     </div>
   );
-}
+});
 
 const card = {
   background: "#fff",
