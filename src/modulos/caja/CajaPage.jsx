@@ -26,6 +26,15 @@ import { puedeHacer } from "../../utils/permisos";
 import { fechaHoyNegocio } from "../../utils/fechas";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { db } from "../../firebase";
+import {
+  FaMoneyBillWave,
+  FaUniversity,
+  FaWallet,
+  FaCreditCard,
+  FaEllipsisH,
+} from "react-icons/fa";
+import "./CajaPage.css";
+
 
 function formatearFechaCaja(fechaISO) {
   if (!fechaISO) return "-";
@@ -53,6 +62,8 @@ const fechaCaja = fechaHoyNegocio(perfil);
   const [saldoApertura, setSaldoApertura] = useState(0);
   const [corrigiendoApertura, setCorrigiendoApertura] = useState(false);
   const [saldoCierreReal, setSaldoCierreReal] = useState("");
+  const [modalCerrarCaja, setModalCerrarCaja] = useState(false);
+  const [observacionCierre, setObservacionCierre] = useState("");
 
   const [modalMovimiento, setModalMovimiento] = useState(false);
   const [modalCambioTurno, setModalCambioTurno] = useState(false);
@@ -465,41 +476,46 @@ setExito("Apertura corregida.");
     }
   };
 
-  const handleCerrarCaja = async () => {
-    try {
-
-      if (saldoCierreReal === "" || saldoCierreReal === null || isNaN(Number(saldoCierreReal))) {
-        setError("Antes de cerrar la caja tenés que ingresar el efectivo real contado.");
-        return;
-      }
-      const ok = window.confirm(
-        `Vas a cerrar la caja con efectivo real de ${formatearMoneda(
-          Number(saldoCierreReal || 0),
-          configMoneda.moneda,
-          configMoneda.localeMoneda
-        )}. ¿Confirmás el cierre?`
+const handleCerrarCaja = async () => {
+  try {
+    if (
+      saldoCierreReal === "" ||
+      saldoCierreReal === null ||
+      isNaN(Number(saldoCierreReal))
+    ) {
+      setError(
+        "Ingresá el efectivo contado antes de cerrar la caja."
       );
-
-      if (!ok) return;
-
-      setError("");
-      setExito("");
-
-
-      await cerrarCaja({
-        perfil,
-        caja,
-        saldoCierreRealEfectivo: Number(saldoCierreReal || 0),
-      });
-
-      setSaldoCierreReal("");
-      
-      setExito("Caja cerrada correctamente.");
-    } catch (err) {
-      console.error(err);
-      setError(err.message || "No se pudo cerrar la caja.");
+      return;
     }
-  };
+
+    setError("");
+    setExito("");
+
+    await cerrarCaja({
+      perfil,
+      caja,
+      saldoCierreRealEfectivo: Number(
+        saldoCierreReal || 0
+      ),
+      observacionCierre:
+        observacionCierre || "",
+    });
+
+    setSaldoCierreReal("");
+    setObservacionCierre("");
+    setModalCerrarCaja(false);
+
+    setExito("Caja cerrada correctamente.");
+  } catch (err) {
+    console.error(err);
+
+    setError(
+      err.message ||
+        "No se pudo cerrar la caja."
+    );
+  }
+};
 
   const handleReabrirCaja = async () => {
     try {
@@ -752,8 +768,14 @@ const opcionesSubtipoManual =
   const ayudaSubtipoCaja =
     AYUDA_SUBTIPOS_CAJA[subtipoManual] || null;
 
+  const diferenciaCierrePreview =
+    saldoCierreReal === ""
+      ? 0
+      : Number(saldoCierreReal || 0) -
+        Number(resumen.efectivoEsperado || 0);
+
   return (
-    <div className="clientes-lista">
+    <div className="clientes-lista caja-page">
       <div
         className="encabezado-lista"
         style={{
@@ -809,9 +831,7 @@ const opcionesSubtipoManual =
                 )}
               </div>
             )}
-          <p style={{ margin: "6px 0 0", color: "#666" }}>
-            Control diario.
-          </p>
+
         </div>
         {puedeVerHistorialCaja && (
             <button style={btnSecondarySmall} onClick={abrirHistorialCaja}>
@@ -887,47 +907,49 @@ const opcionesSubtipoManual =
 
         {estaAbierta && (
           <div style={barraAccionesCompacta}>
-          <button
-            onClick={() => setModalMovimiento(true)}
-            disabled={!puedeCrearMovimientoCaja}
-            style={btnSecondarySmall}
-          >
-            + Agregar movimiento
-          </button>
+            <button
+              onClick={() => setModalMovimiento(true)}
+              disabled={!puedeCrearMovimientoCaja}
+              className="caja-btn caja-btn-primary"
+            >
+              Agregar movimiento
+            </button>
 
-          <button
-            onClick={() => setModalCambioTurno(true)}
-            disabled={!puedeAbrirCerrarCaja}
-            style={btnSecondarySmall}
-          >
-            Cambio de turno
-          </button>
+            <button
+              onClick={() => setModalCambioTurno(true)}
+              disabled={!puedeAbrirCerrarCaja}
+              className="caja-btn caja-btn-primary"
+            >
+              Cambio de turno
+            </button>
 
-            {movimientos.length === 0 && (
+          {movimientos.length === 0 && (
             <button
               onClick={handleCorregirApertura}
               disabled={
                 corrigiendoApertura ||
                 !puedeCorregirAperturaCaja
               }
-              style={btnSecondarySmall}
+              className="caja-btn caja-btn-primary"
             >
               Corregir apertura
             </button>
             )}
 
-            <input
-              type="number"
-              placeholder="Efectivo cierre"
-              value={saldoCierreReal}
-              onChange={(e) => setSaldoCierreReal(e.target.value)}
-              style={inputSmall}
-            />
+
 
             <button
-              onClick={handleCerrarCaja}
-              disabled={!puedeAbrirCerrarCaja} style={btnDangerSmall}>
-              Cerrar
+              type="button"
+              onClick={() => {
+                setError("");
+                setSaldoCierreReal("");
+                setObservacionCierre("");
+                setModalCerrarCaja(true);
+              }}
+              disabled={!puedeAbrirCerrarCaja}
+              className="caja-btn caja-btn-danger caja-btn-cerrar"
+            >
+              Cerrar caja
             </button>
           </div>
         )}
@@ -957,50 +979,38 @@ const opcionesSubtipoManual =
 
       {caja && (
         <section style={card}>
-          <div style={sectionHeader}>
-            <h2 style={{ margin: 0 }}>Movimientos del día</h2>
-              <div
-                style={{
-                  display: "flex",
-                  gap: 8,
-                  alignItems: "center",
-                  flexWrap: "wrap",
-                  justifyContent: "flex-end",
-                  maxWidth: "100%",
-                }}
-              >
-                <span style={{ color: "#6b7280", fontSize: 13 }}>
-                  {movimientos.length} movimientos
-                </span>
+          <div className="caja-section-header">
+            <h2>Movimientos del día</h2>
 
-                <button
-                  style={btnSecondarySmall}
-                  onClick={() => setMostrarResumen(true)}
-                >
-                  Resumen
-                </button>
-
-
-              </div>
+            <select
+              value={filtroTipoMovimiento}
+              onChange={(e) =>
+                setFiltroTipoMovimiento(e.target.value)
+              }
+              className="caja-filtro-movimientos"
+            >
+              <option value="">Todos</option>
+              <option value="ingreso">Ingresos</option>
+              <option value="egreso">Egresos</option>
+            </select>
           </div>
 
-            <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
-              <select
-                value={filtroTipoMovimiento}
-                onChange={(e) => setFiltroTipoMovimiento(e.target.value)}
-                style={inputSmall}
-              >
-                <option value="">Todos</option>
-                <option value="ingreso">Ingresos</option>
-                <option value="egreso">Egresos</option>
-              </select>
+          <div className="caja-movimientos-layout">
+
+            <div className="caja-movimientos-principal">
+              <MovimientoTabla
+                movimientos={movimientosFiltrados}
+                configMoneda={configMoneda}
+                onVerVenta={onVerVenta}
+              />
             </div>
 
-            <MovimientoTabla
-              movimientos={movimientosFiltrados}
+            <ResumenPagos
+              resumenPorMedios={resumenPorMedios}
               configMoneda={configMoneda}
-              onVerVenta={onVerVenta}
             />
+
+          </div>
         </section>
       )}
 
@@ -1157,56 +1167,176 @@ const opcionesSubtipoManual =
           </div>
         </div>
       )}
-      {mostrarResumen && (
-  <div style={modalOverlay}>
-    <div style={modalCaja}>
-      <div style={modalHeader}>
-        <h3 style={{ margin: 0 }}>Resumen por medios</h3>
 
-        <button
-          style={modalCloseBtn}
-          onClick={() => setMostrarResumen(false)}
-        >
-          ✕
-        </button>
-      </div>
+       {modalCerrarCaja && (
+        <div className="caja-modal-overlay">
+          <div className="caja-modal caja-modal-cierre">
 
-      <div style={modalResumenGrid}>
-        {Object.entries(resumenPorMedios).map(([medio, valores]) => (
-          <div key={medio} style={modalResumenCard}>
-            <span style={{ fontSize: 13, color: "#6b7280" }}>
-              {medio}
-            </span>
+            <div className="caja-modal-cierre-header">
+              <div>
+                <h2>Cerrar caja</h2>
+                <p>
+                  Confirmá el efectivo contado para
+                  finalizar la jornada.
+                </p>
+              </div>
 
-            <strong style={{ fontSize: 18 }}>
-              {formatearMoneda(
-                valores.ingresos - valores.egresos,
-                configMoneda.moneda,
-                configMoneda.localeMoneda
+              <button
+                type="button"
+                className="caja-modal-close"
+                onClick={() =>
+                  setModalCerrarCaja(false)
+                }
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="caja-cierre-resumen">
+              <div>
+                <span>Efectivo esperado</span>
+
+                <strong>
+                  {formatearMoneda(
+                    resumen.efectivoEsperado,
+                    configMoneda.moneda,
+                    configMoneda.localeMoneda
+                  )}
+                </strong>
+              </div>
+            </div>
+
+            <div className="caja-modal-form">
+
+              <div>
+                <label>Efectivo contado</label>
+
+                <input
+                  autoFocus
+                  type="number"
+                  value={saldoCierreReal}
+                  onChange={(e) =>
+                    setSaldoCierreReal(
+                      e.target.value
+                    )
+                  }
+                  placeholder="Ingresá el monto contado"
+                />
+              </div>
+
+              {saldoCierreReal !== "" && (
+                <div
+                  className={`caja-diferencia-cierre ${
+                    diferenciaCierrePreview === 0
+                      ? "correcta"
+                      : "diferencia"
+                  }`}
+                >
+                  <span>Diferencia</span>
+
+                  <strong>
+                    {formatearMoneda(
+                      diferenciaCierrePreview,
+                      configMoneda.moneda,
+                      configMoneda.localeMoneda
+                    )}
+                  </strong>
+                </div>
               )}
-            </strong>
 
-            <small style={{ color: "#6b7280" }}>
-              Ing.{" "}
-              {formatearMoneda(
-                valores.ingresos,
-                configMoneda.moneda,
-                configMoneda.localeMoneda
-              )}
-              {" / "}
-              Egr.{" "}
-              {formatearMoneda(
-                valores.egresos,
-                configMoneda.moneda,
-                configMoneda.localeMoneda
-              )}
-            </small>
+              <div>
+                <label>
+                  Observación opcional
+                </label>
+
+                <textarea
+                  value={observacionCierre}
+                  onChange={(e) =>
+                    setObservacionCierre(
+                      e.target.value
+                    )
+                  }
+                  rows={3}
+                  placeholder="Ej: diferencia revisada, efectivo retirado..."
+                />
+              </div>
+
+            </div>
+
+            <div className="caja-modal-cierre-actions">
+              <button
+                type="button"
+                className="caja-btn caja-btn-secondary"
+                onClick={() =>
+                  setModalCerrarCaja(false)
+                }
+              >
+                Cancelar
+              </button>
+
+              <button
+                type="button"
+                className="caja-btn caja-btn-danger"
+                onClick={handleCerrarCaja}
+              >
+                Confirmar cierre
+              </button>
+            </div>
+
           </div>
-        ))}
-      </div>
-    </div>
-  </div>
-)}
+        </div>
+      )}
+
+      {mostrarResumen && (
+        <div style={modalOverlay}>
+          <div style={modalCaja}>
+            <div style={modalHeader}>
+              <h3 style={{ margin: 0 }}>Resumen por medios</h3>
+
+              <button
+                style={modalCloseBtn}
+                onClick={() => setMostrarResumen(false)}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={modalResumenGrid}>
+              {Object.entries(resumenPorMedios).map(([medio, valores]) => (
+                <div key={medio} style={modalResumenCard}>
+                  <span style={{ fontSize: 13, color: "#6b7280" }}>
+                    {medio}
+                  </span>
+
+                  <strong style={{ fontSize: 18 }}>
+                    {formatearMoneda(
+                      valores.ingresos - valores.egresos,
+                      configMoneda.moneda,
+                      configMoneda.localeMoneda
+                    )}
+                  </strong>
+
+                  <small style={{ color: "#6b7280" }}>
+                    Ing.{" "}
+                    {formatearMoneda(
+                      valores.ingresos,
+                      configMoneda.moneda,
+                      configMoneda.localeMoneda
+                    )}
+                    {" / "}
+                    Egr.{" "}
+                    {formatearMoneda(
+                      valores.egresos,
+                      configMoneda.moneda,
+                      configMoneda.localeMoneda
+                    )}
+                  </small>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {mostrarHistorial && (
       <div style={modalOverlay}>
@@ -1486,6 +1616,102 @@ const opcionesSubtipoManual =
   );
 }
 
+const ResumenPagos = memo(function ResumenPagos({
+  resumenPorMedios,
+  configMoneda,
+}) {
+  const obtenerTotal = (...medios) => {
+    return medios.reduce((total, medio) => {
+      const data = resumenPorMedios[medio];
+
+      if (!data) return total;
+
+      return (
+        total +
+        Number(data.ingresos || 0) -
+        Number(data.egresos || 0)
+      );
+    }, 0);
+  };
+
+  const items = [
+    {
+      key: "efectivo",
+      label: "Efectivo",
+      icono: <FaMoneyBillWave />,
+      valor: obtenerTotal(
+        "efectivo",
+        "efectivo_caja"
+      ),
+    },
+    {
+      key: "transferencia",
+      label: "Transferencia",
+      icono: <FaUniversity />,
+      valor: obtenerTotal("transferencia"),
+    },
+    {
+      key: "billeteras",
+      label: "Billeteras virtuales",
+      icono: <FaWallet />,
+      valor: obtenerTotal(
+        "mercado_pago",
+        "mp"
+      ),
+    },
+    {
+      key: "debito",
+      label: "Débito",
+      icono: <FaCreditCard />,
+      valor: obtenerTotal("debito"),
+    },
+    {
+      key: "credito",
+      label: "Crédito",
+      icono: <FaCreditCard />,
+      valor: obtenerTotal("credito"),
+    },
+    {
+      key: "otro",
+      label: "Otros",
+      icono: <FaEllipsisH />,
+      valor: obtenerTotal(
+        "otro",
+        "Sin medio"
+      ),
+    },
+  ];
+
+  return (
+    <aside className="caja-resumen-pagos">
+      <h3>Resumen de pagos</h3>
+
+      {items.map((item) => (
+        <div
+          key={item.key}
+          className="caja-resumen-item"
+        >
+          <span className="caja-resumen-icono">
+            {item.icono}
+          </span>
+
+          <span className="caja-resumen-label">
+            {item.label}
+          </span>
+
+          <strong className="caja-resumen-valor">
+            {formatearMoneda(
+              item.valor,
+              configMoneda.moneda,
+              configMoneda.localeMoneda
+            )}
+          </strong>
+        </div>
+      ))}
+    </aside>
+  );
+});
+
 const MovimientoTabla = memo(function MovimientoTabla({
   movimientos,
   configMoneda,
@@ -1496,11 +1722,11 @@ const MovimientoTabla = memo(function MovimientoTabla({
       <table>
         <thead>
           <tr>
-            <th>Fecha</th>
+            
             <th>Descripción</th>
             <th>Efectivo</th>
             <th>Transferencia</th>
-            <th>Mercado Pago</th>
+            <th>Billeteras virtuales</th>
             <th>Débito</th>
             <th>Crédito</th>
             <th>Otros</th>
@@ -1540,17 +1766,9 @@ const MovimientoTabla = memo(function MovimientoTabla({
 
               return (
                 <span
-                  style={{
-                    display: "inline-block",
-                    padding: "3px 7px",
-                    borderRadius: 8,
-                    fontWeight: 800,
-                    background: esIngreso
-                      ? "rgba(25, 135, 84, 0.10)"
-                      : "rgba(220, 53, 69, 0.10)",
-                    color: esIngreso ? "#198754" : "#dc3545",
-                    whiteSpace: "nowrap",
-                  }}
+                  className={`caja-monto ${
+                    esIngreso ? "ingreso" : "egreso"
+                  }`}
                 >
                   {esIngreso ? "+" : "-"}{" "}
                   {formatearMoneda(
@@ -1575,27 +1793,27 @@ const MovimientoTabla = memo(function MovimientoTabla({
                     onVerVenta(m.origenRefId);
                   }
                 }}
-                style={{
-                  background: anulado
-                    ? "#f1f5f9"
-                    : esControl
-                    ? "rgba(0,150,209,0.06)"
-                    : esIngreso
-                    ? "rgba(25,135,84,0.05)"
-                    : "rgba(220,53,69,0.05)",
-                  color: anulado ? "#64748b" : undefined,
-                  opacity: anulado ? 0.65 : 1,
-                  cursor:
-                    m.origen === "venta" ||
-                    m.origen === "venta_pago"
-                      ? "pointer"
-                      : "default",
-                }}
+                  style={{
+                    background: anulado
+                      ? "#f8fafc"
+                      : esControl
+                      ? "rgba(0,150,209,0.06)"
+                      : "#ffffff",
+
+                    color: anulado ? "#64748b" : undefined,
+                    opacity: anulado ? 0.65 : 1,
+
+                    cursor:
+                      m.origen === "venta" ||
+                      m.origen === "venta_pago"
+                        ? "pointer"
+                        : "default",
+                  }}
               >
-                <td>{formatearFechaCaja(m.fecha)}</td>
+                
 
                 <td>
-                  <div style={{ fontWeight: 700 }}>
+                  <div className="caja-mov-descripcion">
                     {m.descripcion || m.subtipo || "-"}
 
                     {anulado && (
@@ -1686,7 +1904,7 @@ const MovimientoTabla = memo(function MovimientoTabla({
           {movimientos.length === 0 && (
             <tr>
               <td
-                colSpan="8"
+                colSpan="7"
                 style={{
                   textAlign: "center",
                   padding: 14,
@@ -1704,17 +1922,17 @@ const MovimientoTabla = memo(function MovimientoTabla({
 });
 
 const Kpi = memo(function Kpi({
-  label,
-  value,
-  color = "#111827",
-}) {
-  return (
-    <div style={kpiCard}>
-      <span>{label}</span>
-      <strong style={{ color }}>{value}</strong>
-    </div>
-  );
-});
+    label,
+    value,
+    color = "#111827",
+  }) {
+    return (
+      <div style={kpiCard}>
+        <span>{label}</span>
+        <strong style={{ color }}>{value}</strong>
+      </div>
+    );
+  });
 
 const card = {
   background: "#fff",
