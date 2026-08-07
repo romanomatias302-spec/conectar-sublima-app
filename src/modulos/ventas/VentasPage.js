@@ -1274,11 +1274,14 @@ const aplicarProductoSeleccionado = (datosPrecio) => {
                     {mostrarDropdownCliente && !clienteRefId && (
                       <div className="ventas-dropdown">
                         {clientesFiltrados.slice(0, 8).map((c) => (
-                          <button
-                            key={c.firebaseId}
-                            type="button"
-                            onClick={() => usarClienteExistenteEnVenta(c)}
-                          >
+                        <button
+                          key={c.firebaseId}
+                          type="button"
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            usarClienteExistenteEnVenta(c);
+                          }}
+                        >
                             {c.nombre || "Sin nombre"} {c.dni ? `- ${c.dni}` : ""}
                           </button>
                         ))}
