@@ -198,10 +198,17 @@ const {
 
 
 
-  const style = {
-    transform: CSS.Translate.toString(transform),
-    opacity: isDragging ? 0.6 : 1,
-  };
+
+
+
+
+
+const style = {
+  transform: "none",
+
+  opacity:
+    isDragging ? 0.28 : 1,
+};
 
 const etiquetasPedido = obtenerEtiquetasPedido(pedido);
 const estadoFechaEntrega = obtenerEstadoFechaEntrega(pedido);

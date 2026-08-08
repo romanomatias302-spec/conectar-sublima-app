@@ -42,11 +42,57 @@ function obtenerColorSiguiente(columnas) {
 }
 
 function ordenarColumnasPorFlujo(columnas = []) {
-  return [...columnas].sort(
-    (a, b) =>
-      Number(a?.orden ?? 0) -
-      Number(b?.orden ?? 0)
-  );
+  return [...columnas].sort((a, b) => {
+    /*
+     * Reglas estructurales del flujo:
+     *
+     * 1. La columna inicial siempre va primera.
+     * 2. La columna final siempre va última.
+     * 3. Sólo las columnas intermedias se ordenan
+     *    mediante el campo "orden".
+     */
+
+    if (a?.esInicial === true) {
+      return b?.esInicial === true
+        ? 0
+        : -1;
+    }
+
+    if (b?.esInicial === true) {
+      return 1;
+    }
+
+    if (a?.esFinal === true) {
+      return b?.esFinal === true
+        ? 0
+        : 1;
+    }
+
+    if (b?.esFinal === true) {
+      return -1;
+    }
+
+    const ordenA = Number(
+      a?.orden ?? 0
+    );
+
+    const ordenB = Number(
+      b?.orden ?? 0
+    );
+
+    if (ordenA !== ordenB) {
+      return ordenA - ordenB;
+    }
+
+    /*
+     * Desempate estable.
+     */
+    return String(
+      a?.id || ""
+    ).localeCompare(
+      String(b?.id || "")
+    );
+  });
 }
 
 function calcularOrdenEntreColumnas(
@@ -80,13 +126,19 @@ export async function obtenerColumnasProduccion(clienteId) {
 
   const snapshot = await getDocs(q);
 
-  return snapshot.docs
-    .map((d) => ({
-      id: d.id,
-      ...d.data(),
-    }))
-    .filter(col => col.activo !== false)
-    .sort((a,b) => a.orden - b.orden);
+const columnas = snapshot.docs
+  .map((d) => ({
+    id: d.id,
+    ...d.data(),
+  }))
+  .filter(
+    (columna) =>
+      columna.activo !== false
+  );
+
+return ordenarColumnasPorFlujo(
+  columnas
+);
 }
 
 
@@ -441,10 +493,16 @@ export function escucharColumnasProduccion(clienteId, callback) {
           id: d.id,
           ...d.data(),
         }))
-        .filter((col) => col.activo !== false)
-        .sort((a, b) => a.orden - b.orden);
+        .filter(
+          (columna) =>
+            columna.activo !== false
+        );
 
-      callback(columnas);
+      callback(
+        ordenarColumnasPorFlujo(
+          columnas
+        )
+      );
     },
     (error) => {
       console.error("Error escuchando columnas de producción:", error);

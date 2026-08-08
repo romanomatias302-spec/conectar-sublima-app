@@ -1,5 +1,6 @@
 import {
   DndContext,
+  DragOverlay,
   PointerSensor,
   TouchSensor,
   useSensor,
@@ -13,6 +14,55 @@ import {
   useRef,
   useState,
 } from "react";
+
+function ProduccionDragPreview({
+  pedido,
+}) {
+  if (!pedido) return null;
+
+  const numero =
+    pedido.id ||
+    pedido.numeroPedido ||
+    pedido.numero ||
+    "";
+
+  const cliente =
+    pedido.cliente ||
+    pedido.clienteNombre ||
+    pedido.nombreCliente ||
+    "Pedido";
+
+  const portada =
+    pedido.produccionImagenPortadaThumb ||
+    pedido.produccionImagenPortada ||
+    "";
+
+  return (
+    <div className="produccion-drag-preview">
+      {portada && (
+        <div className="produccion-drag-preview-portada">
+          <img
+            src={portada}
+            alt=""
+            draggable={false}
+          />
+        </div>
+      )}
+
+      <div className="produccion-drag-preview-contenido">
+        {numero && (
+          <strong>
+            #{numero}
+          </strong>
+        )}
+
+        <span>
+          {cliente}
+        </span>
+      </div>
+    </div>
+  );
+}
 
 export default function ProduccionBoard({
   columnas,
@@ -52,6 +102,10 @@ export default function ProduccionBoard({
 }) {
 
 const [columnaResaltadaId, setColumnaResaltadaId] = useState(null);
+const [
+  representacionArrastrandoId,
+  setRepresentacionArrastrandoId,
+] = useState("");
 
 const dragScrollRafRef = useRef(null);
 
@@ -120,10 +174,54 @@ const columnasSectorSet = useMemo(() => {
   return new Set(columnasSectorIds);
 }, [columnasSectorIds]);
 
-function manejarDragStart() {
-  const wrapper = document.querySelector(
-    ".produccion-board-wrapper"
+const pedidoPorRepresentacionId =
+  useMemo(() => {
+    const mapa = new Map();
+
+    Object.values(
+      pedidosPorColumna || {}
+    )
+      .flat()
+      .forEach((pedido) => {
+        const pedidoId =
+          pedido.pedidoFirebaseId ||
+          pedido.firebaseId ||
+          pedido.id ||
+          "";
+
+        if (!pedidoId) return;
+
+        const representacionId =
+          pedido.produccionRepresentacionId ||
+          `principal:${pedidoId}`;
+
+        mapa.set(
+          String(representacionId),
+          pedido
+        );
+      });
+
+    return mapa;
+  }, [pedidosPorColumna]);
+
+  const pedidoArrastrando =
+  representacionArrastrandoId
+    ? pedidoPorRepresentacionId.get(
+        String(
+          representacionArrastrandoId
+        )
+      ) || null
+    : null;
+
+function manejarDragStart(event) {
+  setRepresentacionArrastrandoId(
+    String(event?.active?.id || "")
   );
+
+  const wrapper =
+    document.querySelector(
+      ".produccion-board-wrapper"
+    );
 
   dragWrapperRef.current =
     wrapper || null;
@@ -219,6 +317,7 @@ function manejarDragMove(event) {
 
 
 function limpiarEstadoDrag() {
+  setRepresentacionArrastrandoId("");
   if (dragScrollRafRef.current) {
     window.cancelAnimationFrame(
       dragScrollRafRef.current
@@ -466,6 +565,19 @@ onMoverPedido?.(pedidoId, columnaDestinoId);
           );
         })}
       </div>
+
+        <DragOverlay
+          dropAnimation={null}
+        >
+          {pedidoArrastrando ? (
+            <ProduccionDragPreview
+              pedido={
+                pedidoArrastrando
+              }
+            />
+          ) : null}
+        </DragOverlay>
+
     </DndContext>
   );
 }

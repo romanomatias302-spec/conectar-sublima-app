@@ -570,13 +570,51 @@ function filtrarPedidosPorAsignado(lista, filtro, perfil, forzarSoloAsignados = 
   return lista.filter((p) => p.produccionAsignadoUid === filtro);
 }
 
-  const columnasGlobalesOrdenadas = useMemo(() => {
-    return [...columnas].sort(
-      (a, b) =>
-        Number(a?.orden ?? 0) -
-        Number(b?.orden ?? 0)
+const columnasGlobalesOrdenadas = useMemo(() => {
+  return [...columnas].sort((a, b) => {
+    /*
+     * Reglas estructurales:
+     *
+     * Pendiente siempre primera.
+     * Producción finalizada siempre última.
+     * Sólo las columnas intermedias obedecen "orden".
+     */
+
+    if (a?.esInicial === true) {
+      return b?.esInicial === true ? 0 : -1;
+    }
+
+    if (b?.esInicial === true) {
+      return 1;
+    }
+
+    if (a?.esFinal === true) {
+      return b?.esFinal === true ? 0 : 1;
+    }
+
+    if (b?.esFinal === true) {
+      return -1;
+    }
+
+    const ordenA = Number(
+      a?.orden ?? 0
     );
-  }, [columnas]);
+
+    const ordenB = Number(
+      b?.orden ?? 0
+    );
+
+    if (ordenA !== ordenB) {
+      return ordenA - ordenB;
+    }
+
+    return String(
+      a?.id || ""
+    ).localeCompare(
+      String(b?.id || "")
+    );
+  });
+}, [columnas]);
 
   const datosVistaSector = useMemo(() => {
   if (!sectorVistaSeleccionadoId) {

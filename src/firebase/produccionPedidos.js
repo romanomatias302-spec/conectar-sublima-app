@@ -130,12 +130,50 @@ export async function obtenerPedidosProduccionActivos(clienteId) {
       ...d.data(),
     }))
     .filter((pedido) => pedido.produccionFinalizada !== true && pedido.estado !== "Cancelado")
-    .sort((a, b) => {
-      const aTime = a.updatedAt?.seconds || 0;
-      const bTime = b.updatedAt?.seconds || 0;
-      return bTime - aTime;
-    })
-    .slice(0, 100);
+.sort((a, b) => {
+  const obtenerTiempoOrdenProduccion = (pedido) => {
+    if (
+      pedido?.ultimaAccionProduccionAt?.seconds
+    ) {
+      return pedido
+        .ultimaAccionProduccionAt
+        .seconds;
+    }
+
+    if (
+      pedido?.produccionActualizadoAt?.seconds
+    ) {
+      return pedido
+        .produccionActualizadoAt
+        .seconds;
+    }
+
+    if (pedido?.createdAt?.seconds) {
+      return pedido.createdAt.seconds;
+    }
+
+    return 0;
+  };
+
+  const aTime =
+    obtenerTiempoOrdenProduccion(a);
+
+  const bTime =
+    obtenerTiempoOrdenProduccion(b);
+
+  if (aTime !== bTime) {
+    return bTime - aTime;
+  }
+
+  return String(
+    a.firebaseId || a.id || ""
+  ).localeCompare(
+    String(
+      b.firebaseId || b.id || ""
+    )
+  );
+})
+.slice(0, 100);
 
   return {
     pedidos,
@@ -523,11 +561,57 @@ export function escucharPedidosProduccionFinalizadosRecientes(clienteId, callbac
           (pedido) =>
             pedido.produccionFinalizada === true && pedido.estado !== "Cancelado"
         )
-        .sort((a, b) => {
-          const aTime = a.updatedAt?.seconds || 0;
-          const bTime = b.updatedAt?.seconds || 0;
-          return bTime - aTime;
-        })
+          .sort((a, b) => {
+            const obtenerTiempoFinalizacion = (pedido) => {
+              /*
+              * Si el pedido llegó a la columna final
+              * mediante Producción, este es el mejor
+              * timestamp disponible actualmente.
+              */
+              if (
+                pedido?.ultimaAccionProduccionAt?.seconds
+              ) {
+                return pedido
+                  .ultimaAccionProduccionAt
+                  .seconds;
+              }
+
+              /*
+              * Compatibilidad con pedidos anteriores.
+              */
+              if (
+                pedido?.produccionActualizadoAt?.seconds
+              ) {
+                return pedido
+                  .produccionActualizadoAt
+                  .seconds;
+              }
+
+              if (pedido?.createdAt?.seconds) {
+                return pedido.createdAt.seconds;
+              }
+
+              return 0;
+            };
+
+            const aTime =
+              obtenerTiempoFinalizacion(a);
+
+            const bTime =
+              obtenerTiempoFinalizacion(b);
+
+            if (aTime !== bTime) {
+              return bTime - aTime;
+            }
+
+            return String(
+              a.firebaseId || a.id || ""
+            ).localeCompare(
+              String(
+                b.firebaseId || b.id || ""
+              )
+            );
+          })
         .slice(0, 10);
 
       callback(pedidos);
