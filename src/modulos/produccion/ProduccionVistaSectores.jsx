@@ -24,6 +24,7 @@ function MiniColumnaMapa({
   altura = 52,
   neutral = false,
   puedeArrastrar = false,
+  onAbrirSector = null,
 }) {
   const draggableId =
     `mapa-columna:${columna.id}`;
@@ -91,9 +92,33 @@ function MiniColumnaMapa({
           ? " · Arrastrá para reordenar"
           : ""
       }`}
-      onClick={(event) => {
-        event.stopPropagation();
+        onClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+
+          
+
+      if (!puedeArrastrar) {
+          onAbrirSector?.();
+        }
       }}
+      onKeyDown={(event) => {
+        if (
+          event.key !== "Enter" &&
+          event.key !== " "
+        ) {
+          return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+
+        if (!puedeArrastrar) {
+          onAbrirSector?.();
+        }
+      }}
+      role="button"
+      tabIndex={0}
       {...attributes}
       {...listeners}
     >
@@ -523,6 +548,9 @@ export default function ProduccionVistaSectores({
                                     puedeReordenarColumnas &&
                                     !reordenandoColumnas
                                   }
+                                  onAbrirSector={() => {
+                                    seleccionarSector(sector.id);
+                                  }}
                                 />
                               );
                             }
@@ -627,6 +655,11 @@ export default function ProduccionVistaSectores({
                                 puedeReordenarColumnas &&
                                 !reordenandoColumnas
                               }
+                              onAbrirSector={() => {
+                                if (!disponible) return;
+
+                                onVistaCompleta();
+                              }}
                             />
                           );
                         }

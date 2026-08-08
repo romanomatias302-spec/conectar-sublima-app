@@ -8,7 +8,11 @@ import {
 } from "@dnd-kit/core";
 import ProduccionColumn from "./ProduccionColumn";
 
-import { useState } from "react";
+import {
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 export default function ProduccionBoard({
   columnas,
@@ -49,6 +53,17 @@ export default function ProduccionBoard({
 
 const [columnaResaltadaId, setColumnaResaltadaId] = useState(null);
 
+const dragScrollRafRef = useRef(null);
+
+const dragWrapperRef = useRef(null);
+
+const dragWrapperRectRef = useRef(null);
+
+const ultimoCentroDragRef = useRef({
+  x: 0,
+  y: 0,
+});
+
 const sensors = useSensors(
   useSensor(PointerSensor, {
     activationConstraint: {
@@ -64,65 +79,187 @@ const sensors = useSensors(
 
 );
 
+const columnasReferencia = useMemo(() => {
+  return columnasGlobales.length > 0
+    ? columnasGlobales
+    : columnas;
+}, [
+  columnasGlobales,
+  columnas,
+]);
+
+const columnasIntermedias = useMemo(() => {
+  return columnasReferencia.filter(
+    (columna) =>
+      !columna.esInicial &&
+      !columna.esFinal
+  );
+}, [columnasReferencia]);
+
+const indiceIntermediaPorId = useMemo(() => {
+  return new Map(
+    columnasIntermedias.map(
+      (columna, index) => [
+        columna.id,
+        index,
+      ]
+    )
+  );
+}, [columnasIntermedias]);
+
+const sectorPorId = useMemo(() => {
+  return new Map(
+    sectores.map((sector) => [
+      String(sector.id),
+      sector,
+    ])
+  );
+}, [sectores]);
+
+const columnasSectorSet = useMemo(() => {
+  return new Set(columnasSectorIds);
+}, [columnasSectorIds]);
+
+function manejarDragStart() {
+  const wrapper = document.querySelector(
+    ".produccion-board-wrapper"
+  );
+
+  dragWrapperRef.current =
+    wrapper || null;
+
+  dragWrapperRectRef.current =
+    wrapper?.getBoundingClientRect() ||
+    null;
+}
 
 function manejarDragMove(event) {
-  const wrapper = document.querySelector(".produccion-board-wrapper");
+  const wrapper =
+    dragWrapperRef.current;
 
-  if (!wrapper) return;
+  const rect =
+    dragWrapperRectRef.current;
 
-  const rect = wrapper.getBoundingClientRect();
-  const activeRect = event?.active?.rect?.current?.translated;
+  if (!wrapper || !rect) return;
+
+  const activeRect =
+    event?.active?.rect?.current
+      ?.translated;
 
   if (!activeRect) return;
 
-  const x = activeRect.left + activeRect.width / 2;
-  const y = activeRect.top + activeRect.height / 2;
+  /*
+   * Sólo guardamos la última posición conocida.
+   * No tocamos el DOM todavía.
+   */
+  ultimoCentroDragRef.current = {
+    x:
+      activeRect.left +
+      activeRect.width / 2,
 
-  const zonaX = 90;
-  const zonaY = 120;
+    y:
+      activeRect.top +
+      activeRect.height / 2,
+  };
 
-  const velocidadX = 18;
-  const velocidadY = 16;
-
-  // Horizontal
-  if (x > rect.right - zonaX) {
-    wrapper.scrollLeft += velocidadX;
+  /*
+   * Como máximo una operación de scroll
+   * por frame del navegador.
+   */
+  if (dragScrollRafRef.current) {
+    return;
   }
 
-  if (x < rect.left + zonaX) {
-    wrapper.scrollLeft -= velocidadX;
-  }
+  dragScrollRafRef.current =
+    window.requestAnimationFrame(() => {
+      dragScrollRafRef.current =
+        null;
 
-  // Vertical
-  if (y > rect.bottom - zonaY) {
-    wrapper.scrollTop += velocidadY;
-  }
+      const {
+        x,
+        y,
+      } = ultimoCentroDragRef.current;
 
-  if (y < rect.top + zonaY) {
-    wrapper.scrollTop -= velocidadY;
-  }
+      const zonaX = 90;
+      const zonaY = 120;
+
+      const velocidadX = 18;
+      const velocidadY = 16;
+
+      let deltaX = 0;
+      let deltaY = 0;
+
+      if (x > rect.right - zonaX) {
+        deltaX = velocidadX;
+      } else if (
+        x < rect.left + zonaX
+      ) {
+        deltaX = -velocidadX;
+      }
+
+      if (y > rect.bottom - zonaY) {
+        deltaY = velocidadY;
+      } else if (
+        y < rect.top + zonaY
+      ) {
+        deltaY = -velocidadY;
+      }
+
+      if (deltaX !== 0) {
+        wrapper.scrollLeft +=
+          deltaX;
+      }
+
+      if (deltaY !== 0) {
+        wrapper.scrollTop +=
+          deltaY;
+      }
+    });
 }
 
 
-  function manejarDragEnd(event) {
-    if (!puedeMoverPedidos) return;
+function limpiarEstadoDrag() {
+  if (dragScrollRafRef.current) {
+    window.cancelAnimationFrame(
+      dragScrollRafRef.current
+    );
 
-    const { active, over } = event;
+    dragScrollRafRef.current =
+      null;
+  }
 
-    if (!active || !over) return;
+  dragWrapperRef.current = null;
+  dragWrapperRectRef.current = null;
+}
 
-const pedidoId = active.id;
-const overData = over.data?.current || {};
 
-const columnaDestinoId = overData.columnaId || over.id;
-const pedidoObjetivoId = overData.pedidoId || null;
+function manejarDragEnd(event) {
+limpiarEstadoDrag();
 
-if (!pedidoId || !columnaDestinoId) return;
+if (!puedeMoverPedidos) return;
 
-const columnasReferencia =
-  columnasGlobales.length > 0
-    ? columnasGlobales
-    : columnas;
+const { active, over } = event;
+
+if (!active || !over) return;
+
+const overData =
+  over.data?.current || {};
+
+const representacionId =
+  String(active.id || "");
+
+const columnaDestinoId =
+  overData.columnaId ||
+  over.id;
+
+if (
+  !representacionId ||
+  !columnaDestinoId
+) {
+  return;
+}
+
+
 
 const columnaDestino = columnasReferencia.find(
   (c) => c.id === columnaDestinoId
@@ -131,11 +268,81 @@ const ordenManualActivo =
   columnaDestino?.ordenManualActivo === true ||
   columnaDestino?.tipoOrden === "manual";
 
-const pedidoActual = Object.values(pedidosPorColumna)
-  .flat()
-  .find((p) => (p.firebaseId || p.id) === pedidoId);
+const pedidoActual =
+  Object.values(pedidosPorColumna)
+    .flat()
+    .find((p) => {
+      const idRepresentacion =
+        p.produccionRepresentacionId ||
+        `principal:${
+          p.pedidoFirebaseId ||
+          p.firebaseId ||
+          p.id
+        }`;
 
-const mismaColumna = pedidoActual?.columnaProduccionId === columnaDestinoId;
+      return (
+        String(idRepresentacion) ===
+        String(representacionId)
+      );
+    });
+
+if (!pedidoActual) return;
+
+const pedidoId =
+  pedidoActual.pedidoFirebaseId ||
+  pedidoActual.firebaseId ||
+  pedidoActual.id ||
+  "";
+
+const representacionTipo =
+  pedidoActual.produccionRepresentacionTipo ||
+  "principal";
+
+const etapaVinculadaId =
+  pedidoActual.produccionEtapaVinculadaId ||
+  "";
+
+const grupoVinculadoId =
+  pedidoActual.produccionGrupoVinculadoId ||
+  "";
+
+if (!pedidoId) return;
+
+const pedidoObjetivoId =
+  overData.pedidoId || null;    
+
+const columnaActualId =
+  pedidoActual?.columnaRepresentacionId ||
+  pedidoActual?.columnaProduccionId ||
+  "";
+
+const mismaColumna =
+  columnaActualId === columnaDestinoId;
+
+/*
+ * Las ramas vinculadas todavía NO escriben en Firestore.
+ *
+ * Dejamos preparada la identidad pero bloqueamos su
+ * movimiento hasta conectar moverEtapaVinculadaProduccion().
+ *
+ * Hoy no afecta nada porque todavía no renderizamos ramas.
+ */
+if (
+  representacionTipo === "vinculada"
+) {
+  console.warn(
+    "Movimiento de etapa vinculada todavía no habilitado:",
+    {
+      representacionId,
+      pedidoId,
+      etapaVinculadaId,
+      grupoVinculadoId,
+      columnaDestinoId,
+    }
+  );
+
+  return;
+}  
 
 if (ordenManualActivo && mismaColumna && pedidoObjetivoId) {
   onReordenarPedidoManual?.({
@@ -162,32 +369,23 @@ onMoverPedido?.(pedidoId, columnaDestinoId);
   }
 
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={pointerWithin}
-      modifiers={[]}
-      autoScroll={false}
- 
-      measuring={{
-        droppable: {
-          strategy: "always",
-        },
-      }} 
-         
-      onDragMove={manejarDragMove}
-      onDragEnd={manejarDragEnd}
-    >
+      <DndContext
+        sensors={sensors}
+        collisionDetection={pointerWithin}
+        modifiers={[]}
+        autoScroll={false}
+
+        onDragStart={manejarDragStart}
+        onDragMove={manejarDragMove}
+        onDragCancel={limpiarEstadoDrag}
+        onDragEnd={manejarDragEnd}
+      >
       <div className="produccion-board">
         {columnas.map((columna) => {
-          const columnasReferencia =
-            columnasGlobales.length > 0
-              ? columnasGlobales
-              : columnas;
-
-          const intermedias = columnasReferencia.filter(
-            (c) => !c.esInicial && !c.esFinal
-          );
-          const indexIntermedia = intermedias.findIndex((c) => c.id === columna.id);
+          const indexIntermedia =
+            indiceIntermediaPorId.get(
+              columna.id
+            ) ?? -1;
 
           const puedeMoverIzquierda =
             !columna.esInicial &&
@@ -198,18 +396,19 @@ onMoverPedido?.(pedidoId, columnaDestinoId);
             !columna.esInicial &&
             !columna.esFinal &&
             indexIntermedia !== -1 &&
-            indexIntermedia < intermedias.length - 1;
+            indexIntermedia <
+              columnasIntermedias.length - 1;
 
           const sectorColumna =
-            sectores.find(
-              (sector) =>
-                String(sector.id) ===
-                String(columna.sectorId || "")
+            sectorPorId.get(
+              String(columna.sectorId || "")
             ) || null;
 
           const perteneceSectorSeleccionado =
             !!sectorSeleccionadoId &&
-            columnasSectorIds.includes(columna.id);
+            columnasSectorSet.has(
+              columna.id
+            );
 
           const esContextoEntrada =
             columna.id === columnaEntradaId;

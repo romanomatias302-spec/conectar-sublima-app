@@ -2,6 +2,44 @@ import { useEffect, useRef, useState } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import ProduccionCard from "./ProduccionCard";
 
+function ProduccionPedidoDropManual({
+  pedido,
+  columnaId,
+  children,
+}) {
+  const pedidoId =
+    pedido?.pedidoFirebaseId ||
+    pedido?.firebaseId ||
+    pedido?.id ||
+    "";
+
+  const representacionId =
+    pedido?.produccionRepresentacionId ||
+    `principal:${pedidoId}`;
+
+  const { setNodeRef, isOver } = useDroppable({
+    id: `pedido-drop-${representacionId}`,
+
+    data: {
+      tipo: "tarjeta",
+      representacionId,
+      pedidoId,
+      columnaId,
+    },
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={`produccion-pedido-drop-manual ${
+        isOver ? "over" : ""
+      }`}
+    >
+      {children}
+    </div>
+  );
+}
+
 export default function ProduccionColumn({
   columna,
   columnas = [],
@@ -335,29 +373,73 @@ useEffect(() => {
       </div>
 
       <div className="produccion-column-body">
-        {!estaContraida &&
-          pedidosVisibles.map((pedido, index) => (
-        <ProduccionCard
-          key={pedido.firebaseId || pedido.id}
-          pedido={pedido}
-          columnas={columnas}
-          onVerPedido={onVerPedido}
-          onEditarDetalleManual={onEditarDetalleManual}
-          onMoverPedido={onMoverPedido}
-          ordenManualActivo={
-            columna.ordenManualActivo === true || columna.tipoOrden === "manual"
-          }
-          indiceOrdenManual={index + 1}
-          onCambiarColorTarjeta={onCambiarColorTarjeta}
-          ahoraTick={ahoraTick}
-          puedeMoverPedidos={puedeMoverPedidos}
-          puedeEditarDetalleManual={puedeEditarDetalleManual}
-          resaltadaNuevoPedido={
-            pedidoNuevoResaltadoId &&
-            (pedido.firebaseId || pedido.id) === pedidoNuevoResaltadoId
-          }
-        />
-          ))}
+       {!estaContraida &&
+          pedidosVisibles.map((pedido, index) => {
+            const pedidoId =
+              pedido.pedidoFirebaseId ||
+              pedido.firebaseId ||
+              pedido.id;
+
+            const representacionId =
+              pedido.produccionRepresentacionId ||
+              `principal:${pedidoId}`;
+
+            const ordenManualActivo =
+              columna.ordenManualActivo === true ||
+              columna.tipoOrden === "manual";
+
+            const tarjeta = (
+              <ProduccionCard
+                pedido={pedido}
+                columnas={columnas}
+                onVerPedido={onVerPedido}
+                onEditarDetalleManual={onEditarDetalleManual}
+                onMoverPedido={onMoverPedido}
+                ordenManualActivo={ordenManualActivo}
+                indiceOrdenManual={index + 1}
+                onCambiarColorTarjeta={onCambiarColorTarjeta}
+                ahoraTick={ahoraTick}
+                puedeMoverPedidos={puedeMoverPedidos}
+                puedeEditarDetalleManual={
+                  puedeEditarDetalleManual
+                }
+                resaltadaNuevoPedido={
+                  pedidoNuevoResaltadoId &&
+                  (pedido.firebaseId || pedido.id) ===
+                    pedidoNuevoResaltadoId
+                }
+              />
+            );
+
+            /*
+            * Sólo montamos un droppable individual
+            * cuando esta columna utiliza orden manual.
+            */
+            if (ordenManualActivo) {
+              return (
+                <ProduccionPedidoDropManual
+                  key={representacionId}
+                  pedido={pedido}
+                  columnaId={columna.id}
+                >
+                  {tarjeta}
+                </ProduccionPedidoDropManual>
+              );
+            }
+
+            /*
+            * Orden normal:
+            * la tarjeta es únicamente draggable.
+            */
+            return (
+              <div
+                key={representacionId}
+                className="produccion-card-render-item"
+              >
+                {tarjeta}
+              </div>
+            );
+          })}
           {!estaContraida && cantidadOculta > 0 && (
             <div className="produccion-column-limite-info">
               Mostrando últimos {LIMITE_FINALIZADOS_VISIBLES}. Hay {cantidadOculta} finalizados más.

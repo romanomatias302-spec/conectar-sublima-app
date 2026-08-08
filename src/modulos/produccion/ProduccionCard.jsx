@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useDraggable, useDroppable } from "@dnd-kit/core";
+import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 
 function obtenerEstadoFechaEntrega(pedido) {
@@ -159,9 +159,16 @@ export default function ProduccionCard({
   ordenManualActivo = false,
   indiceOrdenManual = null,
 }) {
-  const id = pedido.firebaseId || pedido.id;
+  const pedidoId =
+    pedido.pedidoFirebaseId ||
+    pedido.firebaseId ||
+    pedido.id;
 
-  const dropId = `pedido-drop-${id}`;
+  const representacionId =
+    pedido.produccionRepresentacionId ||
+    `principal:${pedidoId}`;
+
+
   const esMobile = window.innerWidth <= 768;
 
 
@@ -182,18 +189,14 @@ const {
   transform,
   isDragging,
 } = useDraggable({
-    id,
-    disabled: pedido.produccionFinalizada === true || !puedeMoverPedidos,
-  });
+  id: representacionId,
 
-  const { setNodeRef: setDroppableNodeRef } = useDroppable({
-  id: dropId,
-  data: {
-    tipo: "tarjeta",
-    pedidoId: id,
-    columnaId: pedido.columnaProduccionId,
-  },
+  disabled:
+    pedido.produccionFinalizada === true ||
+    !puedeMoverPedidos,
 });
+
+
 
   const style = {
     transform: CSS.Translate.toString(transform),
@@ -231,10 +234,7 @@ const usuarioVisible =
 
   return (
     <div
-      ref={(node) => {
-        setNodeRef(node);
-        setDroppableNodeRef(node);
-      }}
+      ref={setNodeRef}
       style={style}
       className={`produccion-card color-${pedido.produccionColorTarjeta || "blanco"} ${isDragging ? "dragging" : ""} ${pedido.__animandoSalida ? "finalizando" : ""} ${resaltadaNuevoPedido ? "nuevo-pedido-resaltado" : ""}`}
       {...(

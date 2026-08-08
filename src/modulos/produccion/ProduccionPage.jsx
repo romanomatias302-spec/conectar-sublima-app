@@ -14,7 +14,6 @@ import {
   desactivarColumnaProduccion,
   escucharColumnasProduccion,
   moverColumnaProduccion,
-  reordenarColumnaDesdeMapaProduccion,
 } from "../../firebase/produccionColumnas";
 import {
   moverPedidoProduccion,
@@ -38,6 +37,7 @@ import { agruparPedidosPorColumna } from "./produccionUtils";
 import ProduccionBoard from "./ProduccionBoard";
 import ProduccionHeader from "./ProduccionHeader";
 import ProduccionVistaSectores from "./ProduccionVistaSectores";
+import DetalleProduccionModal from "./detalle/DetalleProduccionModal";
 import NuevoSectorProduccionModal from "./NuevoSectorProduccionModal";
 import PedidoFormModal from "../pedidos/PedidoFormModal";
 import {
@@ -124,10 +124,7 @@ const [sectorNuevaColumnaId, setSectorNuevaColumnaId] = useState("");
     setMostrarVistaGeneralSectores,
   ] = useState(false);
 
-  const [
-  reordenandoColumnasMapa,
-  setReordenandoColumnasMapa,
-] = useState(false);
+
 
   /*
   * Preparado para planes.
@@ -1110,64 +1107,17 @@ function toggleColumnaContraida(columnaId) {
   }));
 }
 
-  async function abrirDetalleManual(pedido) {
-    if (!puedeHacerEnProduccion("editarDetalle")) return;
-
-    setPedidoEditandoDetalle(pedido);
-    setMenuDetalleAbierto(false);
-    setVistaMenuDetalle("principal");
-    setMensajeMenuDetalle("");
-    setColorTarjetaManual(pedido?.produccionColorTarjeta || "");
-    setNotaManual(pedido?.produccionNotaCorta || "");
-    setMetrosManual(
-      pedido?.produccionMetros === "" || pedido?.produccionMetros == null
-        ? ""
-        : String(pedido.produccionMetros)
-    );
-const etiquetasActuales = obtenerEtiquetasPedido(pedido);
-setEtiquetasSeleccionadasIds(etiquetasActuales.map((e) => e.id).filter(Boolean));
-    setUsuarioAsignadoUid(pedido?.produccionAsignadoUid || "");
-    setNotaCortaManual(
-    pedido?.produccionNotaCorta || ""
-    );
-
-    setNotaLargaManual(
-    pedido?.produccionNotaLarga || ""
-    );
-
-    setArchivosProduccion(pedido?.produccionArchivos || []);
-
-    setImagenPortadaProduccion(
-    pedido?.produccionImagenPortada || ""
-    );
-
-    setImagenPortadaThumbProduccion(
-      pedido?.produccionImagenPortadaThumb || ""
-    );
-
-    setMostrarSelectorPortada(false);
-
-const productosDelPedido = await cargarProductosDelPedidoProduccion(
-  pedido?.firebaseId
-);
-
-const imagenesDetectadas = obtenerImagenesPedido(productosDelPedido);
-
-setImagenesPedido(imagenesDetectadas);
-
-console.log("IMÁGENES PRODUCCIÓN DETECTADAS:", imagenesDetectadas);
-
-    try {
-      setLoadingHistorialProduccion(true);
-      const historial = await obtenerHistorialProduccionPedido(pedido?.firebaseId);
-      setHistorialProduccion(historial);
-    } catch (error) {
-      console.error("Error cargando historial de producción:", error);
-      setHistorialProduccion([]);
-    } finally {
-      setLoadingHistorialProduccion(false);
-    }
+function abrirDetalleManual(pedido) {
+  if (
+    !puedeHacerEnProduccion(
+      "editarDetalle"
+    )
+  ) {
+    return;
   }
+
+  setPedidoEditandoDetalle(pedido);
+}
 
 function obtenerImagenesPedido(productos = []) {
   const resultado = [];
@@ -1196,18 +1146,6 @@ function obtenerImagenesPedido(productos = []) {
 
 function cerrarDetalleManual() {
   setPedidoEditandoDetalle(null);
-  setNotaManual("");
-  setMetrosManual("");
-  setEtiquetasSeleccionadasIds([]);
-  setUsuarioAsignadoUid("");
-  setHistorialProduccion([]);
-  setLoadingHistorialProduccion(false);
-  setArchivosProduccion([]);
-  setSubiendoArchivoProduccion(false);
-  setMenuDetalleAbierto(false);
-  setVistaMenuDetalle("principal");
-  setMensajeMenuDetalle("");
-  setColorTarjetaManual("");
 }
 
 async function manejarSubirArchivosProduccion(e) {
@@ -1482,29 +1420,56 @@ const puedeGestionarEtiquetasProduccion =
   });
 }
 
- async function manejarCambiarColorTarjeta(pedidoId, color) {
+async function manejarCambiarColorTarjeta(
+  pedidoId,
+  color
+) {
   try {
-    if (!puedeCambiarColorTarjeta) return;
+    if (
+      !puedeCambiarColorTarjeta
+    ) {
+      return;
+    }
+
     if (!pedidoId) return;
 
-    setColorTarjetaManual(color || "");
-
+    /*
+     * Actualización optimista:
+     * la tarjeta cambia inmediatamente.
+     */
     setPedidos((prev) =>
-      prev.map((p) =>
-        (p.firebaseId || p.id) === pedidoId
-          ? { ...p, produccionColorTarjeta: color || "" }
-          : p
+      prev.map((pedido) =>
+        (
+          pedido.firebaseId ||
+          pedido.id
+        ) === pedidoId
+          ? {
+              ...pedido,
+              produccionColorTarjeta:
+                color || "",
+            }
+          : pedido
       )
     );
 
-    await updateDoc(doc(db, "pedidos", pedidoId), {
-      produccionColorTarjeta: color || "",
-    });
-
-    setMensajeMenuDetalle("Color actualizado");
+    await updateDoc(
+      doc(
+        db,
+        "pedidos",
+        pedidoId
+      ),
+      {
+        produccionColorTarjeta:
+          color || "",
+      }
+    );
   } catch (error) {
-    console.error("Error cambiando color de tarjeta:", error);
-    setMensajeMenuDetalle("No se pudo cambiar el color");
+    console.error(
+      "Error cambiando color de tarjeta:",
+      error
+    );
+
+    throw error;
   }
 }
 
@@ -1595,62 +1560,7 @@ async function manejarReordenManualPedido({ pedidoId, pedidoObjetivoId, columnaI
 }
 
 
-  async function manejarReordenarColumnaMapa({
-  columnaId,
-  sectorDestinoId,
-  columnaObjetivoId,
-  posicion,
-}) {
-  try {
-    if (!perfil?.clienteId) return;
 
-    if (!puedeGestionarColumnas) {
-      return;
-    }
-
-    if (!vistaSectoresDisponible) {
-      return;
-    }
-
-    if (reordenandoColumnasMapa) {
-      return;
-    }
-
-    setReordenandoColumnasMapa(true);
-
-    await reordenarColumnaDesdeMapaProduccion({
-      clienteId: perfil.clienteId,
-      columnaId,
-      sectorDestinoId: sectorDestinoId || "",
-      columnaObjetivoId:
-        columnaObjetivoId || "",
-      posicion:
-        posicion === "despues"
-          ? "despues"
-          : "antes",
-    });
-
-    /*
-     * El porcentaje depende de la posición global.
-     * Utilizamos la versión optimizada con batches.
-     */
-    await recalcularPedidosPorCambioDeColumnas(
-      perfil.clienteId
-    );
-  } catch (error) {
-    console.error(
-      "Error reordenando columnas desde el mapa:",
-      error
-    );
-
-    window.alert(
-      error?.message ||
-        "No se pudo cambiar el orden de la columna."
-    );
-  } finally {
-    setReordenandoColumnasMapa(false);
-  }
-}
 
 
   function enfocarTableroProduccion() {
@@ -1899,19 +1809,11 @@ async function manejarReordenManualPedido({ pedidoId, pedidoObjetivoId, columnaI
               <ProduccionVistaSectores
                 sectores={sectoresProduccion}
                 columnas={columnasGlobalesOrdenadas}
-                pedidosPorColumna={pedidosPorColumna}
-                  puedeReordenarColumnas={
-                  puedeGestionarColumnas &&
-                  vistaSectoresDisponible
-                }
+           
 
-                reordenandoColumnas={
-                  reordenandoColumnasMapa
-                }
+                
 
-                onReordenarColumna={
-                  manejarReordenarColumnaMapa
-                }
+               
                 sectorSeleccionadoId={
                   sectorVistaSeleccionadoId
                 }
@@ -1931,654 +1833,117 @@ async function manejarReordenManualPedido({ pedidoId, pedidoObjetivoId, columnaI
 
       <div className="produccion-board-wrapper">
         <ProduccionBoard
-    columnas={columnasVisibles}
-    columnasGlobales={columnasGlobalesOrdenadas}
+          columnas={columnasVisibles}
+          columnasGlobales={columnasGlobalesOrdenadas}
 
-    sectores={sectoresProduccion}
-    sectorSeleccionadoId={sectorVistaSeleccionadoId}
-    sectorSeleccionadoNombre={
-      sectorVistaSeleccionado?.nombre || ""
-    }
-
-    columnaEntradaId={
-      datosVistaSector.columnaEntradaId
-    }
-
-    columnaSalidaId={
-      datosVistaSector.columnaSalidaId
-    }
-
-    columnasSectorIds={
-      datosVistaSector.columnasSectorIds
-    }
-  pedidosPorColumna={pedidosPorColumna}
-  onMoverPedido={manejarMoverPedido}
-  puedeGestionarOrdenManual={puedeGestionarOrdenManual}
-  puedeCambiarColorTarjeta={puedeCambiarColorTarjeta}
-  onReordenarPedidoManual={manejarReordenManualPedido}
-  onCambiarColorTarjeta={manejarCambiarColorTarjeta}
-  onVerPedido={onVerPedido}
-  onEditarColumna={manejarEditarColumna}
-  onEliminarColumna={manejarEliminarColumna}
-  columnaEditandoId={columnaEditandoId}
-  nombreEditarColumna={nombreEditarColumna}
-  setNombreEditarColumna={setNombreEditarColumna}
-  onGuardarEdicionColumna={guardarEdicionColumna}
-  guardandoEdicionColumna={guardandoEdicionColumna}
-  eliminandoColumnaId={eliminandoColumnaId}
-  columnasContraidas={columnasContraidas}
-  onToggleColumnaContraida={toggleColumnaContraida}
-  onEditarDetalleManual={abrirDetalleManual}
-  puedeGestionarColumnas={puedeGestionarColumnas}
-  onMoverColumna={manejarMoverColumna}
-  onToggleOrdenManualColumna={manejarToggleOrdenManualColumna}
-  ahoraTick={ahoraTick}
-  puedeMoverPedidos={puedeHacerEnProduccion("mover")}
-  puedeEditarDetalleManual={puedeHacerEnProduccion("editarDetalle")}
-  pedidoNuevoResaltadoId={pedidoNuevoResaltadoId}
-/>
-</div>
-
-{mostrarNuevoPedidoProduccion && (
-  <PedidoFormModal
-    perfil={perfil}
-    onClose={() => setMostrarNuevoPedidoProduccion(false)}
-    onPedidoCreado={manejarPedidoCreadoDesdeProduccion}
-  />
-)}
-
-{pedidoEditandoDetalle && puedeHacerEnProduccion("editarDetalle") && (
-  <div className="produccion-modal-overlay" onClick={cerrarDetalleManual}>
-    <div
-      className="produccion-modal"
-      onClick={(e) => e.stopPropagation()}
-    >
-      <div className="produccion-modal-header">
-        <h3>Detalle manual de producción</h3>
-
-        <button
-          type="button"
-          className="produccion-modal-menu-btn"
-          onClick={(e) => {
-            e.stopPropagation();
-            setMenuDetalleAbierto((prev) => !prev);
-            setVistaMenuDetalle("principal");
-            setMensajeMenuDetalle("");
-          }}
-        >
-          ⋯
-        </button>
-
-        {menuDetalleAbierto && (
-          <div
-            className="produccion-modal-menu"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {mensajeMenuDetalle && (
-              <div className="produccion-card-menu-success">
-                {mensajeMenuDetalle}
-              </div>
-            )}
-
-            {vistaMenuDetalle === "principal" && (
-              <>
-            {puedeCambiarColorTarjeta && (
-              <button
-                type="button"
-                className="produccion-card-menu-option"
-                onClick={() => setVistaMenuDetalle("color")}
-              >
-                Cambiar color
-              </button>
-            )}
-
-                <button
-                  type="button"
-                  className="produccion-card-menu-option"
-                  onClick={() => setVistaMenuDetalle("mover")}
-                >
-                  Mover
-                </button>
-              </>
-            )}
-
-            {vistaMenuDetalle === "color" && (
-              <>
-                <button
-                  type="button"
-                  className="produccion-card-menu-back"
-                  onClick={() => setVistaMenuDetalle("principal")}
-                >
-                  ← Volver
-                </button>
-
-                <div className="produccion-card-menu-title">Cambiar color</div>
-
-                <div className="produccion-card-color-grid">
-                  {[
-                    { id: "", nombre: "Blanco" },
-                    { id: "amarillo", nombre: "Amarillo" },
-                    { id: "verde", nombre: "Verde" },
-                    { id: "azul", nombre: "Azul" },
-                    { id: "rojo", nombre: "Rojo" },
-                    { id: "violeta", nombre: "Violeta" },
-                  ].map((color) => (
-                    <button
-                      key={color.id || "blanco"}
-                      type="button"
-                      className={`produccion-card-color-dot color-${color.id || "blanco"} ${
-                        colorTarjetaManual === color.id ? "activo" : ""
-                      }`}
-                      onClick={() => {
-                        manejarCambiarColorTarjeta(
-                          pedidoEditandoDetalle.firebaseId,
-                          color.id
-                        );
-                      }}
-                      title={color.nombre}
-                    />
-                  ))}
-                </div>
-              </>
-            )}
-
-            {vistaMenuDetalle === "mover" && (
-              <>
-                <button
-                  type="button"
-                  className="produccion-card-menu-back"
-                  onClick={() => setVistaMenuDetalle("principal")}
-                >
-                  ← Volver
-                </button>
-
-                <div className="produccion-card-menu-title">Mover a columna</div>
-
-                <div className="produccion-card-column-list">
-                  {columnas.map((columna) => (
-                    <button
-                      key={columna.id}
-                      type="button"
-                      onClick={async () => {
-                        await manejarMoverPedido(
-                          pedidoEditandoDetalle.firebaseId,
-                          columna.id
-                        );
-
-                        setMensajeMenuDetalle("Se movió exitosamente");
-
-                        setTimeout(() => {
-                          setMenuDetalleAbierto(false);
-                          setVistaMenuDetalle("principal");
-                          setMensajeMenuDetalle("");
-                        }, 900);
-                      }}
-                    >
-                      {columna.nombre || "Columna"}
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-        )}
-      </div>
-
-      <div className="produccion-modal-section">
-      <h4>Notas internas</h4>
-
-      <label>Nota corta</label>
-      <input
-        type="text"
-        maxLength={60}
-        value={notaCortaManual}
-        onChange={(e) => setNotaCortaManual(e.target.value)}
-        className="produccion-modal-input"
-        placeholder="Ej: Mandar hoy / Esperar tela / Revisar logo"
-      />
-
-      <label>Nota larga</label>
-
-      <textarea
-        rows={4}
-        value={notaLargaManual}
-        onChange={(e) => setNotaLargaManual(e.target.value)}
-        className="produccion-modal-input"
-        placeholder="Detalle interno para producción..."
-        style={{
-          resize: "vertical",
-          minHeight: 110,
-        }}
-      />
-      </div>
-
-      <div className="produccion-modal-section">
-      <h4>Asignación</h4>
-
-      {puedeHacerEnProduccion("asignarUsuario") && (
-        <>
-          <label>Asignado a</label>
-          <div className="produccion-asignacion-box">
-            <select
-              value={usuarioAsignadoUid}
-              onChange={(e) => setUsuarioAsignadoUid(e.target.value)}
-              className="produccion-modal-input"
-            >
-              <option value="">Sin asignar</option>
-              {usuariosProduccion.map((usuario) => (
-                <option key={usuario.uid} value={usuario.uid}>
-                  {usuario.nombre || usuario.email || usuario.uid}
-                </option>
-              ))}
-            </select>
-          </div>
-        </>
-      )}
-
-      </div>
-
-      <div className="produccion-modal-section">
-        <h4>Etiquetas</h4>
-
-<details className="produccion-etiquetas-details">
-  <summary>
-    Etiquetas seleccionadas: {etiquetasSeleccionadasIds.length}/4
-  </summary>
-
-  <div className="produccion-etiquetas-checklist">
-    {etiquetasProduccion.map((etiqueta) => {
-      const activa = etiquetasSeleccionadasIds.includes(etiqueta.id);
-      const maximoAlcanzado =
-        etiquetasSeleccionadasIds.length >= 4 && !activa;
-
-      return (
-<div key={etiqueta.id} className="produccion-etiqueta-check-row">
-  <label className="produccion-etiqueta-check">
-    <input
-      type="checkbox"
-      checked={activa}
-      disabled={maximoAlcanzado}
-      onChange={() => {
-        setEtiquetasSeleccionadasIds((prev) => {
-          if (prev.includes(etiqueta.id)) {
-            return prev.filter((id) => id !== etiqueta.id);
+          sectores={sectoresProduccion}
+          sectorSeleccionadoId={sectorVistaSeleccionadoId}
+          sectorSeleccionadoNombre={
+            sectorVistaSeleccionado?.nombre || ""
           }
 
-          if (prev.length >= 4) return prev;
+          columnaEntradaId={
+            datosVistaSector.columnaEntradaId
+          }
 
-          return [...prev, etiqueta.id];
-        });
-      }}
-    />
+          columnaSalidaId={
+            datosVistaSector.columnaSalidaId
+          }
 
-    <span className="produccion-etiqueta-preview">
-      {etiqueta.nombre}
-    </span>
-  </label>
-
-  {puedeHacerEnProduccion("editarDetalle") && (
-    <div className="produccion-etiqueta-actions">
-      <button
-        type="button"
-        onClick={() => manejarEditarEtiquetaProduccion(etiqueta)}
-      >
-        ✎
-      </button>
-
-      <button
-        type="button"
-        onClick={() => manejarEliminarEtiquetaProduccion(etiqueta)}
-      >
-        ×
-      </button>
-    </div>
-  )}
-</div>
-      );
-    })}
-  </div>
-</details>
-
-<small className="produccion-hint">
-  Podés seleccionar hasta 4 etiquetas por tarjeta.
-</small>
-
-{puedeHacerEnProduccion("editarDetalle") && (
-  <button
-    type="button"
-    className="btn-produccion-secundario"
-    onClick={() => setMostrarNuevaEtiqueta((prev) => !prev)}
-  >
-    + Etiqueta
-  </button>
-  
-)}
-
-      {mostrarNuevaEtiqueta && puedeHacerEnProduccion("editarDetalle") && (
-        <div className="produccion-etiqueta-nueva-box">
-          <input
-            type="text"
-            maxLength={22}
-            value={nuevaEtiquetaNombre}
-            onChange={(e) => setNuevaEtiquetaNombre(e.target.value)}
-            className="produccion-modal-input"
-            placeholder="Nombre de la etiqueta"
-          />
-
-          <div className="produccion-colores-box">
-            {["amarillo", "verde", "azul", "rojo", "violeta"].map((color) => (
-              <button
-                key={color}
-                type="button"
-                className={`produccion-color-btn ${nuevaEtiquetaColor === color ? "activo" : ""}`}
-                onClick={() => setNuevaEtiquetaColor(color)}
-              >
-                {color}
-              </button>
-            ))}
-          </div>
-
-
-
-          <div className="produccion-modal-actions">
-            <button
-              type="button"
-              className="btn-produccion-cancelar"
-              onClick={() => {
-                setMostrarNuevaEtiqueta(false);
-                setNuevaEtiquetaNombre("");
-                setNuevaEtiquetaColor("rojo");
-              }}
-            >
-              Cancelar
-            </button>
-
-            <button
-              type="button"
-              className="btn-produccion-primario"
-              onClick={guardarNuevaEtiquetaProduccion}
-              disabled={guardandoEtiqueta}
-            >
-              {guardandoEtiqueta ? "Guardando..." : "Guardar etiqueta"}
-            </button>
-          </div>
-        </div>
-      )}
-
-</div>
-
-<div className="produccion-modal-section">
-  <h4>Portada</h4>
-
- <label>Imagen de portada</label>
-
-<div className="produccion-portada-box">
-  {imagenPortadaProduccion ? (
-    <>
-      <img
-        src={imagenPortadaProduccion}
-        alt=""
-        title="Ver imagen"
-        onClick={() => setImagenPreviewProduccion(imagenPortadaProduccion)}
-        style={{
-          width: "100%",
-          maxHeight: 180,
-          objectFit: "contain",
-          borderRadius: 10,
-          marginTop: 6,
-          border: "1px solid #e5e7eb",
-          cursor: "zoom-in",
-        }}
-      />
-
-      <div className="produccion-portada-actions">
-        <button
-          type="button"
-          className="btn-produccion-secundario"
-          onClick={() => setImagenPreviewProduccion(imagenPortadaProduccion)}
-        >
-          Ver portada
-        </button>
-
-        <button
-          type="button"
-          className="btn-produccion-secundario"
-          onClick={() => setMostrarSelectorPortada((v) => !v)}
-        >
-          Cambiar portada
-          </button>
-
-          <button
-            type="button"
-            className="btn-produccion-cancelar"
-            onClick={() => {
-              setImagenPortadaProduccion("");
-              setImagenPortadaThumbProduccion("");
-              setMostrarSelectorPortada(false);
-            }}
-          >
-            Quitar
-          </button>
-        </div>
-
-        <button
-          type="button"
-          className="btn-produccion-secundario produccion-btn-full"
-          disabled={imagenesPedido.length === 0}
-          onClick={() => setMostrarSelectorPortada((v) => !v)}
-        >
-          {imagenesPedido.length > 0
-            ? `Ver imágenes del pedido (${imagenesPedido.length})`
-            : "Sin imágenes del pedido"}
-        </button>
-          </>
-        ) : (
-        <>
-          {imagenesPedido.length > 0 ? (
-            <button
-              type="button"
-              className="btn-produccion-secundario produccion-btn-full"
-              onClick={() => setMostrarSelectorPortada((v) => !v)}
-            >
-              Ver imágenes del pedido ({imagenesPedido.length})
-            </button>
-          ) : (
-            <label className="btn-produccion-secundario produccion-btn-full">
-              Subir portada
-
-              <input
-                type="file"
-                accept="image/*"
-                style={{ display: "none" }}
-                onChange={manejarSubirPortada}
-              />
-            </label>
-          )}
-        </>
-      )}
-
-  {mostrarSelectorPortada && (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fill,minmax(90px,1fr))",
-        gap: 10,
-        marginTop: 12,
-        maxHeight: 220,
-        overflowY: "auto",
-      }}
-    >
-      {imagenesPedido.map((img) => (
-        <div
-          key={img.id}
-          style={{
-            cursor: "pointer",
-            border:
-              imagenPortadaProduccion === img.url
-                ? "3px solid #00aeef"
-                : "1px solid #ddd",
-            borderRadius: 10,
-            overflow: "hidden",
-          }}
-          onClick={() => {
-            setImagenPortadaProduccion(img.url);
-            setImagenPortadaThumbProduccion(img.thumbUrl || img.url);
-            setMostrarSelectorPortada(false);
-          }}
-        >
-          <img
-            src={img.url}
-            alt=""
-            style={{
-              width: "100%",
-              height: 90,
-              objectFit: "cover",
-            }}
-          />
-
-          <div className="produccion-img-selector-footer">
-            <span>{img.producto}</span>
-
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setImagenPreviewProduccion(img.url);
-              }}
-            >
-              Ver
-            </button>
-          </div>
-        </div>
-      ))}
-
-        {imagenesPedido.length === 0 && (
-        <div>
-
-        <div
-        style={{
-        color:"#666",
-        marginBottom:10,
-        }}
-        >
-        Este pedido no tiene imágenes.
-        </div>
-
-        <input
-        type="file"
-        accept="image/*"
-        onChange={
-        manejarSubirPortada
-        }
-        />
-
-        {subiendoPortada && (
-        <div>
-        Subiendo portada...
-        </div>
-        )}
-
-        </div>
-        )}
-            </div>
-          )}
-        </div>
-
-        <div className="produccion-modal-section">
-          <h4>Archivos</h4>
-        <label>Archivos de producción</label>
-
-        <div className="produccion-archivos-box">
-          <input
-            type="file"
-            multiple
-            accept=".pdf,.xls,.xlsx,.doc,.docx,.zip"
-            onChange={manejarSubirArchivosProduccion}
-            className="produccion-modal-input"
-          />
-
-          {subiendoArchivoProduccion && (
-            <p className="produccion-historial-empty">Subiendo archivo...</p>
-          )}
-
-{archivosProduccion.length > 0 && (
-  <div className="produccion-archivos-lista">
-    {archivosProduccion.map((archivo) => {
-      const ext = archivo.extension || archivo.nombre?.split(".").pop()?.toLowerCase();
-
-      const icono =
-        ext === "pdf"
-          ? "📕"
-          : ["xls", "xlsx"].includes(ext)
-          ? "📊"
-          : ["doc", "docx"].includes(ext)
-          ? "📄"
-          : ext === "zip"
-          ? "🗜️"
-          : "📎";
-
-      return (
-        <div key={archivo.id} className="produccion-archivo-item compacto">
-          <a
-            href={archivo.url}
-            target="_blank"
-            rel="noreferrer"
-            className="produccion-archivo-nombre"
-            title={archivo.nombre}
-          >
-            <span>{icono}</span>
-            <span>{archivo.nombre}</span>
-          </a>
-
-          <div className="produccion-archivo-acciones">
-            <a href={archivo.url} target="_blank" rel="noreferrer">
-              Ver
-            </a>
-
-            <a href={archivo.url} download={archivo.nombre} title="Descargar">
-              ↓
-            </a>
-
-            <button
-              type="button"
-              onClick={() => {
-                setArchivosProduccion((prev) =>
-                  prev.filter((a) => a.id !== archivo.id)
-                );
-              }}
-              title="Quitar"
-            >
-              ✕
-            </button>
-          </div>
-
-        </div>
-      );
-    })}
-  </div>
-)}
-</div>
-</div>
-</div>
-
-
-
-      <div className="produccion-modal-actions">
-        <button className="btn-produccion-cancelar" onClick={cerrarDetalleManual}>
-          Cancelar
-        </button>
-
-        <button
-          className="btn-produccion-primario"
-          onClick={guardarDetalleManual}
-          disabled={guardandoDetalleManual}
-        >
-          {guardandoDetalleManual ? "Guardando..." : "Guardar"}
-        </button>
+          columnasSectorIds={
+            datosVistaSector.columnasSectorIds
+          }
+        pedidosPorColumna={pedidosPorColumna}
+        onMoverPedido={manejarMoverPedido}
+        puedeGestionarOrdenManual={puedeGestionarOrdenManual}
+        puedeCambiarColorTarjeta={puedeCambiarColorTarjeta}
+        onReordenarPedidoManual={manejarReordenManualPedido}
+        onCambiarColorTarjeta={manejarCambiarColorTarjeta}
+        onVerPedido={onVerPedido}
+        onEditarColumna={manejarEditarColumna}
+        onEliminarColumna={manejarEliminarColumna}
+        columnaEditandoId={columnaEditandoId}
+        nombreEditarColumna={nombreEditarColumna}
+        setNombreEditarColumna={setNombreEditarColumna}
+        onGuardarEdicionColumna={guardarEdicionColumna}
+        guardandoEdicionColumna={guardandoEdicionColumna}
+        eliminandoColumnaId={eliminandoColumnaId}
+        columnasContraidas={columnasContraidas}
+        onToggleColumnaContraida={toggleColumnaContraida}
+        onEditarDetalleManual={abrirDetalleManual}
+        puedeGestionarColumnas={puedeGestionarColumnas}
+        onMoverColumna={manejarMoverColumna}
+        onToggleOrdenManualColumna={manejarToggleOrdenManualColumna}
+        ahoraTick={ahoraTick}
+        puedeMoverPedidos={puedeHacerEnProduccion("mover")}
+        puedeEditarDetalleManual={puedeHacerEnProduccion("editarDetalle")}
+        pedidoNuevoResaltadoId={pedidoNuevoResaltadoId}
+      /> 
+     
       </div>
-    </div>
-  </div>
+
+      {mostrarNuevoPedidoProduccion && (
+        <PedidoFormModal
+          perfil={perfil}
+          onClose={() => setMostrarNuevoPedidoProduccion(false)}
+          onPedidoCreado={manejarPedidoCreadoDesdeProduccion}
+        />
 )}
+
+    {pedidoEditandoDetalle &&
+      puedeHacerEnProduccion(
+        "editarDetalle"
+      ) && (
+        <DetalleProduccionModal
+          key={
+            pedidoEditandoDetalle
+              .pedidoFirebaseId ||
+            pedidoEditandoDetalle
+              .firebaseId ||
+            pedidoEditandoDetalle.id
+          }
+
+          pedido={
+            pedidoEditandoDetalle
+          }
+
+          perfil={perfil}
+
+          columnas={
+            columnasGlobalesOrdenadas
+          }
+
+          usuarios={
+            usuariosProduccion
+          }
+
+          etiquetasDisponibles={
+            etiquetasProduccion
+          }
+
+          puedeAsignarUsuario={
+            puedeHacerEnProduccion(
+              "asignarUsuario"
+            )
+          }
+
+          puedeCambiarColorTarjeta={
+            puedeCambiarColorTarjeta
+          }
+
+          onCerrar={
+            cerrarDetalleManual
+          }
+
+          onMoverPedido={
+            manejarMoverPedido
+          }
+
+          onCambiarColorTarjeta={
+            manejarCambiarColorTarjeta
+          }
+        />
+      )}  
 
 
 
@@ -2823,27 +2188,7 @@ async function manejarReordenManualPedido({ pedidoId, pedidoObjetivoId, columnaI
         </div>
       </div>
     )}
-      {imagenPreviewProduccion && (
-        <div
-          className="produccion-imagen-preview-overlay"
-          onClick={() => setImagenPreviewProduccion("")}
-        >
-          <div
-            className="produccion-imagen-preview-modal"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              type="button"
-              className="produccion-imagen-preview-close"
-              onClick={() => setImagenPreviewProduccion("")}
-            >
-              ×
-            </button>
 
-            <img src={imagenPreviewProduccion} alt="" />
-          </div>
-        </div>
-      )}
     </div>
   );
 }

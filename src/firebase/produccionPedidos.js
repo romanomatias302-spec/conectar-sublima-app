@@ -45,9 +45,66 @@ export function escucharPedidosProduccionActivos(clienteId, callback) {
             pedido.produccionFinalizada !== true && pedido.estado !== "Cancelado"
         )
         .sort((a, b) => {
-          const aTime = a.updatedAt?.seconds || 0;
-          const bTime = b.updatedAt?.seconds || 0;
-          return bTime - aTime;
+          /*
+          * El orden natural del tablero debe depender
+          * de la actividad de PRODUCCIÓN, no de cualquier
+          * edición interna del pedido.
+          *
+          * Prioridad:
+          *
+          * 1. Último movimiento real de producción.
+          * 2. Timestamp histórico de producción.
+          * 3. Fecha de creación del pedido.
+          *
+          * NO usamos updatedAt porque cambia al editar
+          * portada, notas, archivos, etiquetas, etc.
+          */
+          const obtenerTiempoOrdenProduccion = (pedido) => {
+            if (
+              pedido?.ultimaAccionProduccionAt?.seconds
+            ) {
+              return pedido
+                .ultimaAccionProduccionAt
+                .seconds;
+            }
+
+            if (
+              pedido?.produccionActualizadoAt?.seconds
+            ) {
+              return pedido
+                .produccionActualizadoAt
+                .seconds;
+            }
+
+            if (pedido?.createdAt?.seconds) {
+              return pedido.createdAt.seconds;
+            }
+
+            return 0;
+          };
+
+          const aTime =
+            obtenerTiempoOrdenProduccion(a);
+
+          const bTime =
+            obtenerTiempoOrdenProduccion(b);
+
+          if (aTime !== bTime) {
+            return bTime - aTime;
+          }
+
+          /*
+          * Desempate estable.
+          * Evita movimientos visuales aleatorios
+          * cuando dos documentos tienen el mismo tiempo.
+          */
+          return String(
+            a.firebaseId || a.id || ""
+          ).localeCompare(
+            String(
+              b.firebaseId || b.id || ""
+            )
+          );
         })
         .slice(0, 100);
 
