@@ -49,10 +49,7 @@ import {
 import "./produccion.css";
 import { puedeHacer } from "../../utils/permisos";
 import SearchableSelect from "../../comunes/componentes/SearchableSelect";
-/*
-import {
-  construirRepresentacionesProduccion,
-} from "./produccionRepresentaciones"; */
+
 
 
 function getProduccionUIStorageKey(perfil) {
@@ -735,22 +732,7 @@ const pedidosFiltradosPorBusqueda = filtrarPedidosPorBusqueda(
   busquedaProduccion
 );
 
-  /*
- * Los filtros siguen trabajando con pedidos reales.
- * Recién después construimos las representaciones
- * que recibe el tablero.
- */
-/*
-const representacionesProduccion =
-  construirRepresentacionesProduccion({
-    pedidos: pedidosFiltradosPorBusqueda,
-    etapasVinculadas: [],
-  });
 
-const agrupadoBase = agruparPedidosPorColumna(
-  columnas,
-  representacionesProduccion
-); */
 
 const agrupadoBase = agruparPedidosPorColumna(
   columnas,
