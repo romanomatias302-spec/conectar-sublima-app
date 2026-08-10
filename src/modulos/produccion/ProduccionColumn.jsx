@@ -2,43 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import ProduccionCard from "./ProduccionCard";
 
-function ProduccionPedidoDropManual({
-  pedido,
-  columnaId,
-  children,
-}) {
-  const pedidoId =
-    pedido?.pedidoFirebaseId ||
-    pedido?.firebaseId ||
-    pedido?.id ||
-    "";
 
-  const representacionId =
-    pedido?.produccionRepresentacionId ||
-    `principal:${pedidoId}`;
-
-  const { setNodeRef, isOver } = useDroppable({
-    id: `pedido-drop-${representacionId}`,
-
-    data: {
-      tipo: "tarjeta",
-      representacionId,
-      pedidoId,
-      columnaId,
-    },
-  });
-
-  return (
-    <div
-      ref={setNodeRef}
-      className={`produccion-pedido-drop-manual ${
-        isOver ? "over" : ""
-      }`}
-    >
-      {children}
-    </div>
-  );
-}
 
 export default function ProduccionColumn({
   columna,
@@ -373,7 +337,7 @@ useEffect(() => {
       </div>
 
       <div className="produccion-column-body">
-       {!estaContraida &&
+        {!estaContraida &&
           pedidosVisibles.map((pedido, index) => {
             const pedidoId =
               pedido.pedidoFirebaseId ||
@@ -384,60 +348,38 @@ useEffect(() => {
               pedido.produccionRepresentacionId ||
               `principal:${pedidoId}`;
 
-            const ordenManualActivo =
-              columna.ordenManualActivo === true ||
-              columna.tipoOrden === "manual";
-
-            const tarjeta = (
+            return (
               <ProduccionCard
+                key={representacionId}
                 pedido={pedido}
                 columnas={columnas}
                 onVerPedido={onVerPedido}
-                onEditarDetalleManual={onEditarDetalleManual}
+                onEditarDetalleManual={
+                  onEditarDetalleManual
+                }
                 onMoverPedido={onMoverPedido}
-                ordenManualActivo={ordenManualActivo}
+                ordenManualActivo={
+                  columna.ordenManualActivo === true ||
+                  columna.tipoOrden === "manual"
+                }
                 indiceOrdenManual={index + 1}
-                onCambiarColorTarjeta={onCambiarColorTarjeta}
+                onCambiarColorTarjeta={
+                  onCambiarColorTarjeta
+                }
                 ahoraTick={ahoraTick}
-                puedeMoverPedidos={puedeMoverPedidos}
+                puedeMoverPedidos={
+                  puedeMoverPedidos
+                }
                 puedeEditarDetalleManual={
                   puedeEditarDetalleManual
                 }
                 resaltadaNuevoPedido={
                   pedidoNuevoResaltadoId &&
-                  (pedido.firebaseId || pedido.id) ===
+                  (pedido.firebaseId ||
+                    pedido.id) ===
                     pedidoNuevoResaltadoId
                 }
               />
-            );
-
-            /*
-            * Sólo montamos un droppable individual
-            * cuando esta columna utiliza orden manual.
-            */
-            if (ordenManualActivo) {
-              return (
-                <ProduccionPedidoDropManual
-                  key={representacionId}
-                  pedido={pedido}
-                  columnaId={columna.id}
-                >
-                  {tarjeta}
-                </ProduccionPedidoDropManual>
-              );
-            }
-
-            /*
-            * Orden normal:
-            * la tarjeta es únicamente draggable.
-            */
-            return (
-              <div
-                key={representacionId}
-                className="produccion-card-render-item"
-              >
-                {tarjeta}
-              </div>
             );
           })}
           {!estaContraida && cantidadOculta > 0 && (

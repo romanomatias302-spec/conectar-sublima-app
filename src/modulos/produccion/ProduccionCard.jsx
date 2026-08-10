@@ -1,5 +1,8 @@
 import { useState } from "react";
-import { useDraggable } from "@dnd-kit/core";
+import {
+  useDraggable,
+  useDroppable,
+} from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 
 function obtenerEstadoFechaEntrega(pedido) {
@@ -159,17 +162,32 @@ export default function ProduccionCard({
   ordenManualActivo = false,
   indiceOrdenManual = null,
 }) {
-  const pedidoId =
-    pedido.pedidoFirebaseId ||
-    pedido.firebaseId ||
-    pedido.id;
+const pedidoId =
+  pedido.pedidoFirebaseId ||
+  pedido.firebaseId ||
+  pedido.id;
 
-  const representacionId =
-    pedido.produccionRepresentacionId ||
-    `principal:${pedidoId}`;
+const representacionId =
+  pedido.produccionRepresentacionId ||
+  `principal:${pedidoId}`;
+
+const esRepresentacionVinculada =
+  pedido.produccionRepresentacionTipo ===
+  "vinculada";
+
+const draggableId =
+  esRepresentacionVinculada
+    ? representacionId
+    : pedidoId;
+
+const dropId =
+  `pedido-drop-${draggableId}`;
+
+const esMobile =
+  window.innerWidth <= 768;
 
 
-  const esMobile = window.innerWidth <= 768;
+ 
 
 
 const coloresTarjeta = [
@@ -189,25 +207,40 @@ const {
   transform,
   isDragging,
 } = useDraggable({
-  id: representacionId,
+  id: draggableId,
 
   disabled:
     pedido.produccionFinalizada === true ||
     !puedeMoverPedidos,
 });
 
+const {
+  setNodeRef: setDroppableNodeRef,
+} = useDroppable({
+  id: dropId,
 
+  data: {
+    tipo: "tarjeta",
 
+    representacionId,
 
+    pedidoId,
 
+    columnaId:
+      pedido.columnaRepresentacionId ||
+      pedido.columnaProduccionId ||
+      "",
+  },
 
-
+  disabled: !puedeMoverPedidos,
+});
 
 const style = {
-  transform: "none",
+  transform:
+    CSS.Translate.toString(transform),
 
   opacity:
-    isDragging ? 0.28 : 1,
+    isDragging ? 0.6 : 1,
 };
 
 const etiquetasPedido = obtenerEtiquetasPedido(pedido);
@@ -241,7 +274,10 @@ const usuarioVisible =
 
   return (
     <div
-      ref={setNodeRef}
+      ref={(node) => {
+        setNodeRef(node);
+        setDroppableNodeRef(node);
+      }}
       style={style}
       className={`produccion-card color-${pedido.produccionColorTarjeta || "blanco"} ${isDragging ? "dragging" : ""} ${pedido.__animandoSalida ? "finalizando" : ""} ${resaltadaNuevoPedido ? "nuevo-pedido-resaltado" : ""}`}
       {...(

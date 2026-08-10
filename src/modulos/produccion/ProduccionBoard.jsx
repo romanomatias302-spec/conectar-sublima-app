@@ -1,6 +1,6 @@
 import {
   DndContext,
-  DragOverlay,
+  
   PointerSensor,
   TouchSensor,
   useSensor,
@@ -11,58 +11,10 @@ import ProduccionColumn from "./ProduccionColumn";
 
 import {
   useMemo,
-  useRef,
   useState,
 } from "react";
 
-function ProduccionDragPreview({
-  pedido,
-}) {
-  if (!pedido) return null;
 
-  const numero =
-    pedido.id ||
-    pedido.numeroPedido ||
-    pedido.numero ||
-    "";
-
-  const cliente =
-    pedido.cliente ||
-    pedido.clienteNombre ||
-    pedido.nombreCliente ||
-    "Pedido";
-
-  const portada =
-    pedido.produccionImagenPortadaThumb ||
-    pedido.produccionImagenPortada ||
-    "";
-
-  return (
-    <div className="produccion-drag-preview">
-      {portada && (
-        <div className="produccion-drag-preview-portada">
-          <img
-            src={portada}
-            alt=""
-            draggable={false}
-          />
-        </div>
-      )}
-
-      <div className="produccion-drag-preview-contenido">
-        {numero && (
-          <strong>
-            #{numero}
-          </strong>
-        )}
-
-        <span>
-          {cliente}
-        </span>
-      </div>
-    </div>
-  );
-}
 
 export default function ProduccionBoard({
   columnas,
@@ -102,21 +54,9 @@ export default function ProduccionBoard({
 }) {
 
 const [columnaResaltadaId, setColumnaResaltadaId] = useState(null);
-const [
-  representacionArrastrandoId,
-  setRepresentacionArrastrandoId,
-] = useState("");
 
-const dragScrollRafRef = useRef(null);
 
-const dragWrapperRef = useRef(null);
 
-const dragWrapperRectRef = useRef(null);
-
-const ultimoCentroDragRef = useRef({
-  x: 0,
-  y: 0,
-});
 
 const sensors = useSensors(
   useSensor(PointerSensor, {
@@ -174,71 +114,22 @@ const columnasSectorSet = useMemo(() => {
   return new Set(columnasSectorIds);
 }, [columnasSectorIds]);
 
-const pedidoPorRepresentacionId =
-  useMemo(() => {
-    const mapa = new Map();
 
-    Object.values(
-      pedidosPorColumna || {}
-    )
-      .flat()
-      .forEach((pedido) => {
-        const pedidoId =
-          pedido.pedidoFirebaseId ||
-          pedido.firebaseId ||
-          pedido.id ||
-          "";
 
-        if (!pedidoId) return;
 
-        const representacionId =
-          pedido.produccionRepresentacionId ||
-          `principal:${pedidoId}`;
 
-        mapa.set(
-          String(representacionId),
-          pedido
-        );
-      });
 
-    return mapa;
-  }, [pedidosPorColumna]);
 
-  const pedidoArrastrando =
-  representacionArrastrandoId
-    ? pedidoPorRepresentacionId.get(
-        String(
-          representacionArrastrandoId
-        )
-      ) || null
-    : null;
-
-function manejarDragStart(event) {
-  setRepresentacionArrastrandoId(
-    String(event?.active?.id || "")
-  );
-
+function manejarDragMove(event) {
   const wrapper =
     document.querySelector(
       ".produccion-board-wrapper"
     );
 
-  dragWrapperRef.current =
-    wrapper || null;
-
-  dragWrapperRectRef.current =
-    wrapper?.getBoundingClientRect() ||
-    null;
-}
-
-function manejarDragMove(event) {
-  const wrapper =
-    dragWrapperRef.current;
+  if (!wrapper) return;
 
   const rect =
-    dragWrapperRectRef.current;
-
-  if (!wrapper || !rect) return;
+    wrapper.getBoundingClientRect();
 
   const activeRect =
     event?.active?.rect?.current
@@ -246,94 +137,46 @@ function manejarDragMove(event) {
 
   if (!activeRect) return;
 
-  /*
-   * Sólo guardamos la última posición conocida.
-   * No tocamos el DOM todavía.
-   */
-  ultimoCentroDragRef.current = {
-    x:
-      activeRect.left +
-      activeRect.width / 2,
+  const x =
+    activeRect.left +
+    activeRect.width / 2;
 
-    y:
-      activeRect.top +
-      activeRect.height / 2,
-  };
+  const y =
+    activeRect.top +
+    activeRect.height / 2;
 
-  /*
-   * Como máximo una operación de scroll
-   * por frame del navegador.
-   */
-  if (dragScrollRafRef.current) {
-    return;
+  const zonaX = 90;
+  const zonaY = 120;
+
+  const velocidadX = 18;
+  const velocidadY = 16;
+
+  if (x > rect.right - zonaX) {
+    wrapper.scrollLeft +=
+      velocidadX;
   }
 
-  dragScrollRafRef.current =
-    window.requestAnimationFrame(() => {
-      dragScrollRafRef.current =
-        null;
+  if (x < rect.left + zonaX) {
+    wrapper.scrollLeft -=
+      velocidadX;
+  }
 
-      const {
-        x,
-        y,
-      } = ultimoCentroDragRef.current;
+  if (y > rect.bottom - zonaY) {
+    wrapper.scrollTop +=
+      velocidadY;
+  }
 
-      const zonaX = 90;
-      const zonaY = 120;
-
-      const velocidadX = 18;
-      const velocidadY = 16;
-
-      let deltaX = 0;
-      let deltaY = 0;
-
-      if (x > rect.right - zonaX) {
-        deltaX = velocidadX;
-      } else if (
-        x < rect.left + zonaX
-      ) {
-        deltaX = -velocidadX;
-      }
-
-      if (y > rect.bottom - zonaY) {
-        deltaY = velocidadY;
-      } else if (
-        y < rect.top + zonaY
-      ) {
-        deltaY = -velocidadY;
-      }
-
-      if (deltaX !== 0) {
-        wrapper.scrollLeft +=
-          deltaX;
-      }
-
-      if (deltaY !== 0) {
-        wrapper.scrollTop +=
-          deltaY;
-      }
-    });
+  if (y < rect.top + zonaY) {
+    wrapper.scrollTop -=
+      velocidadY;
+  }
 }
 
 
-function limpiarEstadoDrag() {
-  setRepresentacionArrastrandoId("");
-  if (dragScrollRafRef.current) {
-    window.cancelAnimationFrame(
-      dragScrollRafRef.current
-    );
-
-    dragScrollRafRef.current =
-      null;
-  }
-
-  dragWrapperRef.current = null;
-  dragWrapperRectRef.current = null;
-}
 
 
 function manejarDragEnd(event) {
-limpiarEstadoDrag();
+
 
 if (!puedeMoverPedidos) return;
 
@@ -344,7 +187,7 @@ if (!active || !over) return;
 const overData =
   over.data?.current || {};
 
-const representacionId =
+const activeId =
   String(active.id || "");
 
 const columnaDestinoId =
@@ -352,7 +195,7 @@ const columnaDestinoId =
   over.id;
 
 if (
-  !representacionId ||
+  !activeId ||
   !columnaDestinoId
 ) {
   return;
@@ -368,20 +211,25 @@ const ordenManualActivo =
   columnaDestino?.tipoOrden === "manual";
 
 const pedidoActual =
-  Object.values(pedidosPorColumna)
+  Object.values(
+    pedidosPorColumna
+  )
     .flat()
-    .find((p) => {
-      const idRepresentacion =
-        p.produccionRepresentacionId ||
-        `principal:${
-          p.pedidoFirebaseId ||
-          p.firebaseId ||
-          p.id
-        }`;
+    .find((pedido) => {
+      const pedidoId =
+        pedido.pedidoFirebaseId ||
+        pedido.firebaseId ||
+        pedido.id ||
+        "";
+
+      const representacionId =
+        pedido.produccionRepresentacionId ||
+        `principal:${pedidoId}`;
 
       return (
-        String(idRepresentacion) ===
-        String(representacionId)
+        String(pedidoId) === activeId ||
+        String(representacionId) ===
+          activeId
       );
     });
 
@@ -392,6 +240,10 @@ const pedidoId =
   pedidoActual.firebaseId ||
   pedidoActual.id ||
   "";
+
+const representacionId =
+  pedidoActual.produccionRepresentacionId ||
+  `principal:${pedidoId}`;  
 
 const representacionTipo =
   pedidoActual.produccionRepresentacionTipo ||
@@ -473,10 +325,14 @@ onMoverPedido?.(pedidoId, columnaDestinoId);
         collisionDetection={pointerWithin}
         modifiers={[]}
         autoScroll={false}
-
-        onDragStart={manejarDragStart}
+        measuring={{
+          droppable: {
+            strategy: "always",
+          },
+        }}
+        
         onDragMove={manejarDragMove}
-        onDragCancel={limpiarEstadoDrag}
+        
         onDragEnd={manejarDragEnd}
       >
       <div className="produccion-board">
@@ -566,17 +422,7 @@ onMoverPedido?.(pedidoId, columnaDestinoId);
         })}
       </div>
 
-        <DragOverlay
-          dropAnimation={null}
-        >
-          {pedidoArrastrando ? (
-            <ProduccionDragPreview
-              pedido={
-                pedidoArrastrando
-              }
-            />
-          ) : null}
-        </DragOverlay>
+
 
     </DndContext>
   );

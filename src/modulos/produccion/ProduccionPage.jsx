@@ -49,9 +49,10 @@ import {
 import "./produccion.css";
 import { puedeHacer } from "../../utils/permisos";
 import SearchableSelect from "../../comunes/componentes/SearchableSelect";
+/*
 import {
   construirRepresentacionesProduccion,
-} from "./produccionRepresentaciones";
+} from "./produccionRepresentaciones"; */
 
 
 function getProduccionUIStorageKey(perfil) {
@@ -739,6 +740,7 @@ const pedidosFiltradosPorBusqueda = filtrarPedidosPorBusqueda(
  * Recién después construimos las representaciones
  * que recibe el tablero.
  */
+/*
 const representacionesProduccion =
   construirRepresentacionesProduccion({
     pedidos: pedidosFiltradosPorBusqueda,
@@ -748,6 +750,11 @@ const representacionesProduccion =
 const agrupadoBase = agruparPedidosPorColumna(
   columnas,
   representacionesProduccion
+); */
+
+const agrupadoBase = agruparPedidosPorColumna(
+  columnas,
+  pedidosFiltradosPorBusqueda
 );
 
   const columnaFinal = columnas.find((c) => c.esFinal);
