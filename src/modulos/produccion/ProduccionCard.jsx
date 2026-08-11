@@ -188,8 +188,18 @@ const esRepresentacionVinculada =
   pedido.produccionRepresentacionTipo ===
   "vinculada";
 
+const esEtapaVinculadaFinalizada =
+  esRepresentacionVinculada &&
+  pedido.produccionEtapaFinalizada === true;  
+
+const esEsperaReunion =
+  pedido.produccionRepresentacionTipo ===
+    "reunion" ||
+  pedido.produccionEsperaReunion === true;  
+
 const draggableId =
-  esRepresentacionVinculada
+  esRepresentacionVinculada ||
+  esEsperaReunion
     ? representacionId
     : pedidoId;
 
@@ -230,9 +240,11 @@ const {
 } = useDraggable({
   id: draggableId,
 
-  disabled:
-    pedido.produccionFinalizada === true ||
-    !puedeMoverPedidos,
+disabled:
+  pedido.produccionFinalizada === true ||
+  esEtapaVinculadaFinalizada ||
+  esEsperaReunion ||
+  !puedeMoverPedidos,
 });
 
 const {
@@ -253,7 +265,9 @@ const {
       "",
   },
 
-  disabled: !puedeMoverPedidos,
+  disabled:
+    !puedeMoverPedidos ||
+    esEsperaReunion,
 });
 
 const style = {
@@ -281,27 +295,43 @@ const itemsActionMenu = [
     visible: puedeEditarDetalleManual,
   },
 
-  !esRepresentacionVinculada
-    ? {
-        id: "crear-etapas-vinculadas",
-        label: "Crear etapas vinculadas",
-        icon: <FaLink />,
-        onClick: () =>
-          onGestionarEtapaVinculada({
-            accion: "crear",
-            pedido,
-          }),
-      }
-    : null,
+!esRepresentacionVinculada &&
+!esEsperaReunion
+  ? {
+      id: "crear-etapas-vinculadas",
+      label: "Crear etapas vinculadas",
+      icon: <FaLink />,
+      onClick: () =>
+        onGestionarEtapaVinculada({
+          accion: "crear",
+          pedido,
+        }),
+    }
+  : null,
 
-  esRepresentacionVinculada
+esRepresentacionVinculada &&
+!esEtapaVinculadaFinalizada
+
+  ? {
+      id: "finalizar-etapa-vinculada",
+      label: "Finalizar esta etapa",
+      icon: <FaCheck />,
+      onClick: () =>
+        onGestionarEtapaVinculada({
+          accion: "finalizar",
+          pedido,
+        }),
+    }
+  : null,
+
+  esEsperaReunion
     ? {
-        id: "finalizar-etapa-vinculada",
-        label: "Finalizar esta etapa",
+        id: "tomar-flujo-vinculado",
+        label: "Tomar",
         icon: <FaCheck />,
         onClick: () =>
           onGestionarEtapaVinculada({
-            accion: "finalizar",
+            accion: "tomar",
             pedido,
           }),
       }
@@ -346,6 +376,35 @@ const usuarioVisible =
     !!tiempoEtapa ||
     !!ultimoUsuario;
 
+  const totalEtapasVinculadas =
+    Number(
+      pedido.produccionFlujoVinculado
+        ?.totalEtapas ||
+      pedido.produccionTotalEtapas ||
+      0
+    );
+
+  const etapasFinalizadasVinculadas =
+    Number(
+      pedido.produccionFlujoVinculado
+        ?.etapasFinalizadas ??
+      0
+    );
+
+  const etapasPendientesVinculadas =
+    Math.max(
+      0,
+      totalEtapasVinculadas -
+        etapasFinalizadasVinculadas
+    );
+
+  const textoEtapaFinalizada =
+    etapasPendientesVinculadas === 0
+      ? "Finalizada · listo"
+      : etapasPendientesVinculadas === 1
+      ? "Finalizada · falta 1"
+      : `Finalizada · faltan ${etapasPendientesVinculadas}`;  
+
   return (
     <div
       ref={(node) => {
@@ -353,14 +412,36 @@ const usuarioVisible =
         setDroppableNodeRef(node);
       }}
       style={style}
-      className={`produccion-card color-${pedido.produccionColorTarjeta || "blanco"} ${isDragging ? "dragging" : ""} ${pedido.__animandoSalida ? "finalizando" : ""} ${resaltadaNuevoPedido ? "nuevo-pedido-resaltado" : ""}`}
+     className={`produccion-card color-${
+        pedido.produccionColorTarjeta || "blanco"
+      } ${
+        isDragging ? "dragging" : ""
+      } ${
+        pedido.__animandoSalida ? "finalizando" : ""
+      } ${
+        resaltadaNuevoPedido
+          ? "nuevo-pedido-resaltado"
+          : ""
+      } ${
+        esEtapaVinculadaFinalizada
+          ? "etapa-vinculada-finalizada"
+          : ""
+      }`}
       {...(
-        !esMobile && pedido.produccionFinalizada !== true && puedeMoverPedidos
+        !esMobile &&
+        pedido.produccionFinalizada !== true &&
+        !esEtapaVinculadaFinalizada &&
+        !esEsperaReunion &&
+        puedeMoverPedidos
           ? listeners
           : {}
       )}
       {...(
-        !esMobile && pedido.produccionFinalizada !== true && puedeMoverPedidos
+        !esMobile &&
+        pedido.produccionFinalizada !== true &&
+        !esEtapaVinculadaFinalizada &&
+        !esEsperaReunion &&
+        puedeMoverPedidos
           ? attributes
           : {}
       )}
@@ -370,18 +451,30 @@ const usuarioVisible =
         type="button"
         className="produccion-card-drag-handle"
         {...(
-          esMobile && pedido.produccionFinalizada !== true && puedeMoverPedidos
+          esMobile &&
+          pedido.produccionFinalizada !== true &&
+          !esEtapaVinculadaFinalizada &&
+          !esEsperaReunion &&
+          puedeMoverPedidos
             ? listeners
             : {}
         )}
         {...(
-          esMobile && pedido.produccionFinalizada !== true && puedeMoverPedidos
+          esMobile &&
+          pedido.produccionFinalizada !== true &&
+          !esEtapaVinculadaFinalizada &&
+          !esEsperaReunion &&
+          puedeMoverPedidos
             ? attributes
             : {}
         )}
         title={
           pedido.produccionFinalizada === true
             ? "Pedido finalizado"
+            : esEtapaVinculadaFinalizada
+            ? "Etapa finalizada"
+            : esEsperaReunion
+            ? "Listo para tomar"
             : !puedeMoverPedidos
             ? "Sin permiso para mover"
             : "Mover tarjeta"
@@ -553,7 +646,36 @@ const usuarioVisible =
 
         </div>
 
-       
+        {esEtapaVinculadaFinalizada && (
+          <div className="produccion-etapa-finalizada-info">
+            <div className="produccion-etapa-finalizada-titulo">
+              <FaCheck />
+              <span>
+                {textoEtapaFinalizada}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {esEsperaReunion && (
+          <div className="produccion-reunion-lista">
+            <span>Listo</span>
+
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+
+                onGestionarEtapaVinculada({
+                  accion: "tomar",
+                  pedido,
+                });
+              }}
+            >
+              Tomar
+            </button>
+          </div>
+        )}
 
         <div className="produccion-card-layout">
           <div className="produccion-card-main">

@@ -1182,6 +1182,7 @@ match /produccion_sectores/{sectorId} {
             "estado",
             "ordenRama",
             "produccionSortOrder",
+            "sectoresProcesados",
             "createdByUid",
             "createdByNombre",
             "createdAt",
@@ -1202,7 +1203,9 @@ match /produccion_sectores/{sectorId} {
           && request.resource.data.nombre is string
           && request.resource.data.nombre != ""
           && request.resource.data.estado == "activa"
-          && request.resource.data.ordenRama is number;
+          && request.resource.data.ordenRama is number
+          && request.resource.data.sectoresProcesados is list;
+
 
         /*
         * Una rama puede:
@@ -1231,6 +1234,7 @@ match /produccion_sectores/{sectorId} {
           && onlyChangesAllowed([
             "columnaProduccionId",
             "produccionSortOrder",
+            "sectoresProcesados",
             "estado",
             "updatedAt",
             "ultimaAccionUid",

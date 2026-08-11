@@ -204,6 +204,8 @@ export async function crearGrupoVinculadoProduccion({
 
         produccionSortOrder: null,
 
+        sectoresProcesados: [],
+
         createdByUid:
           usuarioActor?.uid || "",
 
@@ -234,6 +236,13 @@ export async function moverEtapaVinculadaProduccion({
   etapaId,
   columnaDestinoId,
   produccionSortOrder = null,
+
+  sectorOrigenId = "",
+  sectorOrigenNombre = "",
+
+  sectorDestinoId = "",
+  sectorDestinoNombre = "",
+
   usuarioActor = null,
 }) {
   if (!etapaId) {
@@ -254,20 +263,105 @@ export async function moverEtapaVinculadaProduccion({
     etapaId
   );
 
-  await updateDoc(etapaRef, {
-    columnaProduccionId:
-      columnaDestinoId,
-       produccionSortOrder,
+await runTransaction(
+  db,
+  async (transaction) => {
+    const etapaSnap =
+      await transaction.get(
+        etapaRef
+      );
 
-    updatedAt:
-      serverTimestamp(),
+    if (!etapaSnap.exists()) {
+      throw new Error(
+        "La etapa vinculada ya no existe."
+      );
+    }
 
-    ultimaAccionUid:
-      usuarioActor?.uid || "",
+    const etapa =
+      etapaSnap.data();
 
-    ultimaAccionNombre:
-      usuarioActor?.nombre || "",
-  });
+    const sectoresProcesadosActuales =
+      Array.isArray(
+        etapa.sectoresProcesados
+      )
+        ? etapa.sectoresProcesados
+        : [];
+
+    const cambioDeSector =
+      Boolean(sectorOrigenId) &&
+      Boolean(sectorDestinoId) &&
+      String(sectorOrigenId) !==
+        String(sectorDestinoId);
+
+    let sectoresProcesadosNuevos =
+      sectoresProcesadosActuales;
+
+    /*
+     * Si la rama sale de un sector hacia otro,
+     * consideramos procesado el sector que deja.
+     */
+    if (cambioDeSector) {
+      const yaProcesado =
+        sectoresProcesadosActuales.some(
+          (sector) =>
+            String(
+              sector?.sectorId || ""
+            ) ===
+            String(sectorOrigenId)
+        );
+
+      if (!yaProcesado) {
+        sectoresProcesadosNuevos = [
+          ...sectoresProcesadosActuales,
+          {
+            sectorId:
+              sectorOrigenId,
+
+            sectorNombre:
+              sectorOrigenNombre || "",
+
+            completadoPorUid:
+              usuarioActor?.uid || "",
+
+            completadoPorNombre:
+              usuarioActor?.nombre || "",
+
+            /*
+             * Usamos fecha cliente dentro del array
+             * porque serverTimestamp() no debe usarse
+             * dentro de objetos de array de forma
+             * problemática.
+             */
+            completadoAt:
+              new Date().toISOString(),
+          },
+        ];
+      }
+    }
+
+    transaction.update(
+      etapaRef,
+      {
+        columnaProduccionId:
+          columnaDestinoId,
+
+        produccionSortOrder,
+
+        sectoresProcesados:
+          sectoresProcesadosNuevos,
+
+        updatedAt:
+          serverTimestamp(),
+
+        ultimaAccionUid:
+          usuarioActor?.uid || "",
+
+        ultimaAccionNombre:
+          usuarioActor?.nombre || "",
+      }
+    );
+  }
+);
 }
 
 export async function finalizarEtapaVinculadaProduccion({
@@ -306,17 +400,11 @@ export async function finalizarEtapaVinculadaProduccion({
     grupoVinculadoId
   );
 
-  const pedidoRef = doc(
-    db,
-    "pedidos",
-    pedidoId
-  );
-
   return runTransaction(
     db,
     async (transaction) => {
       /*
-       * Leemos primero todo lo necesario.
+       * Leemos primero la etapa y el grupo.
        */
       const etapaSnap =
         await transaction.get(
@@ -326,11 +414,6 @@ export async function finalizarEtapaVinculadaProduccion({
       const grupoSnap =
         await transaction.get(
           grupoRef
-        );
-
-      const pedidoSnap =
-        await transaction.get(
-          pedidoRef
         );
 
       if (!etapaSnap.exists()) {
@@ -345,32 +428,21 @@ export async function finalizarEtapaVinculadaProduccion({
         );
       }
 
-      if (!pedidoSnap.exists()) {
-        throw new Error(
-          "El pedido ya no existe."
-        );
-      }
-
       const etapa =
         etapaSnap.data();
 
       const grupo =
         grupoSnap.data();
 
-      const pedido =
-        pedidoSnap.data();
-
       /*
        * Evita doble finalización.
-       *
-       * Si dos usuarios hacen click casi
-       * al mismo tiempo, no contamos dos veces.
        */
       if (etapa.estado === "lista") {
         return {
           yaFinalizada: true,
-          reunionRealizada:
-            grupo.estado === "reunido",
+          listoReunion:
+            grupo.estado ===
+            "listo_reunion",
         };
       }
 
@@ -399,7 +471,13 @@ export async function finalizarEtapaVinculadaProduccion({
           totalEtapas;
 
       /*
-       * Marcamos ESTA rama como lista.
+       * Esta etapa pasa a estado "lista".
+       *
+       * IMPORTANTE:
+       * NO la movemos de columna.
+       *
+       * Queda registrada exactamente
+       * donde fue finalizada.
        */
       transaction.update(
         etapaRef,
@@ -421,7 +499,8 @@ export async function finalizarEtapaVinculadaProduccion({
       );
 
       /*
-       * Todavía quedan ramas trabajando.
+       * Todavía quedan otras etapas
+       * vinculadas trabajando.
        */
       if (!esUltimaEtapa) {
         transaction.update(
@@ -437,19 +516,24 @@ export async function finalizarEtapaVinculadaProduccion({
 
         return {
           reunionRealizada: false,
+          listoReunion: false,
+
           etapasFinalizadas:
             nuevasFinalizadas,
+
           totalEtapas,
         };
       }
 
       /*
-       * ÚLTIMA RAMA.
+       * ÚLTIMA ETAPA FINALIZADA.
        *
-       * El grupo deja de estar activo.
-       * Desde este momento la capa de
-       * representaciones volverá a mostrar
-       * el pedido principal.
+       * Ya NO reunimos automáticamente.
+       *
+       * El grupo queda preparado para
+       * una futura acción explícita:
+       *
+       * "Reunir y continuar"
        */
       const columnaReunionId =
         grupo.columnaReunionId || "";
@@ -463,10 +547,171 @@ export async function finalizarEtapaVinculadaProduccion({
       transaction.update(
         grupoRef,
         {
-          estado: "reunido",
+          estado:
+            "listo_reunion",
 
           etapasFinalizadas:
             nuevasFinalizadas,
+
+          listoReunionAt:
+            serverTimestamp(),
+
+          updatedAt:
+            serverTimestamp(),
+        }
+      );
+
+      return {
+        reunionRealizada: false,
+        listoReunion: true,
+
+        etapasFinalizadas:
+          nuevasFinalizadas,
+
+        totalEtapas,
+
+        columnaReunionId,
+      };
+    }
+  );
+}
+
+export async function tomarGrupoVinculadoProduccion({
+  grupoVinculadoId,
+  pedidoId,
+  produccionSortOrder = null,
+  usuarioActor = null,
+}) {
+  if (!grupoVinculadoId) {
+    throw new Error(
+      "Falta grupoVinculadoId."
+    );
+  }
+
+  if (!pedidoId) {
+    throw new Error(
+      "Falta pedidoId."
+    );
+  }
+
+  const grupoRef = doc(
+    db,
+    GRUPOS_COLLECTION,
+    grupoVinculadoId
+  );
+
+  const pedidoRef = doc(
+    db,
+    "pedidos",
+    pedidoId
+  );
+
+  return runTransaction(
+    db,
+    async (transaction) => {
+      const grupoSnap =
+        await transaction.get(
+          grupoRef
+        );
+
+      const pedidoSnap =
+        await transaction.get(
+          pedidoRef
+        );
+
+      if (!grupoSnap.exists()) {
+        throw new Error(
+          "El grupo vinculado ya no existe."
+        );
+      }
+
+      if (!pedidoSnap.exists()) {
+        throw new Error(
+          "El pedido ya no existe."
+        );
+      }
+
+      const grupo =
+        grupoSnap.data();
+
+      const pedido =
+        pedidoSnap.data();
+
+      /*
+       * Seguridad adicional:
+       * el grupo tiene que corresponder
+       * al mismo pedido.
+       */
+      if (
+        String(grupo.pedidoId || "") !==
+        String(pedidoId)
+      ) {
+        throw new Error(
+          "El grupo no corresponde al pedido."
+        );
+      }
+
+      /*
+       * Si otro usuario ya lo tomó,
+       * evitamos repetir la operación.
+       */
+      if (grupo.estado === "reunido") {
+        return {
+          yaTomado: true,
+          columnaReunionId:
+            grupo.columnaReunionId || "",
+        };
+      }
+
+      /*
+       * Solamente puede tomarse cuando
+       * todas las etapas terminaron.
+       */
+      if (
+        grupo.estado !==
+        "listo_reunion"
+      ) {
+        throw new Error(
+          "Todavía hay etapas pendientes."
+        );
+      }
+
+      const totalEtapas =
+        Number(
+          grupo.totalEtapas || 0
+        );
+
+      const etapasFinalizadas =
+        Number(
+          grupo.etapasFinalizadas || 0
+        );
+
+      if (
+        totalEtapas <= 0 ||
+        etapasFinalizadas <
+          totalEtapas
+      ) {
+        throw new Error(
+          "Todavía hay etapas pendientes."
+        );
+      }
+
+      const columnaReunionId =
+        grupo.columnaReunionId || "";
+
+      if (!columnaReunionId) {
+        throw new Error(
+          "No se encontró el punto de reunión."
+        );
+      }
+
+      /*
+       * Cerramos el flujo vinculado.
+       */
+      transaction.update(
+        grupoRef,
+        {
+          estado: "reunido",
 
           reunidoAt:
             serverTimestamp(),
@@ -477,8 +722,11 @@ export async function finalizarEtapaVinculadaProduccion({
       );
 
       /*
-       * La card normal reaparece directamente
-       * en la columna elegida como reunión.
+       * El pedido principal aparece
+       * exactamente en el punto de reunión.
+       *
+       * Desde ese momento vuelve a funcionar
+       * como una card común.
        */
       transaction.update(
         pedidoRef,
@@ -490,13 +738,14 @@ export async function finalizarEtapaVinculadaProduccion({
             "en_proceso",
 
           estado:
-            pedido.estado ===
-            "Cancelado"
+            pedido.estado === "Cancelado"
               ? "Cancelado"
               : "En proceso",
 
           produccionFinalizada:
             false,
+
+          produccionSortOrder,
 
           produccionActualizadoAt:
             serverTimestamp(),
@@ -516,7 +765,7 @@ export async function finalizarEtapaVinculadaProduccion({
       );
 
       return {
-        reunionRealizada: true,
+        tomado: true,
         columnaReunionId,
       };
     }

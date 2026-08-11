@@ -8255,4 +8255,90 @@ body.dark-mode
 /* =====================================================
    FLUJO VINCULADO - MODAL COMPLETO - fin
    ===================================================== */
+/* =========================================
+   ETAPA VINCULADA FINALIZADA
+   ========================================= */
 
+.produccion-card.etapa-vinculada-finalizada {
+  opacity: 0.68;
+  cursor: default;
+}
+
+.produccion-card.etapa-vinculada-finalizada:hover {
+  opacity: 0.78;
+}
+
+.produccion-card.etapa-vinculada-finalizada
+.produccion-card-drag-handle {
+  cursor: default;
+  opacity: 0.35;
+}
+
+.produccion-etapa-finalizada-info {
+  margin: 8px 10px 4px;
+  padding: 8px 10px;
+  border: 1px solid #bbf7d0;
+  border-radius: 9px;
+  background: #f0fdf4;
+}
+
+.produccion-etapa-finalizada-titulo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+
+  font-size: 12px;
+  font-weight: 700;
+  color: #15803d;
+}
+
+.produccion-etapa-finalizada-titulo svg {
+  flex: 0 0 auto;
+  font-size: 11px;
+}
+
+.produccion-etapa-finalizada-usuario {
+  margin-top: 3px;
+  padding-left: 17px;
+
+  font-size: 11px;
+  line-height: 1.3;
+  color: #64748b;
+}
+
+/* =========================================
+   ETAPA VINCULADA FINALIZADA - fin 
+   ========================================= */
+
+  .produccion-reunion-lista {
+  margin: 8px 10px 4px;
+  padding: 7px 9px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+
+  border: 1px solid #bae6fd;
+  border-radius: 9px;
+  background: #f0f9ff;
+
+  font-size: 12px;
+  font-weight: 700;
+  color: #0369a1;
+}
+
+.produccion-reunion-lista button {
+  border: 0;
+  border-radius: 7px;
+
+  padding: 5px 10px;
+
+  background: #0284c7;
+  color: white;
+
+  font-size: 11px;
+  font-weight: 700;
+
+  cursor: pointer;
+} 

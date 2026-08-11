@@ -55,6 +55,7 @@ import {
   crearGrupoVinculadoProduccion,
   moverEtapaVinculadaProduccion,
   finalizarEtapaVinculadaProduccion,
+  tomarGrupoVinculadoProduccion,
 } from "../../firebase/produccionEtapasVinculadas";
 import {
   construirRepresentacionesProduccion,
@@ -1064,17 +1065,87 @@ async function manejarMoverEtapaVinculada({
     return;
   }
 
+  /*
+   * Buscamos la rama real.
+   *
+   * Esto nos permite conocer en qué columna
+   * estaba ANTES del movimiento.
+   */
+  const etapaActual =
+    etapasVinculadasProduccion.find(
+      (etapa) =>
+        String(etapa.id) ===
+        String(etapaId)
+    );
+
+  if (!etapaActual) {
+    return;
+  }
+
   try {
+    /*
+     * Columna a la que queremos mover
+     * la rama.
+     */
     const columnaDestino =
       columnasGlobalesOrdenadas.find(
         (columna) =>
-          columna.id === columnaDestinoId
+          String(columna.id) ===
+          String(columnaDestinoId)
       );
 
     if (!columnaDestino) {
       return;
     }
 
+    /*
+     * Columna en la que está actualmente
+     * la rama vinculada.
+     */
+    const columnaOrigen =
+      columnasGlobalesOrdenadas.find(
+        (columna) =>
+          String(columna.id) ===
+          String(
+            etapaActual.columnaProduccionId
+          )
+      );
+
+    /*
+     * Sector al que pertenece cada columna.
+     *
+     * Si alguna columna no tiene sector,
+     * queda como string vacío.
+     */
+    const sectorOrigenId =
+      columnaOrigen?.sectorId || "";
+
+    const sectorDestinoId =
+      columnaDestino?.sectorId || "";
+
+    /*
+     * Buscamos los datos completos de los
+     * sectores para guardar también su nombre
+     * como referencia histórica.
+     */
+    const sectorOrigen =
+      sectoresProduccion.find(
+        (sector) =>
+          String(sector.id) ===
+          String(sectorOrigenId)
+      ) || null;
+
+    const sectorDestino =
+      sectoresProduccion.find(
+        (sector) =>
+          String(sector.id) ===
+          String(sectorDestinoId)
+      ) || null;
+
+    /*
+     * Conservamos exactamente la lógica
+     * actual de orden manual.
+     */
     const destinoTieneOrdenManual =
       columnaDestino.ordenManualActivo ===
         true ||
@@ -1103,12 +1174,30 @@ async function manejarMoverEtapaVinculada({
         ? ultimoOrdenDestino + 1000
         : null;
 
+    /*
+     * Movemos la rama.
+     *
+     * Además enviamos origen/destino para
+     * que el servicio pueda detectar cuando
+     * una rama abandona un sector.
+     */
     await moverEtapaVinculadaProduccion({
       etapaId,
+
       columnaDestinoId,
 
       produccionSortOrder:
         produccionSortOrderNuevo,
+
+      sectorOrigenId,
+
+      sectorOrigenNombre:
+        sectorOrigen?.nombre || "",
+
+      sectorDestinoId,
+
+      sectorDestinoNombre:
+        sectorDestino?.nombre || "",
 
       usuarioActor: {
         uid:
@@ -2029,6 +2118,14 @@ if (accion === "finalizar") {
   return;
 }
 
+if (accion === "tomar") {
+  manejarTomarGrupoVinculado(
+    pedido
+  );
+
+  return;
+}
+
 if (accion === "ver-flujo") {
   setPedidoFlujoVinculado(
     pedido
@@ -2141,6 +2238,117 @@ async function manejarFinalizarEtapaVinculada(
   } catch (error) {
     console.error(
       "Error finalizando etapa vinculada:",
+      error
+    );
+  }
+}
+
+async function manejarTomarGrupoVinculado(
+  pedido
+) {
+  if (!pedido) return;
+
+  const grupoVinculadoId =
+    pedido.produccionGrupoVinculadoId ||
+    "";
+
+  const pedidoId =
+    pedido.pedidoFirebaseId ||
+    pedido.firebaseId ||
+    pedido.id ||
+    "";
+
+  if (
+    !grupoVinculadoId ||
+    !pedidoId
+  ) {
+    return;
+  }
+
+  try {
+    const grupo =
+      gruposVinculadosProduccion.find(
+        (item) =>
+          String(item.id) ===
+          String(grupoVinculadoId)
+      );
+
+    if (!grupo) {
+      return;
+    }
+
+    if (
+      grupo.estado !==
+      "listo_reunion"
+    ) {
+      return;
+    }
+
+    const columnaReunionId =
+      grupo.columnaReunionId || "";
+
+    const columnaReunion =
+      columnasGlobalesOrdenadas.find(
+        (columna) =>
+          String(columna.id) ===
+          String(columnaReunionId)
+      );
+
+    if (!columnaReunion) {
+      return;
+    }
+
+    const destinoTieneOrdenManual =
+      columnaReunion.ordenManualActivo ===
+        true ||
+      columnaReunion.tipoOrden ===
+        "manual";
+
+    const tarjetasDestino =
+      pedidosPorColumna[
+        columnaReunionId
+      ] || [];
+
+    const ultimoOrdenDestino =
+      Math.max(
+        0,
+        ...tarjetasDestino.map(
+          (tarjeta) =>
+            Number(
+              tarjeta.produccionSortOrder ||
+                0
+            )
+        )
+      );
+
+    const produccionSortOrderNuevo =
+      destinoTieneOrdenManual
+        ? ultimoOrdenDestino + 1000
+        : null;
+
+    await tomarGrupoVinculadoProduccion({
+      grupoVinculadoId,
+
+      pedidoId,
+
+      produccionSortOrder:
+        produccionSortOrderNuevo,
+
+      usuarioActor: {
+        uid:
+          perfil?.uid ||
+          perfil?.firebaseUid ||
+          "",
+
+        nombre:
+          perfil?.nombre ||
+          perfil?.email ||
+          "Usuario",
+      },
+    });
+  } catch (error) {
+    console.error(
+      "Error tomando pedido en punto de reunión:",
       error
     );
   }

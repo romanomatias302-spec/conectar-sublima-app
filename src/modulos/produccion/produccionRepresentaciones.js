@@ -123,6 +123,18 @@ export function crearRepresentacionVinculadaProduccion({
     produccionEstadoRama:
       etapa.estado || "activa",
 
+    produccionEtapaFinalizada:
+      etapa.estado === "lista",
+
+    produccionEtapaFinalizadaAt:
+      etapa.listaAt || null,
+
+    produccionEtapaFinalizadaPorUid:
+      etapa.listaPorUid || "",
+
+    produccionEtapaFinalizadaPorNombre:
+      etapa.listaPorNombre || "",  
+
     produccionFlujoVinculado: {
   grupoId: grupo?.id || etapa?.grupoVinculadoId || "",
 
@@ -222,6 +234,107 @@ export function crearRepresentacionVinculadaProduccion({
   };
 }
 
+
+
+export function crearRepresentacionEsperaReunionProduccion({
+  pedido,
+  grupo,
+}) {
+  if (!pedido || !grupo) {
+    return null;
+  }
+
+  const pedidoFirebaseId =
+    obtenerPedidoFirebaseId(pedido);
+
+  if (!pedidoFirebaseId) {
+    return null;
+  }
+
+  if (!grupo?.id) {
+    return null;
+  }
+
+  const columnaReunionId =
+    grupo.columnaReunionId || "";
+
+  if (!columnaReunionId) {
+    return null;
+  }
+
+  return {
+    ...pedido,
+
+    /*
+     * Sigue siendo el mismo pedido comercial.
+     */
+    firebaseId:
+      pedidoFirebaseId,
+
+    pedidoFirebaseId,
+
+    /*
+     * Identidad visual temporal.
+     *
+     * Todavía NO es la representación
+     * principal normal.
+     */
+    produccionRepresentacionId:
+      `reunion:${grupo.id}`,
+
+    produccionRepresentacionTipo:
+      "reunion",
+
+    produccionEsperaReunion:
+      true,
+
+    produccionEsEtapaVinculada:
+      false,
+
+    produccionEtapaVinculadaId:
+      "",
+
+    produccionGrupoVinculadoId:
+      grupo.id,
+
+    produccionEstadoGrupo:
+      grupo.estado || "",
+
+    produccionTotalEtapas:
+      Number(
+        grupo.totalEtapas || 0
+      ),
+
+    produccionEtapasFinalizadas:
+      Number(
+        grupo.etapasFinalizadas || 0
+      ),
+
+    produccionColumnaReunionId:
+      columnaReunionId,
+
+    /*
+     * Visualmente aparece en el punto
+     * de reunión.
+     *
+     * El pedido real todavía no fue movido.
+     */
+    columnaRepresentacionId:
+      columnaReunionId,
+
+    columnaProduccionId:
+      columnaReunionId,
+
+    /*
+     * Todavía no ocupa un orden permanente.
+     * Al tocar "Tomar" calcularemos su
+     * orden definitivo.
+     */
+    produccionSortOrder:
+      null,
+  };
+}
+
 /**
  * Construye TODAS las representaciones operativas.
  *
@@ -307,14 +420,27 @@ const etapasGrupo =
         Number(b?.ordenRama || 0)
     );
 
-const ramasActivas =
-  etapasGrupo.filter(
-    (etapa) =>
-      String(etapa?.estado || "") ===
-      "activa"
-  );
+/*
+ * Mostramos todas las etapas vinculadas
+ * que sigan perteneciendo al flujo:
+ *
+ * - activa → se puede seguir trabajando;
+ * - lista  → permanece visible como finalizada.
+ *
+ * Las canceladas ya fueron excluidas
+ * previamente en etapasGrupo.
+ */
+etapasGrupo.forEach((etapa) => {
+  const estadoEtapa =
+    String(etapa?.estado || "");
 
-ramasActivas.forEach((etapa) => {
+  if (
+    estadoEtapa !== "activa" &&
+    estadoEtapa !== "lista"
+  ) {
+    return;
+  }
+
   const representacion =
     crearRepresentacionVinculadaProduccion({
       pedido,
@@ -327,6 +453,30 @@ ramasActivas.forEach((etapa) => {
     resultado.push(representacion);
   }
 });
+/*
+ * Cuando todas las etapas terminaron,
+ * aparece una única card de espera
+ * en el punto de reunión.
+ *
+ * Todavía no mostramos la card principal.
+ */
+if (
+  String(grupoActivo.estado || "") ===
+  "listo_reunion"
+) {
+  const esperaReunion =
+    crearRepresentacionEsperaReunionProduccion({
+      pedido,
+      grupo: grupoActivo,
+    });
+
+  if (esperaReunion) {
+    resultado.push(
+      esperaReunion
+    );
+  }
+}
+
   });
 
   return resultado;
