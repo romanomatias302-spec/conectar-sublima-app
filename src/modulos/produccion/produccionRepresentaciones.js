@@ -77,6 +77,7 @@ export function crearRepresentacionVinculadaProduccion({
   pedido,
   etapa,
   grupo,
+  etapasGrupo = [],
 }) {
   if (!pedido || !etapa) return null;
 
@@ -122,12 +123,80 @@ export function crearRepresentacionVinculadaProduccion({
     produccionEstadoRama:
       etapa.estado || "activa",
 
+    produccionFlujoVinculado: {
+  grupoId: grupo?.id || etapa?.grupoVinculadoId || "",
+
+  estadoGrupo:
+    grupo?.estado || "activo",
+
+  columnaOrigenId:
+    grupo?.columnaOrigenId || "",
+
+  columnaReunionId:
+    grupo?.columnaReunionId || "",
+
+  totalEtapas:
+    Number(
+      grupo?.totalEtapas ||
+        etapasGrupo.length ||
+        0
+    ),
+
+  etapasFinalizadas:
+    Number(
+      grupo?.etapasFinalizadas ??
+        etapasGrupo.filter(
+          (item) =>
+            item?.estado === "lista"
+        ).length
+    ),
+
+  ramas: etapasGrupo
+    .filter(
+      (item) =>
+        item?.estado !== "cancelada"
+    )
+    .sort(
+      (a, b) =>
+        Number(a?.ordenRama || 0) -
+        Number(b?.ordenRama || 0)
+    )
+    .map((item) => ({
+      id: item.id || "",
+
+      nombre:
+        String(item.nombre || "").trim() ||
+        "Etapa vinculada",
+
+      estado:
+        item.estado || "activa",
+
+      columnaProduccionId:
+        item.columnaProduccionId || "",
+
+      ordenRama:
+        Number(item.ordenRama || 0),
+
+      listaPorUid:
+        item.listaPorUid || "",
+
+      listaPorNombre:
+        item.listaPorNombre || "",
+
+      listaAt:
+        item.listaAt || null,
+    })),
+},  
+
     /*
      * La posición visual pertenece a la rama,
      * no al pedido principal.
      */
     columnaRepresentacionId:
       etapa.columnaProduccionId || "",
+
+    produccionSortOrder:
+     etapa.produccionSortOrder ?? null,  
 
     /*
      * Mantenemos también columnaProduccionId
@@ -220,36 +289,44 @@ export function construirRepresentacionesProduccion({
      * Pedido con producción paralela:
      * no mostramos la tarjeta principal.
      */
-    const ramasActivas =
-      etapasVinculadas
-        .filter(
-          (etapa) =>
-            String(
-              etapa?.grupoVinculadoId || ""
-            ) === String(grupoActivo.id) &&
-            String(etapa?.pedidoId || "") ===
-              String(pedidoId) &&
-            String(etapa?.estado || "") ===
-              "activa"
-        )
-        .sort(
-          (a, b) =>
-            Number(a?.ordenRama || 0) -
-            Number(b?.ordenRama || 0)
-        );
+const etapasGrupo =
+  etapasVinculadas
+    .filter(
+      (etapa) =>
+        String(
+          etapa?.grupoVinculadoId || ""
+        ) === String(grupoActivo.id) &&
+        String(etapa?.pedidoId || "") ===
+          String(pedidoId) &&
+        String(etapa?.estado || "") !==
+          "cancelada"
+    )
+    .sort(
+      (a, b) =>
+        Number(a?.ordenRama || 0) -
+        Number(b?.ordenRama || 0)
+    );
 
-    ramasActivas.forEach((etapa) => {
-      const representacion =
-        crearRepresentacionVinculadaProduccion({
-          pedido,
-          etapa,
-          grupo: grupoActivo,
-        });
+const ramasActivas =
+  etapasGrupo.filter(
+    (etapa) =>
+      String(etapa?.estado || "") ===
+      "activa"
+  );
 
-      if (representacion) {
-        resultado.push(representacion);
-      }
+ramasActivas.forEach((etapa) => {
+  const representacion =
+    crearRepresentacionVinculadaProduccion({
+      pedido,
+      etapa,
+      grupo: grupoActivo,
+      etapasGrupo,
     });
+
+  if (representacion) {
+    resultado.push(representacion);
+  }
+});
   });
 
   return resultado;

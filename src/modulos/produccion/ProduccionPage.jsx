@@ -39,6 +39,9 @@ import ProduccionHeader from "./ProduccionHeader";
 import ProduccionVistaSectores from "./ProduccionVistaSectores";
 import DetalleProduccionModal from "./detalle/DetalleProduccionModal";
 import NuevoSectorProduccionModal from "./NuevoSectorProduccionModal";
+import EtapasVinculadasModal from "./EtapasVinculadasModal";
+import ProduccionFlujoVinculado
+  from "./ProduccionFlujoVinculado";
 import PedidoFormModal from "../pedidos/PedidoFormModal";
 import {
   escucharEtiquetasProduccion,
@@ -46,9 +49,20 @@ import {
   actualizarEtiquetaProduccion,
   desactivarEtiquetaProduccion,
 } from "../../firebase/produccionEtiquetas";
+import {
+  escucharGruposVinculadosProduccion,
+  escucharEtapasVinculadasProduccion,
+  crearGrupoVinculadoProduccion,
+  moverEtapaVinculadaProduccion,
+  finalizarEtapaVinculadaProduccion,
+} from "../../firebase/produccionEtapasVinculadas";
+import {
+  construirRepresentacionesProduccion,
+} from "./produccionRepresentaciones";
 import "./produccion.css";
 import { puedeHacer } from "../../utils/permisos";
 import SearchableSelect from "../../comunes/componentes/SearchableSelect";
+
 
 
 
@@ -194,6 +208,31 @@ const [pedidoNuevoResaltadoId, setPedidoNuevoResaltadoId] = useState(null);
     setPosicionNuevaColumnaEnSector,
   ] = useState("fin");
 
+const [
+  gruposVinculadosProduccion,
+  setGruposVinculadosProduccion,
+] = useState([]);
+
+const [
+  etapasVinculadasProduccion,
+  setEtapasVinculadasProduccion,
+] = useState([]);
+
+const [
+  pedidoGestionVinculada,
+  setPedidoGestionVinculada,
+] = useState(null);
+
+const [
+  mostrarModalEtapasVinculadas,
+  setMostrarModalEtapasVinculadas,
+] = useState(false);
+
+const [
+    pedidoFlujoVinculado,
+    setPedidoFlujoVinculado,
+  ] = useState(null);
+
   const puedeHacerEnProduccion = (accion = "ver") => {
     return puedeHacer(perfil, "produccion", accion);
   };
@@ -208,7 +247,32 @@ const uidActual =
   perfil?.uid || perfil?.firebaseUid || "";
 
 
+useEffect(() => {
+  const clienteId = perfil?.clienteId;
 
+  if (!clienteId) {
+    setGruposVinculadosProduccion([]);
+    setEtapasVinculadasProduccion([]);
+    return;
+  }
+
+  const unsubscribeGrupos =
+    escucharGruposVinculadosProduccion(
+      clienteId,
+      setGruposVinculadosProduccion
+    );
+
+  const unsubscribeEtapas =
+    escucharEtapasVinculadasProduccion(
+      clienteId,
+      setEtapasVinculadasProduccion
+    );
+
+  return () => {
+    unsubscribeGrupos?.();
+    unsubscribeEtapas?.();
+  };
+}, [perfil?.clienteId]);
 
   useEffect(() => {
   let unsubscribe = null;
@@ -709,6 +773,7 @@ const sectorVistaSeleccionado =
     filtroAsignado,
     perfil,
     debeVerSoloAsignados
+
   );
 const finalizadosFiltrados = filtrarPedidosPorAsignado(
   pedidosFinalizadosRecientes,
@@ -734,10 +799,23 @@ const pedidosFiltradosPorBusqueda = filtrarPedidosPorBusqueda(
 
 
 
-const agrupadoBase = agruparPedidosPorColumna(
-  columnas,
-  pedidosFiltradosPorBusqueda
-);
+const representacionesProduccion =
+  construirRepresentacionesProduccion({
+    pedidos:
+      pedidosFiltradosPorBusqueda,
+
+    gruposVinculados:
+      gruposVinculadosProduccion,
+
+    etapasVinculadas:
+      etapasVinculadasProduccion,
+  });
+
+const agrupadoBase =
+  agruparPedidosPorColumna(
+    columnas,
+    representacionesProduccion
+  );
 
   const columnaFinal = columnas.find((c) => c.esFinal);
   if (!columnaFinal) {
@@ -842,6 +920,9 @@ const animadosFiltradosPorBusqueda = filtrarPedidosPorBusqueda(
   perfil,
   debeVerSoloAsignados,
   busquedaProduccion,
+  gruposVinculadosProduccion,
+  etapasVinculadasProduccion,
+
 ]);
 
   async function manejarMoverPedido(pedidoId, columnaDestinoId) {
@@ -974,6 +1055,80 @@ const animadosFiltradosPorBusqueda = filtrarPedidosPorBusqueda(
       setMoviendo(false);
     }
   }
+
+async function manejarMoverEtapaVinculada({
+  etapaId,
+  columnaDestinoId,
+}) {
+  if (!etapaId || !columnaDestinoId) {
+    return;
+  }
+
+  try {
+    const columnaDestino =
+      columnasGlobalesOrdenadas.find(
+        (columna) =>
+          columna.id === columnaDestinoId
+      );
+
+    if (!columnaDestino) {
+      return;
+    }
+
+    const destinoTieneOrdenManual =
+      columnaDestino.ordenManualActivo ===
+        true ||
+      columnaDestino.tipoOrden ===
+        "manual";
+
+    const tarjetasDestino =
+      pedidosPorColumna[
+        columnaDestinoId
+      ] || [];
+
+    const ultimoOrdenDestino =
+      Math.max(
+        0,
+        ...tarjetasDestino.map(
+          (tarjeta) =>
+            Number(
+              tarjeta.produccionSortOrder ||
+                0
+            )
+        )
+      );
+
+    const produccionSortOrderNuevo =
+      destinoTieneOrdenManual
+        ? ultimoOrdenDestino + 1000
+        : null;
+
+    await moverEtapaVinculadaProduccion({
+      etapaId,
+      columnaDestinoId,
+
+      produccionSortOrder:
+        produccionSortOrderNuevo,
+
+      usuarioActor: {
+        uid:
+          perfil?.uid ||
+          perfil?.firebaseUid ||
+          "",
+
+        nombre:
+          perfil?.nombre ||
+          perfil?.email ||
+          "Usuario",
+      },
+    });
+  } catch (error) {
+    console.error(
+      "Error moviendo etapa vinculada:",
+      error
+    );
+  }
+}
 
   if (loading) {
     return <div className="produccion-page">Cargando producción...</div>;
@@ -1514,75 +1669,308 @@ function manejarPedidoCreadoDesdeProduccion(pedidoCreado) {
   setMostrarNuevoPedidoProduccion(false);
 }
 
-async function manejarReordenManualPedido({ pedidoId, pedidoObjetivoId, columnaId }) {
+async function manejarReordenManualRepresentacion({
+  representacionId,
+  representacionObjetivoId,
+  columnaId,
+}) {
   try {
     if (!puedeHacerEnProduccion("mover")) return;
-    if (!pedidoId || !pedidoObjetivoId || !columnaId) return;
-    if (pedidoId === pedidoObjetivoId) return;
 
-    const columna = columnas.find((c) => c.id === columnaId);
+    if (
+      !representacionId ||
+      !representacionObjetivoId ||
+      !columnaId
+    ) {
+      return;
+    }
+
+    if (
+      String(representacionId) ===
+      String(representacionObjetivoId)
+    ) {
+      return;
+    }
+
+    const columna =
+      columnasGlobalesOrdenadas.find(
+        (c) => c.id === columnaId
+      );
+
     const ordenManualActivo =
-      columna?.ordenManualActivo === true || columna?.tipoOrden === "manual";
+      columna?.ordenManualActivo === true ||
+      columna?.tipoOrden === "manual";
 
     if (!ordenManualActivo) return;
 
-    const pedidosColumna = pedidos
-      .filter((p) => p.columnaProduccionId === columnaId)
-      .sort((a, b) => {
-        const ordenA = Number(a.produccionSortOrder ?? 999999);
-        const ordenB = Number(b.produccionSortOrder ?? 999999);
+    /*
+     * IMPORTANTE:
+     * Trabajamos con las representaciones que realmente
+     * están visibles en la columna.
+     *
+     * Acá pueden convivir:
+     * - pedidos normales;
+     * - ramas vinculadas.
+     */
+    const tarjetasColumna = [
+      ...(pedidosPorColumna[columnaId] || []),
+    ].sort((a, b) => {
+      const ordenA = Number(
+        a.produccionSortOrder ?? 999999
+      );
 
-        if (ordenA !== ordenB) return ordenA - ordenB;
+      const ordenB = Number(
+        b.produccionSortOrder ?? 999999
+      );
 
-        return String(a.id || "").localeCompare(String(b.id || ""));
-      });
+      if (ordenA !== ordenB) {
+        return ordenA - ordenB;
+      }
 
-    const indexActual = pedidosColumna.findIndex(
-      (p) => (p.firebaseId || p.id) === pedidoId
-    );
+      const idA =
+        a.produccionRepresentacionId ||
+        `principal:${
+          a.pedidoFirebaseId ||
+          a.firebaseId ||
+          a.id ||
+          ""
+        }`;
 
-    const indexObjetivo = pedidosColumna.findIndex(
-      (p) => (p.firebaseId || p.id) === pedidoObjetivoId
-    );
+      const idB =
+        b.produccionRepresentacionId ||
+        `principal:${
+          b.pedidoFirebaseId ||
+          b.firebaseId ||
+          b.id ||
+          ""
+        }`;
 
-    if (indexActual === -1 || indexObjetivo === -1) return;
-
-    const copia = [...pedidosColumna];
-    const [movido] = copia.splice(indexActual, 1);
-    copia.splice(indexObjetivo, 0, movido);
-
-    const batch = writeBatch(db);
-
-    copia.forEach((pedido, index) => {
-      const idDoc = pedido.firebaseId || pedido.id;
-      if (!idDoc) return;
-
-      const nuevoOrden = (index + 1) * 1000;
-
-      batch.update(doc(db, "pedidos", idDoc), {
-        produccionSortOrder: nuevoOrden,
-      });
+      return String(idA).localeCompare(
+        String(idB)
+      );
     });
+
+    const obtenerRepresentacionId = (
+      tarjeta
+    ) => {
+      const pedidoId =
+        tarjeta.pedidoFirebaseId ||
+        tarjeta.firebaseId ||
+        tarjeta.id ||
+        "";
+
+      return String(
+        tarjeta.produccionRepresentacionId ||
+          `principal:${pedidoId}`
+      );
+    };
+
+    const indexActual =
+      tarjetasColumna.findIndex(
+        (tarjeta) =>
+          obtenerRepresentacionId(
+            tarjeta
+          ) === String(representacionId)
+      );
+
+    const indexObjetivo =
+      tarjetasColumna.findIndex(
+        (tarjeta) =>
+          obtenerRepresentacionId(
+            tarjeta
+          ) ===
+          String(
+            representacionObjetivoId
+          )
+      );
+
+    if (
+      indexActual === -1 ||
+      indexObjetivo === -1
+    ) {
+      return;
+    }
+
+    const copia = [
+      ...tarjetasColumna,
+    ];
+
+    const [movida] =
+      copia.splice(indexActual, 1);
+
+    copia.splice(
+      indexObjetivo,
+      0,
+      movida
+    );
+
+    const batch =
+      writeBatch(db);
+
+    copia.forEach(
+      (tarjeta, index) => {
+        const nuevoOrden =
+          (index + 1) * 1000;
+
+        const esVinculada =
+          tarjeta
+            .produccionRepresentacionTipo ===
+            "vinculada";
+
+        /*
+         * RAMA VINCULADA
+         */
+        if (esVinculada) {
+          const etapaId =
+            tarjeta
+              .produccionEtapaVinculadaId ||
+            "";
+
+          if (!etapaId) return;
+
+          batch.update(
+            doc(
+              db,
+              "produccion_etapas_vinculadas",
+              etapaId
+            ),
+            {
+              produccionSortOrder:
+                nuevoOrden,
+            }
+          );
+
+          return;
+        }
+
+        /*
+         * PEDIDO NORMAL
+         */
+        const pedidoId =
+          tarjeta.pedidoFirebaseId ||
+          tarjeta.firebaseId ||
+          tarjeta.id ||
+          "";
+
+        if (!pedidoId) return;
+
+        batch.update(
+          doc(
+            db,
+            "pedidos",
+            pedidoId
+          ),
+          {
+            produccionSortOrder:
+              nuevoOrden,
+          }
+        );
+      }
+    );
+
+    /*
+     * Optimista para pedidos normales.
+     */
+    const ordenPedidoPorId =
+      new Map();
+
+    /*
+     * Optimista para ramas vinculadas.
+     */
+    const ordenEtapaPorId =
+      new Map();
+
+    copia.forEach(
+      (tarjeta, index) => {
+        const nuevoOrden =
+          (index + 1) * 1000;
+
+        if (
+          tarjeta
+            .produccionRepresentacionTipo ===
+          "vinculada"
+        ) {
+          const etapaId =
+            tarjeta
+              .produccionEtapaVinculadaId;
+
+          if (etapaId) {
+            ordenEtapaPorId.set(
+              String(etapaId),
+              nuevoOrden
+            );
+          }
+
+          return;
+        }
+
+        const pedidoId =
+          tarjeta.pedidoFirebaseId ||
+          tarjeta.firebaseId ||
+          tarjeta.id;
+
+        if (pedidoId) {
+          ordenPedidoPorId.set(
+            String(pedidoId),
+            nuevoOrden
+          );
+        }
+      }
+    );
 
     setPedidos((prev) =>
       prev.map((pedido) => {
-        const idPedido = pedido.firebaseId || pedido.id;
-        const nuevoIndex = copia.findIndex(
-          (p) => (p.firebaseId || p.id) === idPedido
-        );
+        const pedidoId =
+          pedido.firebaseId ||
+          pedido.id;
 
-        if (nuevoIndex === -1) return pedido;
+        const nuevoOrden =
+          ordenPedidoPorId.get(
+            String(pedidoId || "")
+          );
+
+        if (
+          nuevoOrden === undefined
+        ) {
+          return pedido;
+        }
 
         return {
           ...pedido,
-          produccionSortOrder: (nuevoIndex + 1) * 1000,
+          produccionSortOrder:
+            nuevoOrden,
         };
       })
     );
 
+    setEtapasVinculadasProduccion(
+      (prev) =>
+        prev.map((etapa) => {
+          const nuevoOrden =
+            ordenEtapaPorId.get(
+              String(etapa.id || "")
+            );
+
+          if (
+            nuevoOrden === undefined
+          ) {
+            return etapa;
+          }
+
+          return {
+            ...etapa,
+            produccionSortOrder:
+              nuevoOrden,
+          };
+        })
+    );
+
     await batch.commit();
   } catch (error) {
-    console.error("Error reordenando pedido manualmente:", error);
+    console.error(
+      "Error reordenando producción manualmente:",
+      error
+    );
   }
 }
 
@@ -1621,9 +2009,142 @@ async function manejarReordenManualPedido({ pedidoId, pedidoObjetivoId, columnaI
     enfocarTableroProduccion();
   }
 
+function manejarGestionarEtapaVinculada({
+  accion,
+  pedido,
+}) {
+  if (!pedido) return;
+
+  if (accion === "crear") {
+    setPedidoGestionVinculada(pedido);
+    setMostrarModalEtapasVinculadas(true);
+    return;
+  }
+
+if (accion === "finalizar") {
+  manejarFinalizarEtapaVinculada(
+    pedido
+  );
+
+  return;
+}
+
+if (accion === "ver-flujo") {
+  setPedidoFlujoVinculado(
+    pedido
+  );
+
+  return;
+}
+}
 
 
+async function manejarCrearEtapasVinculadas({
+  etapas,
+  columnaReunionId,
+}) {
+  if (!pedidoGestionVinculada) return;
+  if (!perfil?.clienteId) return;
 
+  const pedidoId =
+    pedidoGestionVinculada.pedidoFirebaseId ||
+    pedidoGestionVinculada.firebaseId ||
+    pedidoGestionVinculada.id;
+
+  if (!pedidoId) return;
+
+  await crearGrupoVinculadoProduccion({
+    clienteId:
+      perfil.clienteId,
+
+    pedidoId,
+
+    columnaOrigenId:
+      pedidoGestionVinculada
+        .columnaProduccionId || "",
+
+    columnaReunionId,
+
+    etapas,
+
+    usuarioActor: {
+      uid:
+        perfil?.uid ||
+        perfil?.firebaseUid ||
+        "",
+
+      nombre:
+        perfil?.nombre ||
+        perfil?.email ||
+        "Usuario",
+    },
+  });
+
+  setMostrarModalEtapasVinculadas(
+    false
+  );
+
+  setPedidoGestionVinculada(null);
+}
+
+async function manejarFinalizarEtapaVinculada(
+  pedido
+) {
+  if (!pedido) return;
+
+  const etapaId =
+    pedido.produccionEtapaVinculadaId ||
+    "";
+
+  const grupoVinculadoId =
+    pedido.produccionGrupoVinculadoId ||
+    "";
+
+  const pedidoId =
+    pedido.pedidoFirebaseId ||
+    pedido.firebaseId ||
+    pedido.id ||
+    "";
+
+  if (
+    !etapaId ||
+    !grupoVinculadoId ||
+    !pedidoId
+  ) {
+    return;
+  }
+
+  try {
+    const resultado =
+      await finalizarEtapaVinculadaProduccion({
+        etapaId,
+        grupoVinculadoId,
+        pedidoId,
+
+        usuarioActor: {
+          uid:
+            perfil?.uid ||
+            perfil?.firebaseUid ||
+            "",
+
+          nombre:
+            perfil?.nombre ||
+            perfil?.email ||
+            "Usuario",
+        },
+      });
+
+    console.log(
+      "Etapa vinculada finalizada:",
+      resultado
+    );
+  } catch (error) {
+    console.error(
+      "Error finalizando etapa vinculada:",
+      error
+    );
+  }
+}
 
   return (
     <div className="produccion-page">
@@ -1880,11 +2401,23 @@ async function manejarReordenManualPedido({ pedidoId, pedidoObjetivoId, columnaI
           columnasSectorIds={
             datosVistaSector.columnasSectorIds
           }
+
+
+
+
         pedidosPorColumna={pedidosPorColumna}
         onMoverPedido={manejarMoverPedido}
+        onMoverEtapaVinculada={
+          manejarMoverEtapaVinculada
+        }
         puedeGestionarOrdenManual={puedeGestionarOrdenManual}
         puedeCambiarColorTarjeta={puedeCambiarColorTarjeta}
-        onReordenarPedidoManual={manejarReordenManualPedido}
+        onReordenarRepresentacionManual={
+          manejarReordenManualRepresentacion
+        }
+        onReordenarRepresentacionManual={
+          manejarReordenManualRepresentacion
+        }
         onCambiarColorTarjeta={manejarCambiarColorTarjeta}
         onVerPedido={onVerPedido}
         onEditarColumna={manejarEditarColumna}
@@ -1898,6 +2431,9 @@ async function manejarReordenManualPedido({ pedidoId, pedidoObjetivoId, columnaI
         columnasContraidas={columnasContraidas}
         onToggleColumnaContraida={toggleColumnaContraida}
         onEditarDetalleManual={abrirDetalleManual}
+        onGestionarEtapaVinculada={
+          manejarGestionarEtapaVinculada
+        }
         puedeGestionarColumnas={puedeGestionarColumnas}
         onMoverColumna={manejarMoverColumna}
         onToggleOrdenManualColumna={manejarToggleOrdenManualColumna}
@@ -1905,9 +2441,53 @@ async function manejarReordenManualPedido({ pedidoId, pedidoObjetivoId, columnaI
         puedeMoverPedidos={puedeHacerEnProduccion("mover")}
         puedeEditarDetalleManual={puedeHacerEnProduccion("editarDetalle")}
         pedidoNuevoResaltadoId={pedidoNuevoResaltadoId}
+        
       /> 
      
       </div>
+
+      {mostrarModalEtapasVinculadas &&
+        pedidoGestionVinculada && (
+          <EtapasVinculadasModal
+            pedido={
+              pedidoGestionVinculada
+            }
+
+            columnas={
+              columnasGlobalesOrdenadas
+            }
+
+            onCerrar={() => {
+              setMostrarModalEtapasVinculadas(
+                false
+              );
+
+              setPedidoGestionVinculada(
+                null
+              );
+            }}
+
+            onGuardar={
+              manejarCrearEtapasVinculadas
+            }
+          />
+        )}
+
+      {pedidoFlujoVinculado && (
+        <ProduccionFlujoVinculado
+          pedido={
+            pedidoFlujoVinculado
+          }
+          columnas={
+            columnasGlobalesOrdenadas
+          }
+          onCerrar={() => {
+            setPedidoFlujoVinculado(
+              null
+            );
+          }}
+        />
+      )}  
 
       {mostrarNuevoPedidoProduccion && (
         <PedidoFormModal
@@ -2215,6 +2795,8 @@ async function manejarReordenManualPedido({ pedidoId, pedidoObjetivoId, columnaI
         </div>
       </div>
     )}
+
+
 
     </div>
   );

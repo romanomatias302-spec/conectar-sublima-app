@@ -29,7 +29,9 @@ export default function ProduccionBoard({
 
   pedidosPorColumna,
   onMoverPedido,
-  onReordenarPedidoManual,
+  onMoverEtapaVinculada,
+  
+  onReordenarRepresentacionManual,
   onCambiarColorTarjeta,
   onVerPedido,
   onEditarColumna,
@@ -43,6 +45,7 @@ export default function ProduccionBoard({
   columnasContraidas,
   onToggleColumnaContraida,
   onEditarDetalleManual,
+  onGestionarEtapaVinculada,
   puedeGestionarColumnas,
   onMoverColumna,
   onToggleOrdenManualColumna,
@@ -259,8 +262,10 @@ const grupoVinculadoId =
 
 if (!pedidoId) return;
 
-const pedidoObjetivoId =
-  overData.pedidoId || null;    
+const representacionObjetivoId =
+  overData.representacionId || null;
+
+
 
 const columnaActualId =
   pedidoActual?.columnaRepresentacionId ||
@@ -270,46 +275,60 @@ const columnaActualId =
 const mismaColumna =
   columnaActualId === columnaDestinoId;
 
-/*
- * Las ramas vinculadas todavía NO escriben en Firestore.
- *
- * Dejamos preparada la identidad pero bloqueamos su
- * movimiento hasta conectar moverEtapaVinculadaProduccion().
- *
- * Hoy no afecta nada porque todavía no renderizamos ramas.
- */
 if (
-  representacionTipo === "vinculada"
+  ordenManualActivo &&
+  mismaColumna &&
+  representacionObjetivoId
 ) {
-  console.warn(
-    "Movimiento de etapa vinculada todavía no habilitado:",
-    {
-      representacionId,
-      pedidoId,
-      etapaVinculadaId,
-      grupoVinculadoId,
-      columnaDestinoId,
-    }
-  );
-
-  return;
-}  
-
-if (ordenManualActivo && mismaColumna && pedidoObjetivoId) {
-  onReordenarPedidoManual?.({
-    pedidoId,
-    pedidoObjetivoId,
+  onReordenarRepresentacionManual?.({
+    representacionId,
+    representacionObjetivoId,
     columnaId: columnaDestinoId,
   });
 
-  setColumnaResaltadaId(columnaDestinoId);
+  setColumnaResaltadaId(
+    columnaDestinoId
+  );
 
   setTimeout(() => {
     setColumnaResaltadaId(null);
   }, 1200);
 
   return;
+}  
+
+if (
+  representacionTipo === "vinculada"
+) {
+  if (!etapaVinculadaId) {
+    return;
+  }
+
+  /*
+   * Una rama vinculada se mueve de manera
+   * independiente al pedido comercial.
+   *
+   * NO modificamos pedidos/{pedidoId}.
+   */
+  onMoverEtapaVinculada?.({
+    etapaId: etapaVinculadaId,
+    grupoVinculadoId,
+    pedidoId,
+    columnaDestinoId,
+  });
+
+  setColumnaResaltadaId(
+    columnaDestinoId
+  );
+
+  setTimeout(() => {
+    setColumnaResaltadaId(null);
+  }, 2200);
+
+  return;
 }
+
+
 
 onMoverPedido?.(pedidoId, columnaDestinoId);
     setColumnaResaltadaId(columnaDestinoId);
@@ -394,6 +413,9 @@ onMoverPedido?.(pedidoId, columnaDestinoId);
               estaContraida={columnasContraidas?.includes(columna.id)}
               onToggleContraer={() => onToggleColumnaContraida?.(columna.id)}
               onEditarDetalleManual={onEditarDetalleManual}
+              onGestionarEtapaVinculada={
+                onGestionarEtapaVinculada
+              }
               puedeGestionarColumnas={puedeGestionarColumnas}
               onMoverColumna={onMoverColumna}
               onToggleOrdenManualColumna={onToggleOrdenManualColumna}

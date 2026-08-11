@@ -6957,4 +6957,1302 @@ body.dark-mode
    CARD ARRASTRADA SIEMPRE SOBRE ENCABEZADOS - fin
    ========================================================= */
 
+      /* =========================================================
+   CARd vinculada icono
+   ========================================================= */
+
+
+
+   .produccion-card-vinculada-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 22px;
+  height: 22px;
+
+  flex: 0 0 22px;
+
+  border-radius: 999px;
+
+  background: rgba(0, 174, 239, 0.12);
+  color: #0096d1;
+
+  border: 1px solid rgba(0, 174, 239, 0.22);
+}
+
+
+      /* =========================================================
+   CARd vinculada icono fin
+   ========================================================= */
+
+   /* =========================================================
+   PRODUCCIÓN - ACTION MENU DE CARD
+   ========================================================= */
+
+.produccion-card-action-menu {
+  margin-left: auto;
+  flex: 0 0 auto;
+  position: relative;
+  z-index: 5;
+}
+
+.action-menu-trigger.produccion-card-menu-trigger {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 7px;
+
+  color: #64748b;
+}
+
+.action-menu-trigger.produccion-card-menu-trigger:hover,
+.action-menu-trigger.produccion-card-menu-trigger.active {
+  background: rgba(15, 23, 42, 0.07);
+  color: #0f172a;
+}
+
+   /* =========================================================
+   PRODUCCIÓN - ACTION MENU DE CARD - fin
+   ========================================================= */
+
+/* =========================================================
+   PRODUCCIÓN - MODAL ETAPAS VINCULADAS
+   ========================================================= */
+
+.produccion-vinculadas-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000000;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 24px;
+
+  background: rgba(15, 23, 42, 0.32);
+  backdrop-filter: blur(2px);
+}
+
+.produccion-vinculadas-modal {
+  width: min(760px, 96vw);
+  max-height: 88vh;
+
+  display: flex;
+  flex-direction: column;
+
+  background: #ffffff;
+  border: 1px solid #dfe5ec;
+  border-radius: 16px;
+
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.2);
+
+  overflow: hidden;
+}
+
+.produccion-vinculadas-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+
+  padding: 20px 22px 16px;
+
+  border-bottom: 1px solid #edf1f5;
+}
+
+.produccion-vinculadas-header-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.produccion-vinculadas-header-icon {
+  width: 38px;
+  height: 38px;
+
+  flex: 0 0 38px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 10px;
+
+  background: #eaf8ff;
+  color: #0797d5;
+
+  font-size: 16px;
+}
+
+.produccion-vinculadas-kicker {
+  display: block;
+
+  margin-bottom: 2px;
+
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+
+  color: #0797d5;
+}
+
+.produccion-vinculadas-header h3 {
+  margin: 0;
+
+  font-size: 18px;
+  font-weight: 700;
+
+  color: #172033;
+}
+
+.produccion-vinculadas-header p {
+  margin: 4px 0 0;
+
+  font-size: 12px;
+  color: #64748b;
+}
+
+.produccion-vinculadas-cerrar {
+  width: 32px;
+  height: 32px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 0;
+
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+
+  background: #fff;
+  color: #64748b;
+
+  cursor: pointer;
+}
+
+.produccion-vinculadas-body {
+  padding: 20px 22px;
+
+  overflow-y: auto;
+}
+
+.produccion-vinculadas-seccion-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 16px;
+
+  margin-bottom: 12px;
+}
+
+.produccion-vinculadas-seccion-header strong {
+  display: block;
+
+  font-size: 14px;
+  color: #172033;
+}
+
+.produccion-vinculadas-seccion-header span {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.produccion-vinculadas-contador {
+  flex: 0 0 auto;
+
+  padding: 5px 9px;
+
+  border-radius: 999px;
+
+  background: #f1f5f9;
+
+  font-size: 11px !important;
+  font-weight: 600;
+
+  color: #64748b !important;
+}
+
+.produccion-vinculadas-contador.completo {
+  background: #eaf8ff;
+  color: #0789c1 !important;
+}
+
+.produccion-vinculadas-columnas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.produccion-vinculadas-etapa {
+  min-height: 36px;
+
+  display: inline-flex;
+  align-items: center;
+
+  gap: 7px;
+
+  padding: 7px 11px;
+
+  border: 1px solid #dce3eb;
+  border-radius: 9px;
+
+  background: #fff;
+
+  color: #334155;
+
+  font-size: 12px;
+  font-weight: 500;
+
+  cursor: pointer;
+
+  transition:
+    border-color 0.12s ease,
+    background 0.12s ease;
+}
+
+.produccion-vinculadas-etapa:hover {
+  border-color: #84cff0;
+  background: #f5fcff;
+}
+
+.produccion-vinculadas-etapa.seleccionada {
+  border-color: #27aae1;
+
+  background: #eaf8ff;
+
+  color: #067fb4;
+}
+
+.produccion-vinculadas-etapa-check {
+  width: 17px;
+  height: 17px;
+
+  flex: 0 0 17px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  border: 1px solid #cad4df;
+  border-radius: 5px;
+
+  background: #fff;
+
+  font-size: 9px;
+}
+
+.produccion-vinculadas-etapa.seleccionada
+  .produccion-vinculadas-etapa-check {
+  border-color: #27aae1;
+
+  background: #27aae1;
+  color: #fff;
+}
+
+.produccion-vinculadas-flujo {
+  margin-top: 18px;
+
+  display: flex;
+  align-items: center;
+
+  gap: 12px;
+
+  padding: 12px 14px;
+
+  border: 1px solid #dcebf3;
+  border-radius: 11px;
+
+  background: #f8fcfe;
+}
+
+.produccion-vinculadas-flujo-ramas {
+  flex: 1;
+
+  display: flex;
+  flex-wrap: wrap;
+
+  gap: 5px;
+}
+
+.produccion-vinculadas-flujo-ramas span {
+  padding: 4px 7px;
+
+  border-radius: 6px;
+
+  background: #eaf8ff;
+
+  color: #067fb4;
+
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.produccion-vinculadas-flujo-flecha {
+  flex: 0 0 auto;
+
+  color: #94a3b8;
+}
+
+.produccion-vinculadas-flujo-reunion {
+  flex: 0 0 auto;
+}
+
+.produccion-vinculadas-flujo-reunion span {
+  display: block;
+
+  margin-bottom: 2px;
+
+  font-size: 10px;
+  color: #64748b;
+}
+
+.produccion-vinculadas-flujo-reunion strong {
+  font-size: 12px;
+  color: #172033;
+}
+
+.produccion-vinculadas-reunion {
+  margin-top: 20px;
+}
+
+.produccion-vinculadas-reunion-titulo {
+  margin-bottom: 7px;
+}
+
+.produccion-vinculadas-reunion-titulo strong {
+  display: block;
+
+  font-size: 13px;
+  color: #172033;
+}
+
+.produccion-vinculadas-reunion-titulo span {
+  font-size: 11px;
+  color: #64748b;
+}
+
+.produccion-vinculadas-reunion select {
+  width: 100%;
+  height: 39px;
+
+  padding: 0 10px;
+
+  border: 1px solid #d8e0e9;
+  border-radius: 8px;
+
+  background: #fff;
+
+  color: #334155;
+
+  font-size: 12px;
+}
+
+.produccion-vinculadas-reunion select:focus {
+  outline: none;
+
+  border-color: #27aae1;
+
+  box-shadow: 0 0 0 3px rgba(39, 170, 225, 0.1);
+}
+
+.produccion-vinculadas-auto {
+  display: block;
+
+  margin-top: 5px;
+
+  font-size: 10px;
+  color: #0789c1;
+}
+
+.produccion-vinculadas-error {
+  margin-top: 12px;
+
+  padding: 9px 11px;
+
+  border-radius: 8px;
+
+  background: #fff1f0;
+
+  color: #b42318;
+
+  font-size: 12px;
+}
+
+.produccion-vinculadas-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+
+  padding: 14px 22px;
+
+  border-top: 1px solid #edf1f5;
+
+  background: #fafbfc;
+}
+
+.produccion-vinculadas-btn {
+  min-height: 36px;
+
+  padding: 7px 14px;
+
+  border-radius: 8px;
+
+  font-size: 12px;
+  font-weight: 600;
+
+  cursor: pointer;
+}
+
+.produccion-vinculadas-btn.secundario {
+  border: 1px solid #d8e0e9;
+
+  background: #fff;
+  color: #475569;
+}
+
+.produccion-vinculadas-btn.principal {
+  border: 1px solid #0797d5;
+
+  background: #0797d5;
+  color: #fff;
+}
+
+.produccion-vinculadas-btn.principal:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+  .produccion-vinculadas-overlay {
+    padding: 10px;
+    align-items: flex-end;
+  }
+
+  .produccion-vinculadas-modal {
+    width: 100%;
+    max-height: 92vh;
+
+    border-radius: 16px 16px 0 0;
+  }
+
+  .produccion-vinculadas-flujo {
+    align-items: flex-start;
+  }
+}
+
+/* =========================================================
+   PRODUCCIÓN - MODAL ETAPAS VINCULADAS - fin 
+   ========================================================= */
+
+   /* ======================================================
+   RAMAS VINCULADAS COINCIDIENDO EN LA MISMA COLUMNA
+   ====================================================== */
+
+.produccion-vinculo-stack {
+  position: relative;
+
+  margin-bottom: 10px;
+  padding: 7px 7px 8px 17px;
+
+  border: 1px solid rgba(0, 150, 209, 0.16);
+  border-radius: 12px;
+
+  background: rgba(0, 150, 209, 0.035);
+}
+
+.produccion-vinculo-stack-header {
+  display: flex;
+  align-items: center;
+
+  min-height: 24px;
+  margin-bottom: 5px;
+}
+
+.produccion-vinculo-stack-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+
+  min-height: 22px;
+  padding: 3px 8px;
+
+  border: 1px solid rgba(0, 150, 209, 0.18);
+  border-radius: 999px;
+
+  background: rgba(0, 150, 209, 0.09);
+
+  color: #0788bd;
+
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.produccion-vinculo-stack-cards {
+  position: relative;
+
+  display: flex;
+  flex-direction: column;
+
+  gap: 7px;
+}
+
+/*
+ * Línea vertical principal del vínculo.
+ */
+.produccion-vinculo-stack-cards::before {
+  content: "";
+
+  position: absolute;
+
+  left: -10px;
+  top: 16px;
+  bottom: 16px;
+
+  width: 2px;
+
+  border-radius: 999px;
+
+  background: #22a9df;
+
+  box-shadow:
+    0 0 0 3px rgba(34, 169, 223, 0.07);
+}
+
+/*
+ * Cada card tiene su pequeña rama
+ * horizontal hacia el lazo.
+ */
+.produccion-vinculo-stack-item {
+  position: relative;
+}
+
+.produccion-vinculo-stack-item::before {
+  content: "";
+
+  position: absolute;
+
+  z-index: 1;
+
+  left: -10px;
+  top: 25px;
+
+  width: 10px;
+  height: 2px;
+
+  background: #22a9df;
+}
+
+/*
+ * Punto de conexión.
+ */
+.produccion-vinculo-stack-item::after {
+  content: "";
+
+  position: absolute;
+
+  z-index: 2;
+
+  left: -13px;
+  top: 22px;
+
+  width: 7px;
+  height: 7px;
+
+  border: 2px solid #22a9df;
+  border-radius: 50%;
+
+  background: #f6f7f9;
+}
+
+   /* ======================================================
+   RAMAS VINCULADAS COINCIDIENDO EN LA MISMA COLUMNA - fin
+   ====================================================== */
  
+   /* =====================================================
+   FLUJO VINCULADO - MINI MAPA
+   ===================================================== */
+
+.produccion-card-vinculada-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.produccion-flujo-preview {
+  position: fixed;
+  z-index: 2147483000;
+
+  width: 330px;
+  max-height: 390px;
+  overflow-y: auto;
+
+  padding: 14px;
+
+  border: 1px solid #dce5ed;
+  border-radius: 14px;
+
+  background: #ffffff;
+  color: #172033;
+
+  box-shadow:
+    0 20px 50px rgba(15, 23, 42, 0.2);
+
+  pointer-events: none;
+}
+
+.produccion-flujo-preview-cabecera {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+
+  padding-bottom: 11px;
+  margin-bottom: 12px;
+
+  border-bottom: 1px solid #edf1f5;
+}
+
+.produccion-flujo-preview-icono {
+  width: 31px;
+  height: 31px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  flex: 0 0 31px;
+
+  border-radius: 9px;
+
+  background: #e7f7fd;
+  color: #0796ce;
+}
+
+.produccion-flujo-preview-cabecera strong {
+  display: block;
+
+  font-size: 12px;
+  font-weight: 750;
+
+  color: #172033;
+}
+
+.produccion-flujo-preview-cabecera span {
+  display: block;
+
+  margin-top: 2px;
+
+  font-size: 10px;
+  color: #7b8798;
+}
+
+
+/* RESUMEN */
+
+.produccion-flujo-resumen {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 10px;
+
+  margin-bottom: 12px;
+}
+
+.produccion-flujo-resumen-cantidad {
+  display: flex;
+  align-items: baseline;
+
+  gap: 5px;
+}
+
+.produccion-flujo-resumen-cantidad strong {
+  font-size: 15px;
+  color: #182334;
+}
+
+.produccion-flujo-resumen-cantidad span {
+  font-size: 10px;
+  color: #7b8798;
+}
+
+.produccion-flujo-pendientes {
+  padding: 4px 8px;
+
+  border-radius: 999px;
+
+  background: #fff3e2;
+  color: #a85c07;
+
+  font-size: 10px;
+  font-weight: 750;
+}
+
+.produccion-flujo-pendientes.completo {
+  background: #e9f7ee;
+  color: #33845a;
+}
+
+
+/* RAMAS */
+
+.produccion-flujo-ramas {
+  display: flex;
+  flex-direction: column;
+
+  gap: 7px;
+}
+
+.produccion-flujo-rama {
+  display: flex;
+  align-items: flex-start;
+
+  gap: 9px;
+
+  padding: 9px 10px;
+
+  border: 1px solid #e5eaf0;
+  border-radius: 10px;
+
+  background: #fbfcfd;
+}
+
+.produccion-flujo-rama.activa {
+  border-left: 3px solid #22a9df;
+}
+
+.produccion-flujo-rama.finalizada {
+  border-left: 3px solid #41a66a;
+  background: #f8fcf9;
+}
+
+.produccion-flujo-rama-estado {
+  width: 20px;
+  height: 20px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  flex: 0 0 20px;
+
+  border-radius: 50%;
+
+  background: #e5f6fd;
+  color: #0796ce;
+
+  font-size: 9px;
+}
+
+.produccion-flujo-rama-estado > span {
+  width: 6px;
+  height: 6px;
+
+  border-radius: 50%;
+
+  background: #22a9df;
+}
+
+.produccion-flujo-rama.finalizada
+  .produccion-flujo-rama-estado {
+  background: #e8f6ed;
+  color: #33845a;
+}
+
+.produccion-flujo-rama-contenido {
+  min-width: 0;
+  flex: 1;
+}
+
+.produccion-flujo-rama-cabecera {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 8px;
+}
+
+.produccion-flujo-rama-cabecera strong {
+  min-width: 0;
+
+  font-size: 11px;
+  font-weight: 750;
+
+  color: #172033;
+
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.produccion-flujo-rama-cabecera > span {
+  flex: 0 0 auto;
+
+  font-size: 9px;
+  font-weight: 700;
+
+  color: #7b8798;
+}
+
+.produccion-flujo-rama-ubicacion {
+  display: flex;
+  align-items: center;
+
+  gap: 5px;
+
+  margin-top: 5px;
+
+  font-size: 10px;
+  color: #69778a;
+}
+
+.produccion-flujo-rama-ubicacion svg {
+  font-size: 9px;
+  color: #22a9df;
+}
+
+.produccion-flujo-rama-responsable {
+  margin-top: 5px;
+
+  font-size: 10px;
+  color: #69778a;
+}
+
+
+/* REUNIÓN */
+
+.produccion-flujo-reunion {
+  display: flex;
+  align-items: center;
+
+  gap: 9px;
+
+  margin-top: 12px;
+  padding: 9px 10px;
+
+  border: 1px dashed #79cae8;
+  border-radius: 10px;
+
+  background: #f4fbfe;
+}
+
+.produccion-flujo-reunion-icono {
+  width: 28px;
+  height: 28px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  flex: 0 0 28px;
+
+  border-radius: 8px;
+
+  background: #def4fc;
+  color: #0796ce;
+}
+
+.produccion-flujo-reunion > div:last-child span {
+  display: block;
+
+  font-size: 9px;
+  color: #7b8798;
+}
+
+.produccion-flujo-reunion > div:last-child strong {
+  display: block;
+
+  margin-top: 1px;
+
+  font-size: 11px;
+  color: #172033;
+}
+
+   /* =====================================================
+   FLUJO VINCULADO - MINI MAPA - fin
+   ===================================================== */
+
+   /* =====================================================
+   PRODUCCION CARD ACTION MENU - CAPA SUPERIOR
+   ===================================================== */
+
+/* =====================================================
+   PRODUCCION CARD - CAPAS
+   ===================================================== */
+
+/*
+ * No asignamos z-index general a todas las cards.
+ * DnD ya utiliza transform y crearíamos stacking
+ * contexts innecesarios.
+ */
+.produccion-card {
+  position: relative;
+}
+
+
+/*
+ * La card que tiene abierto el ActionMenu
+ * debe quedar por encima de sus hermanas.
+ */
+.produccion-card:has(
+  .produccion-card-action-menu
+) {
+  position: relative;
+}
+
+
+/*
+ * Menú de acciones.
+ */
+.produccion-card-action-menu {
+  position: relative;
+  z-index: 10000;
+}
+
+
+/*
+ * La card arrastrada siempre arriba.
+ */
+.produccion-card.dragging {
+  position: relative !important;
+  z-index: 200000 !important;
+}
+
+
+/*
+ * El preview vive ahora mediante Portal
+ * directamente dentro de body.
+ */
+.produccion-flujo-preview {
+  position: fixed !important;
+  z-index: 2147483000 !important;
+}
+
+   /* =====================================================
+   PRODUCCION CARD ACTION MENU - CAPA SUPERIOR - fin
+   ===================================================== */
+
+
+/* =====================================================
+   FLUJO VINCULADO - MODAL COMPLETO
+   ===================================================== */
+
+.produccion-flujo-modal-overlay {
+  position: fixed;
+  inset: 0;
+
+  z-index: 2147482000;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 20px;
+
+  background: rgba(15, 23, 42, 0.38);
+
+  backdrop-filter: blur(3px);
+}
+
+.produccion-flujo-modal {
+  width: min(640px, 96vw);
+  max-height: 86vh;
+
+  display: flex;
+  flex-direction: column;
+
+  overflow: hidden;
+
+  border: 1px solid #dce4ec;
+  border-radius: 18px;
+
+  background: #ffffff;
+
+  box-shadow:
+    0 28px 80px rgba(15, 23, 42, 0.25);
+}
+
+
+/* HEADER */
+
+.produccion-flujo-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+
+  gap: 18px;
+
+  padding: 20px 22px;
+
+  border-bottom: 1px solid #edf1f5;
+}
+
+.produccion-flujo-modal-titulo {
+  display: flex;
+  align-items: center;
+
+  gap: 12px;
+}
+
+.produccion-flujo-modal-icono {
+  width: 42px;
+  height: 42px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  flex: 0 0 42px;
+
+  border-radius: 11px;
+
+  background: #e8f7fd;
+  color: #0796ce;
+
+  font-size: 16px;
+}
+
+.produccion-flujo-modal-titulo
+  > div:last-child
+  > span {
+  display: block;
+
+  margin-bottom: 2px;
+
+  color: #0796ce;
+
+  font-size: 10px;
+  font-weight: 800;
+
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.produccion-flujo-modal-titulo h3 {
+  margin: 0;
+
+  color: #172033;
+
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.produccion-flujo-modal-titulo p {
+  margin: 4px 0 0;
+
+  color: #738095;
+
+  font-size: 11px;
+}
+
+
+/* CERRAR */
+
+.produccion-flujo-modal-cerrar {
+  width: 32px;
+  height: 32px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  flex: 0 0 32px;
+
+  padding: 0;
+
+  border: 1px solid #e1e7ed;
+  border-radius: 9px;
+
+  background: #ffffff;
+  color: #708094;
+
+  cursor: pointer;
+
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.produccion-flujo-modal-cerrar:hover {
+  background: #f5f7f9;
+  color: #172033;
+  border-color: #d2dae3;
+}
+
+
+/* BODY */
+
+.produccion-flujo-modal-body {
+  padding: 20px 22px 22px;
+
+  overflow-y: auto;
+}
+
+
+/*
+ * En el modal damos más aire
+ * a las ramas que en el mini mapa.
+ */
+
+.produccion-flujo-modal-body
+  .produccion-flujo-resumen {
+  margin-bottom: 16px;
+}
+
+.produccion-flujo-modal-body
+  .produccion-flujo-resumen-cantidad
+  strong {
+  font-size: 19px;
+}
+
+.produccion-flujo-modal-body
+  .produccion-flujo-resumen-cantidad
+  span {
+  font-size: 11px;
+}
+
+.produccion-flujo-modal-body
+  .produccion-flujo-pendientes {
+  padding: 5px 10px;
+
+  font-size: 11px;
+}
+
+
+/* RAMAS GRANDES */
+
+.produccion-flujo-modal-body
+  .produccion-flujo-ramas {
+  gap: 9px;
+}
+
+.produccion-flujo-modal-body
+  .produccion-flujo-rama {
+  padding: 12px 13px;
+
+  border-radius: 11px;
+}
+
+.produccion-flujo-modal-body
+  .produccion-flujo-rama-estado {
+  width: 24px;
+  height: 24px;
+
+  flex-basis: 24px;
+
+  font-size: 10px;
+}
+
+.produccion-flujo-modal-body
+  .produccion-flujo-rama-cabecera
+  strong {
+  font-size: 13px;
+}
+
+.produccion-flujo-modal-body
+  .produccion-flujo-rama-cabecera
+  > span {
+  font-size: 10px;
+}
+
+.produccion-flujo-modal-body
+  .produccion-flujo-rama-ubicacion,
+.produccion-flujo-modal-body
+  .produccion-flujo-rama-responsable {
+  margin-top: 6px;
+
+  font-size: 11px;
+}
+
+
+/* PUNTO DE REUNIÓN */
+
+.produccion-flujo-modal-body
+  .produccion-flujo-reunion {
+  margin-top: 16px;
+
+  padding: 12px 13px;
+
+  border-radius: 11px;
+}
+
+.produccion-flujo-modal-body
+  .produccion-flujo-reunion-icono {
+  width: 32px;
+  height: 32px;
+
+  flex-basis: 32px;
+}
+
+.produccion-flujo-modal-body
+  .produccion-flujo-reunion
+  > div:last-child
+  span {
+  font-size: 10px;
+}
+
+.produccion-flujo-modal-body
+  .produccion-flujo-reunion
+  > div:last-child
+  strong {
+  margin-top: 2px;
+
+  font-size: 13px;
+}
+
+
+/* TEXTO INFERIOR */
+
+.produccion-flujo-explicacion {
+  margin: 14px 0 0;
+
+  color: #8a96a6;
+
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+
+/* MOBILE */
+
+@media (max-width: 768px) {
+  .produccion-flujo-modal-overlay {
+    padding: 12px;
+  }
+
+  .produccion-flujo-modal {
+    width: 100%;
+    max-height: 88vh;
+
+    border-radius: 15px;
+  }
+
+  .produccion-flujo-modal-header {
+    padding: 16px;
+  }
+
+  .produccion-flujo-modal-body {
+    padding: 16px;
+  }
+
+  .produccion-flujo-modal-icono {
+    width: 38px;
+    height: 38px;
+
+    flex-basis: 38px;
+  }
+}
+
+/* =====================================================
+   FLUJO VINCULADO - MODAL COMPLETO - fin
+   ===================================================== */
+

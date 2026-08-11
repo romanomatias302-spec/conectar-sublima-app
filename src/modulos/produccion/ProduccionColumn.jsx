@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import ProduccionCard from "./ProduccionCard";
 
@@ -20,6 +20,7 @@ export default function ProduccionColumn({
   estaContraida = false,
   onToggleContraer,
   onEditarDetalleManual,
+  onGestionarEtapaVinculada,
   onMoverPedido,
   onCambiarColorTarjeta,
   puedeGestionarColumnas = false,
@@ -65,6 +66,130 @@ const pedidosVisibles =
   esColumnaFinal && !estaContraida
     ? pedidos.slice(0, LIMITE_FINALIZADOS_VISIBLES)
     : pedidos;
+
+const bloquesPedidosVisibles = useMemo(() => {
+  const lista = Array.isArray(pedidosVisibles)
+    ? pedidosVisibles
+    : [];
+
+  const usados = new Set();
+  const bloquesBase = [];
+
+  function obtenerRepresentacionId(pedido) {
+    const pedidoId =
+      pedido?.pedidoFirebaseId ||
+      pedido?.firebaseId ||
+      pedido?.id ||
+      "";
+
+    return String(
+      pedido?.produccionRepresentacionId ||
+        `principal:${pedidoId}`
+    );
+  }
+
+  lista.forEach((pedido) => {
+    const representacionId =
+      obtenerRepresentacionId(pedido);
+
+    if (
+      !representacionId ||
+      usados.has(representacionId)
+    ) {
+      return;
+    }
+
+    const esVinculada =
+      pedido?.produccionRepresentacionTipo ===
+      "vinculada";
+
+    const grupoId = String(
+      pedido?.produccionGrupoVinculadoId || ""
+    );
+
+    /*
+     * Si es una rama vinculada,
+     * buscamos otras ramas DEL MISMO GRUPO
+     * que actualmente estén en esta misma columna.
+     *
+     * Como ProduccionColumn ya recibe solamente
+     * las cards de esta columna, no necesitamos
+     * volver a comprobar columnaProduccionId.
+     */
+    if (esVinculada && grupoId) {
+      const hermanas = lista.filter((item) => {
+        const itemRepresentacionId =
+          obtenerRepresentacionId(item);
+
+        if (
+          !itemRepresentacionId ||
+          usados.has(itemRepresentacionId)
+        ) {
+          return false;
+        }
+
+        return (
+          item?.produccionRepresentacionTipo ===
+            "vinculada" &&
+          String(
+            item?.produccionGrupoVinculadoId || ""
+          ) === grupoId
+        );
+      });
+
+      /*
+       * Sólo creamos grupo visual cuando
+       * realmente coinciden 2 o más ramas.
+       */
+      if (hermanas.length > 1) {
+        hermanas.forEach((item) => {
+          usados.add(
+            obtenerRepresentacionId(item)
+          );
+        });
+
+        bloquesBase.push({
+          tipo: "grupo-vinculado",
+          grupoId,
+          items: hermanas,
+        });
+
+        return;
+      }
+    }
+
+    usados.add(representacionId);
+
+    bloquesBase.push({
+      tipo: "simple",
+      grupoId: grupoId || "",
+      items: [pedido],
+    });
+  });
+
+  /*
+   * Recalculamos el índice visual después
+   * de agrupar.
+   *
+   * Esto es importante para que el número
+   * de orden manual siga coincidiendo con
+   * la posición que el usuario ve.
+   */
+  let indiceVisual = 0;
+
+  return bloquesBase.map((bloque) => ({
+    ...bloque,
+
+    items: bloque.items.map((pedido) => {
+      indiceVisual += 1;
+
+      return {
+        pedido,
+        indiceVisual,
+      };
+    }),
+  }));
+}, [pedidosVisibles]);    
 
 const cantidadOculta =
   esColumnaFinal && pedidos.length > LIMITE_FINALIZADOS_VISIBLES
@@ -338,7 +463,137 @@ useEffect(() => {
 
       <div className="produccion-column-body">
         {!estaContraida &&
-          pedidosVisibles.map((pedido, index) => {
+          bloquesPedidosVisibles.map((bloque) => {
+            /*
+            * =====================================
+            * 2 O MÁS RAMAS DEL MISMO GRUPO
+            * EN ESTA COLUMNA
+            * =====================================
+            */
+            if (
+              bloque.tipo === "grupo-vinculado"
+            ) {
+              return (
+                <div
+                  key={`grupo-${columna.id}-${bloque.grupoId}`}
+                  className="produccion-vinculo-stack"
+                >
+                  <div className="produccion-vinculo-stack-header">
+                    <span className="produccion-vinculo-stack-badge">
+                      <svg
+                        width="13"
+                        height="13"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        aria-hidden="true"
+                      >
+                        <path
+                          d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+
+                        <path
+                          d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+
+                      {bloque.items.length} etapas vinculadas
+                    </span>
+                  </div>
+
+                  <div className="produccion-vinculo-stack-cards">
+                    {bloque.items.map(
+                      ({
+                        pedido,
+                        indiceVisual,
+                      }) => {
+                        const pedidoId =
+                          pedido.pedidoFirebaseId ||
+                          pedido.firebaseId ||
+                          pedido.id;
+
+                        const representacionId =
+                          pedido
+                            .produccionRepresentacionId ||
+                          `principal:${pedidoId}`;
+
+                        return (
+                          <div
+                            key={
+                              representacionId
+                            }
+                            className="produccion-vinculo-stack-item"
+                          >
+                            <ProduccionCard
+                              pedido={pedido}
+                              columnas={columnas}
+                              onVerPedido={
+                                onVerPedido
+                              }
+                              onEditarDetalleManual={
+                                onEditarDetalleManual
+                              }
+                              onGestionarEtapaVinculada={
+                                onGestionarEtapaVinculada
+                              }
+                              onMoverPedido={
+                                onMoverPedido
+                              }
+                              ordenManualActivo={
+                                columna.ordenManualActivo ===
+                                  true ||
+                                columna.tipoOrden ===
+                                  "manual"
+                              }
+                              indiceOrdenManual={
+                                indiceVisual
+                              }
+                              onCambiarColorTarjeta={
+                                onCambiarColorTarjeta
+                              }
+                              ahoraTick={
+                                ahoraTick
+                              }
+                              puedeMoverPedidos={
+                                puedeMoverPedidos
+                              }
+                              puedeEditarDetalleManual={
+                                puedeEditarDetalleManual
+                              }
+                              resaltadaNuevoPedido={
+                                pedidoNuevoResaltadoId &&
+                                (pedido.firebaseId ||
+                                  pedido.id) ===
+                                  pedidoNuevoResaltadoId
+                              }
+                            />
+                          </div>
+                        );
+                      }
+                    )}
+                  </div>
+                </div>
+              );
+            }
+
+            /*
+            * =====================================
+            * CARD NORMAL O RAMA SIN HERMANA
+            * EN ESTA COLUMNA
+            * =====================================
+            */
+            const {
+              pedido,
+              indiceVisual,
+            } = bloque.items[0];
+
             const pedidoId =
               pedido.pedidoFirebaseId ||
               pedido.firebaseId ||
@@ -357,12 +612,18 @@ useEffect(() => {
                 onEditarDetalleManual={
                   onEditarDetalleManual
                 }
+                onGestionarEtapaVinculada={
+                  onGestionarEtapaVinculada
+                }
                 onMoverPedido={onMoverPedido}
                 ordenManualActivo={
-                  columna.ordenManualActivo === true ||
+                  columna.ordenManualActivo ===
+                    true ||
                   columna.tipoOrden === "manual"
                 }
-                indiceOrdenManual={index + 1}
+                indiceOrdenManual={
+                  indiceVisual
+                }
                 onCambiarColorTarjeta={
                   onCambiarColorTarjeta
                 }

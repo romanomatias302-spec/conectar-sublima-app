@@ -3,6 +3,18 @@ import {
   useDraggable,
   useDroppable,
 } from "@dnd-kit/core";
+import {
+  FaLink,
+  FaCheck,
+  FaProjectDiagram,
+  FaEye,
+  FaEdit,
+} from "react-icons/fa";
+
+import ActionMenu from "../../comunes/componentes/ActionMenu";
+import {
+  ProduccionFlujoPreview,
+} from "./ProduccionFlujoVinculado";
 import { CSS } from "@dnd-kit/utilities";
 
 function obtenerEstadoFechaEntrega(pedido) {
@@ -152,6 +164,7 @@ export default function ProduccionCard({
   pedido,
   onVerPedido = () => {},
   onEditarDetalleManual = () => {},
+  onGestionarEtapaVinculada = () => {},
   ahoraTick = Date.now(),
   puedeMoverPedidos = true,
   puedeEditarDetalleManual = true,
@@ -186,7 +199,15 @@ const dropId =
 const esMobile =
   window.innerWidth <= 768;
 
+const [
+  mostrarPreviewVinculo,
+  setMostrarPreviewVinculo,
+] = useState(false);
 
+const [
+  posicionPreviewVinculo,
+  setPosicionPreviewVinculo,
+] = useState(null);
  
 
 
@@ -238,14 +259,67 @@ const {
 const style = {
   transform:
     CSS.Translate.toString(transform),
-
-  opacity:
-    isDragging ? 0.6 : 1,
 };
 
 const etiquetasPedido = obtenerEtiquetasPedido(pedido);
 const estadoFechaEntrega = obtenerEstadoFechaEntrega(pedido);
 const entregaProgreso = obtenerProgresoEntrega(pedido);
+
+const itemsActionMenu = [
+  {
+    id: "ver-pedido",
+    label: "Ver pedido",
+    icon: <FaEye />,
+    onClick: () => onVerPedido(pedido),
+  },
+
+  {
+    id: "editar-detalle",
+    label: "Editar detalle",
+    icon: <FaEdit />,
+    onClick: () => onEditarDetalleManual(pedido),
+    visible: puedeEditarDetalleManual,
+  },
+
+  !esRepresentacionVinculada
+    ? {
+        id: "crear-etapas-vinculadas",
+        label: "Crear etapas vinculadas",
+        icon: <FaLink />,
+        onClick: () =>
+          onGestionarEtapaVinculada({
+            accion: "crear",
+            pedido,
+          }),
+      }
+    : null,
+
+  esRepresentacionVinculada
+    ? {
+        id: "finalizar-etapa-vinculada",
+        label: "Finalizar esta etapa",
+        icon: <FaCheck />,
+        onClick: () =>
+          onGestionarEtapaVinculada({
+            accion: "finalizar",
+            pedido,
+          }),
+      }
+    : null,
+
+  esRepresentacionVinculada
+    ? {
+        id: "ver-flujo-vinculado",
+        label: "Ver flujo vinculado",
+        icon: <FaProjectDiagram />,
+        onClick: () =>
+          onGestionarEtapaVinculada({
+            accion: "ver-flujo",
+            pedido,
+          }),
+      }
+    : null,
+].filter(Boolean);
 
   const tiempoEtapa = formatearTiempoEnEtapa(
     pedido.produccionActualizadoAt || pedido.ultimaAccionProduccionAt,
@@ -350,10 +424,133 @@ const usuarioVisible =
             {pedido.id || pedido.numeroPedido || pedido.numero || "Sin número"}
           </div>
 
+            {esRepresentacionVinculada && (
+              <span
+                className="produccion-card-vinculada-wrap"
+                onMouseEnter={(event) => {
+                  if (esMobile) return;
 
+                  const rect =
+                    event.currentTarget.getBoundingClientRect();
 
+                  const anchoPreview = 330;
+                  const altoPreviewEstimado = 390;
+                  const margen = 12;
 
-          
+                  let left =
+                    rect.right + 10;
+
+                  if (
+                    left + anchoPreview >
+                    window.innerWidth - margen
+                  ) {
+                    left =
+                      rect.left -
+                      anchoPreview -
+                      10;
+                  }
+
+                  let top = rect.top;
+
+                  if (
+                    top + altoPreviewEstimado >
+                    window.innerHeight - margen
+                  ) {
+                    top =
+                      window.innerHeight -
+                      altoPreviewEstimado -
+                      margen;
+                  }
+
+                  setPosicionPreviewVinculo({
+                    top: Math.max(
+                      margen,
+                      top
+                    ),
+
+                    left: Math.max(
+                      margen,
+                      left
+                    ),
+                  });
+
+                  setMostrarPreviewVinculo(
+                    true
+                  );
+                }}
+                onMouseLeave={() => {
+                  setMostrarPreviewVinculo(
+                    false
+                  );
+                }}
+                onPointerDown={(event) => {
+                  event.stopPropagation();
+                }}
+                onMouseDown={(event) => {
+                  event.stopPropagation();
+                }}
+                onClick={(event) => {
+                  event.stopPropagation();
+                }}
+              >
+                  <span
+                    className="produccion-card-vinculada-icon"
+                  >
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    aria-hidden="true"
+                  >
+                    <path
+                      d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+
+                    <path
+                      d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </span>
+
+                {mostrarPreviewVinculo &&
+                  posicionPreviewVinculo &&
+                  pedido.produccionFlujoVinculado && (
+                    <ProduccionFlujoPreview
+                      flujo={
+                        pedido.produccionFlujoVinculado
+                      }
+                      columnas={columnas}
+                      posicion={
+                        posicionPreviewVinculo
+                      }
+                    />
+                  )}
+              </span>
+            )}
+
+          <div
+            className="produccion-card-action-menu"
+            onPointerDown={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <ActionMenu
+              items={itemsActionMenu}
+              title="Acciones de producción"
+              triggerClassName="produccion-card-menu-trigger"
+            />
+          </div>
+
         </div>
 
        

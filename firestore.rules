@@ -429,6 +429,61 @@ function canReadMovimientos(clienteId) {
         );
     }
 
+    function canCreateMovimientoDesdeCaja(clienteId) {
+      return isSuperAdmin()
+        || (
+          tenantUserBase(clienteId)
+          && request.resource.data.clienteId == clienteId
+          && request.resource.data.origen == "caja"
+          && (
+            isAdmin()
+
+            || (
+              request.resource.data.subtipo == "aporte_capital"
+              && permisoModuloAccion(
+                "caja",
+                "crearAporteCapital"
+              )
+            )
+
+            || (
+              request.resource.data.subtipo == "retiro_capital"
+              && permisoModuloAccion(
+                "caja",
+                "crearRetiroCapital"
+              )
+            )
+
+            || (
+              request.resource.data.subtipo == "ajuste_positivo"
+              && permisoModuloAccion(
+                "caja",
+                "crearAjustePositivo"
+              )
+            )
+
+            || (
+              request.resource.data.subtipo == "ajuste_negativo"
+              && permisoModuloAccion(
+                "caja",
+                "crearAjusteNegativo"
+              )
+            )
+
+            || (
+              request.resource.data.subtipo != "aporte_capital"
+              && request.resource.data.subtipo != "retiro_capital"
+              && request.resource.data.subtipo != "ajuste_positivo"
+              && request.resource.data.subtipo != "ajuste_negativo"
+              && permisoModuloAccion(
+                "caja",
+                "crearMovimiento"
+              )
+            )
+          )
+        );
+    }
+
     function canUpdateMovimientos(clienteId) {
       return isSuperAdmin()
         || (
@@ -439,6 +494,29 @@ function canReadMovimientos(clienteId) {
             || canUpdateVentas(clienteId)
             || canUpdateCaja(clienteId)
           )
+        );
+    }
+
+
+
+    function canVincularGastoAMovimientoCaja(clienteId) {
+      return isSuperAdmin()
+        || (
+          tenantUserBase(clienteId)
+          && (
+            isAdmin()
+            || permisoModuloAccion(
+              "caja",
+              "crearMovimiento"
+            )
+          )
+          && resource.data.origen == "caja"
+          && request.resource.data.clienteId ==
+            resource.data.clienteId
+          && onlyChangesAllowed([
+            "gastoRefId",
+            "updatedAt"
+          ])
         );
     }
     
@@ -557,6 +635,11 @@ function canReadMovimientos(clienteId) {
           || permisoModuloAccion("ventas", "crear")
           || permisoModuloAccion("ventas", "editar")
           || permisoModuloAccion("ventas", "ver")
+
+          || permisoModuloAccion("caja", "ver")
+          || permisoModuloAccion("caja", "crearMovimiento")
+          || permisoModuloAccion("caja", "abrirCerrar")
+          || permisoModuloAccion("caja", "historial")
         )
       );
 
@@ -875,31 +958,79 @@ function canReadMovimientos(clienteId) {
     }
     
 
-    // =========================
-    // produccion_sectores
-    // =========================
-    match /produccion_sectores/{sectorId} {
-      allow read: if canReadProduccionColumnas(
-        resource.data.clienteId
-      );
+// =========================
+// produccion_sectores
+// =========================
+match /produccion_sectores/{sectorId} {
 
-      allow create: if canGestionarColumnasProduccion(
-        request.resource.data.clienteId
-      )
-      && request.resource.data.clienteId is string
-      && request.resource.data.clienteId != ""
-      && request.resource.data.nombre is string
-      && request.resource.data.nombre != ""
-      && request.resource.data.activo == true;
+  /*
+   * Lectura:
+   * - superadmin;
+   * - admin activo del mismo tenant;
+   * - usuarios del tenant con Producción o Pedidos visible.
+   *
+   * La consulta del frontend debe incluir:
+   * where("clienteId", "==", perfil.clienteId)
+   */
+  allow read: if canReadProduccionColumnas(
+    resource.data.clienteId
+  );
 
-      allow update: if canGestionarColumnasProduccion(
-        resource.data.clienteId
-      )
-      && request.resource.data.clienteId ==
-        resource.data.clienteId;
+  /*
+   * Creación:
+   * solamente administradores o usuarios con
+   * produccion.gestionarColumnas.
+   */
+  allow create: if
+    canGestionarColumnasProduccion(
+      request.resource.data.clienteId
+    )
+    && request.resource.data.keys().hasOnly([
+      "clienteId",
+      "nombre",
+      "orden",
+      "activo",
+      "createdAt",
+      "updatedAt"
+    ])
+    && request.resource.data.clienteId is string
+    && request.resource.data.clienteId != ""
+    && request.resource.data.nombre is string
+    && request.resource.data.nombre != ""
+    && request.resource.data.orden is number
+    && request.resource.data.activo == true;
 
-      allow delete: if false;
-    }
+  /*
+   * Actualización:
+   * - clienteId no puede cambiar;
+   * - createdAt no puede cambiar;
+   * - sólo se modifican campos previstos.
+   */
+  allow update: if
+    canGestionarColumnasProduccion(
+      resource.data.clienteId
+    )
+    && request.resource.data.clienteId ==
+      resource.data.clienteId
+    && request.resource.data.createdAt ==
+      resource.data.createdAt
+    && onlyChangesAllowed([
+      "nombre",
+      "orden",
+      "activo",
+      "updatedAt"
+    ])
+    && request.resource.data.nombre is string
+    && request.resource.data.nombre != ""
+    && request.resource.data.orden is number
+    && request.resource.data.activo is bool;
+
+  /*
+   * Los sectores se desactivan con activo:false.
+   * No se eliminan físicamente.
+   */
+  allow delete: if false;
+}
     
     
     // =========================
@@ -925,6 +1056,198 @@ function canReadMovimientos(clienteId) {
           );
 
         allow delete: if canManageProduccionColumnas(resource.data.clienteId);
+      }
+
+      // =========================
+      // produccion_grupos_vinculados
+      // =========================
+      match /produccion_grupos_vinculados/{grupoId} {
+
+        /*
+        * Lectura:
+        * mismos usuarios que pueden visualizar Producción/Pedidos
+        * dentro del tenant.
+        */
+        allow read: if
+          canReadProduccionColumnas(
+            resource.data.clienteId
+          );
+
+        /*
+        * Crear una producción vinculada:
+        * requiere permiso para mover Producción.
+        *
+        * Además:
+        * - clienteId pertenece al tenant;
+        * - el pedido realmente pertenece a ese tenant;
+        * - sólo aceptamos los campos previstos.
+        */
+        allow create: if
+          canMoverProduccion(
+            request.resource.data.clienteId
+          )
+          && request.resource.data.clienteId ==
+            pedidoParentClienteId(
+              request.resource.data.pedidoId
+            )
+          && request.resource.data.keys().hasOnly([
+            "clienteId",
+            "pedidoId",
+            "columnaOrigenId",
+            "columnaReunionId",
+            "estado",
+            "totalEtapas",
+            "etapasFinalizadas",
+            "createdByUid",
+            "createdByNombre",
+            "createdAt",
+            "updatedAt"
+          ])
+          && request.resource.data.clienteId is string
+          && request.resource.data.clienteId != ""
+          && request.resource.data.pedidoId is string
+          && request.resource.data.pedidoId != ""
+          && request.resource.data.columnaReunionId is string
+          && request.resource.data.columnaReunionId != ""
+          && request.resource.data.estado == "activo"
+          && request.resource.data.totalEtapas is number
+          && request.resource.data.totalEtapas >= 2
+          && request.resource.data.etapasFinalizadas == 0;
+
+        /*
+        * Por ahora el grupo sólo cambia cuando
+        * todas sus ramas terminan.
+        *
+        * No permitimos cambiar tenant, pedido,
+        * columnas de origen/reunión ni totalEtapas.
+        */
+        allow update: if
+          canMoverProduccion(
+            resource.data.clienteId
+          )
+          && request.resource.data.clienteId ==
+            resource.data.clienteId
+          && request.resource.data.pedidoId ==
+            resource.data.pedidoId
+          && onlyChangesAllowed([
+            "estado",
+            "etapasFinalizadas",
+            "listoReunionAt",
+            "reunidoAt",
+            "updatedAt"
+          ])
+          && request.resource.data.estado in [
+            "activo",
+            "listo_reunion",
+            "reunido"
+          ];
+
+        /*
+        * No eliminamos físicamente grupos.
+        */
+        allow delete: if false;
+      }
+
+
+      // =========================
+      // produccion_etapas_vinculadas
+      // =========================
+      match /produccion_etapas_vinculadas/{etapaId} {
+
+        /*
+        * Lectura aislada por tenant.
+        */
+        allow read: if
+          canReadProduccionColumnas(
+            resource.data.clienteId
+          );
+
+        /*
+        * Creación de cada rama.
+        */
+        allow create: if
+          canMoverProduccion(
+            request.resource.data.clienteId
+          )
+          && request.resource.data.clienteId ==
+            pedidoParentClienteId(
+              request.resource.data.pedidoId
+            )
+          && request.resource.data.keys().hasOnly([
+            "clienteId",
+            "pedidoId",
+            "grupoVinculadoId",
+            "nombre",
+            "columnaProduccionId",
+            "estado",
+            "ordenRama",
+            "produccionSortOrder",
+            "createdByUid",
+            "createdByNombre",
+            "createdAt",
+            "updatedAt",
+            "listaAt",
+            "listaPorUid",
+            "listaPorNombre"
+            
+          ])
+          && request.resource.data.clienteId is string
+          && request.resource.data.clienteId != ""
+          && request.resource.data.pedidoId is string
+          && request.resource.data.pedidoId != ""
+          && request.resource.data.grupoVinculadoId is string
+          && request.resource.data.grupoVinculadoId != ""
+          && request.resource.data.columnaProduccionId is string
+          && request.resource.data.columnaProduccionId != ""
+          && request.resource.data.nombre is string
+          && request.resource.data.nombre != ""
+          && request.resource.data.estado == "activa"
+          && request.resource.data.ordenRama is number;
+
+        /*
+        * Una rama puede:
+        *
+        * A) moverse:
+        *    columnaProduccionId
+        *    ultimaAccion...
+        *
+        * B) finalizarse:
+        *    estado = lista
+        *    listaAt / listaPor...
+        *
+        * Pero jamás puede cambiar de tenant,
+        * pedido o grupo.
+        */
+        allow update: if
+          canMoverProduccion(
+            resource.data.clienteId
+          )
+          && request.resource.data.clienteId ==
+            resource.data.clienteId
+          && request.resource.data.pedidoId ==
+            resource.data.pedidoId
+          && request.resource.data.grupoVinculadoId ==
+            resource.data.grupoVinculadoId
+          && onlyChangesAllowed([
+            "columnaProduccionId",
+            "produccionSortOrder",
+            "estado",
+            "updatedAt",
+            "ultimaAccionUid",
+            "ultimaAccionNombre",
+            "listaAt",
+            "listaPorUid",
+            "listaPorNombre"
+          ])
+          && request.resource.data.estado in [
+            "activa",
+            "lista"
+          ];
+
+        /*
+        * Tampoco eliminamos ramas físicamente.
+        */
+        allow delete: if false;
       }
     
     
@@ -1114,7 +1437,20 @@ function canReadMovimientos(clienteId) {
     match /gastos/{gastoId} {
       allow read: if canReadGastos(resource.data.clienteId);
 
-      allow create: if canCreateGastos(request.resource.data.clienteId);
+      allow create: if
+        canCreateGastos(
+          request.resource.data.clienteId
+        )
+        || (
+          request.resource.data.origen == "caja"
+          && request.resource.data.movimientoRefId is string
+          && request.resource.data.movimientoRefId != ""
+          && canModulo(
+            request.resource.data.clienteId,
+            "caja",
+            "crearMovimiento"
+          )
+        );
 
       allow update: if canUpdateGastos(resource.data.clienteId)
         && request.resource.data.clienteId == resource.data.clienteId;
@@ -1129,10 +1465,31 @@ function canReadMovimientos(clienteId) {
     match /movimientos/{movimientoId} {
       allow read: if canReadMovimientos(resource.data.clienteId);
 
-      allow create: if canCreateMovimientos(request.resource.data.clienteId);
+      allow create: if
+        (
+          request.resource.data.origen == "caja"
+          && canCreateMovimientoDesdeCaja(
+            request.resource.data.clienteId
+          )
+        )
+        ||
+        (
+          request.resource.data.origen != "caja"
+          && canCreateMovimientos(
+            request.resource.data.clienteId
+          )
+        );
 
-      allow update: if canUpdateMovimientos(resource.data.clienteId)
-        && request.resource.data.clienteId == resource.data.clienteId;
+      allow update: if (
+          canUpdateMovimientos(
+            resource.data.clienteId
+          )
+          || canVincularGastoAMovimientoCaja(
+            resource.data.clienteId
+          )
+        )
+        && request.resource.data.clienteId ==
+          resource.data.clienteId;
 
       allow delete: if false;
     }
