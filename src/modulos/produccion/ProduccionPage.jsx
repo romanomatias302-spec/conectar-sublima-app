@@ -2665,6 +2665,10 @@ async function manejarTomarGrupoVinculado(
               columnasGlobalesOrdenadas
             }
 
+            sectores={
+              sectoresProduccion
+            }
+
             onCerrar={() => {
               setMostrarModalEtapasVinculadas(
                 false

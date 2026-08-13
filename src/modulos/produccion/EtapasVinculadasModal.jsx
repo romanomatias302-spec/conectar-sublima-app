@@ -14,6 +14,7 @@ import {
 export default function EtapasVinculadasModal({
   pedido,
   columnas = [],
+  sectores = [],
   onCerrar = () => {},
   onGuardar = async () => {},
 }) {
@@ -45,6 +46,85 @@ export default function EtapasVinculadasModal({
           !columna.esFinal
       );
     }, [columnas]);
+
+  const sectoresPorId =
+  useMemo(() => {
+    const mapa = new Map();
+
+    sectores.forEach((sector) => {
+      if (!sector?.id) return;
+
+      mapa.set(
+        String(sector.id),
+        sector
+      );
+    });
+
+    return mapa;
+  }, [sectores]);
+
+
+function agruparColumnasPorSector(
+  listaColumnas
+) {
+  const grupos = [];
+  const mapaGrupos = new Map();
+
+  listaColumnas.forEach((columna) => {
+    const sectorId =
+      String(
+        columna?.sectorId || ""
+      );
+
+    const sector =
+      sectoresPorId.get(
+        sectorId
+      ) || null;
+
+    const grupoId =
+      sectorId ||
+      "__sin_sector__";
+
+    if (!mapaGrupos.has(grupoId)) {
+      const nuevoGrupo = {
+        id: grupoId,
+
+        nombre:
+          sector?.nombre ||
+          "Sin sector",
+
+        columnas: [],
+      };
+
+      mapaGrupos.set(
+        grupoId,
+        nuevoGrupo
+      );
+
+      grupos.push(
+        nuevoGrupo
+      );
+    }
+
+    mapaGrupos
+      .get(grupoId)
+      .columnas.push(
+        columna
+      );
+  });
+
+  return grupos;
+}  
+
+const columnasDisponiblesPorSector =
+  useMemo(() => {
+    return agruparColumnasPorSector(
+      columnasDisponibles
+    );
+  }, [
+    columnasDisponibles,
+    sectoresPorId,
+  ]);
 
   /*
    * Índice más avanzado de las ramas
@@ -103,6 +183,16 @@ export default function EtapasVinculadasModal({
       columnas,
       indiceMaximoSeleccionado,
     ]);
+
+    const columnasReunionPorSector =
+      useMemo(() => {
+        return agruparColumnasPorSector(
+          columnasReunionDisponibles
+        );
+      }, [
+        columnasReunionDisponibles,
+        sectoresPorId,
+      ]);
 
   /*
    * Elegimos automáticamente la primera
@@ -324,41 +414,56 @@ export default function EtapasVinculadasModal({
             </div>
           </div>
 
-          <div className="produccion-vinculadas-columnas">
-            {columnasDisponibles.map(
-              (columna) => {
-                const seleccionada =
-                  columnasSeleccionadasIds.includes(
-                    columna.id
-                  );
+          <div className="produccion-vinculadas-sectores">
+            {columnasDisponiblesPorSector.map(
+              (grupoSector) => (
+                <div
+                  key={grupoSector.id}
+                  className="produccion-vinculadas-sector"
+                >
+                  <div className="produccion-vinculadas-sector-titulo">
+                    {grupoSector.nombre}
+                  </div>
 
-                return (
-                  <button
-                    key={columna.id}
-                    type="button"
-                    className={
-                      seleccionada
-                        ? "produccion-vinculadas-etapa seleccionada"
-                        : "produccion-vinculadas-etapa"
-                    }
-                    onClick={() =>
-                      toggleColumna(
-                        columna.id
-                      )
-                    }
-                  >
-                    <span className="produccion-vinculadas-etapa-check">
-                      {seleccionada && (
-                        <FaCheck />
-                      )}
-                    </span>
+                  <div className="produccion-vinculadas-columnas">
+                    {grupoSector.columnas.map(
+                      (columna) => {
+                        const seleccionada =
+                          columnasSeleccionadasIds.includes(
+                            columna.id
+                          );
 
-                    <span>
-                      {columna.nombre}
-                    </span>
-                  </button>
-                );
-              }
+                        return (
+                          <button
+                            key={columna.id}
+                            type="button"
+                            className={
+                              seleccionada
+                                ? "produccion-vinculadas-etapa seleccionada"
+                                : "produccion-vinculadas-etapa"
+                            }
+                            onClick={() =>
+                              toggleColumna(
+                                columna.id
+                              )
+                            }
+                          >
+                            <span className="produccion-vinculadas-etapa-check">
+                              {seleccionada && (
+                                <FaCheck />
+                              )}
+                            </span>
+
+                            <span>
+                              {columna.nombre}
+                            </span>
+                          </button>
+                        );
+                      }
+                    )}
+                  </div>
+                </div>
+              )
             )}
           </div>
 
@@ -420,14 +525,23 @@ export default function EtapasVinculadasModal({
                   : "Seleccionar columna"}
               </option>
 
-              {columnasReunionDisponibles.map(
-                (columna) => (
-                  <option
-                    key={columna.id}
-                    value={columna.id}
+              {columnasReunionPorSector.map(
+                (grupoSector) => (
+                  <optgroup
+                    key={grupoSector.id}
+                    label={grupoSector.nombre}
                   >
-                    {columna.nombre}
-                  </option>
+                    {grupoSector.columnas.map(
+                      (columna) => (
+                        <option
+                          key={columna.id}
+                          value={columna.id}
+                        >
+                          {columna.nombre}
+                        </option>
+                      )
+                    )}
+                  </optgroup>
                 )
               )}
             </select>
