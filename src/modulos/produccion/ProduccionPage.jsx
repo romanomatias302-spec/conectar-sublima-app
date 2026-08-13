@@ -1078,9 +1078,13 @@ async function manejarMoverEtapaVinculada({
         String(etapaId)
     );
 
+
   if (!etapaActual) {
     return;
   }
+
+  const etapasVinculadasPrevias =
+  [...etapasVinculadasProduccion];
 
   try {
     /*
@@ -1174,6 +1178,35 @@ async function manejarMoverEtapaVinculada({
         ? ultimoOrdenDestino + 1000
         : null;
 
+        /*
+    * Actualización inmediata de la card vinculada.
+    *
+    * La movemos visualmente antes de esperar
+    * la respuesta de Firestore.
+    *
+    * El listener en tiempo real después confirma
+    * el estado definitivo.
+    */
+    setEtapasVinculadasProduccion(
+      (prev) =>
+        prev.map((etapa) =>
+          String(etapa.id) ===
+          String(etapaId)
+            ? {
+                ...etapa,
+
+                columnaProduccionId:
+                  columnaDestinoId,
+
+                produccionSortOrder:
+                  produccionSortOrderNuevo ??
+                  etapa.produccionSortOrder ??
+                  null,
+              }
+            : etapa
+        )
+    );    
+
     /*
      * Movemos la rama.
      *
@@ -1211,12 +1244,20 @@ async function manejarMoverEtapaVinculada({
           "Usuario",
       },
     });
-  } catch (error) {
-    console.error(
-      "Error moviendo etapa vinculada:",
-      error
-    );
-  }
+} catch (error) {
+  console.error(
+    "Error moviendo etapa vinculada:",
+    error
+  );
+
+  /*
+   * Si Firestore rechazó el movimiento,
+   * restauramos la posición anterior.
+   */
+  setEtapasVinculadasProduccion(
+    etapasVinculadasPrevias
+  );
+}
 }
 
   if (loading) {

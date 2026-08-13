@@ -388,171 +388,183 @@ const columnasDisponiblesPorSector =
         </div>
 
         <div className="produccion-vinculadas-body">
-          <div className="produccion-vinculadas-seccion-header">
-            <div>
-              <strong>
-                ¿Qué etapas trabajarán en paralelo?
-              </strong>
+          <div className="produccion-vinculadas-contenido">
 
-              <span>
-                Elegí dos o más.
-              </span>
-            </div>
+            {/* ==============================
+                IZQUIERDA - ETAPAS
+                ============================== */}
+            <div className="produccion-vinculadas-etapas-panel">
 
-            <div
-              className={
-                columnasSeleccionadasIds
-                  .length >= 2
-                  ? "produccion-vinculadas-contador completo"
-                  : "produccion-vinculadas-contador"
-              }
-            >
-              {
-                columnasSeleccionadasIds.length
-              }{" "}
-              seleccionadas
-            </div>
-          </div>
+              <div className="produccion-vinculadas-seccion-header">
+                <div>
+                  <strong>
+                    ¿Qué etapas trabajarán en paralelo?
+                  </strong>
 
-          <div className="produccion-vinculadas-sectores">
-            {columnasDisponiblesPorSector.map(
-              (grupoSector) => (
-                <div
-                  key={grupoSector.id}
-                  className="produccion-vinculadas-sector"
-                >
-                  <div className="produccion-vinculadas-sector-titulo">
-                    {grupoSector.nombre}
-                  </div>
-
-                  <div className="produccion-vinculadas-columnas">
-                    {grupoSector.columnas.map(
-                      (columna) => {
-                        const seleccionada =
-                          columnasSeleccionadasIds.includes(
-                            columna.id
-                          );
-
-                        return (
-                          <button
-                            key={columna.id}
-                            type="button"
-                            className={
-                              seleccionada
-                                ? "produccion-vinculadas-etapa seleccionada"
-                                : "produccion-vinculadas-etapa"
-                            }
-                            onClick={() =>
-                              toggleColumna(
-                                columna.id
-                              )
-                            }
-                          >
-                            <span className="produccion-vinculadas-etapa-check">
-                              {seleccionada && (
-                                <FaCheck />
-                              )}
-                            </span>
-
-                            <span>
-                              {columna.nombre}
-                            </span>
-                          </button>
-                        );
-                      }
-                    )}
-                  </div>
+               
                 </div>
-              )
-            )}
-          </div>
 
-          {columnasSeleccionadasIds.length >=
-            2 && (
-            <div className="produccion-vinculadas-flujo">
-              <div className="produccion-vinculadas-flujo-ramas">
-                {nombresSeleccionados.map(
-                  (nombre) => (
-                    <span key={nombre}>
-                      {nombre}
+                <div
+                  className={
+                    columnasSeleccionadasIds.length >= 2
+                      ? "produccion-vinculadas-contador completo"
+                      : "produccion-vinculadas-contador"
+                  }
+                >
+                  {columnasSeleccionadasIds.length}{" "}
+                  seleccionadas
+                </div>
+              </div>
+
+              <div className="produccion-vinculadas-etapas-scroll">
+                <div className="produccion-vinculadas-sectores">
+                  {columnasDisponiblesPorSector.map(
+                    (grupoSector) => (
+                      <div
+                        key={grupoSector.id}
+                        className="produccion-vinculadas-sector"
+                      >
+                        <div className="produccion-vinculadas-sector-titulo">
+                          {grupoSector.nombre}
+                        </div>
+
+                        <div className="produccion-vinculadas-columnas">
+                          {grupoSector.columnas.map(
+                            (columna) => {
+                              const seleccionada =
+                                columnasSeleccionadasIds.includes(
+                                  columna.id
+                                );
+
+                              return (
+                                <button
+                                  key={columna.id}
+                                  type="button"
+                                  className={
+                                    seleccionada
+                                      ? "produccion-vinculadas-etapa seleccionada"
+                                      : "produccion-vinculadas-etapa"
+                                  }
+                                  onClick={() =>
+                                    toggleColumna(
+                                      columna.id
+                                    )
+                                  }
+                                >
+                                  <span className="produccion-vinculadas-etapa-check">
+                                    {seleccionada && (
+                                      <FaCheck />
+                                    )}
+                                  </span>
+
+                                  <span>
+                                    {columna.nombre}
+                                  </span>
+                                </button>
+                              );
+                            }
+                          )}
+                        </div>
+                      </div>
+                    )
+                  )}
+                </div>
+              </div>
+            </div>
+
+
+            {/* ==============================
+                DERECHA - REUNIÓN Y RESUMEN
+                ============================== */}
+            <aside className="produccion-vinculadas-lateral">
+
+              <div className="produccion-vinculadas-reunion">
+                <div className="produccion-vinculadas-reunion-titulo">
+                  <strong>
+                    Punto de reunión
+                  </strong>
+
+                  <span>
+                    Cuando todas terminen, el pedido continúa acá.
+                  </span>
+                </div>
+
+                <select
+                  value={columnaReunionId}
+                  disabled={
+                    columnasSeleccionadasIds.length < 2
+                  }
+                  onChange={(event) =>
+                    setColumnaReunionId(
+                      event.target.value
+                    )
+                  }
+                >
+                  <option value="">
+                    {columnasSeleccionadasIds.length < 2
+                      ? "Primero seleccioná las etapas"
+                      : "Seleccionar columna"}
+                  </option>
+
+                  {columnasReunionPorSector.map(
+                    (grupoSector) => (
+                      <optgroup
+                        key={grupoSector.id}
+                        label={grupoSector.nombre}
+                      >
+                        {grupoSector.columnas.map(
+                          (columna) => (
+                            <option
+                              key={columna.id}
+                              value={columna.id}
+                            >
+                              {columna.nombre}
+                            </option>
+                          )
+                        )}
+                      </optgroup>
+                    )
+                  )}
+                </select>
+
+                {columnasSeleccionadasIds.length >= 2 &&
+                  columnaReunionId && (
+                    <span className="produccion-vinculadas-auto">
+                      Punto sugerido automáticamente. Podés cambiarlo.
                     </span>
-                  )
-                )}
+                  )}
               </div>
 
-              <FaArrowRight className="produccion-vinculadas-flujo-flecha" />
 
-              <div className="produccion-vinculadas-flujo-reunion">
-                <span>
-                  Se reúnen en
-                </span>
-
-                <strong>
-                  {columnaReunion?.nombre ||
-                    "Seleccionar"}
-                </strong>
-              </div>
-            </div>
-          )}
-
-          <div className="produccion-vinculadas-reunion">
-            <div className="produccion-vinculadas-reunion-titulo">
-              <strong>
-                Punto de reunión
-              </strong>
-
-              <span>
-                Cuando todas terminen, el pedido continúa acá.
-              </span>
-            </div>
-
-            <select
-              value={columnaReunionId}
-              disabled={
-                columnasSeleccionadasIds
-                  .length < 2
-              }
-              onChange={(event) =>
-                setColumnaReunionId(
-                  event.target.value
-                )
-              }
-            >
-              <option value="">
-                {columnasSeleccionadasIds
-                  .length < 2
-                  ? "Primero seleccioná las etapas"
-                  : "Seleccionar columna"}
-              </option>
-
-              {columnasReunionPorSector.map(
-                (grupoSector) => (
-                  <optgroup
-                    key={grupoSector.id}
-                    label={grupoSector.nombre}
-                  >
-                    {grupoSector.columnas.map(
-                      (columna) => (
-                        <option
-                          key={columna.id}
-                          value={columna.id}
-                        >
-                          {columna.nombre}
-                        </option>
+              {columnasSeleccionadasIds.length >= 2 && (
+                <div className="produccion-vinculadas-flujo">
+                  <div className="produccion-vinculadas-flujo-ramas">
+                    {nombresSeleccionados.map(
+                      (nombre) => (
+                        <span key={nombre}>
+                          {nombre}
+                        </span>
                       )
                     )}
-                  </optgroup>
-                )
-              )}
-            </select>
+                  </div>
 
-            {columnasSeleccionadasIds.length >=
-              2 &&
-              columnaReunionId && (
-                <span className="produccion-vinculadas-auto">
-                  Punto sugerido automáticamente. Podés cambiarlo.
-                </span>
+                  <FaArrowRight className="produccion-vinculadas-flujo-flecha" />
+
+                  <div className="produccion-vinculadas-flujo-reunion">
+                    <span>
+                      Continúa en
+                    </span>
+
+                    <strong>
+                      {columnaReunion?.nombre ||
+                        "Seleccionar"}
+                    </strong>
+                  </div>
+                </div>
               )}
+
+            </aside>
+
           </div>
 
           {error && (
