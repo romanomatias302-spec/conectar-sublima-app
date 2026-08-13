@@ -2,6 +2,7 @@ import {
   addDoc,
   collection,
   getDocs,
+  getDoc,
   query,
   where,
   serverTimestamp,
@@ -224,11 +225,71 @@ export async function crearColumnaProduccion({ clienteId, nombre, orden }) {
   return ref.id;
 }
 
-export async function actualizarColumnaProduccion(columnaId, data) {
-  const ref = doc(db, PRODUCCION_COLUMNAS_COLLECTION, columnaId);
-  await updateDoc(ref, {
+export async function actualizarColumnaProduccion(
+  columnaId,
+  data
+) {
+  if (!columnaId) {
+    throw new Error(
+      "Falta columnaId."
+    );
+  }
+
+  const ref = doc(
+    db,
+    PRODUCCION_COLUMNAS_COLLECTION,
+    columnaId
+  );
+
+  const snapshot =
+    await getDoc(ref);
+
+  if (!snapshot.exists()) {
+    throw new Error(
+      "No se encontró la columna."
+    );
+  }
+
+  const columnaActual =
+    snapshot.data();
+
+  const esEstructural =
+    columnaActual?.esInicial === true ||
+    columnaActual?.esFinal === true;
+
+  let datosActualizacion = {
     ...data,
-    updatedAt: serverTimestamp(),
+  };
+
+  if (esEstructural) {
+    /*
+     * Pendiente y Producción finalizada
+     * forman parte de la estructura base.
+     *
+     * Nunca pueden:
+     * - cambiar su orden;
+     * - cambiar de sector;
+     * - dejar de ser inicial/final;
+     * - transformarse en la otra.
+     */
+
+    const {
+      orden,
+      sectorId,
+      esInicial,
+      esFinal,
+      ...datosPermitidos
+    } = datosActualizacion;
+
+    datosActualizacion =
+      datosPermitidos;
+  }
+
+  await updateDoc(ref, {
+    ...datosActualizacion,
+
+    updatedAt:
+      serverTimestamp(),
   });
 }
 

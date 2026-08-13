@@ -88,21 +88,7 @@ unsubscribeColumnas =
   escucharColumnasProduccion(
     perfil.clienteId,
     (lista) => {
-      const columnasRecibidas = lista || [];
-
-      console.table(
-        columnasRecibidas.map((columna) => ({
-          id: columna.id,
-          nombre: columna.nombre,
-          orden: columna.orden,
-          sectorId: columna.sectorId || "",
-          inicial: columna.esInicial === true,
-          final: columna.esFinal === true,
-          activo: columna.activo !== false,
-        }))
-      );
-
-      setColumnas(columnasRecibidas);
+      setColumnas(lista || []);
     }
   );
 
