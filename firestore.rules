@@ -1098,6 +1098,7 @@ match /produccion_sectores/{sectorId} {
             "estado",
             "totalEtapas",
             "etapasFinalizadas",
+            "columnasUsadas",
             "createdByUid",
             "createdByNombre",
             "createdAt",
@@ -1112,7 +1113,8 @@ match /produccion_sectores/{sectorId} {
           && request.resource.data.estado == "activo"
           && request.resource.data.totalEtapas is number
           && request.resource.data.totalEtapas >= 2
-          && request.resource.data.etapasFinalizadas == 0;
+          && request.resource.data.etapasFinalizadas == 0
+          && request.resource.data.columnasUsadas is list;
 
         /*
         * Por ahora el grupo sólo cambia cuando
@@ -1132,6 +1134,7 @@ match /produccion_sectores/{sectorId} {
           && onlyChangesAllowed([
             "estado",
             "etapasFinalizadas",
+            "columnasUsadas",
             "listoReunionAt",
             "reunidoAt",
             "updatedAt"

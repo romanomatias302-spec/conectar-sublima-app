@@ -152,6 +152,36 @@ export async function crearGrupoVinculadoProduccion({
 
   const batch = writeBatch(db);
 
+  /*
+ * Creamos antes las referencias de las etapas
+ * para poder registrar desde el inicio qué
+ * columna corresponde a cada card vinculada.
+ */
+const etapasConRef =
+  etapasValidas.map(
+    (etapa, index) => ({
+      etapa,
+      index,
+      etapaRef: doc(
+        collection(
+          db,
+          ETAPAS_COLLECTION
+        )
+      ),
+    })
+  );
+
+const columnasUsadas =
+  etapasConRef.map(
+    ({ etapa, etapaRef }) => ({
+      columnaId:
+        etapa.columnaProduccionId,
+
+      etapaId:
+        etapaRef.id,
+    })
+  );
+
   batch.set(grupoRef, {
     clienteId,
     pedidoId,
@@ -165,6 +195,7 @@ export async function crearGrupoVinculadoProduccion({
 
     totalEtapas: etapasValidas.length,
     etapasFinalizadas: 0,
+    columnasUsadas,
 
     createdByUid:
       usuarioActor?.uid || "",
@@ -176,11 +207,12 @@ export async function crearGrupoVinculadoProduccion({
     updatedAt: serverTimestamp(),
   });
 
-  etapasValidas.forEach(
-    (etapa, index) => {
-      const etapaRef = doc(
-        collection(db, ETAPAS_COLLECTION)
-      );
+  etapasConRef.forEach(
+    ({
+      etapa,
+      index,
+      etapaRef,
+    }) => {
 
       batch.set(etapaRef, {
         clienteId,
@@ -280,6 +312,100 @@ await runTransaction(
     const etapa =
       etapaSnap.data();
 
+    const grupoVinculadoId =
+      etapa.grupoVinculadoId || "";
+
+    if (!grupoVinculadoId) {
+      throw new Error(
+        "La etapa no tiene una vinculación válida."
+      );
+    }
+
+    const grupoRef = doc(
+      db,
+      GRUPOS_COLLECTION,
+      grupoVinculadoId
+    );
+
+    const grupoSnap =
+      await transaction.get(
+        grupoRef
+      );
+
+    if (!grupoSnap.exists()) {
+      throw new Error(
+        "La vinculación ya no existe."
+      );
+    }
+
+    const grupo =
+      grupoSnap.data();
+
+    const columnasUsadasActuales =
+      Array.isArray(
+        grupo.columnasUsadas
+      )
+        ? grupo.columnasUsadas
+        : [];  
+    
+          /*
+      * Una card vinculada no puede entrar
+      * en una columna que ya utilizó OTRA
+      * card del mismo grupo.
+      *
+      * La misma card sí puede volver a una
+      * columna que ella misma utilizó.
+      */
+      const usadaPorOtraCard =
+        columnasUsadasActuales.some(
+          (item) =>
+            String(
+              item?.columnaId || ""
+            ) ===
+              String(columnaDestinoId) &&
+            String(
+              item?.etapaId || ""
+            ) !==
+              String(etapaId)
+        );
+
+      if (usadaPorOtraCard) {
+        const error = new Error(
+          "Esta etapa ya fue tomada por otra card vinculada. Finalizá esta etapa para continuar."
+        );
+
+        error.code =
+          "produccion/columna-ocupada-vinculada";
+
+        throw error;
+      }    
+
+    const yaRegistradaPorEstaCard =
+      columnasUsadasActuales.some(
+        (item) =>
+          String(
+            item?.columnaId || ""
+          ) ===
+            String(columnaDestinoId) &&
+          String(
+            item?.etapaId || ""
+          ) ===
+            String(etapaId)
+      );
+
+    const columnasUsadasNuevas =
+      yaRegistradaPorEstaCard
+        ? columnasUsadasActuales
+        : [
+            ...columnasUsadasActuales,
+            {
+              columnaId:
+                columnaDestinoId,
+
+              etapaId,
+            },
+          ];  
+
     const sectoresProcesadosActuales =
       Array.isArray(
         etapa.sectoresProcesados
@@ -338,6 +464,17 @@ await runTransaction(
         ];
       }
     }
+
+    transaction.update(
+      grupoRef,
+      {
+        columnasUsadas:
+          columnasUsadasNuevas,
+
+        updatedAt:
+          serverTimestamp(),
+      }
+    );
 
     transaction.update(
       etapaRef,

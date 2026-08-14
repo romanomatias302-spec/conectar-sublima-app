@@ -2191,6 +2191,8 @@ async function manejarCrearEtapasVinculadas({
 
   if (!pedidoId) return;
 
+
+
   await crearGrupoVinculadoProduccion({
     clienteId:
       perfil.clienteId,
