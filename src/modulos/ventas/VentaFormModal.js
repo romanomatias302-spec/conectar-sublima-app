@@ -3,11 +3,12 @@ import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "../../firebase";
 import { crearVenta } from "../../firebase/ventas";
 import { puedeHacer } from "../../utils/permisos";
+import { fechaHoyNegocio } from "../../utils/fechas";
 
 export default function VentaFormModal({ perfil, onClose, onVentaCreada }) {
   const [clientes, setClientes] = useState([]);
   const [formData, setFormData] = useState({
-    fechaVenta: new Date().toISOString().split("T")[0],
+    fechaVenta: fechaHoyNegocio(perfil),
     clienteRefId: "",
     descripcion: "",
     cantidad: 1,

@@ -3792,3 +3792,430 @@ margin-top:20px;
   border-radius: 999px !important;
   line-height: 1 !important;
 }
+
+/* =====================================================
+   COTIZACIÓN - IMPRESIÓN
+   ===================================================== */
+
+@media print {
+
+  /* Área principal */
+  .cotizacion-print-area {
+    width: 100% !important;
+    max-width: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    gap: 10px !important;
+    overflow: visible !important;
+  }
+
+  /* Tarjetas más compactas para papel */
+  .cotizacion-print-area .ventas-card {
+    width: 100% !important;
+    max-width: none !important;
+    box-sizing: border-box !important;
+    box-shadow: none !important;
+    border: 1px solid #e5e7eb !important;
+    border-radius: 8px !important;
+    padding: 10px !important;
+    margin: 0 0 10px 0 !important;
+    overflow: visible !important;
+  }
+
+  /* Muy importante: elimina scroll de la tabla */
+  .cotizacion-print-area .ventas-table-wrap {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow: visible !important;
+    overflow-x: visible !important;
+  }
+
+  .cotizacion-print-area .cotizacion-detalle-items-table {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    table-layout: fixed !important;
+    border-collapse: collapse !important;
+  }
+
+  .cotizacion-print-area .cotizacion-detalle-items-table th,
+  .cotizacion-print-area .cotizacion-detalle-items-table td {
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    box-sizing: border-box !important;
+    padding: 6px 7px !important;
+    font-size: 11px !important;
+  }
+
+  /* Distribución real para A4 */
+  .cotizacion-print-area .cotizacion-detalle-items-table th:nth-child(1),
+  .cotizacion-print-area .cotizacion-detalle-items-table td:nth-child(1) {
+    width: 52% !important;
+  }
+
+  .cotizacion-print-area .cotizacion-detalle-items-table th:nth-child(2),
+  .cotizacion-print-area .cotizacion-detalle-items-table td:nth-child(2) {
+    width: 12% !important;
+    text-align: center !important;
+  }
+
+  .cotizacion-print-area .cotizacion-detalle-items-table th:nth-child(3),
+  .cotizacion-print-area .cotizacion-detalle-items-table td:nth-child(3) {
+    width: 18% !important;
+    text-align: right !important;
+  }
+
+  .cotizacion-print-area .cotizacion-detalle-items-table th:nth-child(4),
+  .cotizacion-print-area .cotizacion-detalle-items-table td:nth-child(4) {
+    width: 18% !important;
+    text-align: right !important;
+  }
+
+  /* Producto */
+  .cotizacion-print-area .ventas-producto-row {
+    min-width: 0 !important;
+    gap: 7px !important;
+  }
+
+  .cotizacion-print-area .ventas-producto-img {
+    width: 34px !important;
+    height: 34px !important;
+    min-width: 34px !important;
+  }
+
+  .cotizacion-print-area .ventas-producto-nombre {
+    font-size: 11px !important;
+  }
+
+  /* Resumen de importes */
+  .cotizacion-print-area .cotizacion-resumen-final {
+    width: 260px !important;
+    max-width: 260px !important;
+    margin: 4px 0 0 auto !important;
+    padding: 10px 12px !important;
+    border: 1px solid #dbe3eb !important;
+    page-break-inside: avoid !important;
+  }
+
+  .cotizacion-print-area
+    .cotizacion-resumen-final
+    .ventas-resumen-row {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 16px !important;
+    margin: 0 !important;
+    padding: 4px 0 !important;
+    font-size: 12px !important;
+  }
+
+  .cotizacion-print-area
+    .cotizacion-resumen-final
+    .ventas-resumen-row span {
+    flex: 1 !important;
+  }
+
+  .cotizacion-print-area
+    .cotizacion-resumen-final
+    .ventas-resumen-row strong {
+    min-width: 95px !important;
+    text-align: right !important;
+  }
+
+  .cotizacion-print-area
+    .cotizacion-resumen-final
+    .ventas-total {
+    margin-top: 3px !important;
+    padding-top: 7px !important;
+    border-top: 1px solid #cbd5e1 !important;
+    font-size: 15px !important;
+    font-weight: 800 !important;
+  }
+
+  .cotizacion-print-area
+    .cotizacion-resumen-final
+    .ventas-total strong {
+    font-size: 16px !important;
+  }
+}
+
+/* ==================================================
+   COTIZACION - VISTA EXCLUSIVA DE IMPRESION
+   ================================================== */
+
+.cotizacion-print-only {
+  display: none;
+}
+
+@media print {
+
+  @page {
+    size: A4 portrait;
+    margin: 10mm;
+  }
+
+  .cotizacion-screen-only,
+  .ventas-importar-overlay {
+    display: none !important;
+  }
+
+  .cotizacion-print-only {
+    display: block !important;
+    visibility: visible !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    color: #111827 !important;
+    font-family: Arial, sans-serif !important;
+  }
+
+  .cotizacion-print-only * {
+    visibility: visible !important;
+    box-sizing: border-box !important;
+  }
+
+  /* HEADER */
+
+  .cotizacion-print-header {
+    margin-bottom: 14px;
+  }
+
+  .cotizacion-print-negocio {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .cotizacion-print-logo {
+    width: 56px;
+    height: 56px;
+    object-fit: contain;
+  }
+
+  .cotizacion-print-negocio h1 {
+    margin: 0;
+    font-size: 23px;
+    line-height: 1.15;
+  }
+
+  .cotizacion-print-negocio p {
+    margin: 4px 0 0;
+    font-size: 13px;
+    color: #475569;
+  }
+
+  /* DATOS GENERALES */
+
+  .cotizacion-print-info {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 7px;
+    padding: 10px;
+    border: 1px solid #dbe3eb;
+    border-radius: 8px;
+    margin-bottom: 14px;
+  }
+
+  .cotizacion-print-info > div {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .cotizacion-print-info span {
+    font-size: 10px;
+    color: #64748b;
+    font-weight: 700;
+  }
+
+  .cotizacion-print-info strong {
+    font-size: 12px;
+  }
+
+  /* NOTAS */
+
+  .cotizacion-print-notas {
+    margin-bottom: 14px;
+    padding: 9px 10px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+  }
+
+  .cotizacion-print-notas span {
+    font-size: 10px;
+    font-weight: 700;
+    color: #64748b;
+  }
+
+  .cotizacion-print-notas p {
+    margin: 3px 0 0;
+    font-size: 11px;
+  }
+
+  /* ITEMS */
+
+  .cotizacion-print-items {
+    width: 100%;
+  }
+
+  .cotizacion-print-items h2 {
+    margin: 0 0 7px;
+    font-size: 16px;
+  }
+
+  .cotizacion-print-items table {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    border-collapse: collapse !important;
+    table-layout: fixed !important;
+  }
+
+  .cotizacion-print-items th,
+  .cotizacion-print-items td {
+    border-bottom: 1px solid #e2e8f0;
+    padding: 7px 6px;
+    font-size: 13px;
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: unset !important;
+  }
+
+  .cotizacion-print-items th {
+    background: #f8fafc;
+    font-size: 14px;
+    font-weight: 700;
+  }
+
+  .print-col-producto {
+    width: 52%;
+  }
+
+  .print-col-cantidad {
+    width: 10%;
+  }
+
+  .print-col-precio {
+    width: 19%;
+  }
+
+  .print-col-subtotal {
+    width: 19%;
+  }
+
+.cotizacion-print-items th,
+.cotizacion-print-items td,
+.print-center,
+.print-money {
+  text-align: center !important;
+  vertical-align: middle !important;
+}
+
+.print-money {
+  white-space: nowrap !important;
+}
+
+.cotizacion-print-producto {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 9px !important;
+  min-width: 0;
+  width: 100% !important;
+  text-align: left !important;
+}
+
+.cotizacion-print-producto-imagen {
+  width: 42px !important;
+  height: 42px !important;
+  min-width: 42px !important;
+  flex: 0 0 42px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.cotizacion-print-producto-imagen img {
+  width: 42px !important;
+  height: 42px !important;
+  object-fit: contain !important;
+  display: block !important;
+}
+
+.cotizacion-print-producto span {
+  display: block !important;
+  flex: 1 1 auto !important;
+  width: auto !important;
+  min-width: 0 !important;
+
+  color: #111827 !important;
+  font-size: 13px !important;
+  line-height: 1.25 !important;
+
+  text-align: left !important;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: unset !important;
+  word-break: normal !important;
+  overflow-wrap: break-word !important;
+}
+
+  /* RESUMEN */
+
+  .cotizacion-print-resumen {
+    width: 300px;
+    margin: 14px 0 0 auto;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 10px 13px;
+    page-break-inside: avoid;
+  }
+
+  .cotizacion-print-resumen > div {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    padding: 5px 0;
+    font-size: 14px;
+  }
+
+  .cotizacion-print-resumen span {
+    font-weight: 600;
+  }
+
+  .cotizacion-print-resumen strong {
+    font-size: 15px;
+    text-align: right;
+  }
+
+  .cotizacion-print-total {
+    margin-top: 4px;
+    padding-top: 9px !important;
+    border-top: 1px solid #94a3b8;
+  }
+
+  .cotizacion-print-total span {
+    font-size: 18px;
+    font-weight: 800;
+  }
+
+  .cotizacion-print-total strong {
+    font-size: 21px;
+    font-weight: 900;
+  }
+}
+
+.cotizacion-detalle-items-table th:first-child,
+.cotizacion-detalle-items-table td:first-child {
+  text-align: left !important;
+}
+.cotizacion-detalle-items-table .ventas-producto-row {
+  justify-content: flex-start !important;
+  text-align: left !important;
+}
+
+.cotizacion-detalle-items-table .ventas-producto-main,
+.cotizacion-detalle-items-table .ventas-producto-nombre {
+  text-align: left !important;
+}

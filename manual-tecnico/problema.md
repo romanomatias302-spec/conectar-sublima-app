@@ -1,3 +1,8 @@
+### error de permisos al eliminar venta / no reglas ni usuarios
+El cliente no podia eliminar la venta y descubrimos que no eran permisos ni perfil, era que tenia un pedido asociado y al eliminar la venta 
+daba error, se soluciono modificando archivos. no se tocaron permisos.
+
+
 ### ERROR RESUELTO – LENTITUD EXTREMA EN PRODUCCIÓN
 Problema detectado
 
