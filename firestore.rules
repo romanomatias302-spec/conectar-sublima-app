@@ -233,7 +233,18 @@ function canReadPedidos(clienteId) {
     }
 
     function canEditarDetalleProduccion(clienteId) {
-      return canModulo(clienteId, "produccion", "editarDetalle");
+      return isSuperAdmin()
+        || (
+          tenantUserBase(clienteId)
+          && (
+            isAdmin()
+            || (
+              hasPermisos()
+              && profile().permisos.produccion is map
+              && profile().permisos.produccion.editarDetalle == true
+            )
+          )
+        );
     }
 
     function canAsignarUsuarioProduccion(clienteId) {
@@ -265,6 +276,7 @@ function canUpdatePedidoProduccion(clienteId) {
           "produccionMetros",
 
           "produccionImagenPortada",
+          "produccionImagenPortadaThumb",
           "produccionImagenPortadaOrigen",
 
           "produccionArchivos",
@@ -307,18 +319,12 @@ function canUpdatePedidoProduccion(clienteId) {
 
     function canUpdatePedidos(clienteId) {
       return isSuperAdmin()
-        || (
-          tenantUserBase(clienteId)
-          && (
-            isAdmin()
-            || canEditPedidoGeneral(clienteId)
-            || canUpdatePedidoProduccion(clienteId)
-            || canUpdatePedidoDetalleProduccion(clienteId)
-            || canUpdatePedidoAsignacion(clienteId)
-            || canUpdatePedidoColorTarjeta(clienteId)
-            || canUpdatePedidoOrdenManual(clienteId)
-          )
-        );
+        || canUpdatePedidoDetalleProduccion(clienteId)
+        || canUpdatePedidoProduccion(clienteId)
+        || canUpdatePedidoAsignacion(clienteId)
+        || canUpdatePedidoColorTarjeta(clienteId)
+        || canUpdatePedidoOrdenManual(clienteId)
+        || canEditPedidoGeneral(clienteId);
     }
 
     function canReadProduccionColumnas(clienteId) {
@@ -496,6 +502,8 @@ function canReadMovimientos(clienteId) {
           )
         );
     }
+
+
 
     function canVincularGastoAMovimientoCaja(clienteId) {
       return isSuperAdmin()
@@ -1054,6 +1062,205 @@ match /produccion_sectores/{sectorId} {
           );
 
         allow delete: if canManageProduccionColumnas(resource.data.clienteId);
+      }
+
+      // =========================
+      // produccion_grupos_vinculados
+      // =========================
+      match /produccion_grupos_vinculados/{grupoId} {
+
+        /*
+        * Lectura:
+        * mismos usuarios que pueden visualizar Producción/Pedidos
+        * dentro del tenant.
+        */
+        allow read: if
+          canReadProduccionColumnas(
+            resource.data.clienteId
+          );
+
+        /*
+        * Crear una producción vinculada:
+        * requiere permiso para mover Producción.
+        *
+        * Además:
+        * - clienteId pertenece al tenant;
+        * - el pedido realmente pertenece a ese tenant;
+        * - sólo aceptamos los campos previstos.
+        */
+        allow create: if
+          canMoverProduccion(
+            request.resource.data.clienteId
+          )
+          && request.resource.data.clienteId ==
+            pedidoParentClienteId(
+              request.resource.data.pedidoId
+            )
+          && request.resource.data.keys().hasOnly([
+            "clienteId",
+            "pedidoId",
+            "columnaOrigenId",
+            "columnaReunionId",
+            "estado",
+            "totalEtapas",
+            "etapasFinalizadas",
+            "columnasUsadas",
+            "createdByUid",
+            "createdByNombre",
+            "createdAt",
+            "updatedAt"
+          ])
+          && request.resource.data.clienteId is string
+          && request.resource.data.clienteId != ""
+          && request.resource.data.pedidoId is string
+          && request.resource.data.pedidoId != ""
+          && request.resource.data.columnaReunionId is string
+          && request.resource.data.columnaReunionId != ""
+          && request.resource.data.estado == "activo"
+          && request.resource.data.totalEtapas is number
+          && request.resource.data.totalEtapas >= 2
+          && request.resource.data.etapasFinalizadas == 0
+          && request.resource.data.columnasUsadas is list;
+
+        /*
+        * Por ahora el grupo sólo cambia cuando
+        * todas sus ramas terminan.
+        *
+        * No permitimos cambiar tenant, pedido,
+        * columnas de origen/reunión ni totalEtapas.
+        */
+        allow update: if
+          canMoverProduccion(
+            resource.data.clienteId
+          )
+          && request.resource.data.clienteId ==
+            resource.data.clienteId
+          && request.resource.data.pedidoId ==
+            resource.data.pedidoId
+          && onlyChangesAllowed([
+            "estado",
+            "etapasFinalizadas",
+            "columnasUsadas",
+            "listoReunionAt",
+            "reunidoAt",
+            "updatedAt"
+          ])
+          && request.resource.data.estado in [
+            "activo",
+            "listo_reunion",
+            "reunido"
+          ];
+
+        /*
+        * No eliminamos físicamente grupos.
+        */
+        allow delete: if false;
+      }
+
+
+      // =========================
+      // produccion_etapas_vinculadas
+      // =========================
+      match /produccion_etapas_vinculadas/{etapaId} {
+
+        /*
+        * Lectura aislada por tenant.
+        */
+        allow read: if
+          canReadProduccionColumnas(
+            resource.data.clienteId
+          );
+
+        /*
+        * Creación de cada rama.
+        */
+        allow create: if
+          canMoverProduccion(
+            request.resource.data.clienteId
+          )
+          && request.resource.data.clienteId ==
+            pedidoParentClienteId(
+              request.resource.data.pedidoId
+            )
+          && request.resource.data.keys().hasOnly([
+            "clienteId",
+            "pedidoId",
+            "grupoVinculadoId",
+            "nombre",
+            "columnaProduccionId",
+            "estado",
+            "ordenRama",
+            "produccionSortOrder",
+            "sectoresProcesados",
+            "createdByUid",
+            "createdByNombre",
+            "createdAt",
+            "updatedAt",
+            "listaAt",
+            "listaPorUid",
+            "listaPorNombre"
+            
+          ])
+          && request.resource.data.clienteId is string
+          && request.resource.data.clienteId != ""
+          && request.resource.data.pedidoId is string
+          && request.resource.data.pedidoId != ""
+          && request.resource.data.grupoVinculadoId is string
+          && request.resource.data.grupoVinculadoId != ""
+          && request.resource.data.columnaProduccionId is string
+          && request.resource.data.columnaProduccionId != ""
+          && request.resource.data.nombre is string
+          && request.resource.data.nombre != ""
+          && request.resource.data.estado == "activa"
+          && request.resource.data.ordenRama is number
+          && request.resource.data.sectoresProcesados is list;
+
+
+        /*
+        * Una rama puede:
+        *
+        * A) moverse:
+        *    columnaProduccionId
+        *    ultimaAccion...
+        *
+        * B) finalizarse:
+        *    estado = lista
+        *    listaAt / listaPor...
+        *
+        * Pero jamás puede cambiar de tenant,
+        * pedido o grupo.
+        */
+        allow update: if
+          canMoverProduccion(
+            resource.data.clienteId
+          )
+          && request.resource.data.clienteId ==
+            resource.data.clienteId
+          && request.resource.data.pedidoId ==
+            resource.data.pedidoId
+          && request.resource.data.grupoVinculadoId ==
+            resource.data.grupoVinculadoId
+          && onlyChangesAllowed([
+            "columnaProduccionId",
+            "produccionSortOrder",
+            "sectoresProcesados",
+            "estado",
+            "updatedAt",
+            "ultimaAccionUid",
+            "ultimaAccionNombre",
+            "listaAt",
+            "listaPorUid",
+            "listaPorNombre"
+          ])
+          && request.resource.data.estado in [
+            "activa",
+            "lista"
+          ];
+
+        /*
+        * Tampoco eliminamos ramas físicamente.
+        */
+        allow delete: if false;
       }
     
     
