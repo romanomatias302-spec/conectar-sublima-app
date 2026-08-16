@@ -317,15 +317,110 @@ function canUpdatePedidoProduccion(clienteId) {
         ]);
     }
 
-    function canUpdatePedidos(clienteId) {
-      return isSuperAdmin()
-        || canUpdatePedidoDetalleProduccion(clienteId)
-        || canUpdatePedidoProduccion(clienteId)
-        || canUpdatePedidoAsignacion(clienteId)
-        || canUpdatePedidoColorTarjeta(clienteId)
-        || canUpdatePedidoOrdenManual(clienteId)
-        || canEditPedidoGeneral(clienteId);
-    }
+function canUpdatePedidos(clienteId) {
+  return isSuperAdmin()
+    || (
+      tenantUserBase(clienteId)
+      && (
+        isAdmin()
+
+        || (
+          onlyChangesAllowed([
+            "produccionNotaCorta",
+            "produccionNotaLarga",
+            "produccionMetros",
+            "produccionImagenPortada",
+            "produccionImagenPortadaThumb",
+            "produccionImagenPortadaOrigen",
+            "produccionArchivos",
+            "produccionEtiquetas",
+            "produccionEtiquetaId",
+            "produccionEtiquetaNombre",
+            "produccionEtiquetaColor",
+            "updatedAt"
+          ])
+          && permisoModuloAccion(
+            "produccion",
+            "editarDetalle"
+          )
+        )
+
+        || (
+          onlyChangesAllowed([
+            "produccionAsignadoUid",
+            "produccionAsignadoNombre",
+            "produccionAsignadoEmail",
+            "produccionAsignadoAt",
+            "produccionAsignadoPorUid",
+            "produccionAsignadoPorNombre",
+            "updatedAt"
+          ])
+          && permisoModuloAccion(
+            "produccion",
+            "asignarUsuario"
+          )
+        )
+
+        || (
+          onlyChangesAllowed([
+            "columnaProduccionId",
+            "progresoProduccion",
+            "estadoProduccion",
+            "produccionFinalizada",
+            "estado",
+            "produccionActualizadoAt",
+            "updatedAt",
+            "ultimaAccionProduccionPor",
+            "ultimaAccionProduccionPorNombre",
+            "ultimaAccionProduccionAt",
+            "produccionSortOrder"
+          ])
+          && permisoModuloAccion(
+            "produccion",
+            "mover"
+          )
+        )
+
+        || (
+          onlyChangesAllowed([
+            "produccionColorTarjeta"
+          ])
+          && permisoModuloAccion(
+            "produccion",
+            "cambiarColorTarjeta"
+          )
+        )
+
+        || (
+          onlyChangesAllowed([
+            "produccionSortOrder"
+          ])
+          && permisoModuloAccion(
+            "produccion",
+            "mover"
+          )
+        )
+
+        || (
+          onlyChangesAllowed([
+            "ventaRefId",
+            "ventaVisibleId",
+            "ventaEstado",
+            "updatedAt"
+          ])
+          && (
+            permisoModuloAccion("ventas", "crear")
+            || permisoModuloAccion("ventas", "editar")
+          )
+        )
+
+        || permisoModuloAccion(
+          "pedidos",
+          "editar"
+        )
+      )
+    );
+}
 
     function canReadProduccionColumnas(clienteId) {
       return isSuperAdmin()

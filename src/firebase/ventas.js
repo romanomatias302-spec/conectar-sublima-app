@@ -220,40 +220,36 @@ const sucursalNombre = perfil?.sucursalDefaultNombre || "Sucursal principal";
     ventas: 1,
   });
 
-  for (const item of itemsNormalizados) {
-      await addDoc(collection(db, "ventas", ventaRef.id, "items"), {
-        clienteId: perfil.clienteId,
-        ventaRefId: ventaRef.id,
-        numeroVenta,
-        descripcion: item.descripcion,
-        cantidad: item.cantidad,
-        precioUnitario: item.precioUnitario,
-        subtotal: item.subtotal,
-        excluirDescuento: item.excluirDescuento === true,
+for (const item of itemsNormalizados) {
+  await addDoc(collection(db, "ventas", ventaRef.id, "items"), {
+    clienteId: perfil.clienteId,
+    ventaRefId: ventaRef.id,
+    numeroVenta,
+    descripcion: item.descripcion,
+    cantidad: item.cantidad,
+    precioUnitario: item.precioUnitario,
+    subtotal: item.subtotal,
+    excluirDescuento: item.excluirDescuento === true,
 
-        origenPrecio: item.origenPrecio || "manual",
-        listaPrecioId: item.listaPrecioId || "",
-        listaPrecioNombre: item.listaPrecioNombre || "",
-        productoListaNombre: item.productoListaNombre || "",
-        productoBaseId: item.productoBaseId || "",
-        varianteId: item.varianteId || "",
-        varianteNombre: item.varianteNombre || "",
-        imagenUrl: item.imagenUrl || "",
-        imagenThumb: item.imagenThumb || "",
-        varianteId: item.varianteId || "",
-        varianteNombre: item.varianteNombre || "",
-        imagenUrl: item.imagenUrl || "",
-        imagenThumb: item.imagenThumb || "",
-        reglaCantidad: item.reglaCantidad || null,
-        adicionalesSeleccionados: item.adicionalesSeleccionados || [],
-        precioDetalleInterno: item.precioDetalleInterno || null,
-        origenItem: "inicial",
-        estadoItem: "activo",
-        motivoAnulacion: "",
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-  }
+    origenPrecio: item.origenPrecio || "manual",
+    listaPrecioId: item.listaPrecioId || "",
+    listaPrecioNombre: item.listaPrecioNombre || "",
+    productoListaNombre: item.productoListaNombre || "",
+    productoBaseId: item.productoBaseId || "",
+    varianteId: item.varianteId || "",
+    varianteNombre: item.varianteNombre || "",
+    imagenUrl: item.imagenUrl || "",
+    imagenThumb: item.imagenThumb || "",
+    reglaCantidad: item.reglaCantidad || null,
+    adicionalesSeleccionados: item.adicionalesSeleccionados || [],
+    precioDetalleInterno: item.precioDetalleInterno || null,
+    origenItem: "inicial",
+    estadoItem: "activo",
+    motivoAnulacion: "",
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+}
 
   if (pagosNormalizados.length > 0) {
     for (const pago of pagosNormalizados) {

@@ -1012,6 +1012,8 @@ if (puedeHacerEnProduccion("asignarUsuario")) {
 
 
 
+
+
 await actualizarDetalleManualProduccion({
 pedidoId: pedidoEditandoDetalle.firebaseId,
 
