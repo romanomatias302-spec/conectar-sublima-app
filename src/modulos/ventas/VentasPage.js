@@ -873,9 +873,14 @@ const guardarClienteRapido = async () => {
         return;
       }
 
-      const tipoPermitido =
-        archivo.type === "application/pdf" ||
-        archivo.type.startsWith("image/");
+    const tiposPermitidos = [
+      "application/pdf",
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+    ];
+
+    const tipoPermitido = tiposPermitidos.includes(archivo.type);
 
       if (!tipoPermitido) {
         setError("El comprobante debe ser una imagen o un archivo PDF.");

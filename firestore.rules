@@ -636,7 +636,8 @@ function canReadMovimientos(clienteId) {
     function canTouchUltimoNumeroVenta(clienteId) {
       return isSuperAdmin()
         || (
-          tenantUserBase(clienteId)
+          sameTenant(clienteId)
+          && resource.data.estado == "activo"
           && (
             isAdmin()
             || permisoModuloAccion("ventas", "crear")
@@ -647,7 +648,8 @@ function canReadMovimientos(clienteId) {
     function canTouchUltimoNumeroRecibo(clienteId) {
       return isSuperAdmin()
         || (
-          tenantUserBase(clienteId)
+          sameTenant(clienteId)
+          && resource.data.estado == "activo"
           && (
             isAdmin()
             || permisoModuloAccion("ventas", "crear")
@@ -660,11 +662,8 @@ function canReadMovimientos(clienteId) {
     function canTouchUltimoNumeroCotizacion(clienteId) {
       return isSuperAdmin()
         || (
-          tenantUserBase(clienteId)
-          && (
-            isAdmin()
-            || permisoModuloAccion("ventas", "crearCotizacion")
-          )
+          sameTenant(clienteId)
+          && resource.data.estado == "activo"
         );
     }
 
@@ -673,7 +672,15 @@ function canReadMovimientos(clienteId) {
     }
 
     function canCreateCotizaciones(clienteId) {
-      return canModulo(clienteId, "ventas", "crearCotizacion");
+      return isSuperAdmin()
+        || (
+          tenantUserBase(clienteId)
+          && (
+            isAdmin()
+            || permisoModuloAccion("ventas", "crearCotizacion")
+            || permisoModuloAccion("ventas", "cotizaciones")
+          )
+        );
     }
 
     function canUpdateCotizaciones(clienteId) {
@@ -685,7 +692,8 @@ function canReadMovimientos(clienteId) {
     function canTouchUltimoNumeroPedido(clienteId) {
       return isSuperAdmin()
         || (
-          tenantUserBase(clienteId)
+          sameTenant(clienteId)
+          && resource.data.estado == "activo"
           && (
             isAdmin()
             || permisoModuloAccion("pedidos", "crear")
@@ -813,46 +821,88 @@ function canReadMovimientos(clienteId) {
       allow read: if isSuperAdmin() || sameTenant(clienteId);
 
       allow update: if isSuperAdmin()
-        || (
-          isAdmin()
-          && isActiveUser()
-          && clienteId == profile().clienteId
-        )
-        || (
-          canTouchUltimoNumeroVenta(clienteId)
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            "ultimoNumeroVenta",
-            "updatedAt"
-          ])
-        )
 
-        || (
-          canTouchUltimoNumeroRecibo(clienteId)
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            "ultimoNumeroRecibo",
-            "updatedAt"
-          ])
-        )
-
-        || (
-          canTouchUltimoNumeroPedido(clienteId)
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            "ultimoNumeroPedido",
-            "updatedAt"
-          ])
-        )
+      // Administrador del tenant:
+      // conserva exactamente el comportamiento actual.
       || (
-        signedIn()
+        isAdmin()
         && isActiveUser()
         && clienteId == profile().clienteId
+      )
+
+      // Usuario común:
+      // validamos tenant/estado UNA sola vez.
+      || (
+        sameTenant(clienteId)
+        && resource.data.estado == "activo"
         && (
-          isAdmin()
-          || permisoModuloAccion("ventas", "crearCotizacion")
+
+          // Contador de ventas
+          (
+            changedKeys().hasOnly([
+              "ultimoNumeroVenta",
+              "updatedAt"
+            ])
+            && permisoModuloAccion(
+              "ventas",
+              "crear"
+            )
+          )
+
+          ||
+
+          // Contador de recibos
+          (
+            changedKeys().hasOnly([
+              "ultimoNumeroRecibo",
+              "updatedAt"
+            ])
+            && (
+              permisoModuloAccion(
+                "ventas",
+                "crear"
+              )
+              || permisoModuloAccion(
+                "ventas",
+                "editar"
+              )
+            )
+          )
+
+          ||
+
+          // Contador de pedidos
+          (
+            changedKeys().hasOnly([
+              "ultimoNumeroPedido",
+              "updatedAt"
+            ])
+            && permisoModuloAccion(
+              "pedidos",
+              "crear"
+            )
+          )
+
+          ||
+
+          // Contador de cotizaciones
+          (
+            changedKeys().hasOnly([
+              "ultimoNumeroCotizacion",
+              "updatedAt"
+            ])
+            && (
+              permisoModuloAccion(
+                "ventas",
+                "crearCotizacion"
+              )
+              || permisoModuloAccion(
+                "ventas",
+                "cotizaciones"
+              )
+            )
+          )
         )
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          "ultimoNumeroCotizacion",
-          "updatedAt"
-        ])
       );
 
       allow create, delete: if isSuperAdmin();
