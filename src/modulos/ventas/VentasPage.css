@@ -325,8 +325,8 @@
 
 .ventas-pago-item {
   display: grid;
-  grid-template-columns: 1fr 1fr 34px;
-  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 34px 34px;
+  gap: 6px;
   align-items: center;
 }
 
@@ -353,6 +353,94 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* COMPROBANTE DE PAGO */
+
+.ventas-pago-comprobante-btn {
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 0;
+
+  border: 1px solid #d7dbe3;
+  border-radius: 8px;
+
+  background: #fff;
+  color: #64748b;
+
+  cursor: pointer;
+
+  box-sizing: border-box;
+
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.ventas-pago-comprobante-btn:hover {
+  border-color: #0ea5e9;
+  color: #0284c7;
+  background: #f0f9ff;
+}
+
+.ventas-pago-comprobante-btn.is-active {
+  border-color: #86efac;
+  background: #f0fdf4;
+  color: #16a34a;
+}
+
+.ventas-pago-comprobante-nombre {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+
+  margin-top: 4px;
+  padding-left: 2px;
+
+  font-size: 11px;
+  line-height: 1.2;
+
+  color: #64748b;
+}
+
+.ventas-pago-comprobante-nombre span {
+  white-space: nowrap;
+}
+
+.ventas-pago-comprobante-nombre button {
+  width: 18px;
+  height: 18px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 0;
+
+  border: none;
+  border-radius: 50%;
+
+  background: #e5e7eb;
+  color: #475569;
+
+  font-size: 13px;
+  line-height: 1;
+
+  cursor: pointer;
+}
+
+.ventas-pago-comprobante-nombre button:hover {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+/* COMPROBANTE DE PAGO fin */
 
 .ventas-add-pago-btn {
   margin-top: 4px;
@@ -714,10 +802,17 @@
     font-size: 15px;
   }
 
-  .ventas-pago-item {
-    grid-template-columns: 1fr 1fr 30px;
-    gap: 6px;
-  }
+.ventas-pago-item {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 30px 30px;
+  gap: 5px;
+}
+
+.ventas-pago-comprobante-btn,
+.ventas-pago-remove {
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+}
 }
 
 @media (max-width: 768px) {
@@ -4219,3 +4314,332 @@ margin-top:20px;
 .cotizacion-detalle-items-table .ventas-producto-nombre {
   text-align: left !important;
 }
+
+/* =====================================
+   DETALLE VENTA - AGREGAR ITEM
+   ===================================== */
+
+.ventas-detalle-item-grid {
+  display: grid;
+  grid-template-columns:
+    minmax(280px, 1fr)
+    110px
+    80px
+    150px;
+  gap: 10px;
+  align-items: start;
+  width: 100%;
+}
+
+.ventas-detalle-producto-field,
+.ventas-detalle-precio-field,
+.ventas-detalle-cantidad-field,
+.ventas-detalle-excluir-field {
+  min-width: 0;
+}
+
+.ventas-detalle-precio-field,
+.ventas-detalle-cantidad-field {
+  width: 100%;
+}
+
+.ventas-detalle-precio-field input,
+.ventas-detalle-cantidad-field input {
+  width: 100% !important;
+  height: 32px !important;
+  min-height: 32px !important;
+  padding: 0 8px !important;
+  box-sizing: border-box;
+}
+
+/* Mantiene todos los labels alineados */
+.ventas-detalle-item-grid > .ventas-field > label:first-child {
+  min-height: 16px;
+  margin-bottom: 6px;
+}
+
+/* Campo excluir descuento */
+.ventas-detalle-excluir {
+  width: 32px;
+  height: 32px;
+  min-height: 32px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 0;
+  box-sizing: border-box;
+
+  border: 1px solid #d7dbe3;
+  border-radius: 8px;
+  background: #fff;
+
+  font-size: 11px;
+  font-weight: 500;
+  color: #475569;
+
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ventas-detalle-excluir input {
+  width: 14px !important;
+  height: 14px !important;
+  min-width: 14px;
+  margin: 0 !important;
+  flex: none;
+}
+
+.ventas-detalle-excluir:has(input:checked) {
+  border-color: #7dd3fc;
+  background: #f0f9ff;
+  color: #036986;
+}
+
+.ventas-detalle-excluir-field .ventas-detalle-excluir {
+  margin-top: 0;
+}
+
+.ventas-detalle-item-grid + .ventas-actions-row {
+  margin-top: 12px;
+  justify-content: flex-start;
+}
+
+
+/* TABLET */
+
+@media (max-width: 900px) {
+  .ventas-detalle-item-grid {
+    grid-template-columns:
+      minmax(220px, 1fr)
+      105px
+      75px
+      140px;
+    gap: 8px;
+  }
+}
+
+
+/* MOBILE */
+
+@media (max-width: 650px) {
+  .ventas-detalle-item-grid {
+    grid-template-columns: 1fr 90px;
+  }
+
+  .ventas-detalle-producto-field {
+    grid-column: 1 / -1;
+  }
+
+  .ventas-detalle-precio-field,
+  .ventas-detalle-cantidad-field {
+    width: 100%;
+  }
+
+  .ventas-detalle-excluir-field {
+    grid-column: 1 / -1;
+  }
+
+  .ventas-detalle-excluir {
+    width: fit-content;
+  }
+}
+
+
+/* =====================================
+   DETALLE VENTA - AGREGAR ITEM - fin
+   ===================================== */
+   
+/* =====================================================
+   VENTA - IMPRESIÓN - RESUMEN PROFESIONAL
+   ===================================================== */
+
+@media print {
+
+.ventas-page .ventas-layout > aside.ventas-card-sm {
+  width: 300px !important;
+  max-width: 300px !important;
+  min-width: 300px !important;
+
+  display: block !important;
+
+  margin: 12px 0 0 auto !important;
+  padding: 10px 13px !important;
+
+  box-sizing: border-box !important;
+
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 8px !important;
+
+  background: #fff !important;
+  box-shadow: none !important;
+
+  page-break-inside: avoid !important;
+}
+
+  .ventas-page .ventas-resumen {
+    gap: 0 !important;
+  }
+
+.ventas-page .ventas-resumen-row {
+  display: grid !important;
+  grid-template-columns: 150px 110px !important;
+
+  align-items: center !important;
+  justify-content: end !important;
+
+  gap: 10px !important;
+  padding: 5px 0 !important;
+
+  font-size: 14px !important;
+  line-height: 1.25 !important;
+}
+
+  .ventas-page .ventas-resumen-row span:first-child {
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    white-space: nowrap !important;
+  }
+
+  .ventas-page .ventas-resumen-row strong {
+    font-size: 15px !important;
+    text-align: right !important;
+    white-space: nowrap !important;
+    justify-self: end !important;
+  }
+
+  .ventas-page .ventas-total {
+    margin-top: 4px !important;
+    padding-top: 9px !important;
+
+    border-top: 1px solid #94a3b8 !important;
+
+    font-size: 18px !important;
+    font-weight: 800 !important;
+  }
+
+  .ventas-page .ventas-total span {
+    font-size: 18px !important;
+    font-weight: 800 !important;
+  }
+
+  .ventas-page .ventas-total strong {
+    font-size: 21px !important;
+    font-weight: 900 !important;
+  }
+
+  .ventas-page .ventas-saldo-badge {
+    min-width: 0 !important;
+    padding: 2px 6px !important;
+    font-size: 13px !important;
+  }
+
+  .ventas-page .ventas-resumen-row:nth-last-child(1),
+  .ventas-page .ventas-resumen-row:nth-last-child(2) {
+    display: none !important;
+  }
+
+.ventas-page .ventas-layout > aside.ventas-card-sm .ventas-card-header {
+  width: 100% !important;
+  margin: 0 0 8px 0 !important;
+}
+
+.ventas-page .ventas-layout > aside.ventas-card-sm .ventas-card-header h2 {
+  width: auto !important;
+  margin: 0 !important;
+  font-size: 14px !important;
+}
+}   
+
+/* =====================================================
+   VENTA - IMPRESIÓN - RESUMEN PROFESIONAL - fin
+   ===================================================== */
+
+/* =====================================================
+   venta detalle - comprobante de pago
+   ===================================================== */
+
+   .ventas-pago-comprobante-detalle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+
+  margin-top: 10px;
+
+  font-size: 12px;
+  color: #64748b;
+}
+
+.ventas-pago-comprobante-detalle .ventas-pago-comprobante-btn {
+  flex: 0 0 34px;
+}
+
+.ventas-pago-comprobante-quitar {
+  width: 20px;
+  height: 20px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 0;
+
+  border: none;
+  border-radius: 50%;
+
+  background: #e5e7eb;
+  color: #475569;
+
+  cursor: pointer;
+
+  font-size: 14px;
+  line-height: 1;
+}
+
+.ventas-pago-comprobante-quitar:hover {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+/**/
+
+.ventas-pago-acciones {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ventas-pago-icon-btn {
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 0;
+
+  border: 1px solid #d7dbe3;
+  border-radius: 8px;
+
+  background: #fff;
+  color: #64748b;
+
+  cursor: pointer;
+
+  box-sizing: border-box;
+}
+
+.ventas-pago-icon-btn:hover {
+  border-color: #0ea5e9;
+  background: #f0f9ff;
+  color: #0284c7;
+}
+
+   /* =====================================================
+   VENTA detalle - comprobante de pago fin
+   ===================================================== */
+
+
