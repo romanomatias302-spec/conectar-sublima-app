@@ -462,6 +462,18 @@ function canReadVentas(clienteId) {
       return canModulo(clienteId, "ventas", "editar");
     }
 
+    function canAsignarNumeroRecibo(clienteId) {
+      return isSuperAdmin()
+        || (
+          tenantUserBase(clienteId)
+          && (
+            isAdmin()
+            || permisoModuloAccion("ventas", "crear")
+            || permisoModuloAccion("ventas", "editar")
+          )
+        );
+    }
+
 function canReadMovimientos(clienteId) {
   return isSuperAdmin()
     || (
@@ -621,7 +633,7 @@ function canReadMovimientos(clienteId) {
         );
     }
     
-        function canTouchUltimoNumeroVenta(clienteId) {
+    function canTouchUltimoNumeroVenta(clienteId) {
       return isSuperAdmin()
         || (
           tenantUserBase(clienteId)
@@ -631,8 +643,21 @@ function canReadMovimientos(clienteId) {
           )
         );
     }
+    
+    function canTouchUltimoNumeroRecibo(clienteId) {
+      return isSuperAdmin()
+        || (
+          tenantUserBase(clienteId)
+          && (
+            isAdmin()
+            || permisoModuloAccion("ventas", "crear")
+            || permisoModuloAccion("ventas", "editar")
+          )
+        );
+    }
 
-        function canTouchUltimoNumeroCotizacion(clienteId) {
+
+    function canTouchUltimoNumeroCotizacion(clienteId) {
       return isSuperAdmin()
         || (
           tenantUserBase(clienteId)
@@ -800,6 +825,15 @@ function canReadMovimientos(clienteId) {
             "updatedAt"
           ])
         )
+
+        || (
+          canTouchUltimoNumeroRecibo(clienteId)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            "ultimoNumeroRecibo",
+            "updatedAt"
+          ])
+        )
+
         || (
           canTouchUltimoNumeroPedido(clienteId)
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
@@ -1404,8 +1438,32 @@ match /produccion_sectores/{sectorId} {
           )
           && request.resource.data.clienteId == ventaParentClienteId(ventaId);
 
-        allow update: if canUpdateVentas(ventaParentClienteId(ventaId))
-          && request.resource.data.clienteId == ventaParentClienteId(ventaId);
+          allow update: if
+            (
+              canUpdateVentas(
+                ventaParentClienteId(ventaId)
+              )
+              && request.resource.data.clienteId ==
+                ventaParentClienteId(ventaId)
+            )
+            ||
+            (
+              canAsignarNumeroRecibo(
+                ventaParentClienteId(ventaId)
+              )
+              && request.resource.data.clienteId ==
+                resource.data.clienteId
+              && resource.data.clienteId ==
+                ventaParentClienteId(ventaId)
+              && request.resource.data
+                .diff(resource.data)
+                .affectedKeys()
+                .hasOnly([
+                  "numeroRecibo",
+                  "numeroReciboAsignadoAt",
+                  "updatedAt"
+                ])
+            );
 
         // por ahora no borramos pagos
         allow delete: if false;

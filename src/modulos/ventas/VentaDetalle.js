@@ -18,6 +18,7 @@ import {
   agregarItemAVenta,
   agregarPagoPosteriorAVenta,
   adjuntarComprobanteAPago,
+  obtenerOAsignarNumeroRecibo,
   anularItemDeVenta,
   anularPagoDeVenta,
   anularVenta,
@@ -27,7 +28,7 @@ import { fechaHoyNegocio } from "../../utils/fechas";
 import "./VentasPage.css";
 import { puedeHacer } from "../../utils/permisos";
 import ProductoSelectorModal from "../../components/ProductoSelectorModal/ProductoSelectorModal";
-import { Eye, Paperclip } from "lucide-react";
+import { Eye, Paperclip, ReceiptText } from "lucide-react";
 
 
 export default function VentaDetalle({ perfil, ventaId, onVolver, onVerPedido }) {
@@ -82,6 +83,8 @@ const [nuevoPago, setNuevoPago] = useState(() => ({
   const [guardandoPago, setGuardandoPago] = useState(false);
   const [anulandoVenta, setAnulandoVenta] = useState(false);
 
+  const [reciboImpresion, setReciboImpresion] = useState(null);
+
   const [error, setError] = useState("");
   const [exito, setExito] = useState("");
 
@@ -97,6 +100,14 @@ const puedeAnularVentas =
 
 
   const configMoneda = obtenerConfigMonedaDesdePerfil(perfil);
+
+  const formatearNumeroRecibo = (numero) => {
+    const valor = Number(numero || 0);
+
+    if (!valor) return "";
+
+    return `REC-${String(valor).padStart(6, "0")}`;
+  };
 
   const cargarVentaCompleta = async () => {
     try {
@@ -417,6 +428,65 @@ const puedeAnularVentas =
     }
   };
 
+  const imprimirReciboPago = async (pago) => {
+    try {
+      if (!pago?.firebaseId || !venta?.firebaseId) return;
+
+      setError("");
+
+      let numeroRecibo = pago.numeroRecibo || "";
+
+      /*
+      * Compatibilidad con pagos históricos:
+      * si todavía no tienen recibo, se asigna
+      * el siguiente número disponible.
+      */
+      if (!numeroRecibo) {
+        numeroRecibo = await obtenerOAsignarNumeroRecibo({
+          perfil,
+          ventaId: venta.firebaseId,
+          pagoId: pago.firebaseId,
+        });
+
+        await cargarVentaCompleta();
+      }
+
+      const recibo = {
+        ...pago,
+        numeroRecibo: String(numeroRecibo),
+      };
+
+      setReciboImpresion(recibo);
+
+      const tituloAnterior = document.title;
+
+      const cliente = (venta.clienteNombre || "Cliente")
+        .replace(/[\\/:*?"<>|]/g, "")
+        .trim();
+
+      document.title =
+        `${formatearNumeroRecibo(numeroRecibo)} - ${cliente}`;
+
+      const limpiarDespuesDeImprimir = () => {
+        document.title = tituloAnterior;
+        setReciboImpresion(null);
+      };
+
+      window.addEventListener(
+        "afterprint",
+        limpiarDespuesDeImprimir,
+        { once: true }
+      );
+
+      setTimeout(() => {
+        window.print();
+      }, 50);
+    } catch (err) {
+      console.error("Error preparando recibo:", err);
+      setError("No se pudo preparar el recibo.");
+    }
+  };
+
   const seleccionarComprobanteNuevoPago = (archivo) => {
   if (!archivo) return;
 
@@ -558,7 +628,116 @@ const puedeAnularVentas =
   
 
   return (
-    <div className="ventas-page">
+    <div
+      className={`ventas-page ${
+        reciboImpresion ? "ventas-print-recibo-mode" : ""
+      }`}
+    >
+      {reciboImpresion && (
+        <section className="ventas-recibo-print">
+          <div className="ventas-recibo-header">
+            <div className="ventas-recibo-negocio">
+              {configNegocio.logoUrl && (
+                <img
+                  src={configNegocio.logoUrl}
+                  alt="Logo negocio"
+                />
+              )}
+
+              <div>
+                <strong>
+                  {configNegocio.nombreVisible || "Comprobante de pago"}
+                </strong>
+                <span>Recibo de pago</span>
+              </div>
+            </div>
+
+            <div className="ventas-recibo-numero">
+              <span>RECIBO</span>
+              <strong>
+                {formatearNumeroRecibo(
+                  reciboImpresion.numeroRecibo
+                )}
+              </strong>
+            </div>
+          </div>
+
+          <div className="ventas-recibo-info">
+            <div>
+              <span>Fecha</span>
+              <strong>{reciboImpresion.fechaPago || "-"}</strong>
+            </div>
+
+            <div>
+              <span>Cliente</span>
+              <strong>{venta.clienteNombre || "-"}</strong>
+            </div>
+
+            <div>
+              <span>Venta asociada</span>
+              <strong>#{venta.numeroVenta || "-"}</strong>
+            </div>
+          </div>
+
+          <div className="ventas-recibo-monto">
+            <span>Recibimos la suma de</span>
+
+            <strong>
+              {formatearMoneda(
+                reciboImpresion.monto,
+                configMoneda.moneda,
+                configMoneda.localeMoneda
+              )}
+            </strong>
+          </div>
+
+          <div className="ventas-recibo-detalle">
+            <div>
+              <span>Medio de pago</span>
+              <strong>
+                {reciboImpresion.medioPago || "-"}
+              </strong>
+            </div>
+
+            {reciboImpresion.observacion && (
+              <div>
+                <span>Observación</span>
+                <strong>
+                  {reciboImpresion.observacion}
+                </strong>
+              </div>
+            )}
+
+            {reciboImpresion.fechaComprobanteReal && (
+              <div>
+                <span>Fecha real del comprobante</span>
+                <strong>
+                  {reciboImpresion.fechaComprobanteReal}
+                </strong>
+              </div>
+            )}
+          </div>
+
+          {(reciboImpresion.estadoPagoRegistro || "activo") !==
+            "activo" && (
+            <div className="ventas-recibo-anulado">
+              RECIBO ANULADO
+            </div>
+          )}
+
+          <div className="ventas-recibo-footer">
+            <span>
+              Este recibo corresponde exclusivamente al pago indicado.
+            </span>
+
+            <strong>
+              {formatearNumeroRecibo(
+                reciboImpresion.numeroRecibo
+              )}
+            </strong>
+          </div>
+        </section>
+      )}
       <div className="factura-negocio-print">
         {configNegocio.logoUrl && (
           <img
@@ -1018,6 +1197,21 @@ const puedeAnularVentas =
                               </label>
                             )
                           )}
+
+
+                          <button
+                            type="button"
+                            className="ventas-pago-icon-btn"
+                            title={
+                              pago.numeroRecibo
+                                ? `Imprimir ${formatearNumeroRecibo(pago.numeroRecibo)}`
+                                : "Generar e imprimir recibo"
+                            }
+                            onClick={() => imprimirReciboPago(pago)}
+                          >
+                            <ReceiptText size={15} />
+                          </button>
+
 
                           {activo &&
                             !ventaAnulada &&

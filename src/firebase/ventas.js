@@ -52,6 +52,8 @@ export async function obtenerSiguienteNumeroVenta(clienteId) {
   return nuevoNumero.toString();
 }
 
+
+
 async function subirComprobantePago({
   clienteId,
   ventaId,
@@ -269,9 +271,6 @@ const sucursalNombre = perfil?.sucursalDefaultNombre || "Sucursal principal";
 
   const ventaRef = await addDoc(collection(db, "ventas"), ventaData);
 
-  console.log("USO SAAS venta", {
-    clienteId: perfil?.clienteId,
-  });
 
   await registrarUsoSaas({
     clienteId: perfil.clienteId,
@@ -351,7 +350,23 @@ for (const item of itemsNormalizados) {
       updatedAt: serverTimestamp(),
     };
 
-      await addDoc(collection(db, "ventas", ventaRef.id, "pagos"), pagoData);
+      const pagoRef = await addDoc(
+        collection(db, "ventas", ventaRef.id, "pagos"),
+        pagoData
+      );
+
+      try {
+        await obtenerOAsignarNumeroRecibo({
+          perfil,
+          ventaId: ventaRef.id,
+          pagoId: pagoRef.id,
+        });
+      } catch (errorRecibo) {
+        console.error(
+          "El pago inicial fue creado, pero no se pudo asignar número de recibo:",
+          errorRecibo
+        );
+      }
 
       await addDoc(collection(db, "movimientos"), {
         clienteId: perfil.clienteId,
@@ -444,7 +459,9 @@ export async function agregarPagoAVenta({
     })
   : null;  
 
-  await addDoc(collection(db, "ventas", venta.firebaseId, "pagos"), {
+  const pagoRef = await addDoc(
+    collection(db, "ventas", venta.firebaseId, "pagos"),
+    {
     clienteId: perfil.clienteId,
     sucursalId,
     sucursalNombre,
@@ -463,7 +480,21 @@ export async function agregarPagoAVenta({
     motivoAnulacion: "",
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
+    
   });
+
+  try {
+  await obtenerOAsignarNumeroRecibo({
+    perfil,
+    ventaId: venta.firebaseId,
+    pagoId: pagoRef.id,
+  });
+} catch (errorRecibo) {
+  console.error(
+    "El pago fue creado, pero no se pudo asignar número de recibo:",
+    errorRecibo
+  );
+}
 
 await addDoc(collection(db, "movimientos"), {
   clienteId: perfil.clienteId,
@@ -531,6 +562,92 @@ export async function obtenerPagosDeVenta(ventaId) {
     firebaseId: d.id,
     ...d.data(),
   }));
+}
+
+export async function obtenerOAsignarNumeroRecibo({
+  perfil,
+  ventaId,
+  pagoId,
+}) {
+  if (!perfil?.clienteId) {
+    throw new Error("Perfil inválido.");
+  }
+
+  if (!ventaId || !pagoId) {
+    throw new Error("Faltan datos del pago.");
+  }
+
+  const clienteSaasRef = doc(
+    db,
+    "clientes-saas",
+    perfil.clienteId
+  );
+
+  const pagoRef = doc(
+    db,
+    "ventas",
+    ventaId,
+    "pagos",
+    pagoId
+  );
+
+  const numeroRecibo = await runTransaction(
+    db,
+    async (transaction) => {
+      const [clienteSnap, pagoSnap] = await Promise.all([
+        transaction.get(clienteSaasRef),
+        transaction.get(pagoRef),
+      ]);
+
+      if (!clienteSnap.exists()) {
+        throw new Error("No existe el cliente SaaS asociado.");
+      }
+
+      if (!pagoSnap.exists()) {
+        throw new Error("El pago no existe.");
+      }
+
+      const pagoData = pagoSnap.data();
+
+      if (pagoData.clienteId !== perfil.clienteId) {
+        throw new Error(
+          "El pago no pertenece a la empresa."
+        );
+      }
+
+      /*
+       * Si el pago ya tiene recibo, devolvemos exactamente
+       * el mismo número. Nunca generamos otro.
+       */
+      if (pagoData.numeroRecibo) {
+        return String(pagoData.numeroRecibo);
+      }
+
+      const clienteData = clienteSnap.data();
+
+      const ultimoNumeroRecibo = Number(
+        clienteData.ultimoNumeroRecibo || 0
+      );
+
+      const siguienteNumero =
+        ultimoNumeroRecibo + 1;
+
+      transaction.update(clienteSaasRef, {
+        ultimoNumeroRecibo: siguienteNumero,
+        updatedAt: serverTimestamp(),
+      });
+
+      transaction.update(pagoRef, {
+        numeroRecibo: siguienteNumero.toString(),
+        numeroReciboAsignadoAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+
+      return siguienteNumero.toString();
+    }
+  );
+
+  return numeroRecibo;
 }
 
 export async function adjuntarComprobanteAPago({
