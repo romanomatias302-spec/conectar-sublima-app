@@ -17,6 +17,8 @@ import {
   actualizarPedidoAsociadoDeVenta,
   agregarItemAVenta,
   agregarPagoPosteriorAVenta,
+  adjuntarComprobanteAPago,
+  obtenerOAsignarNumeroRecibo,
   anularItemDeVenta,
   anularPagoDeVenta,
   anularVenta,
@@ -25,6 +27,8 @@ import { formatearMoneda, obtenerConfigMonedaDesdePerfil } from "../../utils/mon
 import { fechaHoyNegocio } from "../../utils/fechas";
 import "./VentasPage.css";
 import { puedeHacer } from "../../utils/permisos";
+import ProductoSelectorModal from "../../components/ProductoSelectorModal/ProductoSelectorModal";
+import { Eye, Paperclip, ReceiptText } from "lucide-react";
 
 
 export default function VentaDetalle({ perfil, ventaId, onVolver, onVerPedido }) {
@@ -42,11 +46,29 @@ const [busquedaPedido, setBusquedaPedido] = useState("");
 const [mostrarDropdownPedido, setMostrarDropdownPedido] = useState(false);
 const [guardandoPedido, setGuardandoPedido] = useState(false);
 
-  const [nuevoItem, setNuevoItem] = useState({
-    descripcion: "",
-    cantidad: 1,
-    precioUnitario: 0,
-  });
+const [nuevoItem, setNuevoItem] = useState({
+  descripcion: "",
+  cantidad: 1,
+  precioUnitario: 0,
+  excluirDescuento: false,
+
+  origenPrecio: "manual",
+  listaPrecioId: "",
+  listaPrecioNombre: "",
+  productoListaNombre: "",
+  productoBaseId: "",
+  varianteId: "",
+  varianteNombre: "",
+
+  imagenUrl: "",
+  imagenThumb: "",
+
+  reglaCantidad: null,
+  adicionalesSeleccionados: [],
+  precioDetalleInterno: null,
+});
+
+const [modalPrecioAbierto, setModalPrecioAbierto] = useState(false);
 
 const [nuevoPago, setNuevoPago] = useState(() => ({
   monto: 0,
@@ -54,11 +76,14 @@ const [nuevoPago, setNuevoPago] = useState(() => ({
   fechaPago: fechaHoyNegocio(perfil),
   observacion: "",
   fechaComprobanteReal: "",
+  comprobanteArchivo: null,
 }));
 
   const [guardandoItem, setGuardandoItem] = useState(false);
   const [guardandoPago, setGuardandoPago] = useState(false);
   const [anulandoVenta, setAnulandoVenta] = useState(false);
+
+  const [reciboImpresion, setReciboImpresion] = useState(null);
 
   const [error, setError] = useState("");
   const [exito, setExito] = useState("");
@@ -75,6 +100,14 @@ const puedeAnularVentas =
 
 
   const configMoneda = obtenerConfigMonedaDesdePerfil(perfil);
+
+  const formatearNumeroRecibo = (numero) => {
+    const valor = Number(numero || 0);
+
+    if (!valor) return "";
+
+    return `REC-${String(valor).padStart(6, "0")}`;
+  };
 
   const cargarVentaCompleta = async () => {
     try {
@@ -313,6 +346,22 @@ const puedeAnularVentas =
     }
   };
 
+  const abrirSelectorPrecio = () => {
+    setModalPrecioAbierto(true);
+    setError("");
+  };
+
+  const aplicarProductoSeleccionado = (datosPrecio) => {
+    setNuevoItem((prev) => ({
+      ...prev,
+      ...datosPrecio,
+      cantidad: prev.cantidad,
+    }));
+
+    setModalPrecioAbierto(false);
+    setError("");
+  };
+
   const guardarNuevoItem = async () => {
     try {
       if (!puedeEditarVentas) return;
@@ -324,15 +373,49 @@ const puedeAnularVentas =
       await agregarItemAVenta({
         perfil,
         venta,
+
         descripcion: nuevoItem.descripcion,
         cantidad: Number(nuevoItem.cantidad),
         precioUnitario: Number(nuevoItem.precioUnitario),
+
+        excluirDescuento: nuevoItem.excluirDescuento === true,
+
+        origenPrecio: nuevoItem.origenPrecio || "manual",
+        listaPrecioId: nuevoItem.listaPrecioId || "",
+        listaPrecioNombre: nuevoItem.listaPrecioNombre || "",
+        productoListaNombre: nuevoItem.productoListaNombre || "",
+        productoBaseId: nuevoItem.productoBaseId || "",
+        varianteId: nuevoItem.varianteId || "",
+        varianteNombre: nuevoItem.varianteNombre || "",
+
+        imagenUrl: nuevoItem.imagenUrl || "",
+        imagenThumb: nuevoItem.imagenThumb || "",
+
+        reglaCantidad: nuevoItem.reglaCantidad || null,
+        adicionalesSeleccionados: nuevoItem.adicionalesSeleccionados || [],
+        precioDetalleInterno: nuevoItem.precioDetalleInterno || null,
       });
 
       setNuevoItem({
         descripcion: "",
         cantidad: 1,
         precioUnitario: 0,
+        excluirDescuento: false,
+
+        origenPrecio: "manual",
+        listaPrecioId: "",
+        listaPrecioNombre: "",
+        productoListaNombre: "",
+        productoBaseId: "",
+        varianteId: "",
+        varianteNombre: "",
+
+        imagenUrl: "",
+        imagenThumb: "",
+
+        reglaCantidad: null,
+        adicionalesSeleccionados: [],
+        precioDetalleInterno: null,
       });
 
       await cargarVentaCompleta();
@@ -342,6 +425,138 @@ const puedeAnularVentas =
       setError(err.message || "No se pudo agregar el ítem.");
     } finally {
       setGuardandoItem(false);
+    }
+  };
+
+  const imprimirReciboPago = async (pago) => {
+    try {
+      if (!pago?.firebaseId || !venta?.firebaseId) return;
+
+      setError("");
+
+      let numeroRecibo = pago.numeroRecibo || "";
+
+      /*
+      * Compatibilidad con pagos históricos:
+      * si todavía no tienen recibo, se asigna
+      * el siguiente número disponible.
+      */
+      if (!numeroRecibo) {
+        numeroRecibo = await obtenerOAsignarNumeroRecibo({
+          perfil,
+          ventaId: venta.firebaseId,
+          pagoId: pago.firebaseId,
+        });
+
+        await cargarVentaCompleta();
+      }
+
+      const recibo = {
+        ...pago,
+        numeroRecibo: String(numeroRecibo),
+      };
+
+      setReciboImpresion(recibo);
+
+      const tituloAnterior = document.title;
+
+      const cliente = (venta.clienteNombre || "Cliente")
+        .replace(/[\\/:*?"<>|]/g, "")
+        .trim();
+
+      document.title =
+        `${formatearNumeroRecibo(numeroRecibo)} - ${cliente}`;
+
+      const limpiarDespuesDeImprimir = () => {
+        document.title = tituloAnterior;
+        setReciboImpresion(null);
+      };
+
+      window.addEventListener(
+        "afterprint",
+        limpiarDespuesDeImprimir,
+        { once: true }
+      );
+
+      setTimeout(() => {
+        window.print();
+      }, 50);
+    } catch (err) {
+      console.error("Error preparando recibo:", err);
+      setError("No se pudo preparar el recibo.");
+    }
+  };
+
+  const seleccionarComprobanteNuevoPago = (archivo) => {
+  if (!archivo) return;
+
+  const MAX_BYTES = 2 * 1024 * 1024;
+
+  if (archivo.size > MAX_BYTES) {
+    setError("El comprobante no puede superar los 2 MB.");
+    return;
+  }
+
+  const tiposPermitidos = [
+    "application/pdf",
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+  ];
+
+  const tipoPermitido = tiposPermitidos.includes(archivo.type);
+
+  if (!tipoPermitido) {
+    setError("El comprobante debe ser una imagen o un archivo PDF.");
+    return;
+  }
+
+  setNuevoPago((prev) => ({
+    ...prev,
+    comprobanteArchivo: archivo,
+  }));
+
+  setError("");
+};
+
+    const adjuntarComprobantePagoExistente = async (pago, archivo) => {
+    if (!archivo || !pago?.firebaseId || !venta?.firebaseId) return;
+
+    const MAX_BYTES = 2 * 1024 * 1024;
+
+    if (archivo.size > MAX_BYTES) {
+      setError("El comprobante no puede superar los 2 MB.");
+      return;
+    }
+
+    const tiposPermitidos = [
+      "application/pdf",
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+    ];
+
+    if (!tiposPermitidos.includes(archivo.type)) {
+      setError("El comprobante debe ser PDF, JPG, PNG o WEBP.");
+      return;
+    }
+
+    try {
+      setError("");
+
+      await adjuntarComprobanteAPago({
+        perfil,
+        ventaId: venta.firebaseId,
+        pagoId: pago.firebaseId,
+        archivo,
+      });
+
+      await cargarVentaCompleta();
+
+      setExito("Comprobante adjuntado.");
+    } catch (err) {
+      console.error("Error adjuntando comprobante:", err);
+      setError("No se pudo adjuntar el comprobante.");
     }
   };
 
@@ -360,6 +575,7 @@ const puedeAnularVentas =
         medioPago: nuevoPago.medioPago,
         fechaPago: nuevoPago.fechaPago,
         fechaComprobanteReal: nuevoPago.fechaComprobanteReal,
+        comprobanteArchivo: nuevoPago.comprobanteArchivo || null,
         observacion: nuevoPago.observacion,
       });
 
@@ -369,14 +585,22 @@ const puedeAnularVentas =
         fechaPago: fechaHoyNegocio(perfil),
         observacion: "",
         fechaComprobanteReal: "",
+        comprobanteArchivo: null,
       });
 
       await cargarVentaCompleta();
       setExito("Pago agregado con éxito.");
-    } catch (err) {
-      console.error(err);
-      setError(err.message || "No se pudo agregar el pago.");
-    } finally {
+      } catch (err) {
+        console.error("Error agregando pago:", err);
+
+        if (err?.code === "storage/unauthorized") {
+          setError("No se pudo adjuntar el comprobante.");
+        } else if (err?.code === "storage/retry-limit-exceeded") {
+          setError("No se pudo subir el comprobante. Intentá nuevamente.");
+        } else {
+          setError("No se pudo agregar el pago.");
+        }
+      } finally {
       setGuardandoPago(false);
     }
   };
@@ -404,7 +628,116 @@ const puedeAnularVentas =
   
 
   return (
-    <div className="ventas-page">
+    <div
+      className={`ventas-page ${
+        reciboImpresion ? "ventas-print-recibo-mode" : ""
+      }`}
+    >
+      {reciboImpresion && (
+        <section className="ventas-recibo-print">
+          <div className="ventas-recibo-header">
+            <div className="ventas-recibo-negocio">
+              {configNegocio.logoUrl && (
+                <img
+                  src={configNegocio.logoUrl}
+                  alt="Logo negocio"
+                />
+              )}
+
+              <div>
+                <strong>
+                  {configNegocio.nombreVisible || "Comprobante de pago"}
+                </strong>
+                <span>Recibo de pago</span>
+              </div>
+            </div>
+
+            <div className="ventas-recibo-numero">
+              <span>RECIBO</span>
+              <strong>
+                {formatearNumeroRecibo(
+                  reciboImpresion.numeroRecibo
+                )}
+              </strong>
+            </div>
+          </div>
+
+          <div className="ventas-recibo-info">
+            <div>
+              <span>Fecha</span>
+              <strong>{reciboImpresion.fechaPago || "-"}</strong>
+            </div>
+
+            <div>
+              <span>Cliente</span>
+              <strong>{venta.clienteNombre || "-"}</strong>
+            </div>
+
+            <div>
+              <span>Venta asociada</span>
+              <strong>#{venta.numeroVenta || "-"}</strong>
+            </div>
+          </div>
+
+          <div className="ventas-recibo-monto">
+            <span>Recibimos la suma de</span>
+
+            <strong>
+              {formatearMoneda(
+                reciboImpresion.monto,
+                configMoneda.moneda,
+                configMoneda.localeMoneda
+              )}
+            </strong>
+          </div>
+
+          <div className="ventas-recibo-detalle">
+            <div>
+              <span>Medio de pago</span>
+              <strong>
+                {reciboImpresion.medioPago || "-"}
+              </strong>
+            </div>
+
+            {reciboImpresion.observacion && (
+              <div>
+                <span>Observación</span>
+                <strong>
+                  {reciboImpresion.observacion}
+                </strong>
+              </div>
+            )}
+
+            {reciboImpresion.fechaComprobanteReal && (
+              <div>
+                <span>Fecha real del comprobante</span>
+                <strong>
+                  {reciboImpresion.fechaComprobanteReal}
+                </strong>
+              </div>
+            )}
+          </div>
+
+          {(reciboImpresion.estadoPagoRegistro || "activo") !==
+            "activo" && (
+            <div className="ventas-recibo-anulado">
+              RECIBO ANULADO
+            </div>
+          )}
+
+          <div className="ventas-recibo-footer">
+            <span>
+              Este recibo corresponde exclusivamente al pago indicado.
+            </span>
+
+            <strong>
+              {formatearNumeroRecibo(
+                reciboImpresion.numeroRecibo
+              )}
+            </strong>
+          </div>
+        </section>
+      )}
       <div className="factura-negocio-print">
         {configNegocio.logoUrl && (
           <img
@@ -435,7 +768,7 @@ const puedeAnularVentas =
               <button
                 className="btn btn-secondary btn-xs"
                 onClick={handleAnularVenta}
-                disabled={anulandoVenta || !puedeEditarVentas}
+                disabled={anulandoVenta || !puedeAnularVentas}
               >
                 {anulandoVenta ? "Anulando..." : "Anular venta"}
               </button>
@@ -575,10 +908,11 @@ const puedeAnularVentas =
               <table className="ventas-table">
                 <thead>
                   <tr>
-                    <th>Descripción</th>
+                    <th>Producto</th>
                     <th>Cantidad</th>
                     <th>Precio unitario</th>
                     <th>Subtotal</th>
+                    <th>Descuento</th>
                     <th>Estado</th>
                     <th>Acción</th>
                   </tr>
@@ -592,10 +926,50 @@ const puedeAnularVentas =
                         key={item.firebaseId}
                         className={!activo ? "ventas-row-anulada" : ""}
                       >
-                        <td>{item.descripcion}</td>
+                        <td className="ventas-producto-td">
+                          <div className="ventas-producto-row">
+                            <div className="ventas-producto-img">
+                              {item.imagenThumb || item.imagenUrl ? (
+                                <img
+                                  src={item.imagenThumb || item.imagenUrl}
+                                  alt={item.descripcion || "Producto"}
+                                />
+                              ) : (
+                                <span />
+                              )}
+                            </div>
+
+                            <div className="ventas-producto-main">
+                              <strong className="ventas-producto-nombre">
+                                {item.descripcion || "Producto sin descripción"}
+                              </strong>
+
+                              {item.origenPrecio === "lista_precio" && (
+                                <small className="ventas-item-source">
+                                  {item.varianteNombre
+                                    ? `Lista de precios · ${item.varianteNombre}`
+                                    : "Lista de precios"}
+                                </small>
+                              )}
+                            </div>
+                          </div>
+                        </td>
                         <td>{item.cantidad}</td>
                         <td>{formatearMoneda(item.precioUnitario, configMoneda.moneda, configMoneda.localeMoneda)}</td>
-                        <td>{formatearMoneda(item.subtotal, configMoneda.moneda, configMoneda.localeMoneda)}</td>  
+                        <td>{formatearMoneda(item.subtotal, configMoneda.moneda, configMoneda.localeMoneda)}</td>
+                        <td>
+                          {item.excluirDescuento === true ? (
+                            <span className="ventas-estado-badge ventas-estado-anulado">
+                              Excluido
+                            </span>
+                          ) : Number(venta.descuentoPorcentaje || 0) > 0 ? (
+                            <span className="ventas-estado-badge ventas-estado-ok">
+                              {Number(venta.descuentoPorcentaje)}%
+                            </span>
+                          ) : (
+                            "-"
+                          )}
+                        </td>  
                         <td>
                           <span className={`ventas-estado-badge ${activo ? "ventas-estado-ok" : "ventas-estado-anulado"}`}>
                             {activo ? "Activo" : "Anulado"}
@@ -627,44 +1001,110 @@ const puedeAnularVentas =
                 <h2>Agregar nuevo ítem</h2>
               </div>
 
-              <div className="ventas-grid ventas-grid-3">
-                <div className="ventas-field">
-                  <label>Descripción</label>
-                  <input
-                    value={nuevoItem.descripcion}
-                    onChange={(e) =>
-                      setNuevoItem((prev) => ({ ...prev, descripcion: e.target.value }))
-                    }
-                    disabled={!puedeEditarVentas || ventaAnulada}
-                  />
+              <div className="ventas-detalle-item-grid">
+
+                <div className="ventas-field ventas-detalle-producto-field">
+                  <label>Producto</label>
+
+                  <div className="ventas-descripcion-selector ventas-descripcion-selector-clean">
+                    <input
+                      value={nuevoItem.descripcion}
+                      onChange={(e) =>
+                        setNuevoItem((prev) => ({
+                          ...prev,
+                          descripcion: e.target.value,
+
+                          origenPrecio: "manual",
+                          listaPrecioId: "",
+                          listaPrecioNombre: "",
+                          productoListaNombre: "",
+                          productoBaseId: "",
+                          varianteId: "",
+                          varianteNombre: "",
+                          imagenUrl: "",
+                          imagenThumb: "",
+                          reglaCantidad: null,
+                          adicionalesSeleccionados: [],
+                          precioDetalleInterno: null,
+                        }))
+                      }
+                      placeholder="Ej: Remera personalizada"
+                      disabled={!puedeEditarVentas || ventaAnulada}
+                    />
+
+                    <button
+                      type="button"
+                      className="ventas-selector-precio-btn"
+                      onClick={abrirSelectorPrecio}
+                      disabled={!puedeEditarVentas || ventaAnulada}
+                      title="Agregar desde lista de precios"
+                    />
+                  </div>
+
+                  {nuevoItem.origenPrecio === "lista_precio" && (
+                    <small className="ventas-item-source">
+                      {nuevoItem.varianteNombre
+                        ? `Lista de precios · ${nuevoItem.varianteNombre}`
+                        : "Lista de precios"}
+                    </small>
+                  )}
                 </div>
 
-                <div className="ventas-field">
-                  <label>Cantidad</label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={nuevoItem.cantidad}
-                    onChange={(e) =>
-                      setNuevoItem((prev) => ({ ...prev, cantidad: e.target.value }))
-                    }
-                    disabled={!puedeEditarVentas || ventaAnulada}
-                  />
-                </div>
-
-                <div className="ventas-field">
+                <div className="ventas-field ventas-detalle-precio-field">
                   <label>Precio unitario</label>
                   <input
                     type="number"
                     min="0"
                     value={nuevoItem.precioUnitario}
                     onChange={(e) =>
-                      setNuevoItem((prev) => ({ ...prev, precioUnitario: e.target.value }))
+                      setNuevoItem((prev) => ({
+                        ...prev,
+                        precioUnitario: e.target.value,
+                      }))
                     }
                     disabled={!puedeEditarVentas || ventaAnulada}
                   />
                 </div>
+
+                <div className="ventas-field ventas-detalle-cantidad-field">
+                  <label>Cantidad</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={nuevoItem.cantidad}
+                    onChange={(e) =>
+                      setNuevoItem((prev) => ({
+                        ...prev,
+                        cantidad: e.target.value,
+                      }))
+                    }
+                    disabled={!puedeEditarVentas || ventaAnulada}
+                  />
+                </div>
+
+                <div className="ventas-field ventas-detalle-excluir-field">
+                  <label>Excluir dto.</label>
+
+                  <label className="ventas-detalle-excluir">
+                    <input
+                      type="checkbox"
+                      checked={nuevoItem.excluirDescuento === true}
+                      onChange={(e) =>
+                        setNuevoItem((prev) => ({
+                          ...prev,
+                          excluirDescuento: e.target.checked,
+                        }))
+                      }
+                      disabled={!puedeEditarVentas || ventaAnulada}
+                    />
+
+                    
+                  </label>
+                </div>
+
               </div>
+
+
 
               <div className="ventas-actions-row">
                 <button
@@ -715,20 +1155,76 @@ const puedeAnularVentas =
                             {activo ? "Activo" : "Anulado"}
                           </span>
                         </td>
-                        <td>
-                          {activo &&
-                          !ventaAnulada &&
-                          puedeAnularVentas ? (
+                      <td>
+                        <div className="ventas-pago-acciones">
+                          {pago.comprobante?.url ? (
                             <button
-                              className="btn btn-secondary btn-xs"
-                              onClick={() => anularPago(pago)}
+                              type="button"
+                              className="ventas-pago-icon-btn"
+                              title="Ver comprobante"
+                              onClick={() =>
+                                window.open(
+                                  pago.comprobante.url,
+                                  "_blank",
+                                  "noopener,noreferrer"
+                                )
+                              }
                             >
-                              Anular
+                              <Eye size={15} />
                             </button>
                           ) : (
-                            "-"
+                            activo &&
+                            !ventaAnulada &&
+                            puedeEditarVentas && (
+                              <label
+                                className="ventas-pago-icon-btn"
+                                title="Adjuntar comprobante"
+                              >
+                                <Paperclip size={15} />
+
+                                <input
+                                  type="file"
+                                  accept=".pdf,image/jpeg,image/png,image/webp"
+                                  style={{ display: "none" }}
+                                  onChange={(e) => {
+                                    const archivo = e.target.files?.[0] || null;
+
+                                    adjuntarComprobantePagoExistente(pago, archivo);
+
+                                    e.target.value = "";
+                                  }}
+                                />
+                              </label>
+                            )
                           )}
-                        </td>
+
+
+                          <button
+                            type="button"
+                            className="ventas-pago-icon-btn"
+                            title={
+                              pago.numeroRecibo
+                                ? `Imprimir ${formatearNumeroRecibo(pago.numeroRecibo)}`
+                                : "Generar e imprimir recibo"
+                            }
+                            onClick={() => imprimirReciboPago(pago)}
+                          >
+                            <ReceiptText size={15} />
+                          </button>
+
+
+                          {activo &&
+                            !ventaAnulada &&
+                            puedeAnularVentas && (
+                              <button
+                                className="btn btn-secondary btn-xs"
+                                onClick={() => anularPago(pago)}
+                              >
+                                Anular
+                              </button>
+                            )}
+                        </div>
+                      </td>
                       </tr>
                     );
                   })}
@@ -809,6 +1305,57 @@ const puedeAnularVentas =
                 />
               </div>
 
+              <div className="ventas-pago-comprobante-detalle">
+                <label
+                  className={`ventas-pago-comprobante-btn ${
+                    nuevoPago.comprobanteArchivo ? "is-active" : ""
+                  }`}
+                  title={
+                    nuevoPago.comprobanteArchivo
+                      ? nuevoPago.comprobanteArchivo.name
+                      : "Adjuntar comprobante (máx. 2 MB)"
+                  }
+                >
+                  <Paperclip size={15} />
+
+                  <input
+                    type="file"
+                    accept="image/*,application/pdf"
+                    style={{ display: "none" }}
+                    disabled={!puedeEditarVentas || ventaAnulada}
+                    onChange={(e) => {
+                      const archivo = e.target.files?.[0] || null;
+
+                      seleccionarComprobanteNuevoPago(archivo);
+
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
+
+                <span>
+                  {nuevoPago.comprobanteArchivo
+                    ? "Comprobante adjunto"
+                    : "Adjuntar comprobante"}
+                </span>
+
+                {nuevoPago.comprobanteArchivo && (
+                  <button
+                    type="button"
+                    className="ventas-pago-comprobante-quitar"
+                    onClick={() =>
+                      setNuevoPago((prev) => ({
+                        ...prev,
+                        comprobanteArchivo: null,
+                      }))
+                    }
+                    title="Quitar comprobante"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+
               <div className="ventas-actions-row">
                 <button
                   className="btn btn-primary"
@@ -844,8 +1391,20 @@ const puedeAnularVentas =
             </div>
 
             <div className="ventas-resumen-row">
-              <span>Descuento</span>
-              <strong>{formatearMoneda(venta.descuento, configMoneda.moneda, configMoneda.localeMoneda)}</strong> 
+              <span>
+                Descuento
+                {Number(venta.descuentoPorcentaje || 0) > 0
+                  ? ` (${Number(venta.descuentoPorcentaje)}%)`
+                  : ""}
+              </span>
+
+              <strong>
+                {formatearMoneda(
+                  venta.descuento,
+                  configMoneda.moneda,
+                  configMoneda.localeMoneda
+                )}
+              </strong>
             </div>
 
             <div className="ventas-resumen-row ventas-total">
@@ -892,6 +1451,16 @@ const puedeAnularVentas =
           </div>
         </aside>
       </div>
+      <ProductoSelectorModal
+        open={modalPrecioAbierto}
+        perfil={perfil}
+        configMoneda={configMoneda}
+        itemActual={nuevoItem}
+        onClose={() => {
+          setModalPrecioAbierto(false);
+        }}
+        onAplicar={aplicarProductoSeleccionado}
+      />
     </div>
   );
 }

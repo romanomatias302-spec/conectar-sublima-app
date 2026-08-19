@@ -325,8 +325,8 @@
 
 .ventas-pago-item {
   display: grid;
-  grid-template-columns: 1fr 1fr 34px;
-  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 34px 34px;
+  gap: 6px;
   align-items: center;
 }
 
@@ -353,6 +353,94 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* COMPROBANTE DE PAGO */
+
+.ventas-pago-comprobante-btn {
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 0;
+
+  border: 1px solid #d7dbe3;
+  border-radius: 8px;
+
+  background: #fff;
+  color: #64748b;
+
+  cursor: pointer;
+
+  box-sizing: border-box;
+
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.ventas-pago-comprobante-btn:hover {
+  border-color: #0ea5e9;
+  color: #0284c7;
+  background: #f0f9ff;
+}
+
+.ventas-pago-comprobante-btn.is-active {
+  border-color: #86efac;
+  background: #f0fdf4;
+  color: #16a34a;
+}
+
+.ventas-pago-comprobante-nombre {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+
+  margin-top: 4px;
+  padding-left: 2px;
+
+  font-size: 11px;
+  line-height: 1.2;
+
+  color: #64748b;
+}
+
+.ventas-pago-comprobante-nombre span {
+  white-space: nowrap;
+}
+
+.ventas-pago-comprobante-nombre button {
+  width: 18px;
+  height: 18px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 0;
+
+  border: none;
+  border-radius: 50%;
+
+  background: #e5e7eb;
+  color: #475569;
+
+  font-size: 13px;
+  line-height: 1;
+
+  cursor: pointer;
+}
+
+.ventas-pago-comprobante-nombre button:hover {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+/* COMPROBANTE DE PAGO fin */
 
 .ventas-add-pago-btn {
   margin-top: 4px;
@@ -714,10 +802,17 @@
     font-size: 15px;
   }
 
-  .ventas-pago-item {
-    grid-template-columns: 1fr 1fr 30px;
-    gap: 6px;
-  }
+.ventas-pago-item {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 30px 30px;
+  gap: 5px;
+}
+
+.ventas-pago-comprobante-btn,
+.ventas-pago-remove {
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+}
 }
 
 @media (max-width: 768px) {
@@ -3792,3 +3887,949 @@ margin-top:20px;
   border-radius: 999px !important;
   line-height: 1 !important;
 }
+
+/* =====================================================
+   COTIZACIÓN - IMPRESIÓN
+   ===================================================== */
+
+@media print {
+
+  /* Área principal */
+  .cotizacion-print-area {
+    width: 100% !important;
+    max-width: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    gap: 10px !important;
+    overflow: visible !important;
+  }
+
+  /* Tarjetas más compactas para papel */
+  .cotizacion-print-area .ventas-card {
+    width: 100% !important;
+    max-width: none !important;
+    box-sizing: border-box !important;
+    box-shadow: none !important;
+    border: 1px solid #e5e7eb !important;
+    border-radius: 8px !important;
+    padding: 10px !important;
+    margin: 0 0 10px 0 !important;
+    overflow: visible !important;
+  }
+
+  /* Muy importante: elimina scroll de la tabla */
+  .cotizacion-print-area .ventas-table-wrap {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow: visible !important;
+    overflow-x: visible !important;
+  }
+
+  .cotizacion-print-area .cotizacion-detalle-items-table {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    table-layout: fixed !important;
+    border-collapse: collapse !important;
+  }
+
+  .cotizacion-print-area .cotizacion-detalle-items-table th,
+  .cotizacion-print-area .cotizacion-detalle-items-table td {
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    box-sizing: border-box !important;
+    padding: 6px 7px !important;
+    font-size: 11px !important;
+  }
+
+  /* Distribución real para A4 */
+  .cotizacion-print-area .cotizacion-detalle-items-table th:nth-child(1),
+  .cotizacion-print-area .cotizacion-detalle-items-table td:nth-child(1) {
+    width: 52% !important;
+  }
+
+  .cotizacion-print-area .cotizacion-detalle-items-table th:nth-child(2),
+  .cotizacion-print-area .cotizacion-detalle-items-table td:nth-child(2) {
+    width: 12% !important;
+    text-align: center !important;
+  }
+
+  .cotizacion-print-area .cotizacion-detalle-items-table th:nth-child(3),
+  .cotizacion-print-area .cotizacion-detalle-items-table td:nth-child(3) {
+    width: 18% !important;
+    text-align: right !important;
+  }
+
+  .cotizacion-print-area .cotizacion-detalle-items-table th:nth-child(4),
+  .cotizacion-print-area .cotizacion-detalle-items-table td:nth-child(4) {
+    width: 18% !important;
+    text-align: right !important;
+  }
+
+  /* Producto */
+  .cotizacion-print-area .ventas-producto-row {
+    min-width: 0 !important;
+    gap: 7px !important;
+  }
+
+  .cotizacion-print-area .ventas-producto-img {
+    width: 34px !important;
+    height: 34px !important;
+    min-width: 34px !important;
+  }
+
+  .cotizacion-print-area .ventas-producto-nombre {
+    font-size: 11px !important;
+  }
+
+  /* Resumen de importes */
+  .cotizacion-print-area .cotizacion-resumen-final {
+    width: 260px !important;
+    max-width: 260px !important;
+    margin: 4px 0 0 auto !important;
+    padding: 10px 12px !important;
+    border: 1px solid #dbe3eb !important;
+    page-break-inside: avoid !important;
+  }
+
+  .cotizacion-print-area
+    .cotizacion-resumen-final
+    .ventas-resumen-row {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 16px !important;
+    margin: 0 !important;
+    padding: 4px 0 !important;
+    font-size: 12px !important;
+  }
+
+  .cotizacion-print-area
+    .cotizacion-resumen-final
+    .ventas-resumen-row span {
+    flex: 1 !important;
+  }
+
+  .cotizacion-print-area
+    .cotizacion-resumen-final
+    .ventas-resumen-row strong {
+    min-width: 95px !important;
+    text-align: right !important;
+  }
+
+  .cotizacion-print-area
+    .cotizacion-resumen-final
+    .ventas-total {
+    margin-top: 3px !important;
+    padding-top: 7px !important;
+    border-top: 1px solid #cbd5e1 !important;
+    font-size: 15px !important;
+    font-weight: 800 !important;
+  }
+
+  .cotizacion-print-area
+    .cotizacion-resumen-final
+    .ventas-total strong {
+    font-size: 16px !important;
+  }
+}
+
+/* ==================================================
+   COTIZACION - VISTA EXCLUSIVA DE IMPRESION
+   ================================================== */
+
+.cotizacion-print-only {
+  display: none;
+}
+
+@media print {
+
+  @page {
+    size: A4 portrait;
+    margin: 10mm;
+  }
+
+  .cotizacion-screen-only,
+  .ventas-importar-overlay {
+    display: none !important;
+  }
+
+  .cotizacion-print-only {
+    display: block !important;
+    visibility: visible !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    color: #111827 !important;
+    font-family: Arial, sans-serif !important;
+  }
+
+  .cotizacion-print-only * {
+    visibility: visible !important;
+    box-sizing: border-box !important;
+  }
+
+  /* HEADER */
+
+  .cotizacion-print-header {
+    margin-bottom: 14px;
+  }
+
+  .cotizacion-print-negocio {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .cotizacion-print-logo {
+    width: 56px;
+    height: 56px;
+    object-fit: contain;
+  }
+
+  .cotizacion-print-negocio h1 {
+    margin: 0;
+    font-size: 23px;
+    line-height: 1.15;
+  }
+
+  .cotizacion-print-negocio p {
+    margin: 4px 0 0;
+    font-size: 13px;
+    color: #475569;
+  }
+
+  /* DATOS GENERALES */
+
+  .cotizacion-print-info {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 7px;
+    padding: 10px;
+    border: 1px solid #dbe3eb;
+    border-radius: 8px;
+    margin-bottom: 14px;
+  }
+
+  .cotizacion-print-info > div {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .cotizacion-print-info span {
+    font-size: 10px;
+    color: #64748b;
+    font-weight: 700;
+  }
+
+  .cotizacion-print-info strong {
+    font-size: 12px;
+  }
+
+  /* NOTAS */
+
+  .cotizacion-print-notas {
+    margin-bottom: 14px;
+    padding: 9px 10px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+  }
+
+  .cotizacion-print-notas span {
+    font-size: 10px;
+    font-weight: 700;
+    color: #64748b;
+  }
+
+  .cotizacion-print-notas p {
+    margin: 3px 0 0;
+    font-size: 11px;
+  }
+
+  /* ITEMS */
+
+  .cotizacion-print-items {
+    width: 100%;
+  }
+
+  .cotizacion-print-items h2 {
+    margin: 0 0 7px;
+    font-size: 16px;
+  }
+
+  .cotizacion-print-items table {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    border-collapse: collapse !important;
+    table-layout: fixed !important;
+  }
+
+  .cotizacion-print-items th,
+  .cotizacion-print-items td {
+    border-bottom: 1px solid #e2e8f0;
+    padding: 7px 6px;
+    font-size: 13px;
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: unset !important;
+  }
+
+  .cotizacion-print-items th {
+    background: #f8fafc;
+    font-size: 14px;
+    font-weight: 700;
+  }
+
+  .print-col-producto {
+    width: 52%;
+  }
+
+  .print-col-cantidad {
+    width: 10%;
+  }
+
+  .print-col-precio {
+    width: 19%;
+  }
+
+  .print-col-subtotal {
+    width: 19%;
+  }
+
+.cotizacion-print-items th,
+.cotizacion-print-items td,
+.print-center,
+.print-money {
+  text-align: center !important;
+  vertical-align: middle !important;
+}
+
+.print-money {
+  white-space: nowrap !important;
+}
+
+.cotizacion-print-producto {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 9px !important;
+  min-width: 0;
+  width: 100% !important;
+  text-align: left !important;
+}
+
+.cotizacion-print-producto-imagen {
+  width: 42px !important;
+  height: 42px !important;
+  min-width: 42px !important;
+  flex: 0 0 42px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.cotizacion-print-producto-imagen img {
+  width: 42px !important;
+  height: 42px !important;
+  object-fit: contain !important;
+  display: block !important;
+}
+
+.cotizacion-print-producto span {
+  display: block !important;
+  flex: 1 1 auto !important;
+  width: auto !important;
+  min-width: 0 !important;
+
+  color: #111827 !important;
+  font-size: 13px !important;
+  line-height: 1.25 !important;
+
+  text-align: left !important;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: unset !important;
+  word-break: normal !important;
+  overflow-wrap: break-word !important;
+}
+
+  /* RESUMEN */
+
+  .cotizacion-print-resumen {
+    width: 300px;
+    margin: 14px 0 0 auto;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 10px 13px;
+    page-break-inside: avoid;
+  }
+
+  .cotizacion-print-resumen > div {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    padding: 5px 0;
+    font-size: 14px;
+  }
+
+  .cotizacion-print-resumen span {
+    font-weight: 600;
+  }
+
+  .cotizacion-print-resumen strong {
+    font-size: 15px;
+    text-align: right;
+  }
+
+  .cotizacion-print-total {
+    margin-top: 4px;
+    padding-top: 9px !important;
+    border-top: 1px solid #94a3b8;
+  }
+
+  .cotizacion-print-total span {
+    font-size: 18px;
+    font-weight: 800;
+  }
+
+  .cotizacion-print-total strong {
+    font-size: 21px;
+    font-weight: 900;
+  }
+}
+
+.cotizacion-detalle-items-table th:first-child,
+.cotizacion-detalle-items-table td:first-child {
+  text-align: left !important;
+}
+.cotizacion-detalle-items-table .ventas-producto-row {
+  justify-content: flex-start !important;
+  text-align: left !important;
+}
+
+.cotizacion-detalle-items-table .ventas-producto-main,
+.cotizacion-detalle-items-table .ventas-producto-nombre {
+  text-align: left !important;
+}
+
+/* =====================================
+   DETALLE VENTA - AGREGAR ITEM
+   ===================================== */
+
+.ventas-detalle-item-grid {
+  display: grid;
+  grid-template-columns:
+    minmax(280px, 1fr)
+    110px
+    80px
+    150px;
+  gap: 10px;
+  align-items: start;
+  width: 100%;
+}
+
+.ventas-detalle-producto-field,
+.ventas-detalle-precio-field,
+.ventas-detalle-cantidad-field,
+.ventas-detalle-excluir-field {
+  min-width: 0;
+}
+
+.ventas-detalle-precio-field,
+.ventas-detalle-cantidad-field {
+  width: 100%;
+}
+
+.ventas-detalle-precio-field input,
+.ventas-detalle-cantidad-field input {
+  width: 100% !important;
+  height: 32px !important;
+  min-height: 32px !important;
+  padding: 0 8px !important;
+  box-sizing: border-box;
+}
+
+/* Mantiene todos los labels alineados */
+.ventas-detalle-item-grid > .ventas-field > label:first-child {
+  min-height: 16px;
+  margin-bottom: 6px;
+}
+
+/* Campo excluir descuento */
+.ventas-detalle-excluir {
+  width: 32px;
+  height: 32px;
+  min-height: 32px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 0;
+  box-sizing: border-box;
+
+  border: 1px solid #d7dbe3;
+  border-radius: 8px;
+  background: #fff;
+
+  font-size: 11px;
+  font-weight: 500;
+  color: #475569;
+
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ventas-detalle-excluir input {
+  width: 14px !important;
+  height: 14px !important;
+  min-width: 14px;
+  margin: 0 !important;
+  flex: none;
+}
+
+.ventas-detalle-excluir:has(input:checked) {
+  border-color: #7dd3fc;
+  background: #f0f9ff;
+  color: #036986;
+}
+
+.ventas-detalle-excluir-field .ventas-detalle-excluir {
+  margin-top: 0;
+}
+
+.ventas-detalle-item-grid + .ventas-actions-row {
+  margin-top: 12px;
+  justify-content: flex-start;
+}
+
+
+/* TABLET */
+
+@media (max-width: 900px) {
+  .ventas-detalle-item-grid {
+    grid-template-columns:
+      minmax(220px, 1fr)
+      105px
+      75px
+      140px;
+    gap: 8px;
+  }
+}
+
+
+/* MOBILE */
+
+@media (max-width: 650px) {
+  .ventas-detalle-item-grid {
+    grid-template-columns: 1fr 90px;
+  }
+
+  .ventas-detalle-producto-field {
+    grid-column: 1 / -1;
+  }
+
+  .ventas-detalle-precio-field,
+  .ventas-detalle-cantidad-field {
+    width: 100%;
+  }
+
+  .ventas-detalle-excluir-field {
+    grid-column: 1 / -1;
+  }
+
+  .ventas-detalle-excluir {
+    width: fit-content;
+  }
+}
+
+
+/* =====================================
+   DETALLE VENTA - AGREGAR ITEM - fin
+   ===================================== */
+   
+/* =====================================================
+   VENTA - IMPRESIÓN - RESUMEN PROFESIONAL
+   ===================================================== */
+
+@media print {
+
+.ventas-page .ventas-layout > aside.ventas-card-sm {
+  width: 300px !important;
+  max-width: 300px !important;
+  min-width: 300px !important;
+
+  display: block !important;
+
+  margin: 12px 0 0 auto !important;
+  padding: 10px 13px !important;
+
+  box-sizing: border-box !important;
+
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 8px !important;
+
+  background: #fff !important;
+  box-shadow: none !important;
+
+  page-break-inside: avoid !important;
+}
+
+  .ventas-page .ventas-resumen {
+    gap: 0 !important;
+  }
+
+.ventas-page .ventas-resumen-row {
+  display: grid !important;
+  grid-template-columns: 150px 110px !important;
+
+  align-items: center !important;
+  justify-content: end !important;
+
+  gap: 10px !important;
+  padding: 5px 0 !important;
+
+  font-size: 14px !important;
+  line-height: 1.25 !important;
+}
+
+  .ventas-page .ventas-resumen-row span:first-child {
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    white-space: nowrap !important;
+  }
+
+  .ventas-page .ventas-resumen-row strong {
+    font-size: 15px !important;
+    text-align: right !important;
+    white-space: nowrap !important;
+    justify-self: end !important;
+  }
+
+  .ventas-page .ventas-total {
+    margin-top: 4px !important;
+    padding-top: 9px !important;
+
+    border-top: 1px solid #94a3b8 !important;
+
+    font-size: 18px !important;
+    font-weight: 800 !important;
+  }
+
+  .ventas-page .ventas-total span {
+    font-size: 18px !important;
+    font-weight: 800 !important;
+  }
+
+  .ventas-page .ventas-total strong {
+    font-size: 21px !important;
+    font-weight: 900 !important;
+  }
+
+  .ventas-page .ventas-saldo-badge {
+    min-width: 0 !important;
+    padding: 2px 6px !important;
+    font-size: 13px !important;
+  }
+
+  .ventas-page .ventas-resumen-row:nth-last-child(1),
+  .ventas-page .ventas-resumen-row:nth-last-child(2) {
+    display: none !important;
+  }
+
+.ventas-page .ventas-layout > aside.ventas-card-sm .ventas-card-header {
+  width: 100% !important;
+  margin: 0 0 8px 0 !important;
+}
+
+.ventas-page .ventas-layout > aside.ventas-card-sm .ventas-card-header h2 {
+  width: auto !important;
+  margin: 0 !important;
+  font-size: 14px !important;
+}
+}   
+
+/* =====================================================
+   VENTA - IMPRESIÓN - RESUMEN PROFESIONAL - fin
+   ===================================================== */
+
+/* =====================================================
+   venta detalle - comprobante de pago
+   ===================================================== */
+
+   .ventas-pago-comprobante-detalle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+
+  margin-top: 10px;
+
+  font-size: 12px;
+  color: #64748b;
+}
+
+.ventas-pago-comprobante-detalle .ventas-pago-comprobante-btn {
+  flex: 0 0 34px;
+}
+
+.ventas-pago-comprobante-quitar {
+  width: 20px;
+  height: 20px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 0;
+
+  border: none;
+  border-radius: 50%;
+
+  background: #e5e7eb;
+  color: #475569;
+
+  cursor: pointer;
+
+  font-size: 14px;
+  line-height: 1;
+}
+
+.ventas-pago-comprobante-quitar:hover {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+/**/
+
+.ventas-pago-acciones {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ventas-pago-icon-btn {
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 0;
+
+  border: 1px solid #d7dbe3;
+  border-radius: 8px;
+
+  background: #fff;
+  color: #64748b;
+
+  cursor: pointer;
+
+  box-sizing: border-box;
+}
+
+.ventas-pago-icon-btn:hover {
+  border-color: #0ea5e9;
+  background: #f0f9ff;
+  color: #0284c7;
+}
+
+   /* =====================================================
+   VENTA detalle - comprobante de pago fin
+   ===================================================== */
+
+   /* =====================================================
+   VENTA DETALLE - RECIBO DE PAGO
+   ===================================================== */
+
+.ventas-recibo-print {
+  display: none;
+}
+
+.ventas-recibo-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+
+  padding-bottom: 16px;
+  border-bottom: 1px solid #cbd5e1;
+}
+
+.ventas-recibo-negocio {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ventas-recibo-negocio img {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+}
+
+.ventas-recibo-negocio div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.ventas-recibo-negocio strong {
+  font-size: 18px;
+}
+
+.ventas-recibo-negocio span {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.ventas-recibo-numero {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+}
+
+.ventas-recibo-numero span {
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+}
+
+.ventas-recibo-numero strong {
+  font-size: 18px;
+}
+
+.ventas-recibo-info {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+
+  margin-top: 18px;
+}
+
+.ventas-recibo-info > div,
+.ventas-recibo-detalle > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ventas-recibo-info span,
+.ventas-recibo-detalle span {
+  font-size: 11px;
+  color: #64748b;
+}
+
+.ventas-recibo-info strong,
+.ventas-recibo-detalle strong {
+  font-size: 13px;
+  color: #111827;
+}
+
+.ventas-recibo-monto {
+  margin: 22px 0;
+
+  padding: 18px;
+
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.ventas-recibo-monto span {
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.ventas-recibo-monto strong {
+  font-size: 24px;
+  color: #111827;
+}
+
+.ventas-recibo-detalle {
+  display: grid;
+  gap: 12px;
+}
+
+.ventas-recibo-anulado {
+  margin-top: 20px;
+  padding: 10px;
+
+  border: 2px solid #991b1b;
+
+  font-size: 18px;
+  font-weight: 800;
+  text-align: center;
+
+  color: #991b1b;
+}
+
+.ventas-recibo-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+
+  margin-top: 28px;
+  padding-top: 12px;
+
+  border-top: 1px solid #cbd5e1;
+
+  font-size: 10px;
+  color: #64748b;
+}
+
+@media print {
+
+  .ventas-page.ventas-print-recibo-mode > * {
+    display: none !important;
+  }
+
+  .ventas-page.ventas-print-recibo-mode
+    > .ventas-recibo-print {
+    display: block !important;
+    visibility: visible !important;
+
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+
+    width: 100% !important;
+
+    padding: 0 !important;
+    margin: 0 !important;
+
+    background: #fff !important;
+  }
+
+  .ventas-page.ventas-print-recibo-mode
+    .ventas-recibo-print,
+  .ventas-page.ventas-print-recibo-mode
+    .ventas-recibo-print * {
+    visibility: visible !important;
+  }
+
+  .ventas-page.ventas-print-recibo-mode
+    .ventas-recibo-info {
+    grid-template-columns: repeat(3, 1fr) !important;
+  }
+
+  .ventas-page.ventas-print-recibo-mode
+    .ventas-recibo-monto {
+    page-break-inside: avoid !important;
+  }
+}
+
+   /* =====================================================
+   VENTA DETALLE - RECIBO DE PAGO - fin
+   ===================================================== */
+

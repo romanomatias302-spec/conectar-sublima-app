@@ -12,6 +12,7 @@ import {
   startAt,
   endAt,
   onSnapshot,
+  writeBatch,
 } from "firebase/firestore";
 import { db } from "../firebase";
 
@@ -346,13 +347,33 @@ export async function obtenerMovimientosCajaDia({
       ...d.data(),
     }))
     .filter((m) => {
-      const impactaCaja = m.impactaCaja === true;
-
       const perteneceSucursal = todasSucursales
         ? true
-        : movimientoPerteneceASucursal(m, sucursalData.sucursalId);
+        : movimientoPerteneceASucursal(
+            m,
+            sucursalData.sucursalId
+          );
 
-      return impactaCaja && perteneceSucursal;
+      const esMovimientoCaja =
+        m.impactaCaja === true;
+
+      const esCobroVenta =
+        m.origen === "venta_pago" &&
+        m.tipo === "ingreso";
+
+      const esControlCaja =
+        m.origen === "caja" &&
+        m.tipo === "control" &&
+        m.subtipo === "cambio_turno";
+
+      return (
+        perteneceSucursal &&
+        (
+          esMovimientoCaja ||
+          esCobroVenta ||
+          esControlCaja
+        )
+      );
     })
     .sort((a, b) => {
       const fechaA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0;
@@ -385,11 +406,34 @@ export function escucharMovimientosCajaDia({
           firebaseId: d.id,
           ...d.data(),
         }))
-        .filter(
-            (m) =>
-              m.impactaCaja === true &&
-              movimientoPerteneceASucursal(m, sucursalId)
-          )
+          .filter((m) => {
+            const perteneceSucursal =
+              movimientoPerteneceASucursal(
+                m,
+                sucursalId
+              );
+
+            const esMovimientoCaja =
+              m.impactaCaja === true;
+
+            const esCobroVenta =
+              m.origen === "venta_pago" &&
+              m.tipo === "ingreso";
+
+            const esControlCaja =
+              m.origen === "caja" &&
+              m.tipo === "control" &&
+              m.subtipo === "cambio_turno";
+
+            return (
+              perteneceSucursal &&
+              (
+                esMovimientoCaja ||
+                esCobroVenta ||
+                esControlCaja
+              )
+            );
+          })
         .sort((a, b) => {
           const fechaA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0;
           const fechaB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0;
@@ -414,79 +458,183 @@ export async function crearMovimientoManualCaja({
   descripcion = "",
   observacion = "",
 }) {
-  if (!perfil?.clienteId) throw new Error("Perfil inválido.");
-  if (!caja?.firebaseId) throw new Error("No hay caja abierta.");
-  if (caja.estado !== "abierta") throw new Error("La caja no está abierta.");
+  if (!perfil?.clienteId) {
+    throw new Error("Perfil inválido.");
+  }
+
+  if (!caja?.firebaseId) {
+    throw new Error("No hay caja abierta.");
+  }
+
+  if (caja.estado !== "abierta") {
+    throw new Error("La caja no está abierta.");
+  }
+
+  const esAdmin =
+    perfil?.rol === "admin" ||
+    perfil?.rol === "superadmin";
+
+  const permisosCaja = perfil?.permisos?.caja || {};
+
+  if (
+    subtipo === "aporte_capital" &&
+    !esAdmin &&
+    permisosCaja.crearAporteCapital !== true
+  ) {
+    throw new Error(
+      "No tenés permiso para registrar aportes de capital."
+    );
+  }
+
+  if (
+    subtipo === "retiro_capital" &&
+    !esAdmin &&
+    permisosCaja.crearRetiroCapital !== true
+  ) {
+    throw new Error(
+      "No tenés permiso para registrar retiros de dueño o capital."
+    );
+  }
+
+  if (
+    subtipo === "ajuste_positivo" &&
+    !esAdmin &&
+    permisosCaja.crearAjustePositivo !== true
+  ) {
+    throw new Error(
+      "No tenés permiso para realizar ajustes positivos de caja."
+    );
+  }
+
+  if (
+    subtipo === "ajuste_negativo" &&
+    !esAdmin &&
+    permisosCaja.crearAjusteNegativo !== true
+  ) {
+    throw new Error(
+      "No tenés permiso para realizar ajustes negativos de caja."
+    );
+  }
 
   const montoNum = Number(monto || 0);
-  if (montoNum <= 0) throw new Error("El monto debe ser mayor a 0.");
 
-  const subtiposQueImpactanResultado = ["gasto_caja", "otro_egreso", "otro_ingreso"];
+  if (montoNum <= 0) {
+    throw new Error("El monto debe ser mayor a 0.");
+  }
 
-const impactaResultado = subtiposQueImpactanResultado.includes(subtipo);
+  const subtiposQueImpactanResultado = [
+    "gasto_caja",
+    "otro_egreso",
+    "otro_ingreso",
+  ];
 
-const tipoFinanciero =
-  subtipo === "gasto_caja"
-    ? "gasto_operativo"
-    : subtipo === "aporte_capital"
-    ? "aporte_capital"
-    : subtipo === "retiro_capital"
-    ? "retiro_capital"
-    : subtipo === "ajuste_positivo" || subtipo === "ajuste_negativo"
-    ? "ajuste_caja"
-    : "otro";
+  const impactaResultado =
+    subtiposQueImpactanResultado.includes(subtipo);
 
-  const movimientoRef = await addDoc(collection(db, "movimientos"), {
-  clienteId: perfil.clienteId,
-  cajaId: caja.firebaseId,
-  fechaCaja: caja.fechaCaja,
-  fecha: caja.fechaCaja,
-  sucursalId: caja.sucursalId || SUCURSAL_PRINCIPAL_ID,
-  sucursalNombre: caja.sucursalNombre || "Sucursal principal",
+  const tipoFinanciero =
+    subtipo === "gasto_caja"
+      ? "gasto_operativo"
+      : subtipo === "aporte_capital"
+      ? "aporte_capital"
+      : subtipo === "retiro_capital"
+      ? "retiro_capital"
+      : subtipo === "ajuste_positivo" ||
+        subtipo === "ajuste_negativo"
+      ? "ajuste_caja"
+      : "otro";
 
-  tipo,
-  subtipo,
-  origen: "caja",
-  origenRefId: caja.firebaseId,
-
-  descripcion,
-  observacion,
-
-  monto: montoNum,
-  medioPago,
-
-impactaCaja: true,
-impactaResultado,
-tipoFinanciero,
-estadoMovimiento: "activo",
-
-  creadoPor: perfil?.email || "",
-  createdAt: serverTimestamp(),
-  updatedAt: serverTimestamp(),
-});
+let movimientoRef;
 
 if (tipo === "egreso" && impactaResultado) {
-  const gastoRef = await addDoc(collection(db, "gastos"), {
+  movimientoRef = doc(collection(db, "movimientos"));
+  const gastoRef = doc(collection(db, "gastos"));
+
+  const batch = writeBatch(db);
+
+  batch.set(movimientoRef, {
+    clienteId: perfil.clienteId,
+    cajaId: caja.firebaseId,
+    fechaCaja: caja.fechaCaja,
+    fecha: caja.fechaCaja,
+
+    sucursalId:
+      caja.sucursalId || SUCURSAL_PRINCIPAL_ID,
+
+    sucursalNombre:
+      caja.sucursalNombre || "Sucursal principal",
+
+    tipo,
+    subtipo,
+
+    origen: "caja",
+    origenRefId: caja.firebaseId,
+
+    gastoRefId: gastoRef.id,
+
+    descripcion,
+    observacion,
+
+    monto: montoNum,
+    medioPago,
+
+    impactaCaja: true,
+    impactaResultado,
+    tipoFinanciero,
+
+    estadoMovimiento: "activo",
+    activo: true,
+
+    creadoPor:
+      perfil?.uid ||
+      perfil?.firebaseUid ||
+      perfil?.email ||
+      "",
+
+    creadoPorNombre:
+      perfil?.nombre ||
+      perfil?.email ||
+      "",
+
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+
+  batch.set(gastoRef, {
     clienteId: perfil.clienteId,
     fecha: caja.fechaCaja,
 
     origen: "caja",
     origenRefId: movimientoRef.id,
     movimientoRefId: movimientoRef.id,
-    sucursalId: caja.sucursalId || SUCURSAL_PRINCIPAL_ID,
-    sucursalNombre: caja.sucursalNombre || "Sucursal principal",
-    categoria: subtipo === "otro_egreso" ? "Otro egreso de caja" : "Gasto de caja",
+
+    sucursalId:
+      caja.sucursalId || SUCURSAL_PRINCIPAL_ID,
+
+    sucursalNombre:
+      caja.sucursalNombre ||
+      "Sucursal principal",
+
+    categoria:
+      subtipo === "otro_egreso"
+        ? "Otro egreso de caja"
+        : "Gasto de caja",
+
     tipoFinanciero,
+
     proveedor: "",
     comprobanteNumero: "",
     comprobantes: [],
     observaciones: observacion || "",
 
-    descripcion: descripcion || "Caja - Gasto de caja",
+    descripcion:
+      descripcion || "Caja - Gasto de caja",
 
     items: [
       {
-        descripcion: descripcion || "Caja - Gasto de caja",
+        descripcion:
+          descripcion ||
+          "Caja - Gasto de caja",
+
         cantidad: 1,
         precioUnitario: montoNum,
         subtotal: montoNum,
@@ -500,7 +648,9 @@ if (tipo === "egreso" && impactaResultado) {
       },
     ],
 
-    medioPago: medioPago || "efectivo",
+    medioPago:
+      medioPago || "efectivo",
+
     total: montoNum,
     totalPagado: montoNum,
     saldo: 0,
@@ -509,19 +659,105 @@ if (tipo === "egreso" && impactaResultado) {
     activo: true,
     estado: "activo",
 
-    creadoPor: perfil?.uid || perfil?.firebaseUid || "",
-    creadoPorNombre: perfil?.nombre || perfil?.email || "",
+    creadoPor:
+      perfil?.uid ||
+      perfil?.firebaseUid ||
+      "",
+
+    creadoPorNombre:
+      perfil?.nombre ||
+      perfil?.email ||
+      "",
 
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
 
-  await updateDoc(doc(db, "movimientos", movimientoRef.id), {
-    gastoRefId: gastoRef.id,
-    updatedAt: serverTimestamp(),
-  });
+  try {
+    await batch.commit();
+  } catch (error) {
+    console.error(
+      "[CAJA - CREAR EGRESO Y GASTO]",
+      error
+    );
+
+    throw new Error(
+      `[CREAR EGRESO] ${
+        error?.message ||
+        "No se pudo registrar el egreso."
+      }`
+    );
+  }
+} else {
+  try {
+    movimientoRef = await addDoc(
+      collection(db, "movimientos"),
+      {
+        clienteId: perfil.clienteId,
+        cajaId: caja.firebaseId,
+        fechaCaja: caja.fechaCaja,
+        fecha: caja.fechaCaja,
+
+        sucursalId:
+          caja.sucursalId ||
+          SUCURSAL_PRINCIPAL_ID,
+
+        sucursalNombre:
+          caja.sucursalNombre ||
+          "Sucursal principal",
+
+        tipo,
+        subtipo,
+
+        origen: "caja",
+        origenRefId: caja.firebaseId,
+
+        descripcion,
+        observacion,
+
+        monto: montoNum,
+        medioPago,
+
+        impactaCaja: true,
+        impactaResultado,
+        tipoFinanciero,
+
+        estadoMovimiento: "activo",
+        activo: true,
+
+        creadoPor:
+          perfil?.uid ||
+          perfil?.firebaseUid ||
+          perfil?.email ||
+          "",
+
+        creadoPorNombre:
+          perfil?.nombre ||
+          perfil?.email ||
+          "",
+
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      }
+    );
+  } catch (error) {
+    console.error(
+      "[CAJA - CREAR MOVIMIENTO]",
+      error
+    );
+
+    throw new Error(
+      `[CREAR MOVIMIENTO] ${
+        error?.message ||
+        "No se pudo crear el movimiento."
+      }`
+    );
+  }
 }
 
+  return {
+    movimientoId: movimientoRef.id,
+  };
 }
 
 export async function crearCambioTurnoCaja({
@@ -622,16 +858,30 @@ const activos = movimientos.filter(
   (m) =>
     (m.estadoMovimiento || "activo") === "activo" &&
     m.activo !== false &&
-    m.impactaCaja !== false
+    m.impactaCaja === true
 );
 
-  const ingresosEfectivo = activos
-    .filter((m) => m.tipo === "ingreso" && m.medioPago === "efectivo")
-    .reduce((acc, m) => acc + Number(m.monto || 0), 0);
+const ingresosEfectivo = activos
+  .filter(
+    (m) =>
+      m.tipo === "ingreso" &&
+      (
+        m.medioPago === "efectivo" ||
+        m.medioPago === "efectivo_caja"
+      )
+  )
+  .reduce((acc, m) => acc + Number(m.monto || 0), 0);
 
-  const egresosEfectivo = activos
-    .filter((m) => m.tipo === "egreso" && m.medioPago === "efectivo")
-    .reduce((acc, m) => acc + Number(m.monto || 0), 0);
+const egresosEfectivo = activos
+  .filter(
+    (m) =>
+      m.tipo === "egreso" &&
+      (
+        m.medioPago === "efectivo" ||
+        m.medioPago === "efectivo_caja"
+      )
+  )
+  .reduce((acc, m) => acc + Number(m.monto || 0), 0);
 
   const esperado =
     Number(caja.saldoAperturaEfectivo || 0) + ingresosEfectivo - egresosEfectivo;

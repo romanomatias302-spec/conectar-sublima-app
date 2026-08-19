@@ -15,7 +15,12 @@ import {
   onSnapshot,
   writeBatch,
 } from "firebase/firestore";
-import { db } from "../firebase";
+import { db, storage } from "../firebase";
+import {
+  getDownloadURL,
+  ref,
+  uploadBytes,
+} from "firebase/storage";
 import { registrarUsoSaas } from "./saasUso";
 
 export async function obtenerSiguienteNumeroVenta(clienteId) {
@@ -45,6 +50,57 @@ export async function obtenerSiguienteNumeroVenta(clienteId) {
   });
 
   return nuevoNumero.toString();
+}
+
+
+
+async function subirComprobantePago({
+  clienteId,
+  ventaId,
+  archivo,
+}) {
+  if (!archivo) return null;
+
+  const MAX_COMPROBANTE_BYTES = 2 * 1024 * 1024;
+
+  if (archivo.size > MAX_COMPROBANTE_BYTES) {
+    throw new Error("El comprobante no puede superar los 2 MB.");
+  }
+
+    const tiposPermitidos = [
+      "application/pdf",
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+    ];
+
+    const tipoPermitido = tiposPermitidos.includes(archivo.type);
+
+  if (!tipoPermitido) {
+    throw new Error(
+      "El comprobante debe ser una imagen o un archivo PDF."
+    );
+  }
+
+  const nombreSeguro = archivo.name.replace(/[^\w.\-() ]/g, "_");
+
+  const path =
+    `clientes/${clienteId}/ventas/${ventaId}/pagos/comprobantes/` +
+    `${Date.now()}-${nombreSeguro}`;
+
+  const storageRef = ref(storage, path);
+
+  await uploadBytes(storageRef, archivo);
+
+  const url = await getDownloadURL(storageRef);
+
+  return {
+    nombre: archivo.name,
+    tipo: archivo.type || "",
+    size: archivo.size || 0,
+    path,
+    url,
+  };
 }
 
 function normalizarItems({ items = [], descripcion = "", cantidad = 0, precioUnitario = 0 }) {
@@ -107,6 +163,7 @@ export async function crearVenta({
   cantidad = 0,
   precioUnitario = 0,
   descuento = 0,
+  descuentoPorcentaje = 0,
   pedidoAsociado = null,
   vendedor = null,
   pagosIniciales = [],
@@ -139,7 +196,9 @@ const sucursalNombre = perfil?.sucursalDefaultNombre || "Sucursal principal";
           monto: Number(pago.monto || 0),
           medioPago: pago.medioPago || "efectivo",
           fechaPago: pago.fechaPago || fechaVenta,
+          fechaComprobanteReal: pago.fechaComprobanteReal || "",
           observacion: pago.observacion || "",
+          comprobanteArchivo: pago.comprobanteArchivo || null,
         }))
         .filter((pago) => pago.monto > 0)
     : [];
@@ -185,6 +244,7 @@ const sucursalNombre = perfil?.sucursalDefaultNombre || "Sucursal principal";
     precioUnitario: itemsNormalizados.length === 1 ? itemsNormalizados[0].precioUnitario : 0,
     subtotal,
     descuento: Number(descuento || 0),
+    descuentoPorcentaje: Number(descuentoPorcentaje || 0),
     total,
 
     totalPagado: montoInicial,
@@ -211,70 +271,102 @@ const sucursalNombre = perfil?.sucursalDefaultNombre || "Sucursal principal";
 
   const ventaRef = await addDoc(collection(db, "ventas"), ventaData);
 
-  console.log("USO SAAS venta", {
-    clienteId: perfil?.clienteId,
-  });
 
   await registrarUsoSaas({
     clienteId: perfil.clienteId,
     ventas: 1,
   });
 
-  for (const item of itemsNormalizados) {
-      await addDoc(collection(db, "ventas", ventaRef.id, "items"), {
-        clienteId: perfil.clienteId,
-        ventaRefId: ventaRef.id,
-        numeroVenta,
-        descripcion: item.descripcion,
-        cantidad: item.cantidad,
-        precioUnitario: item.precioUnitario,
-        subtotal: item.subtotal,
-        excluirDescuento: item.excluirDescuento === true,
+for (const item of itemsNormalizados) {
+  await addDoc(collection(db, "ventas", ventaRef.id, "items"), {
+    clienteId: perfil.clienteId,
+    ventaRefId: ventaRef.id,
+    numeroVenta,
+    descripcion: item.descripcion,
+    cantidad: item.cantidad,
+    precioUnitario: item.precioUnitario,
+    subtotal: item.subtotal,
+    excluirDescuento: item.excluirDescuento === true,
 
-        origenPrecio: item.origenPrecio || "manual",
-        listaPrecioId: item.listaPrecioId || "",
-        listaPrecioNombre: item.listaPrecioNombre || "",
-        productoListaNombre: item.productoListaNombre || "",
-        productoBaseId: item.productoBaseId || "",
-        varianteId: item.varianteId || "",
-        varianteNombre: item.varianteNombre || "",
-        imagenUrl: item.imagenUrl || "",
-        imagenThumb: item.imagenThumb || "",
-        varianteId: item.varianteId || "",
-        varianteNombre: item.varianteNombre || "",
-        imagenUrl: item.imagenUrl || "",
-        imagenThumb: item.imagenThumb || "",
-        reglaCantidad: item.reglaCantidad || null,
-        adicionalesSeleccionados: item.adicionalesSeleccionados || [],
-        precioDetalleInterno: item.precioDetalleInterno || null,
-        origenItem: "inicial",
-        estadoItem: "activo",
-        motivoAnulacion: "",
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-  }
+    origenPrecio: item.origenPrecio || "manual",
+    listaPrecioId: item.listaPrecioId || "",
+    listaPrecioNombre: item.listaPrecioNombre || "",
+    productoListaNombre: item.productoListaNombre || "",
+    productoBaseId: item.productoBaseId || "",
+    varianteId: item.varianteId || "",
+    varianteNombre: item.varianteNombre || "",
+    imagenUrl: item.imagenUrl || "",
+    imagenThumb: item.imagenThumb || "",
+    reglaCantidad: item.reglaCantidad || null,
+    adicionalesSeleccionados: item.adicionalesSeleccionados || [],
+    precioDetalleInterno: item.precioDetalleInterno || null,
+    origenItem: "inicial",
+    estadoItem: "activo",
+    motivoAnulacion: "",
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+}
 
   if (pagosNormalizados.length > 0) {
     for (const pago of pagosNormalizados) {
-      const pagoData = {
-        clienteId: perfil.clienteId,
-        sucursalId,
-        sucursalNombre,
-        ventaRefId: ventaRef.id,
-        numeroVenta,
-        fechaPago: pago.fechaPago || fechaVenta,
-        fechaComprobanteReal: pago.fechaComprobanteReal || "",
-        monto: Number(pago.monto || 0),
-        medioPago: pago.medioPago || "efectivo",
-        observacion: pago.observacion || "Pago inicial",
-        estadoPagoRegistro: "activo",
-        motivoAnulacion: "",
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      };
+    let comprobante = null;
+    let comprobanteError = "";
 
-      await addDoc(collection(db, "ventas", ventaRef.id, "pagos"), pagoData);
+    if (pago.comprobanteArchivo) {
+      try {
+        comprobante = await subirComprobantePago({
+          clienteId: perfil.clienteId,
+          ventaId: ventaRef.id,
+          archivo: pago.comprobanteArchivo,
+        });
+      } catch (errorComprobante) {
+        console.error(
+          "No se pudo subir el comprobante del pago inicial:",
+          errorComprobante
+        );
+
+        comprobanteError = "No se pudo adjuntar el comprobante.";
+      }
+    }
+    const pagoData = {
+      clienteId: perfil.clienteId,
+      sucursalId,
+      sucursalNombre,
+      ventaRefId: ventaRef.id,
+      numeroVenta,
+      fechaPago: pago.fechaPago || fechaVenta,
+      fechaComprobanteReal: pago.fechaComprobanteReal || "",
+      monto: Number(pago.monto || 0),
+      medioPago: pago.medioPago || "efectivo",
+      observacion: pago.observacion || "Pago inicial",
+
+      comprobante,
+      comprobanteError,
+
+      estadoPagoRegistro: "activo",
+      motivoAnulacion: "",
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    };
+
+      const pagoRef = await addDoc(
+        collection(db, "ventas", ventaRef.id, "pagos"),
+        pagoData
+      );
+
+      try {
+        await obtenerOAsignarNumeroRecibo({
+          perfil,
+          ventaId: ventaRef.id,
+          pagoId: pagoRef.id,
+        });
+      } catch (errorRecibo) {
+        console.error(
+          "El pago inicial fue creado, pero no se pudo asignar número de recibo:",
+          errorRecibo
+        );
+      }
 
       await addDoc(collection(db, "movimientos"), {
         clienteId: perfil.clienteId,
@@ -345,6 +437,8 @@ export async function agregarPagoAVenta({
   fechaPago,
   medioPago,
   observacion = "",
+  fechaComprobanteReal = "",
+  comprobanteArchivo = null,
 }) {
   const montoNum = Number(monto || 0);
   if (!venta?.firebaseId) throw new Error("Venta inválida.");
@@ -356,23 +450,51 @@ export async function agregarPagoAVenta({
     venta?.sucursalNombre ||
     perfil?.sucursalDefaultNombre ||
     "Sucursal principal";
+  
+  const comprobante = comprobanteArchivo
+  ? await subirComprobantePago({
+      clienteId: perfil.clienteId,
+      ventaId: venta.firebaseId,
+      archivo: comprobanteArchivo,
+    })
+  : null;  
 
-  await addDoc(collection(db, "ventas", venta.firebaseId, "pagos"), {
+  const pagoRef = await addDoc(
+    collection(db, "ventas", venta.firebaseId, "pagos"),
+    {
     clienteId: perfil.clienteId,
     sucursalId,
     sucursalNombre,
     ventaRefId: venta.firebaseId,
     numeroVenta: venta.numeroVenta,
     fechaPago,
-    fechaComprobanteReal: arguments[0]?.fechaComprobanteReal || "",
+    fechaComprobanteReal: fechaComprobanteReal || "",
+
     monto: montoNum,
     medioPago: medioPago || "efectivo",
     observacion,
+
+    comprobante,
+
     estadoPagoRegistro: "activo",
     motivoAnulacion: "",
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
+    
   });
+
+  try {
+  await obtenerOAsignarNumeroRecibo({
+    perfil,
+    ventaId: venta.firebaseId,
+    pagoId: pagoRef.id,
+  });
+} catch (errorRecibo) {
+  console.error(
+    "El pago fue creado, pero no se pudo asignar número de recibo:",
+    errorRecibo
+  );
+}
 
 await addDoc(collection(db, "movimientos"), {
   clienteId: perfil.clienteId,
@@ -440,6 +562,139 @@ export async function obtenerPagosDeVenta(ventaId) {
     firebaseId: d.id,
     ...d.data(),
   }));
+}
+
+export async function obtenerOAsignarNumeroRecibo({
+  perfil,
+  ventaId,
+  pagoId,
+}) {
+  if (!perfil?.clienteId) {
+    throw new Error("Perfil inválido.");
+  }
+
+  if (!ventaId || !pagoId) {
+    throw new Error("Faltan datos del pago.");
+  }
+
+  const clienteSaasRef = doc(
+    db,
+    "clientes-saas",
+    perfil.clienteId
+  );
+
+  const pagoRef = doc(
+    db,
+    "ventas",
+    ventaId,
+    "pagos",
+    pagoId
+  );
+
+  const numeroRecibo = await runTransaction(
+    db,
+    async (transaction) => {
+      const [clienteSnap, pagoSnap] = await Promise.all([
+        transaction.get(clienteSaasRef),
+        transaction.get(pagoRef),
+      ]);
+
+      if (!clienteSnap.exists()) {
+        throw new Error("No existe el cliente SaaS asociado.");
+      }
+
+      if (!pagoSnap.exists()) {
+        throw new Error("El pago no existe.");
+      }
+
+      const pagoData = pagoSnap.data();
+
+      if (pagoData.clienteId !== perfil.clienteId) {
+        throw new Error(
+          "El pago no pertenece a la empresa."
+        );
+      }
+
+      /*
+       * Si el pago ya tiene recibo, devolvemos exactamente
+       * el mismo número. Nunca generamos otro.
+       */
+      if (pagoData.numeroRecibo) {
+        return String(pagoData.numeroRecibo);
+      }
+
+      const clienteData = clienteSnap.data();
+
+      const ultimoNumeroRecibo = Number(
+        clienteData.ultimoNumeroRecibo || 0
+      );
+
+      const siguienteNumero =
+        ultimoNumeroRecibo + 1;
+
+      transaction.update(clienteSaasRef, {
+        ultimoNumeroRecibo: siguienteNumero,
+        updatedAt: serverTimestamp(),
+      });
+
+      transaction.update(pagoRef, {
+        numeroRecibo: siguienteNumero.toString(),
+        numeroReciboAsignadoAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+
+      return siguienteNumero.toString();
+    }
+  );
+
+  return numeroRecibo;
+}
+
+export async function adjuntarComprobanteAPago({
+  perfil,
+  ventaId,
+  pagoId,
+  archivo,
+}) {
+  if (!perfil?.clienteId) {
+    throw new Error("Perfil inválido.");
+  }
+
+  if (!ventaId || !pagoId) {
+    throw new Error("Faltan datos del pago.");
+  }
+
+  if (!archivo) {
+    throw new Error("Falta seleccionar el comprobante.");
+  }
+
+  const pagoRef = doc(db, "ventas", ventaId, "pagos", pagoId);
+
+  const pagoSnap = await getDoc(pagoRef);
+
+  if (!pagoSnap.exists()) {
+    throw new Error("El pago no existe.");
+  }
+
+  const pagoData = pagoSnap.data();
+
+  if (pagoData.clienteId !== perfil.clienteId) {
+    throw new Error("El pago no pertenece a la empresa.");
+  }
+
+  const comprobante = await subirComprobantePago({
+    clienteId: perfil.clienteId,
+    ventaId,
+    archivo,
+  });
+
+  await updateDoc(pagoRef, {
+    comprobante,
+    comprobanteError: "",
+    updatedAt: serverTimestamp(),
+  });
+
+  return comprobante;
 }
 
 export async function obtenerItemsDeVenta(ventaId) {
@@ -516,6 +771,20 @@ export async function agregarItemAVenta({
   descripcion,
   cantidad,
   precioUnitario,
+  excluirDescuento = false,
+
+  origenPrecio = "manual",
+  listaPrecioId = "",
+  listaPrecioNombre = "",
+  productoListaNombre = "",
+  productoBaseId = "",
+  varianteId = "",
+  varianteNombre = "",
+  imagenUrl = "",
+  imagenThumb = "",
+  reglaCantidad = null,
+  adicionalesSeleccionados = [],
+  precioDetalleInterno = null,
 }) {
   if (!perfil?.clienteId) throw new Error("Perfil inválido.");
   if (!venta?.firebaseId) throw new Error("Venta inválida.");
@@ -523,26 +792,59 @@ export async function agregarItemAVenta({
   const cantidadNum = Number(cantidad || 0);
   const precioNum = Number(precioUnitario || 0);
 
-  if (!descripcion?.trim()) throw new Error("La descripción es obligatoria.");
-  if (cantidadNum <= 0) throw new Error("La cantidad debe ser mayor a 0.");
-  if (precioNum < 0) throw new Error("El precio unitario no puede ser negativo.");
+  if (!descripcion?.trim()) {
+    throw new Error("La descripción es obligatoria.");
+  }
+
+  if (cantidadNum <= 0) {
+    throw new Error("La cantidad debe ser mayor a 0.");
+  }
+
+  if (precioNum < 0) {
+    throw new Error("El precio unitario no puede ser negativo.");
+  }
 
   const subtotal = cantidadNum * precioNum;
 
-  await addDoc(collection(db, "ventas", venta.firebaseId, "items"), {
-    clienteId: perfil.clienteId,
-    ventaRefId: venta.firebaseId,
-    numeroVenta: venta.numeroVenta,
-    descripcion: descripcion.trim(),
-    cantidad: cantidadNum,
-    precioUnitario: precioNum,
-    subtotal,
-    origenItem: "agregado",
-    estadoItem: "activo",
-    motivoAnulacion: "",
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  });
+  await addDoc(
+    collection(db, "ventas", venta.firebaseId, "items"),
+    {
+      clienteId: perfil.clienteId,
+      ventaRefId: venta.firebaseId,
+      numeroVenta: venta.numeroVenta,
+
+      descripcion: descripcion.trim(),
+      cantidad: cantidadNum,
+      precioUnitario: precioNum,
+      subtotal,
+
+      excluirDescuento: excluirDescuento === true,
+
+      origenPrecio: origenPrecio || "manual",
+      listaPrecioId: listaPrecioId || "",
+      listaPrecioNombre: listaPrecioNombre || "",
+      productoListaNombre: productoListaNombre || "",
+      productoBaseId: productoBaseId || "",
+      varianteId: varianteId || "",
+      varianteNombre: varianteNombre || "",
+
+      imagenUrl: imagenUrl || "",
+      imagenThumb: imagenThumb || "",
+
+      reglaCantidad: reglaCantidad || null,
+      adicionalesSeleccionados: Array.isArray(adicionalesSeleccionados)
+        ? adicionalesSeleccionados
+        : [],
+      precioDetalleInterno: precioDetalleInterno || null,
+
+      origenItem: "agregado",
+      estadoItem: "activo",
+      motivoAnulacion: "",
+
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    }
+  );
 
   await recalcularTotalesVenta(venta.firebaseId);
 }
@@ -555,6 +857,7 @@ export async function agregarPagoPosteriorAVenta({
   fechaPago,
   fechaComprobanteReal = "",
   observacion = "",
+  comprobanteArchivo = null,
 }) {
   return agregarPagoAVenta({
     perfil,
@@ -563,7 +866,9 @@ export async function agregarPagoPosteriorAVenta({
     medioPago,
     fechaPago,
     fechaComprobanteReal,
-    observacion: observacion || "Pago agregado posteriormente",
+    observacion:
+      observacion || "Pago agregado posteriormente",
+    comprobanteArchivo,
   });
 }
 
@@ -600,7 +905,22 @@ async function recalcularTotalesVenta(ventaId) {
     0
   );
 
-  const descuento = Number(ventaData.descuento || 0);
+  const subtotalAplicableDescuento = itemsActivos
+    .filter((item) => item.excluirDescuento !== true)
+    .reduce(
+      (acc, item) => acc + Number(item.subtotal || 0),
+      0
+    );
+
+  const descuentoPorcentaje = Number(
+    ventaData.descuentoPorcentaje || 0
+  );
+
+  const descuento =
+    descuentoPorcentaje > 0
+      ? subtotalAplicableDescuento * (descuentoPorcentaje / 100)
+      : Number(ventaData.descuento || 0);
+
   const total = subtotal - descuento;
   const saldoPendiente = total - totalPagado < 0 ? 0 : total - totalPagado;
   const saldoAFavor = totalPagado > total ? totalPagado - total : 0;
@@ -617,6 +937,7 @@ async function recalcularTotalesVenta(ventaId) {
   await updateDoc(ventaRef, {
     cantidad,
     subtotal,
+    descuento,
     total,
     totalPagado,
     saldoPendiente,
@@ -692,8 +1013,13 @@ export async function anularVenta({
   ventaId,
   motivoAnulacion = "",
 }) {
-  if (!perfil?.clienteId) throw new Error("Perfil inválido.");
-  if (!ventaId) throw new Error("Falta ventaId.");
+  if (!perfil?.clienteId) {
+    throw new Error("Perfil inválido.");
+  }
+
+  if (!ventaId) {
+    throw new Error("Falta ventaId.");
+  }
 
   const ventaRef = doc(db, "ventas", ventaId);
   const ventaSnap = await getDoc(ventaRef);
@@ -704,50 +1030,133 @@ export async function anularVenta({
 
   const ventaData = ventaSnap.data();
 
+  if (ventaData.clienteId !== perfil.clienteId) {
+    throw new Error(
+      "La venta no pertenece a la empresa del usuario autenticado."
+    );
+  }
+
   if ((ventaData.estadoVenta || "activa") === "anulada") {
     throw new Error("La venta ya está anulada.");
   }
 
-const batch = writeBatch(db);
+  /*
+   * Buscamos TODOS los movimientos vinculados a la venta.
+   *
+   * Esto incluye:
+   * - movimiento comercial de la venta;
+   * - cobros iniciales;
+   * - cobros posteriores;
+   * - movimientos de efectivo que impactaron Caja.
+   */
+  const movSnap = await getDocs(
+    query(
+      collection(db, "movimientos"),
+      where("clienteId", "==", perfil.clienteId),
+      where("origenRefId", "==", ventaId)
+    )
+  );
 
-batch.update(ventaRef, {
-  estadoVenta: "anulada",
-  motivoAnulacion,
-  anuladaAt: serverTimestamp(),
-  anuladaPor: perfil?.email || "",
-  anuladaPorNombre: perfil?.nombre || perfil?.email || "",
-  updatedAt: serverTimestamp(),
-});
+  /*
+   * También anulamos los registros de pago de la subcolección
+   * para mantener consistencia y auditoría.
+   */
+  const pagosSnap = await getDocs(
+    collection(db, "ventas", ventaId, "pagos")
+  );
 
-const movSnap = await getDocs(
-  query(
-    collection(db, "movimientos"),
-    where("clienteId", "==", perfil.clienteId),
-    where("origen", "==", "venta"),
-    where("origenRefId", "==", ventaId)
-  )
-);
+  const batch = writeBatch(db);
 
-movSnap.docs.forEach((movDoc) => {
-  batch.update(doc(db, "movimientos", movDoc.id), {
-    estadoMovimiento: "anulado",
-    activo: false,
-    anuladoAt: serverTimestamp(),
-    anuladoPor: perfil?.uid || perfil?.firebaseUid || perfil?.email || "",
-    anuladoPorNombre: perfil?.nombre || perfil?.email || "",
+  batch.update(ventaRef, {
+    estadoVenta: "anulada",
     motivoAnulacion,
+    anuladaAt: serverTimestamp(),
+    anuladaPor:
+      perfil?.uid ||
+      perfil?.firebaseUid ||
+      perfil?.email ||
+      "",
+    anuladaPorNombre: perfil?.nombre || perfil?.email || "",
     updatedAt: serverTimestamp(),
   });
-});
 
-if (ventaData.pedidoRefId) {
-  batch.update(doc(db, "pedidos", ventaData.pedidoRefId), {
-    ventaEstado: "anulada",
-    updatedAt: serverTimestamp(),
+  movSnap.docs.forEach((movDoc) => {
+    batch.update(doc(db, "movimientos", movDoc.id), {
+      estadoMovimiento: "anulado",
+      activo: false,
+      anuladoAt: serverTimestamp(),
+      anuladoPor:
+        perfil?.uid ||
+        perfil?.firebaseUid ||
+        perfil?.email ||
+        "",
+      anuladoPorNombre: perfil?.nombre || perfil?.email || "",
+      motivoAnulacion,
+      updatedAt: serverTimestamp(),
+    });
   });
-}
 
-await batch.commit();
+  pagosSnap.docs.forEach((pagoDoc) => {
+    const pagoData = pagoDoc.data();
+
+    if ((pagoData.estadoPagoRegistro || "activo") !== "activo") {
+      return;
+    }
+
+    batch.update(
+      doc(db, "ventas", ventaId, "pagos", pagoDoc.id),
+      {
+        estadoPagoRegistro: "anulado",
+        motivoAnulacion,
+        anuladoAt: serverTimestamp(),
+        anuladoPor:
+          perfil?.uid ||
+          perfil?.firebaseUid ||
+          perfil?.email ||
+          "",
+        anuladoPorNombre: perfil?.nombre || perfil?.email || "",
+        updatedAt: serverTimestamp(),
+      }
+    );
+  });
+
+  /*
+   * Primero anulamos la venta, sus pagos y sus movimientos.
+   *
+   * El pedido NO forma parte de este batch porque puede haber
+   * sido eliminado y no debe bloquear la anulación de la venta.
+   */
+  await batch.commit();
+
+  /*
+   * Si todavía existe un pedido asociado, intentamos actualizarlo.
+   *
+   * Es una operación secundaria:
+   * si el pedido fue eliminado o no puede actualizarse, la venta
+   * ya quedó anulada correctamente y no debemos revertirla.
+   */
+  if (ventaData.pedidoRefId) {
+    try {
+      await updateDoc(
+        doc(db, "pedidos", ventaData.pedidoRefId),
+        {
+          ventaEstado: "anulada",
+          updatedAt: serverTimestamp(),
+        }
+      );
+    } catch (pedidoError) {
+      console.warn(
+        "La venta fue anulada, pero el pedido asociado no pudo actualizarse.",
+        {
+          ventaId,
+          numeroVenta: ventaData.numeroVenta || "",
+          pedidoRefId: ventaData.pedidoRefId,
+          code: pedidoError?.code || "",
+          message: pedidoError?.message || "",
+        }
+      );
+    }
+  }
 }
 
 export function escucharVentasRecientes({

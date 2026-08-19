@@ -62,16 +62,18 @@ export default function ProductoSelectorModal({
 
 
 
-  useEffect(() => {
-    const cargar = async () => {
-      if (!open || !perfil?.clienteId) return;
+useEffect(() => {
+  const cargar = async () => {
+    if (!open || !perfil?.clienteId) return;
 
+    try {
       const [listasDb, productosBaseDb] = await Promise.all([
         obtenerListasPrecios(perfil.clienteId),
         obtenerProductosBase(perfil.clienteId),
       ]);
 
       const activas = (listasDb || []).filter((l) => l.activa !== false);
+
       setListas(activas);
       setProductosBase(productosBaseDb || []);
 
@@ -81,65 +83,103 @@ export default function ProductoSelectorModal({
         activas[0]?.firebaseId ||
         "";
 
-        setOrigen("lista_precio");
-        setListaId(defaultId);
-        setBusqueda("");
+      setOrigen("lista_precio");
+      setListaId(defaultId);
+      setBusqueda("");
 
-        const listaBase = activas.find((l) => l.firebaseId === defaultId);
-        const productosBaseLista = listaBase?.productos || [];
+      const listaBase = activas.find((l) => l.firebaseId === defaultId);
+      const productosBaseLista = listaBase?.productos || [];
 
-        const indexProductoActual = productosBaseLista.findIndex((p) => {
+      const indexProductoActual = productosBaseLista.findIndex((p) => {
+        return (
+          (itemActual?.productoBaseId &&
+            p.productoBaseId === itemActual.productoBaseId) ||
+          (itemActual?.productoListaNombre &&
+            String(p.nombre || "").trim().toLowerCase() ===
+              String(itemActual.productoListaNombre || "")
+                .trim()
+                .toLowerCase())
+        );
+      });
+
+      if (indexProductoActual >= 0) {
+        const productoActual = productosBaseLista[indexProductoActual];
+        const variantes = normalizarVariantesProducto(productoActual);
+
+        const indexVarianteActual = variantes.findIndex(
+          (v) =>
+            v.id === itemActual?.varianteId ||
+            String(v.nombre || "").trim().toLowerCase() ===
+              String(itemActual?.varianteNombre || "")
+                .trim()
+                .toLowerCase()
+        );
+
+        const varianteActual =
+          variantes[indexVarianteActual >= 0 ? indexVarianteActual : 0];
+
+        const reglas = varianteActual?.reglasCantidad || [];
+
+        const indexReglaActual = reglas.findIndex((r) => {
+          const reglaActual = itemActual?.reglaCantidad || {};
+
           return (
-            (itemActual?.productoBaseId && p.productoBaseId === itemActual.productoBaseId) ||
-            (itemActual?.productoListaNombre &&
-              String(p.nombre || "").trim().toLowerCase() ===
-                String(itemActual.productoListaNombre || "").trim().toLowerCase())
+            Number(r.desde || 0) === Number(reglaActual.desde || 0) &&
+            String(r.hasta ?? "") === String(reglaActual.hasta ?? "") &&
+            Number(r.precio || 0) === Number(reglaActual.precio || 0)
           );
         });
 
-        if (indexProductoActual >= 0) {
-          const productoActual = productosBaseLista[indexProductoActual];
-          const variantes = normalizarVariantesProducto(productoActual);
+        setProductoIndex(String(indexProductoActual));
+        setVarianteIndex(indexVarianteActual >= 0 ? indexVarianteActual : 0);
+        setReglaIndex(indexReglaActual >= 0 ? indexReglaActual : null);
 
-          const indexVarianteActual = variantes.findIndex(
-            (v) =>
-              v.id === itemActual?.varianteId ||
-              String(v.nombre || "").trim().toLowerCase() ===
-                String(itemActual?.varianteNombre || "").trim().toLowerCase()
-          );
+        setAdicionalesIds(
+          Array.isArray(itemActual?.adicionalesSeleccionados)
+            ? itemActual.adicionalesSeleccionados.map(
+                (a, index) => a.id || `adicional-${index}`
+              )
+            : []
+        );
+      } else {
+        setProductoIndex("");
+        setVarianteIndex(0);
+        setReglaIndex(null);
+        setAdicionalesIds([]);
+      }
+    } catch (error) {
+      if (error?.code === "permission-denied") {
+        console.warn(
+          "Usuario sin permisos para consultar la lista de precios.",
+          error
+        );
 
-          const varianteActual =
-            variantes[indexVarianteActual >= 0 ? indexVarianteActual : 0];
+        setListas([]);
+        setProductosBase([]);
+        setListaId("");
+        setProductoIndex("");
+        setVarianteIndex(0);
+        setReglaIndex(null);
+        setAdicionalesIds([]);
 
-          const reglas = varianteActual?.reglasCantidad || [];
+        return;
+      }
 
-          const indexReglaActual = reglas.findIndex((r) => {
-            const reglaActual = itemActual?.reglaCantidad || {};
-            return (
-              Number(r.desde || 0) === Number(reglaActual.desde || 0) &&
-              String(r.hasta ?? "") === String(reglaActual.hasta ?? "") &&
-              Number(r.precio || 0) === Number(reglaActual.precio || 0)
-            );
-          });
+      console.error("Error cargando selector de productos:", error);
 
-          setProductoIndex(String(indexProductoActual));
-          setVarianteIndex(indexVarianteActual >= 0 ? indexVarianteActual : 0);
-          setReglaIndex(indexReglaActual >= 0 ? indexReglaActual : null);
-          setAdicionalesIds(
-            Array.isArray(itemActual?.adicionalesSeleccionados)
-              ? itemActual.adicionalesSeleccionados.map((a, index) => a.id || `adicional-${index}`)
-              : []
-          );
-        } else {
-          setProductoIndex("");
-          setVarianteIndex(0);
-          setReglaIndex(null);
-          setAdicionalesIds([]);
-        }
-    };
+      setListas([]);
+      setProductosBase([]);
+    }
+  };
 
-    cargar();
-  }, [open, perfil?.clienteId, itemActual]);
+  cargar();
+  }, [
+    open,
+    perfil?.clienteId,
+    itemActual?.listaPrecioId,
+    itemActual?.productoBaseId,
+    itemActual?.varianteId,
+  ]);
 
   const listaSeleccionada = useMemo(
     () => listas.find((l) => l.firebaseId === listaId) || null,

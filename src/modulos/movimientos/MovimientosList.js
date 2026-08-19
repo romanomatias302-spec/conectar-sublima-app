@@ -8,6 +8,7 @@ import {
   obtenerSaldosPendientesProveedores,
 } from "../../firebase/informesFinancieros";
 import * as XLSX from "xlsx";
+import { fechaHoyNegocio } from "../../utils/fechas";
 
 
 function formatearMoneda(valor) {
@@ -19,33 +20,43 @@ function formatearMoneda(valor) {
   });
 }
 
-function fechaInput(fecha) {
-  return fecha.toISOString().slice(0, 10);
+function moverFechaISO(fechaISO, cantidadDias) {
+  if (!fechaISO) return "";
+
+  const [anio, mes, dia] = fechaISO.split("-").map(Number);
+
+  const fechaUTC = new Date(Date.UTC(anio, mes - 1, dia));
+
+  fechaUTC.setUTCDate(fechaUTC.getUTCDate() + cantidadDias);
+
+  const nuevoAnio = fechaUTC.getUTCFullYear();
+  const nuevoMes = String(fechaUTC.getUTCMonth() + 1).padStart(2, "0");
+  const nuevoDia = String(fechaUTC.getUTCDate()).padStart(2, "0");
+
+  return `${nuevoAnio}-${nuevoMes}-${nuevoDia}`;
 }
 
-function rangoHoy() {
-  const hoy = new Date();
-  return { desde: fechaInput(hoy), hasta: fechaInput(hoy) };
+function rangoHoy(fechaHoy) {
+  return {
+    desde: fechaHoy,
+    hasta: fechaHoy,
+  };
 }
 
-function rangoAyer() {
-  const ayer = new Date();
-  ayer.setDate(ayer.getDate() - 1);
-  return { desde: fechaInput(ayer), hasta: fechaInput(ayer) };
+function rangoAyer(fechaHoy) {
+  const ayer = moverFechaISO(fechaHoy, -1);
+
+  return {
+    desde: ayer,
+    hasta: ayer,
+  };
 }
 
-function rangoUltimosDias(dias) {
-  const hasta = new Date();
-  const desde = new Date();
-  desde.setDate(hasta.getDate() - dias + 1);
-  return { desde: fechaInput(desde), hasta: fechaInput(hasta) };
-}
-
-function obtenerFechaHaceDias(dias) {
-  const fecha = new Date();
-  fecha.setDate(fecha.getDate() - dias);
-  fecha.setHours(0, 0, 0, 0);
-  return fecha;
+function rangoUltimosDias(fechaHoy, dias) {
+  return {
+    desde: moverFechaISO(fechaHoy, -(dias - 1)),
+    hasta: fechaHoy,
+  };
 }
 
 function formatearDuracion(minutos) {
@@ -65,6 +76,7 @@ function formatearDuracion(minutos) {
 }
 
 export default function MovimientosList({ perfil }) {
+  const fechaHoySistema = fechaHoyNegocio(perfil);
   const [vistaActiva, setVistaActiva] = useState("resumen");
   const [movimientos, setMovimientos] = useState([]);
   const [ultimoDoc, setUltimoDoc] = useState(null);
@@ -73,16 +85,17 @@ export default function MovimientosList({ perfil }) {
   const [historialProduccion, setHistorialProduccion] = useState([]);
   const [loadingProduccion, setLoadingProduccion] = useState(false);
   const [modalHistorialAbierto, setModalHistorialAbierto] = useState(false);
-  const [filtroDesdeProduccion, setFiltroDesdeProduccion] = useState(
-    obtenerFechaHaceDias(7).toISOString().slice(0, 10)
+  const [filtroDesdeProduccion, setFiltroDesdeProduccion] = useState(() =>
+    moverFechaISO(fechaHoySistema, -7)
   );
+
   const [filtroHastaProduccion, setFiltroHastaProduccion] = useState(
-    new Date().toISOString().slice(0, 10)
+    fechaHoySistema
   );
   const [estadoActualProduccion, setEstadoActualProduccion] = useState([]);
 const [loadingEstadoActual, setLoadingEstadoActual] = useState(false);
 const [filtroUsuarioProduccion, setFiltroUsuarioProduccion] = useState("");
-const hoyDefault = rangoHoy();
+const hoyDefault = rangoHoy(fechaHoySistema);
 
 const [rangoFinanzasActivo, setRangoFinanzasActivo] = useState("hoy");
 const [fechaDesdeFinanzas, setFechaDesdeFinanzas] = useState(hoyDefault.desde);
@@ -244,26 +257,26 @@ const movimientoImpactaInforme = (m) => {
 const aplicarRangoRapidoFinanzas = (rango) => {
   setRangoFinanzasActivo(rango);
 
-  if (rango === "hoy") {
-    const r = rangoHoy();
+    if (rango === "hoy") {
+      const r = rangoHoy(fechaHoySistema);
     setFechaDesdeFinanzas(r.desde);
     setFechaHastaFinanzas(r.hasta);
   }
 
   if (rango === "ayer") {
-    const r = rangoAyer();
+    const r = rangoAyer(fechaHoySistema);
     setFechaDesdeFinanzas(r.desde);
     setFechaHastaFinanzas(r.hasta);
   }
 
   if (rango === "7dias") {
-    const r = rangoUltimosDias(7);
+    const r = rangoUltimosDias(fechaHoySistema, 7);
     setFechaDesdeFinanzas(r.desde);
     setFechaHastaFinanzas(r.hasta);
   }
 
   if (rango === "30dias") {
-    const r = rangoUltimosDias(30);
+    const r = rangoUltimosDias(fechaHoySistema, 30);
     setFechaDesdeFinanzas(r.desde);
     setFechaHastaFinanzas(r.hasta);
   }

@@ -801,7 +801,10 @@ const cotizacionesFiltradas = useMemo(() => {
                       <button
                         key={c.firebaseId}
                         type="button"
-                        onClick={() => usarClienteExistente(c)}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          usarClienteExistente(c);
+                        }}
                       >
                         {c.nombre || "Sin nombre"}{" "}
                         {c.dni ? `- ${c.dni}` : ""}

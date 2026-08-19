@@ -1544,6 +1544,8 @@ async function guardarDetalleManual() {
     if (!puedeHacerEnProduccion("editarDetalle")) return;
     if (!pedidoEditandoDetalle?.firebaseId) return;
 
+
+
     setGuardandoDetalleManual(true);
 
 const etiquetasSeleccionadas = etiquetasProduccion
@@ -1568,6 +1570,11 @@ if (puedeHacerEnProduccion("asignarUsuario")) {
     },
   });
 }
+
+
+
+
+
 
 await actualizarDetalleManualProduccion({
 pedidoId: pedidoEditandoDetalle.firebaseId,

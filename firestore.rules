@@ -233,7 +233,18 @@ function canReadPedidos(clienteId) {
     }
 
     function canEditarDetalleProduccion(clienteId) {
-      return canModulo(clienteId, "produccion", "editarDetalle");
+      return isSuperAdmin()
+        || (
+          tenantUserBase(clienteId)
+          && (
+            isAdmin()
+            || (
+              hasPermisos()
+              && profile().permisos.produccion is map
+              && profile().permisos.produccion.editarDetalle == true
+            )
+          )
+        );
     }
 
     function canAsignarUsuarioProduccion(clienteId) {
@@ -265,6 +276,7 @@ function canUpdatePedidoProduccion(clienteId) {
           "produccionMetros",
 
           "produccionImagenPortada",
+          "produccionImagenPortadaThumb",
           "produccionImagenPortadaOrigen",
 
           "produccionArchivos",
@@ -305,21 +317,110 @@ function canUpdatePedidoProduccion(clienteId) {
         ]);
     }
 
-    function canUpdatePedidos(clienteId) {
-      return isSuperAdmin()
+function canUpdatePedidos(clienteId) {
+  return isSuperAdmin()
+    || (
+      tenantUserBase(clienteId)
+      && (
+        isAdmin()
+
         || (
-          tenantUserBase(clienteId)
-          && (
-            isAdmin()
-            || canEditPedidoGeneral(clienteId)
-            || canUpdatePedidoProduccion(clienteId)
-            || canUpdatePedidoDetalleProduccion(clienteId)
-            || canUpdatePedidoAsignacion(clienteId)
-            || canUpdatePedidoColorTarjeta(clienteId)
-            || canUpdatePedidoOrdenManual(clienteId)
+          onlyChangesAllowed([
+            "produccionNotaCorta",
+            "produccionNotaLarga",
+            "produccionMetros",
+            "produccionImagenPortada",
+            "produccionImagenPortadaThumb",
+            "produccionImagenPortadaOrigen",
+            "produccionArchivos",
+            "produccionEtiquetas",
+            "produccionEtiquetaId",
+            "produccionEtiquetaNombre",
+            "produccionEtiquetaColor",
+            "updatedAt"
+          ])
+          && permisoModuloAccion(
+            "produccion",
+            "editarDetalle"
           )
-        );
-    }
+        )
+
+        || (
+          onlyChangesAllowed([
+            "produccionAsignadoUid",
+            "produccionAsignadoNombre",
+            "produccionAsignadoEmail",
+            "produccionAsignadoAt",
+            "produccionAsignadoPorUid",
+            "produccionAsignadoPorNombre",
+            "updatedAt"
+          ])
+          && permisoModuloAccion(
+            "produccion",
+            "asignarUsuario"
+          )
+        )
+
+        || (
+          onlyChangesAllowed([
+            "columnaProduccionId",
+            "progresoProduccion",
+            "estadoProduccion",
+            "produccionFinalizada",
+            "estado",
+            "produccionActualizadoAt",
+            "updatedAt",
+            "ultimaAccionProduccionPor",
+            "ultimaAccionProduccionPorNombre",
+            "ultimaAccionProduccionAt",
+            "produccionSortOrder"
+          ])
+          && permisoModuloAccion(
+            "produccion",
+            "mover"
+          )
+        )
+
+        || (
+          onlyChangesAllowed([
+            "produccionColorTarjeta"
+          ])
+          && permisoModuloAccion(
+            "produccion",
+            "cambiarColorTarjeta"
+          )
+        )
+
+        || (
+          onlyChangesAllowed([
+            "produccionSortOrder"
+          ])
+          && permisoModuloAccion(
+            "produccion",
+            "mover"
+          )
+        )
+
+        || (
+          onlyChangesAllowed([
+            "ventaRefId",
+            "ventaVisibleId",
+            "ventaEstado",
+            "updatedAt"
+          ])
+          && (
+            permisoModuloAccion("ventas", "crear")
+            || permisoModuloAccion("ventas", "editar")
+          )
+        )
+
+        || permisoModuloAccion(
+          "pedidos",
+          "editar"
+        )
+      )
+    );
+}
 
     function canReadProduccionColumnas(clienteId) {
       return isSuperAdmin()
@@ -359,6 +460,18 @@ function canReadVentas(clienteId) {
 
     function canUpdateVentas(clienteId) {
       return canModulo(clienteId, "ventas", "editar");
+    }
+
+    function canAsignarNumeroRecibo(clienteId) {
+      return isSuperAdmin()
+        || (
+          tenantUserBase(clienteId)
+          && (
+            isAdmin()
+            || permisoModuloAccion("ventas", "crear")
+            || permisoModuloAccion("ventas", "editar")
+          )
+        );
     }
 
 function canReadMovimientos(clienteId) {
@@ -520,25 +633,37 @@ function canReadMovimientos(clienteId) {
         );
     }
     
-        function canTouchUltimoNumeroVenta(clienteId) {
+    function canTouchUltimoNumeroVenta(clienteId) {
       return isSuperAdmin()
         || (
-          tenantUserBase(clienteId)
+          sameTenant(clienteId)
+          && resource.data.estado == "activo"
           && (
             isAdmin()
             || permisoModuloAccion("ventas", "crear")
           )
         );
     }
-
-        function canTouchUltimoNumeroCotizacion(clienteId) {
+    
+    function canTouchUltimoNumeroRecibo(clienteId) {
       return isSuperAdmin()
         || (
-          tenantUserBase(clienteId)
+          sameTenant(clienteId)
+          && resource.data.estado == "activo"
           && (
             isAdmin()
-            || permisoModuloAccion("ventas", "crearCotizacion")
+            || permisoModuloAccion("ventas", "crear")
+            || permisoModuloAccion("ventas", "editar")
           )
+        );
+    }
+
+
+    function canTouchUltimoNumeroCotizacion(clienteId) {
+      return isSuperAdmin()
+        || (
+          sameTenant(clienteId)
+          && resource.data.estado == "activo"
         );
     }
 
@@ -547,7 +672,15 @@ function canReadMovimientos(clienteId) {
     }
 
     function canCreateCotizaciones(clienteId) {
-      return canModulo(clienteId, "ventas", "crearCotizacion");
+      return isSuperAdmin()
+        || (
+          tenantUserBase(clienteId)
+          && (
+            isAdmin()
+            || permisoModuloAccion("ventas", "crearCotizacion")
+            || permisoModuloAccion("ventas", "cotizaciones")
+          )
+        );
     }
 
     function canUpdateCotizaciones(clienteId) {
@@ -559,7 +692,8 @@ function canReadMovimientos(clienteId) {
     function canTouchUltimoNumeroPedido(clienteId) {
       return isSuperAdmin()
         || (
-          tenantUserBase(clienteId)
+          sameTenant(clienteId)
+          && resource.data.estado == "activo"
           && (
             isAdmin()
             || permisoModuloAccion("pedidos", "crear")
@@ -687,37 +821,88 @@ function canReadMovimientos(clienteId) {
       allow read: if isSuperAdmin() || sameTenant(clienteId);
 
       allow update: if isSuperAdmin()
-        || (
-          isAdmin()
-          && isActiveUser()
-          && clienteId == profile().clienteId
-        )
-        || (
-          canTouchUltimoNumeroVenta(clienteId)
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            "ultimoNumeroVenta",
-            "updatedAt"
-          ])
-        )
-        || (
-          canTouchUltimoNumeroPedido(clienteId)
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            "ultimoNumeroPedido",
-            "updatedAt"
-          ])
-        )
+
+      // Administrador del tenant:
+      // conserva exactamente el comportamiento actual.
       || (
-        signedIn()
+        isAdmin()
         && isActiveUser()
         && clienteId == profile().clienteId
+      )
+
+      // Usuario común:
+      // validamos tenant/estado UNA sola vez.
+      || (
+        sameTenant(clienteId)
+        && resource.data.estado == "activo"
         && (
-          isAdmin()
-          || permisoModuloAccion("ventas", "crearCotizacion")
+
+          // Contador de ventas
+          (
+            changedKeys().hasOnly([
+              "ultimoNumeroVenta",
+              "updatedAt"
+            ])
+            && permisoModuloAccion(
+              "ventas",
+              "crear"
+            )
+          )
+
+          ||
+
+          // Contador de recibos
+          (
+            changedKeys().hasOnly([
+              "ultimoNumeroRecibo",
+              "updatedAt"
+            ])
+            && (
+              permisoModuloAccion(
+                "ventas",
+                "crear"
+              )
+              || permisoModuloAccion(
+                "ventas",
+                "editar"
+              )
+            )
+          )
+
+          ||
+
+          // Contador de pedidos
+          (
+            changedKeys().hasOnly([
+              "ultimoNumeroPedido",
+              "updatedAt"
+            ])
+            && permisoModuloAccion(
+              "pedidos",
+              "crear"
+            )
+          )
+
+          ||
+
+          // Contador de cotizaciones
+          (
+            changedKeys().hasOnly([
+              "ultimoNumeroCotizacion",
+              "updatedAt"
+            ])
+            && (
+              permisoModuloAccion(
+                "ventas",
+                "crearCotizacion"
+              )
+              || permisoModuloAccion(
+                "ventas",
+                "cotizaciones"
+              )
+            )
+          )
         )
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          "ultimoNumeroCotizacion",
-          "updatedAt"
-        ])
       );
 
       allow create, delete: if isSuperAdmin();
@@ -1303,8 +1488,32 @@ match /produccion_sectores/{sectorId} {
           )
           && request.resource.data.clienteId == ventaParentClienteId(ventaId);
 
-        allow update: if canUpdateVentas(ventaParentClienteId(ventaId))
-          && request.resource.data.clienteId == ventaParentClienteId(ventaId);
+          allow update: if
+            (
+              canUpdateVentas(
+                ventaParentClienteId(ventaId)
+              )
+              && request.resource.data.clienteId ==
+                ventaParentClienteId(ventaId)
+            )
+            ||
+            (
+              canAsignarNumeroRecibo(
+                ventaParentClienteId(ventaId)
+              )
+              && request.resource.data.clienteId ==
+                resource.data.clienteId
+              && resource.data.clienteId ==
+                ventaParentClienteId(ventaId)
+              && request.resource.data
+                .diff(resource.data)
+                .affectedKeys()
+                .hasOnly([
+                  "numeroRecibo",
+                  "numeroReciboAsignadoAt",
+                  "updatedAt"
+                ])
+            );
 
         // por ahora no borramos pagos
         allow delete: if false;

@@ -10,6 +10,7 @@ import {
 import { formatearMoneda, obtenerConfigMonedaDesdePerfil } from "../../utils/moneda";
 import { obtenerUsuariosPorCliente } from "../../firebase/usuariosConfig";
 import { puedeHacer } from "../../utils/permisos";
+import ProductoSelectorModal from "../../components/ProductoSelectorModal/ProductoSelectorModal";
 import "./VentasPage.css";
 
 
@@ -41,6 +42,9 @@ const [editItems, setEditItems] = useState([]);
 const [editDescuento, setEditDescuento] = useState(0);
 const [editVendedorUid, setEditVendedorUid] = useState("");
 const [usuarios, setUsuarios] = useState([]);
+const [modalPrecioEdicionAbierto, setModalPrecioEdicionAbierto] = useState(false);
+const [itemPrecioEdicionIndex, setItemPrecioEdicionIndex] = useState(null);
+
 
 const configMoneda = obtenerConfigMonedaDesdePerfil(perfil);
 const puedeEditarCotizacion = puedeHacer(perfil, "ventas", "editarCotizacion");
@@ -48,6 +52,13 @@ const puedeAnularCotizacion = puedeHacer(perfil, "ventas", "anularCotizacion");
 const puedeConvertirCotizacion = puedeHacer(perfil, "ventas", "convertirCotizacion");
 const puedeOtorgarDescuentoCotizacion =
   puedeHacer(perfil, "ventas", "otorgarDescuentoCotizacion");
+
+const puedeUsarListaPrecios =
+  perfil?.rol === "admin" ||
+  perfil?.rol === "superadmin" ||
+  puedeHacer(perfil, "listasPrecios", "ver") ||
+  puedeHacer(perfil, "ventas", "crear") ||
+  puedeHacer(perfil, "ventas", "crearCotizacion");
 
   const cargarDetalle = async () => {
     try {
@@ -187,17 +198,47 @@ const descuentoPorcentajeActual =
 
 setEditDescuento(descuentoPorcentajeActual);
 
-  setEditItems(
-    items
-      .filter((item) => (item.estadoItem || "activo") === "activo")
-      .map((item) => ({
-        firebaseId: item.firebaseId || "",
-        descripcion: item.descripcion || "",
-        cantidad: Number(item.cantidad || 0),
-        precioUnitario: Number(item.precioUnitario || 0),
-        excluirDescuento: item.excluirDescuento === true,
-      }))
-  );
+setEditItems(
+  items
+    .filter((item) => (item.estadoItem || "activo") === "activo")
+    .map((item) => ({
+      firebaseId: item.firebaseId || "",
+
+      descripcion: item.descripcion || "",
+      cantidad: Number(item.cantidad || 0),
+      precioUnitario: Number(item.precioUnitario || 0),
+      excluirDescuento: item.excluirDescuento === true,
+
+      origenPrecio: item.origenPrecio || "manual",
+
+      listaPrecioId: item.listaPrecioId || "",
+      listaPrecioNombre: item.listaPrecioNombre || "",
+
+      productoListaNombre: item.productoListaNombre || "",
+      productoBaseId: item.productoBaseId || "",
+
+      imagenUrl: item.imagenUrl || "",
+      imagenThumb: item.imagenThumb || "",
+
+      reglaCantidad: item.reglaCantidad || null,
+
+      adicionalesSeleccionados: Array.isArray(item.adicionalesSeleccionados)
+        ? item.adicionalesSeleccionados
+        : [],
+
+      precioDetalleInterno: item.precioDetalleInterno || null,
+
+      varianteId:
+        item.varianteId ||
+        item.precioDetalleInterno?.varianteId ||
+        "",
+
+      varianteNombre:
+        item.varianteNombre ||
+        item.precioDetalleInterno?.varianteNombre ||
+        "",
+    }))
+);
 
   setMenuOpcionesAbierto(false);
   setEditando(true);
@@ -211,6 +252,19 @@ const agregarItemEdicion = () => {
       cantidad: 1,
       precioUnitario: 0,
       excluirDescuento: false,
+
+      origenPrecio: "manual",
+      listaPrecioId: "",
+      listaPrecioNombre: "",
+      productoListaNombre: "",
+      productoBaseId: "",
+      imagenUrl: "",
+      imagenThumb: "",
+      reglaCantidad: null,
+      adicionalesSeleccionados: [],
+      precioDetalleInterno: null,
+      varianteId: "",
+      varianteNombre: "",
     },
   ]);
 };
@@ -221,6 +275,33 @@ const actualizarItemEdicion = (index, campo, valor) => {
       i === index ? { ...item, [campo]: valor } : item
     )
   );
+};
+
+const abrirSelectorPrecioEdicion = (index) => {
+  if (!puedeUsarListaPrecios) return;
+
+  setItemPrecioEdicionIndex(index);
+  setModalPrecioEdicionAbierto(true);
+  setError("");
+};
+
+const aplicarProductoSeleccionadoEdicion = (datosPrecio) => {
+  if (itemPrecioEdicionIndex === null) return;
+
+  setEditItems((prev) =>
+    prev.map((item, index) =>
+      index === itemPrecioEdicionIndex
+        ? {
+            ...item,
+            ...datosPrecio,
+          }
+        : item
+    )
+  );
+
+  setModalPrecioEdicionAbierto(false);
+  setItemPrecioEdicionIndex(null);
+  setError("");
 };
 
 const eliminarItemEdicion = (index) => {
@@ -240,9 +321,18 @@ const editSubtotal = editItemsNormalizados.reduce(
   0
 );
 
+const editSubtotalAplicableDescuento = editItemsNormalizados
+  .filter((item) => item.excluirDescuento !== true)
+  .reduce(
+    (acc, item) => acc + Number(item.subtotal || 0),
+    0
+  );
+
 const editDescuentoMonto =
-  editSubtotal > 0 && Number(editDescuento || 0) > 0
-    ? editSubtotal * (Number(editDescuento || 0) / 100)
+  editSubtotalAplicableDescuento > 0 &&
+  Number(editDescuento || 0) > 0
+    ? editSubtotalAplicableDescuento *
+      (Number(editDescuento || 0) / 100)
     : 0;
 
 const editTotal = editSubtotal - editDescuentoMonto;
@@ -401,7 +491,7 @@ const itemsVenta = items
 
   return (
     <div className="ventas-page cotizacion-print-area">
-      <div className="ventas-topbar cotizacion-detalle-topbar">
+      <div className="ventas-topbar cotizacion-detalle-topbar cotizacion-screen-only">
 
         <div className="cotizacion-negocio-info">
           {configNegocio.logoUrl && (
@@ -475,7 +565,7 @@ const itemsVenta = items
         {exito && <div className="ventas-alert ventas-alert-ok">{exito}</div>}
       </div>
 
-      <section className="ventas-card">
+      <section className="ventas-card cotizacion-screen-only">
         <div className="ventas-top-editable factura-info-grid">
           <div className="ventas-top-editable-item">
             <span>Cliente</span>
@@ -540,7 +630,7 @@ const itemsVenta = items
         )}
       </section>
 
-      <section className="ventas-card">
+      <section className="ventas-card cotizacion-screen-only">
         <div className="ventas-card-header">
           <h2>Ítems cotizados</h2>
         </div>
@@ -553,6 +643,7 @@ const itemsVenta = items
                 <th>Cantidad</th>
                 <th>Precio unitario</th>
                 <th>Subtotal</th>
+
               </tr>
             </thead>
 
@@ -608,7 +699,7 @@ const itemsVenta = items
         </div>
       </section>
 
-      <section className="ventas-card cotizacion-resumen-final">
+      <section className="ventas-card cotizacion-resumen-final cotizacion-screen-only">
         <div className="ventas-resumen-row">
           <span>Subtotal</span>
           <strong>
@@ -644,6 +735,170 @@ const itemsVenta = items
           </strong>
         </div>
       </section>
+
+      <div className="cotizacion-print-only">
+
+        <div className="cotizacion-print-header">
+          <div className="cotizacion-print-negocio">
+            {configNegocio.logoUrl && (
+              <img
+                src={configNegocio.logoUrl}
+                alt="Logo negocio"
+                className="cotizacion-print-logo"
+              />
+            )}
+
+            <div>
+              <h1>Cotización #{cotizacion.numeroCotizacion}</h1>
+              <p>{configNegocio.nombreVisible || "Cotización"}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="cotizacion-print-info">
+          <div>
+            <span>Cliente</span>
+            <strong>{cotizacion.clienteNombre || "-"}</strong>
+          </div>
+
+          <div>
+            <span>Fecha</span>
+            <strong>{cotizacion.fechaCotizacion || "-"}</strong>
+          </div>
+
+          <div>
+            <span>Validez</span>
+            <strong>{cotizacion.fechaValidez || "-"}</strong>
+          </div>
+
+          <div>
+            <span>Vendedor</span>
+            <strong>
+              {cotizacion.vendedorNombre ||
+                cotizacion.vendedorEmail ||
+                "-"}
+            </strong>
+          </div>
+
+          {String(cotizacion.clienteDNI || "").trim() && (
+            <div>
+              <span>Documento</span>
+              <strong>{cotizacion.clienteDNI}</strong>
+            </div>
+          )}
+        </div>
+
+        {cotizacion.notas && (
+          <div className="cotizacion-print-notas">
+            <span>Notas</span>
+            <p>{cotizacion.notas}</p>
+          </div>
+        )}
+
+        <div className="cotizacion-print-items">
+          <h2>Ítems cotizados</h2>
+
+          <table>
+            <colgroup>
+              <col className="print-col-producto" />
+              <col className="print-col-cantidad" />
+              <col className="print-col-precio" />
+              <col className="print-col-subtotal" />
+            </colgroup>
+
+            <thead>
+              <tr>
+                <th>Descripción</th>
+                <th>Cantidad</th>
+                <th>Precio unitario</th>
+                <th>Subtotal</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {items.map((item) => (
+                <tr key={item.firebaseId}>
+                  <td>
+                    <div className="cotizacion-print-producto">
+                      <div className="cotizacion-print-producto-imagen">
+                        {(item.imagenThumb || item.imagenUrl) && (
+                          <img
+                            src={item.imagenThumb || item.imagenUrl}
+                            alt=""
+                          />
+                        )}
+                      </div>
+
+                      <span>
+                        {item.descripcion || "Producto sin descripción"}
+                      </span>
+                    </div>
+                  </td>
+
+                  <td className="print-center">
+                    {item.cantidad}
+                  </td>
+
+                  <td className="print-money">
+                    {formatearMoneda(
+                      item.precioUnitario,
+                      configMoneda.moneda,
+                      configMoneda.localeMoneda
+                    )}
+                  </td>
+
+                  <td className="print-money">
+                    {formatearMoneda(
+                      item.subtotal,
+                      configMoneda.moneda,
+                      configMoneda.localeMoneda
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="cotizacion-print-resumen">
+          <div>
+            <span>Subtotal</span>
+            <strong>
+              {formatearMoneda(
+                cotizacion.subtotal,
+                configMoneda.moneda,
+                configMoneda.localeMoneda
+              )}
+            </strong>
+          </div>
+
+          {descuento > 0 && (
+            <div>
+              <span>Descuento</span>
+              <strong>
+                {formatearMoneda(
+                  descuento,
+                  configMoneda.moneda,
+                  configMoneda.localeMoneda
+                )}
+              </strong>
+            </div>
+          )}
+
+          <div className="cotizacion-print-total">
+            <span>Total</span>
+            <strong>
+              {formatearMoneda(
+                cotizacion.total,
+                configMoneda.moneda,
+                configMoneda.localeMoneda
+              )}
+            </strong>
+          </div>
+        </div>
+
+      </div>
+
       {editando && (
         <div className="ventas-importar-overlay">
             <div className="ventas-importar-modal cotizacion-modal">
@@ -716,25 +971,37 @@ const itemsVenta = items
                 <table className="ventas-table">
                 <thead>
                     <tr>
-                    <th>Descripción</th>
-                    <th>Cant.</th>
-                    <th>Precio</th>
-                    <th>Subtotal</th>
-                    <th></th>
+                      <th>Descripción</th>
+                      <th>Cant.</th>
+                      <th>Precio</th>
+                      <th>Subtotal</th>
+                      <th>Excluir desc.</th>
+                      <th></th>
                     </tr>
                 </thead>
 
                 <tbody>
                     {editItemsNormalizados.map((item, index) => (
                     <tr key={index}>
-                        <td>
-                        <input
+                      <td>
+                        <div className="ventas-descripcion-selector">
+                          <input
                             value={item.descripcion}
                             onChange={(e) =>
-                            actualizarItemEdicion(index, "descripcion", e.target.value)
+                              actualizarItemEdicion(index, "descripcion", e.target.value)
                             }
-                        />
-                        </td>
+                          />
+
+                        {puedeUsarListaPrecios && (
+                          <button
+                            type="button"
+                            className="ventas-selector-precio-btn"
+                            onClick={() => abrirSelectorPrecioEdicion(index)}
+                            title="Agregar desde lista de precios"
+                          />
+                        )}
+                        </div>
+                      </td>
 
                         <td>
                         <input
@@ -764,6 +1031,20 @@ const itemsVenta = items
                             configMoneda.moneda,
                             configMoneda.localeMoneda
                         )}
+                        </td>
+
+                        <td style={{ textAlign: "center" }}>
+                          <input
+                            type="checkbox"
+                            checked={item.excluirDescuento === true}
+                            onChange={(e) =>
+                              actualizarItemEdicion(
+                                index,
+                                "excluirDescuento",
+                                e.target.checked
+                              )
+                            }
+                          />
                         </td>
 
                         <td>
@@ -840,6 +1121,23 @@ const itemsVenta = items
             </div>
         </div>
         )}
+
+        {puedeUsarListaPrecios &&
+          modalPrecioEdicionAbierto &&
+          itemPrecioEdicionIndex !== null && (
+            <ProductoSelectorModal
+              open={true}
+              perfil={perfil}
+              configMoneda={configMoneda}
+              itemActual={editItems[itemPrecioEdicionIndex]}
+              onClose={() => {
+                setModalPrecioEdicionAbierto(false);
+                setItemPrecioEdicionIndex(null);
+              }}
+              onAplicar={aplicarProductoSeleccionadoEdicion}
+            />
+          )} 
+
     </div>
   );
 }

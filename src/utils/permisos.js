@@ -43,14 +43,20 @@ produccion: {
     anularCotizacion: false,
   },
 
-  caja: {
-    ver: false,
-    abrirCerrar: false,
-    crearMovimiento: false,
-    anularMovimiento: false,
-    corregirApertura: false,
-    historial: false,
-  },
+caja: {
+  ver: false,
+  abrirCerrar: false,
+  crearMovimiento: false,
+
+  crearAporteCapital: false,
+  crearRetiroCapital: false,
+  crearAjustePositivo: false,
+  crearAjusteNegativo: false,
+
+  anularMovimiento: false,
+  corregirApertura: false,
+  historial: false,
+},
 
   gastos: {
     ver: false,

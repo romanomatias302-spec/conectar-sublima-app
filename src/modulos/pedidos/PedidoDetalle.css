@@ -1846,3 +1846,393 @@ padding-bottom:14px;
     font-weight: 600 !important;
   }
 }
+
+/* =====================================================
+   SELECTOR DE FORMATO DE IMPRESIÓN
+   ===================================================== */
+
+.pedido-print-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 16px;
+  background: rgba(15, 23, 42, 0.52);
+}
+
+.pedido-print-modal {
+  width: min(460px, 96vw);
+  padding: 18px;
+
+  border: 1px solid #dbe3ec;
+  border-radius: 16px;
+  background: #ffffff;
+
+  box-shadow: 0 22px 60px rgba(15, 23, 42, 0.28);
+}
+
+.pedido-print-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+
+  margin-bottom: 18px;
+}
+
+.pedido-print-modal-header h3 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.pedido-print-modal-header p {
+  margin: 4px 0 0;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.pedido-print-modal-close {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+
+  border: 0;
+  border-radius: 10px;
+  background: #f1f5f9;
+  color: #475569;
+
+  cursor: pointer;
+  font-weight: 900;
+}
+
+.pedido-print-modal-field {
+  display: grid;
+  gap: 6px;
+}
+
+.pedido-print-modal-field label {
+  color: #334155;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.pedido-print-modal-field select,
+.pedido-print-modal-field input {
+  width: 100%;
+  min-height: 42px;
+
+  padding: 9px 11px;
+
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #0f172a;
+
+  font-size: 14px;
+  outline: none;
+}
+
+.pedido-print-modal-field select:focus,
+.pedido-print-modal-field input:focus {
+  border-color: #0096d1;
+  box-shadow: 0 0 0 3px rgba(0, 150, 209, 0.12);
+}
+
+.pedido-print-medidas-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+
+  margin-top: 14px;
+}
+
+.pedido-print-medida-control {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 7px;
+}
+
+.pedido-print-medida-control span {
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.pedido-print-modal-info {
+  margin-top: 14px;
+  padding: 10px 12px;
+
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  background: #eff6ff;
+  color: #1e3a8a;
+
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.pedido-print-modal-error {
+  margin-top: 12px;
+  padding: 10px 12px;
+
+  border: 1px solid rgba(220, 38, 38, 0.28);
+  border-radius: 10px;
+  background: rgba(220, 38, 38, 0.08);
+  color: #b91c1c;
+
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.pedido-print-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+
+  margin-top: 18px;
+}
+
+.pedido-print-modal-actions button {
+  min-height: 40px;
+  padding: 9px 13px;
+
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.pedido-print-modal-cancelar {
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+}
+
+.pedido-print-modal-confirmar {
+  border: 1px solid #0096d1;
+  background: #0096d1;
+  color: #ffffff;
+}
+
+body.dark-mode .pedido-print-modal {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: #252525;
+}
+
+body.dark-mode .pedido-print-modal-header h3,
+body.dark-mode .pedido-print-modal-field label {
+  color: #f1f5f9;
+}
+
+body.dark-mode .pedido-print-modal-header p {
+  color: #cbd5e1;
+}
+
+body.dark-mode .pedido-print-modal-field select,
+body.dark-mode .pedido-print-modal-field input {
+  border-color: rgba(255, 255, 255, 0.16);
+  background: #1f1f1f;
+  color: #f1f5f9;
+}
+
+body.dark-mode .pedido-print-modal-close {
+  background: #333333;
+  color: #e5e7eb;
+}
+
+@media (max-width: 520px) {
+  .pedido-print-medidas-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .pedido-print-modal-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* =====================================================
+   PLANTILLA RESUMIDA PARA TICKET
+   ===================================================== */
+
+.pedido-ticket-print-area {
+  display: none;
+}
+
+@media print {
+  /*
+   * A4 conserva toda la impresión actual.
+   */
+
+  body.printing-pedido-a4 .pedido-ticket-print-area {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  /*
+   * En ticket ocultamos la estructura A4 y la interfaz.
+   */
+
+  body.printing-pedido-ticket .pedido-detalle > h1,
+  body.printing-pedido-ticket .pedido-header-bar,
+  body.printing-pedido-ticket .pedido-print-area,
+  body.printing-pedido-ticket .acciones-detalle,
+  body.printing-pedido-ticket .tabla-productos-scroll,
+  body.printing-pedido-ticket .tabla-productos-desktop,
+  body.printing-pedido-ticket .productos-mobile-list,
+  body.printing-pedido-ticket .cliente-detalle-overlay,
+  body.printing-pedido-ticket .pedido-print-modal-overlay,
+  body.printing-pedido-ticket
+    .pedido-detalle
+    > div[style*="margin-top: 16px"] {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  body.printing-pedido-ticket .pedido-detalle {
+    position: static !important;
+
+    width: 100% !important;
+    max-width: none !important;
+
+    margin: 0 !important;
+    padding: 0 !important;
+
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
+
+    color: #000000 !important;
+  }
+
+  body.printing-pedido-ticket .pedido-ticket-print-area,
+  body.printing-pedido-ticket .pedido-ticket-print-area * {
+    visibility: visible !important;
+  }
+
+  body.printing-pedido-ticket .pedido-ticket-print-area {
+    display: block !important;
+
+    width: 100% !important;
+    max-width: 100% !important;
+
+    margin: 0 !important;
+    padding: 0 !important;
+
+    background: #ffffff !important;
+    color: #000000 !important;
+
+    font-family: Arial, Helvetica, sans-serif !important;
+  }
+
+  body.printing-pedido-ticket .pedido-ticket-header {
+    text-align: center !important;
+
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  body.printing-pedido-ticket .pedido-ticket-numero {
+    font-size: 17px !important;
+    font-weight: 900 !important;
+    line-height: 1.15 !important;
+  }
+
+  body.printing-pedido-ticket .pedido-ticket-cliente {
+    margin-top: 3px !important;
+
+    font-size: 14px !important;
+    font-weight: 800 !important;
+    line-height: 1.2 !important;
+
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+  }
+
+  body.printing-pedido-ticket .pedido-ticket-entrega {
+    margin-top: 3px !important;
+
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    line-height: 1.2 !important;
+  }
+
+  body.printing-pedido-ticket .pedido-ticket-separador {
+    width: 100% !important;
+    height: 0 !important;
+
+    margin: 7px 0 !important;
+
+    border-top: 1px dashed #000000 !important;
+  }
+
+  body.printing-pedido-ticket .pedido-ticket-productos {
+    display: grid !important;
+    gap: 5px !important;
+  }
+
+  body.printing-pedido-ticket .pedido-ticket-producto {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    align-items: start !important;
+    gap: 7px !important;
+
+    font-size: 12px !important;
+    line-height: 1.25 !important;
+
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  body.printing-pedido-ticket
+    .pedido-ticket-producto-nombre {
+    min-width: 0 !important;
+
+    font-weight: 700 !important;
+
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+    word-break: normal !important;
+  }
+
+  body.printing-pedido-ticket
+    .pedido-ticket-producto-cantidad {
+    white-space: nowrap !important;
+    font-weight: 900 !important;
+  }
+
+  body.printing-pedido-ticket .pedido-ticket-restantes {
+    padding-top: 2px !important;
+
+    text-align: center !important;
+    font-size: 11px !important;
+    font-weight: 800 !important;
+    line-height: 1.2 !important;
+  }
+
+  body.printing-pedido-ticket .pedido-ticket-total {
+    display: flex !important;
+    align-items: baseline !important;
+    justify-content: space-between !important;
+    gap: 8px !important;
+
+    font-size: 14px !important;
+    font-weight: 900 !important;
+    line-height: 1.2 !important;
+
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  body.printing-pedido-ticket .pedido-ticket-total strong {
+    white-space: nowrap !important;
+    font-size: 16px !important;
+  }
+}

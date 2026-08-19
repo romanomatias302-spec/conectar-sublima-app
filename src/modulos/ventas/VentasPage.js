@@ -25,6 +25,7 @@ import {
   Plus,
   Trash2,
   ShieldCheck,
+  Paperclip,
 } from "lucide-react";
 import { puedeHacer } from "../../utils/permisos";
 import { obtenerUsuariosPorCliente } from "../../firebase/usuariosConfig";
@@ -389,7 +390,11 @@ const [pedidoRefId, setPedidoRefId] = useState("");
   const [items, setItems] = useState([itemVacio()]);
   const [descuento, setDescuento] = useState(0);
   const [pagosIniciales, setPagosIniciales] = useState([
-    { monto: 0, medioPago: "efectivo" }
+    {
+      monto: 0,
+      medioPago: "efectivo",
+      comprobanteArchivo: null,
+    },
   ]);
   const [observaciones, setObservaciones] = useState("");
 
@@ -731,7 +736,13 @@ const total = useMemo(
     setFechaVenta(fechaHoyNegocio(perfil));
     setItems([itemVacio()]);
     setDescuento(0);
-    setPagosIniciales([{ monto: 0, medioPago: "efectivo" }]);
+    setPagosIniciales([
+      {
+        monto: 0,
+        medioPago: "efectivo",
+        comprobanteArchivo: null,
+      },
+    ]);
     setObservaciones("");
     setMostrarClienteRapido(false);
     setClienteRapido(clienteRapidoInicial);
@@ -852,10 +863,42 @@ const guardarClienteRapido = async () => {
         );
     };
 
+   const seleccionarComprobantePagoInicial = (index, archivo) => {
+      if (!archivo) return;
+
+      const MAX_BYTES = 2 * 1024 * 1024;
+
+      if (archivo.size > MAX_BYTES) {
+        setError("El comprobante no puede superar los 2 MB.");
+        return;
+      }
+
+    const tiposPermitidos = [
+      "application/pdf",
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+    ];
+
+    const tipoPermitido = tiposPermitidos.includes(archivo.type);
+
+      if (!tipoPermitido) {
+        setError("El comprobante debe ser una imagen o un archivo PDF.");
+        return;
+      }
+
+      actualizarPagoInicial(index, "comprobanteArchivo", archivo);
+      setError("");
+    }; 
+
     const agregarPagoInicial = () => {
         setPagosIniciales((prev) => [
         ...prev,
-        { monto: 0, medioPago: "efectivo" }
+        {
+          monto: 0,
+          medioPago: "efectivo",
+          comprobanteArchivo: null,
+        }
         ]);
     };
 
@@ -1047,14 +1090,21 @@ const aplicarProductoSeleccionado = (datosPrecio) => {
         fechaVenta,
         items: itemsValidos,
         descuento: Number(descuentoMonto || 0),
+        descuentoPorcentaje: Number(descuento || 0),
         pedidoAsociado: pedidoSeleccionado || null,
         vendedor: vendedorSeleccionado,
         pagosIniciales: pagosIniciales.map((pago) => ({
           monto: Number(pago.monto || 0),
           medioPago: pago.medioPago || "efectivo",
           fechaPago: fechaVenta,
-          observacion: Number(pago.monto || 0) > 0 ? "Pago inicial" : "",
-          
+
+          observacion:
+            Number(pago.monto || 0) > 0
+              ? "Pago inicial"
+              : "",
+
+          comprobanteArchivo:
+            pago.comprobanteArchivo || null,
         })),
         observaciones,
       });
@@ -1274,11 +1324,14 @@ const aplicarProductoSeleccionado = (datosPrecio) => {
                     {mostrarDropdownCliente && !clienteRefId && (
                       <div className="ventas-dropdown">
                         {clientesFiltrados.slice(0, 8).map((c) => (
-                          <button
-                            key={c.firebaseId}
-                            type="button"
-                            onClick={() => usarClienteExistenteEnVenta(c)}
-                          >
+                        <button
+                          key={c.firebaseId}
+                          type="button"
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            usarClienteExistenteEnVenta(c);
+                          }}
+                        >
                             {c.nombre || "Sin nombre"} {c.dni ? `- ${c.dni}` : ""}
                           </button>
                         ))}
@@ -1685,40 +1738,94 @@ const aplicarProductoSeleccionado = (datosPrecio) => {
 
               <div className="ventas-pagos-lista">
                 {pagosIniciales.map((pago, index) => (
-                  <div className="ventas-pago-item" key={index}>
-                    <input
-                      type="number"
-                      min="0"
-                      placeholder="Monto"
-                      value={pago.monto}
-                      onChange={(e) =>
-                        actualizarPagoInicial(index, "monto", e.target.value)
-                      }
-                      disabled={!puedeCrearVentas}
-                    />
+                  <div key={index}>
+                    <div className="ventas-pago-item">
+                      <input
+                        type="number"
+                        min="0"
+                        placeholder="Monto"
+                        value={pago.monto}
+                        onChange={(e) =>
+                          actualizarPagoInicial(index, "monto", e.target.value)
+                        }
+                        disabled={!puedeCrearVentas}
+                      />
 
-                    <select
-                      value={pago.medioPago}
-                      onChange={(e) =>
-                        actualizarPagoInicial(index, "medioPago", e.target.value)
-                      }
-                    >
-                      <option value="efectivo">Efectivo</option>
-                      <option value="transferencia">Transferencia</option>
-                      <option value="debito">Débito</option>
-                      <option value="credito">Crédito</option>
-                      <option value="mp">Mercado Pago</option>
-                      <option value="otro">Otro</option>
-                    </select>
+                      <select
+                        value={pago.medioPago}
+                        onChange={(e) =>
+                          actualizarPagoInicial(index, "medioPago", e.target.value)
+                        }
+                        disabled={!puedeCrearVentas}
+                      >
+                        <option value="efectivo">Efectivo</option>
+                        <option value="transferencia">Transferencia</option>
+                        <option value="debito">Débito</option>
+                        <option value="credito">Crédito</option>
+                        <option value="mp">Mercado Pago</option>
+                        <option value="otro">Otro</option>
+                      </select>
 
-                    <button
-                      type="button"
-                      className="ventas-pago-remove"
-                      onClick={() => eliminarPagoInicial(index)}
-                      disabled={pagosIniciales.length === 1 || !puedeCrearVentas}
-                    >
-                      ×
-                    </button>
+                        <label
+                          className={`ventas-pago-comprobante-btn ${
+                            pago.comprobanteArchivo ? "is-active" : ""
+                          }`}
+                          title={
+                            pago.comprobanteArchivo
+                              ? pago.comprobanteArchivo.name
+                              : "Adjuntar comprobante (máx. 2 MB)"
+                          }
+                        >
+                        <Paperclip size={15} />
+
+                        <input
+                          type="file"
+                          accept="image/*,application/pdf"
+                          style={{ display: "none" }}
+                          disabled={!puedeCrearVentas}
+                          onChange={(e) => {
+                            const archivo = e.target.files?.[0] || null;
+
+                            seleccionarComprobantePagoInicial(index, archivo);
+
+                            e.target.value = "";
+                          }}
+                        />
+                      </label>
+
+                      <button
+                        type="button"
+                        className="ventas-pago-remove"
+                        onClick={() => eliminarPagoInicial(index)}
+                        disabled={
+                          pagosIniciales.length === 1 || !puedeCrearVentas
+                        }
+                      >
+                        ×
+                      </button>
+                    </div>
+
+                    {pago.comprobanteArchivo && (
+                      <div className="ventas-pago-comprobante-nombre">
+                        <span title={pago.comprobanteArchivo.name}>
+                          Comprobante adjunto
+                        </span>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            actualizarPagoInicial(
+                              index,
+                              "comprobanteArchivo",
+                              null
+                            )
+                          }
+                          title="Quitar comprobante"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

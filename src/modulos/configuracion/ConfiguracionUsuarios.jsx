@@ -84,14 +84,20 @@ produccion: {
     convertirCotizacion: false,
   },
 
-  caja: {
-    ver: false,
-    abrirCerrar: false,
-    crearMovimiento: false,
-    anularMovimiento: false,
-    corregirApertura: false,
-    historial: false,
-  },
+caja: {
+  ver: false,
+  abrirCerrar: false,
+  crearMovimiento: false,
+
+  crearAporteCapital: false,
+  crearRetiroCapital: false,
+  crearAjustePositivo: false,
+  crearAjusteNegativo: false,
+
+  anularMovimiento: false,
+  corregirApertura: false,
+  historial: false,
+},
 
   gastos: {
     ver: false,
@@ -222,6 +228,22 @@ const MODULOS_PERMISOS = [
     {
       key: "crearMovimiento",
       label: "Crear movimientos",
+    },
+    {
+      key: "crearAporteCapital",
+      label: "Registrar aporte de capital",
+    },
+    {
+      key: "crearRetiroCapital",
+      label: "Registrar retiro de dueño / capital",
+    },
+    {
+      key: "crearAjustePositivo",
+      label: "Crear ajuste positivo de caja",
+    },
+    {
+      key: "crearAjusteNegativo",
+      label: "Crear ajuste negativo de caja",
     },
     {
       key: "anularMovimiento",
@@ -438,9 +460,36 @@ const [sucursalesPermitidasEditando, setSucursalesPermitidasEditando] = useState
 
 function abrirEditorPermisos(usuario) {
   setUsuarioEditandoPermisos(usuario);
+  const permisosUsuario = usuario?.permisos || {};
+
   setPermisosEditando({
     ...PERMISOS_DEFAULT_USUARIO,
-    ...(usuario?.permisos || {}),
+    ...permisosUsuario,
+
+    caja: {
+      ...PERMISOS_DEFAULT_USUARIO.caja,
+      ...(permisosUsuario.caja || {}),
+    },
+
+    ventas: {
+      ...PERMISOS_DEFAULT_USUARIO.ventas,
+      ...(permisosUsuario.ventas || {}),
+    },
+
+    produccion: {
+      ...PERMISOS_DEFAULT_USUARIO.produccion,
+      ...(permisosUsuario.produccion || {}),
+    },
+
+    pedidos: {
+      ...PERMISOS_DEFAULT_USUARIO.pedidos,
+      ...(permisosUsuario.pedidos || {}),
+    },
+
+    gastos: {
+      ...PERMISOS_DEFAULT_USUARIO.gastos,
+      ...(permisosUsuario.gastos || {}),
+    },
   });
 
   setSucursalDefaultEditando(usuario.sucursalDefaultId || "principal");
