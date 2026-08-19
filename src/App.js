@@ -386,43 +386,54 @@ useEffect(() => {
       };
     }, [esRutaActivacion]);
 
-    useEffect(() => {
-      if (!perfil) return;
-      if (perfil.rol === "admin" || perfil.rol === "superadmin") return;
+useEffect(() => {
+  if (!perfil) return;
+  if (perfil.rol === "admin" || perfil.rol === "superadmin") return;
 
-      const mapaVistaModulo = {
-        inicio: "inicio",
-        listado: "clientes",
-        formulario: "clientes",
-        detalle: "clientes",
-        pedidos: "pedidos",
-        detallePedido: "pedidos",
-        produccion: "produccion",
-        "ventas-crear": "ventas",
-        "ventas-listado": "ventas",
-        "venta-detalle": "ventas",
-        "cotizaciones-crear": "ventas",
-        "cotizacion-detalle": "ventas",
-        movimientos: "informes",
-        caja: "caja",
-        gastos: "gastos",
-        proveedores: "proveedores",
-        listasPrecios: "listasPrecios",
-        configuracion: "configuracion",
-      };
+  // Permitir abrir el detalle de un pedido desde Producción
+  // sin habilitar el módulo/listado completo de Pedidos.
+  const puedeVerDetalleDesdeProduccion =
+    vista === "detallePedido" &&
+    origenVista === "produccion" &&
+    puedeHacer("produccion", "ver");
 
-      const moduloActual = mapaVistaModulo[vista];
+  if (puedeVerDetalleDesdeProduccion) {
+    return;
+  }
 
-      if (!moduloActual) return;
+  const mapaVistaModulo = {
+    inicio: "inicio",
+    listado: "clientes",
+    formulario: "clientes",
+    detalle: "clientes",
+    pedidos: "pedidos",
+    detallePedido: "pedidos",
+    produccion: "produccion",
+    "ventas-crear": "ventas",
+    "ventas-listado": "ventas",
+    "venta-detalle": "ventas",
+    "cotizaciones-crear": "ventas",
+    "cotizacion-detalle": "ventas",
+    movimientos: "informes",
+    caja: "caja",
+    gastos: "gastos",
+    proveedores: "proveedores",
+    listasPrecios: "listasPrecios",
+    configuracion: "configuracion",
+  };
 
-      if (!puedeVerModulo(moduloActual)) {
-        setVista("inicio");
-        setClienteSeleccionado(null);
-        setPedidoSeleccionado(null);
-        setVentaSeleccionada(null);
-        setOrigenVista(null);
-      }
-    }, [perfil, vista]);
+  const moduloActual = mapaVistaModulo[vista];
+
+  if (!moduloActual) return;
+
+  if (!puedeVerModulo(moduloActual)) {
+    setVista("inicio");
+    setClienteSeleccionado(null);
+    setPedidoSeleccionado(null);
+    setVentaSeleccionada(null);
+    setOrigenVista(null);
+  }
+}, [perfil, vista, origenVista]);
 
   // 🔹 Navegación desde el sidebar
   const manejarSeleccionSidebar = (modulo, extra = {}) => {
