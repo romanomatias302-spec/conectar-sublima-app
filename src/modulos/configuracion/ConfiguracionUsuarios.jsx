@@ -67,6 +67,13 @@ produccion: {
   gestionarColumnas: false,
   ordenManual: false,
   cambiarColorTarjeta: false,
+
+  verSoloSector: false,
+  sectorIds: [],
+
+  crearEtapasVinculadas: false,
+  editarEtapasVinculadas: false,
+  eliminarEtapasVinculadas: false,
 },
 
   ventas: {
@@ -331,6 +338,11 @@ export default function ConfiguracionUsuarios({ perfil }) {
   const [guardandoDatosUsuario, setGuardandoDatosUsuario] = useState(false);
   const [busquedaUsuario, setBusquedaUsuario] = useState("");
   const [sucursales, setSucursales] = useState([]);
+  const [sectoresProduccion, setSectoresProduccion] = useState([]);
+  const [
+    columnasProduccionOrden,
+    setColumnasProduccionOrden,
+  ] = useState([]);
 const [sucursalDefaultEditando, setSucursalDefaultEditando] = useState("principal");
 const [sucursalesPermitidasEditando, setSucursalesPermitidasEditando] = useState(["principal"]);
 
@@ -398,10 +410,232 @@ const [sucursalesPermitidasEditando, setSucursalesPermitidasEditando] = useState
   return () => unsub();
 }, [perfil?.clienteId]);
 
-  const invitacionesPendientes = useMemo(
+useEffect(() => {
+  if (!perfil?.clienteId) return;
+
+  const q = query(
+    collection(db, "produccion_sectores"),
+    where(
+      "clienteId",
+      "==",
+      perfil.clienteId
+    )
+  );
+
+  const unsub = onSnapshot(
+    q,
+    (snap) => {
+      const lista = snap.docs
+        .map((documento) => ({
+          id: documento.id,
+          ...documento.data(),
+        }))
+        .filter(
+          (sector) =>
+            sector.activo !== false
+        )
+        .sort((a, b) => {
+          const ordenA = Number(
+            a?.orden ?? 0
+          );
+
+          const ordenB = Number(
+            b?.orden ?? 0
+          );
+
+          if (ordenA !== ordenB) {
+            return ordenA - ordenB;
+          }
+
+          return String(
+            a?.nombre || ""
+          ).localeCompare(
+            String(b?.nombre || "")
+          );
+        });
+
+      setSectoresProduccion(lista);
+    }
+  );
+
+return () => unsub();
+}, [perfil?.clienteId]);
+
+useEffect(() => {
+  if (!perfil?.clienteId) return;
+
+  const q = query(
+    collection(db, "produccion_columnas"),
+    where(
+      "clienteId",
+      "==",
+      perfil.clienteId
+    )
+  );
+
+  const unsub = onSnapshot(
+    q,
+    (snap) => {
+      const lista = snap.docs
+        .map((documento) => ({
+          id: documento.id,
+          ...documento.data(),
+        }))
+        .filter(
+          (columna) =>
+            columna.activo !== false
+        )
+        .sort((a, b) => {
+          /*
+           * Pendiente siempre primero.
+           */
+          if (a?.esInicial === true) {
+            return b?.esInicial === true
+              ? 0
+              : -1;
+          }
+
+          if (b?.esInicial === true) {
+            return 1;
+          }
+
+          /*
+           * Producción finalizada siempre última.
+           */
+          if (a?.esFinal === true) {
+            return b?.esFinal === true
+              ? 0
+              : 1;
+          }
+
+          if (b?.esFinal === true) {
+            return -1;
+          }
+
+          /*
+           * Las columnas intermedias siguen
+           * el mismo campo orden de Producción.
+           */
+          const ordenA = Number(
+            a?.orden ?? 0
+          );
+
+          const ordenB = Number(
+            b?.orden ?? 0
+          );
+
+          if (ordenA !== ordenB) {
+            return ordenA - ordenB;
+          }
+
+          return String(
+            a?.id || ""
+          ).localeCompare(
+            String(b?.id || "")
+          );
+        });
+
+      setColumnasProduccionOrden(
+        lista
+      );
+    }
+  );
+
+  return () => unsub();
+}, [perfil?.clienteId]);
+
+const invitacionesPendientes = useMemo(
     () => invitaciones.filter((i) => i.estado === "pendiente"),
     [invitaciones]
   );
+
+ const sectoresProduccionOrdenados =
+  useMemo(() => {
+    /*
+     * Guardamos la primera posición
+     * en la que aparece cada sector
+     * dentro del flujo real de columnas.
+     */
+    const primeraPosicionPorSector =
+      new Map();
+
+    columnasProduccionOrden.forEach(
+      (columna, index) => {
+        const sectorId = String(
+          columna?.sectorId || ""
+        );
+
+        if (!sectorId) return;
+
+        if (
+          !primeraPosicionPorSector.has(
+            sectorId
+          )
+        ) {
+          primeraPosicionPorSector.set(
+            sectorId,
+            index
+          );
+        }
+      }
+    );
+
+    return [...sectoresProduccion].sort(
+      (a, b) => {
+        const posicionA =
+          primeraPosicionPorSector.has(
+            String(a.id)
+          )
+            ? primeraPosicionPorSector.get(
+                String(a.id)
+              )
+            : Number.POSITIVE_INFINITY;
+
+        const posicionB =
+          primeraPosicionPorSector.has(
+            String(b.id)
+          )
+            ? primeraPosicionPorSector.get(
+                String(b.id)
+              )
+            : Number.POSITIVE_INFINITY;
+
+        /*
+         * Primero manda la posición real
+         * de las columnas.
+         */
+        if (posicionA !== posicionB) {
+          return posicionA - posicionB;
+        }
+
+        /*
+         * Si un sector todavía no tiene
+         * columnas, conservamos como fallback
+         * su orden propio.
+         */
+        const ordenA = Number(
+          a?.orden ?? 0
+        );
+
+        const ordenB = Number(
+          b?.orden ?? 0
+        );
+
+        if (ordenA !== ordenB) {
+          return ordenA - ordenB;
+        }
+
+        return String(
+          a?.nombre || ""
+        ).localeCompare(
+          String(b?.nombre || "")
+        );
+      }
+    );
+  }, [
+    sectoresProduccion,
+    columnasProduccionOrden,
+  ]); 
 
   async function manejarCrearInvitacion() {
     try {
@@ -479,6 +713,25 @@ function abrirEditorPermisos(usuario) {
     produccion: {
       ...PERMISOS_DEFAULT_USUARIO.produccion,
       ...(permisosUsuario.produccion || {}),
+
+      sectorIds:
+        Array.isArray(
+          permisosUsuario
+            ?.produccion
+            ?.sectorIds
+        )
+          ? permisosUsuario
+              .produccion
+              .sectorIds
+          : permisosUsuario
+              ?.produccion
+              ?.sectorId
+          ? [
+              permisosUsuario
+                .produccion
+                .sectorId,
+            ]
+          : [],
     },
 
     pedidos: {
@@ -622,13 +875,46 @@ function togglePermiso(modulo, accion) {
     if (!confirmar) return;
   }
 
-  setPermisosEditando((prev) => ({
-    ...prev,
-    [modulo]: {
-      ...(prev[modulo] || {}),
-      [accion]: nuevoValor,
-    },
-  }));
+if (
+  modulo === "produccion" &&
+  accion === "verSoloSector"
+) {
+  setPermisosEditando((prev) => {
+    const sectoresActuales =
+      Array.isArray(
+        prev?.produccion?.sectorIds
+      )
+        ? prev.produccion.sectorIds
+        : [];
+
+    return {
+      ...prev,
+
+      produccion: {
+        ...(prev.produccion || {}),
+
+        verSoloSector:
+          nuevoValor,
+
+        sectorIds:
+          nuevoValor
+            ? sectoresActuales
+            : [],
+      },
+    };
+  });
+
+  return;
+}
+
+setPermisosEditando((prev) => ({
+  ...prev,
+  [modulo]: {
+    ...(prev[modulo] || {}),
+    [accion]: nuevoValor,
+  },
+}));
+
 }
 
   async function guardarPermisosUsuario() {
@@ -1166,6 +1452,308 @@ function togglePermiso(modulo, accion) {
                       </label>
                     ))}
                   </div>
+
+                  {modulo.key === "produccion" && (
+                    <div
+                      style={{
+                        marginTop: "16px",
+                        paddingTop: "14px",
+                        borderTop:
+                          "1px solid #d1d5db",
+                        display: "grid",
+                        gap: "11px",
+                      }}
+                    >
+                      <div>
+                        <strong
+                          style={{
+                            fontSize: "13px",
+                            color: "#475569",
+                          }}
+                        >
+                          Acceso por sector
+                        </strong>
+                      </div>
+
+                      <label
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns:
+                            "20px minmax(0, 1fr)",
+                          alignItems: "start",
+                          columnGap: "10px",
+                          cursor: "pointer",
+                          fontSize: "14px",
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={
+                            !!permisosEditando
+                              ?.produccion
+                              ?.verSoloSector
+                          }
+                          onChange={() =>
+                            togglePermiso(
+                              "produccion",
+                              "verSoloSector"
+                            )
+                          }
+                        />
+
+                        <span>
+                          Limitar vista por sectores
+                        </span>
+                      </label>
+
+                      {permisosEditando
+                        ?.produccion
+                        ?.verSoloSector && (
+                        <div
+                          style={{
+                            marginLeft: "30px",
+                            display: "grid",
+                            gap: "8px",
+                          }}
+                        >
+                          <label
+                            style={{
+                              fontSize: "12px",
+                              color: "#64748b",
+                            }}
+                          >
+                            Sectores permitidos
+                          </label>
+
+                          <div
+                            style={{
+                              display: "grid",
+                              gap: "6px",
+                              padding: "8px",
+                              border: "1px solid #e5e7eb",
+                              borderRadius: "10px",
+                              background: "#f8fafc",
+                              maxHeight: "190px",
+                              overflowY: "auto",
+                            }}
+                          >
+                            {sectoresProduccionOrdenados.length ===
+                              0 ? (
+                              <span
+                                style={{
+                                  fontSize: "12px",
+                                  color: "#64748b",
+                                }}
+                              >
+                                No hay sectores disponibles.
+                              </span>
+                            ) : (
+                            sectoresProduccionOrdenados.map(
+                              (sector) => {
+                                  const sectoresSeleccionados =
+                                    Array.isArray(
+                                      permisosEditando
+                                        ?.produccion
+                                        ?.sectorIds
+                                    )
+                                      ? permisosEditando
+                                          .produccion
+                                          .sectorIds
+                                      : [];
+
+                                  const seleccionado =
+                                    sectoresSeleccionados.includes(
+                                      sector.id
+                                    );
+
+                                  return (
+                                    <label
+                                      key={sector.id}
+                                      style={{
+                                        display: "grid",
+                                        gridTemplateColumns:
+                                          "20px minmax(0, 1fr)",
+                                        alignItems: "center",
+                                        gap: "8px",
+                                        cursor: "pointer",
+                                        padding: "5px 6px",
+                                        borderRadius: "7px",
+                                        background:
+                                          seleccionado
+                                            ? "#eef6ff"
+                                            : "transparent",
+                                      }}
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        checked={
+                                          seleccionado
+                                        }
+                                        onChange={() => {
+                                          setPermisosEditando(
+                                            (prev) => {
+                                              const actuales =
+                                                Array.isArray(
+                                                  prev
+                                                    ?.produccion
+                                                    ?.sectorIds
+                                                )
+                                                  ? prev
+                                                      .produccion
+                                                      .sectorIds
+                                                  : [];
+
+                                              const nuevos =
+                                                actuales.includes(
+                                                  sector.id
+                                                )
+                                                  ? actuales.filter(
+                                                      (id) =>
+                                                        id !==
+                                                        sector.id
+                                                    )
+                                                  : [
+                                                      ...actuales,
+                                                      sector.id,
+                                                    ];
+
+                                              return {
+                                                ...prev,
+
+                                                produccion: {
+                                                  ...(prev.produccion ||
+                                                    {}),
+
+                                                  sectorIds:
+                                                    nuevos,
+                                                },
+                                              };
+                                            }
+                                          );
+                                        }}
+                                      />
+
+                                      <span>
+                                        {sector.nombre}
+                                      </span>
+                                    </label>
+                                  );
+                                }
+                              )
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      <div
+                        style={{
+                          marginTop: "4px",
+                          paddingTop: "14px",
+                          borderTop:
+                            "1px solid #e5e7eb",
+                        }}
+                      >
+                        <strong
+                          style={{
+                            fontSize: "13px",
+                            color: "#475569",
+                          }}
+                        >
+                          Etapas vinculadas
+                        </strong>
+                      </div>
+
+                      <label
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns:
+                            "20px minmax(0, 1fr)",
+                          columnGap: "10px",
+                          cursor: "pointer",
+                          fontSize: "14px",
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={
+                            !!permisosEditando
+                              ?.produccion
+                              ?.crearEtapasVinculadas
+                          }
+                          onChange={() =>
+                            togglePermiso(
+                              "produccion",
+                              "crearEtapasVinculadas"
+                            )
+                          }
+                        />
+
+                        <span>
+                          Crear etapas vinculadas
+                        </span>
+                      </label>
+
+                      <label
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns:
+                            "20px minmax(0, 1fr)",
+                          columnGap: "10px",
+                          cursor: "pointer",
+                          fontSize: "14px",
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={
+                            !!permisosEditando
+                              ?.produccion
+                              ?.editarEtapasVinculadas
+                          }
+                          onChange={() =>
+                            togglePermiso(
+                              "produccion",
+                              "editarEtapasVinculadas"
+                            )
+                          }
+                        />
+
+                        <span>
+                          Editar / reabrir etapas vinculadas
+                        </span>
+                      </label>
+
+                      <label
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns:
+                            "20px minmax(0, 1fr)",
+                          columnGap: "10px",
+                          cursor: "pointer",
+                          fontSize: "14px",
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={
+                            !!permisosEditando
+                              ?.produccion
+                              ?.eliminarEtapasVinculadas
+                          }
+                          onChange={() =>
+                            togglePermiso(
+                              "produccion",
+                              "eliminarEtapasVinculadas"
+                            )
+                          }
+                        />
+
+                        <span>
+                          Eliminar vínculo
+                        </span>
+                      </label>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

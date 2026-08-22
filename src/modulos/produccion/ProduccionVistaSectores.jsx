@@ -423,11 +423,7 @@ export default function ProduccionVistaSectores({
             <div>
               <strong>Vista completa</strong>
 
-              <span>
-                Mostrar las{" "}
-                {columnasOrdenadas.length} columnas
-                del flujo.
-              </span>
+
             </div>
           </button>
 

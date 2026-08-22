@@ -165,6 +165,10 @@ export default function ProduccionCard({
   onVerPedido = () => {},
   onEditarDetalleManual = () => {},
   onGestionarEtapaVinculada = () => {},
+
+  puedeCrearEtapasVinculadas = false,
+  puedeEditarEtapasVinculadas = false,
+
   ahoraTick = Date.now(),
   puedeMoverPedidos = true,
   puedeEditarDetalleManual = true,
@@ -296,7 +300,8 @@ const itemsActionMenu = [
   },
 
 !esRepresentacionVinculada &&
-!esEsperaReunion
+!esEsperaReunion &&
+puedeCrearEtapasVinculadas
   ? {
       id: "crear-etapas-vinculadas",
       label: "Crear etapas vinculadas",
@@ -311,7 +316,6 @@ const itemsActionMenu = [
 
 esRepresentacionVinculada &&
 !esEtapaVinculadaFinalizada
-
   ? {
       id: "finalizar-etapa-vinculada",
       label: "Finalizar esta etapa",
@@ -319,6 +323,21 @@ esRepresentacionVinculada &&
       onClick: () =>
         onGestionarEtapaVinculada({
           accion: "finalizar",
+          pedido,
+        }),
+    }
+  : null,
+
+esRepresentacionVinculada &&
+esEtapaVinculadaFinalizada &&
+puedeEditarEtapasVinculadas
+  ? {
+      id: "reabrir-etapa-vinculada",
+      label: "Reabrir esta etapa",
+      icon: <FaEdit />,
+      onClick: () =>
+        onGestionarEtapaVinculada({
+          accion: "reabrir",
           pedido,
         }),
     }
@@ -332,6 +351,20 @@ esRepresentacionVinculada &&
         onClick: () =>
           onGestionarEtapaVinculada({
             accion: "tomar",
+            pedido,
+          }),
+      }
+    : null,
+
+esRepresentacionVinculada &&
+puedeEditarEtapasVinculadas
+  ? {
+      id: "editar-flujo-vinculado",
+        label: "Editar vínculo",
+        icon: <FaEdit />,
+        onClick: () =>
+          onGestionarEtapaVinculada({
+            accion: "editar",
             pedido,
           }),
       }
@@ -495,6 +528,8 @@ const usuarioVisible =
         className="produccion-card-clickable"
         onClick={() => onEditarDetalleManual(pedido)}
       >
+
+
 
       {pedido.produccionImagenPortada && (
         <div className="produccion-card-cover">

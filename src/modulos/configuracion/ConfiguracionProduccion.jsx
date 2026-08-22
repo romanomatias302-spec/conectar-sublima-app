@@ -3,6 +3,7 @@ import {
   FaEdit,
   FaExchangeAlt,
   FaIndustry,
+  FaInfoCircle,
   FaPlus,
   FaTrash,
 } from "react-icons/fa";
@@ -24,6 +25,24 @@ import {
 } from "../../firebase/produccionColumnas";
 
 import "./ConfiguracionProduccion.css";
+
+function InfoTooltip({ texto }) {
+  return (
+    <span className="config-produccion-info-tooltip-wrap">
+      <button
+        type="button"
+        className="config-produccion-info-tooltip-trigger"
+        aria-label="Ver información"
+      >
+        <FaInfoCircle />
+      </button>
+
+      <span className="config-produccion-info-tooltip-box">
+        {texto}
+      </span>
+    </span>
+  );
+}
 
 export default function ConfiguracionProduccion({
   perfil,
@@ -374,15 +393,14 @@ function cerrarMovimientoColumna() {
     <div className="config-produccion">
       <div className="config-produccion-header">
         <div>
-          <h2>
-            <FaIndustry />
-            Configuración de producción
-          </h2>
+          <div className="config-produccion-titulo-con-info">
+            <h2>
+              <FaIndustry />
+              Configuración de producción
+            </h2>
 
-          <p>
-            Organizá las columnas del flujo en sectores
-            de trabajo.
-          </p>
+            <InfoTooltip texto="Organizá las columnas del flujo en sectores de trabajo." />
+          </div>
         </div>
 
         {puedeGestionar && (
@@ -441,18 +459,17 @@ function cerrarMovimientoColumna() {
 
 <section className="config-produccion-zona-sectores">
   <div className="config-produccion-zona-header">
-    <div>
-      <span className="config-produccion-zona-kicker">
-        Flujo productivo
-      </span>
+  <div>
+    <span className="config-produccion-zona-kicker">
+      Flujo productivo
+    </span>
 
+    <div className="config-produccion-titulo-con-info config-produccion-titulo-con-info-secundario">
       <h3>Sectores de producción</h3>
 
-      <p>
-        Los sectores se muestran según el orden real de sus
-        columnas dentro del tablero.
-      </p>
+      <InfoTooltip texto="Los sectores se muestran según el orden real de sus columnas dentro del tablero." />
     </div>
+  </div>
 
     <span className="config-produccion-zona-contador">
       {sectoresOrdenadosPorFlujo.length}

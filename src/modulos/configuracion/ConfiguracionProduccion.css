@@ -1473,3 +1473,73 @@ body.dark-mode .config-produccion-movimiento-info {
 /* =========================================================
    FIN - CONFIGURACIÓN DE PRODUCCIÓN
    ========================================================= */
+
+   .config-produccion-titulo-con-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.config-produccion-titulo-con-info-secundario {
+  margin-top: 4px;
+}
+
+.config-produccion-info-tooltip-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.config-produccion-info-tooltip-trigger {
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: transparent;
+  color: #6b7280;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 999px;
+  padding: 0;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.config-produccion-info-tooltip-trigger:hover,
+.config-produccion-info-tooltip-trigger:focus {
+  background: #eef2f7;
+  color: #1f2937;
+  outline: none;
+}
+
+.config-produccion-info-tooltip-box {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  min-width: 240px;
+  max-width: 320px;
+  background: #111827;
+  color: #fff;
+  font-size: 12px;
+  line-height: 1.45;
+  padding: 10px 12px;
+  border-radius: 10px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.18);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-4px);
+  transition: opacity 0.18s ease, transform 0.18s ease,
+    visibility 0.18s ease;
+  z-index: 30;
+  pointer-events: none;
+}
+
+.config-produccion-info-tooltip-wrap:hover
+  .config-produccion-info-tooltip-box,
+.config-produccion-info-tooltip-wrap:focus-within
+  .config-produccion-info-tooltip-box {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+

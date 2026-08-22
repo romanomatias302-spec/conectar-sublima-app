@@ -21,6 +21,11 @@ export default function ProduccionColumn({
   onToggleContraer,
   onEditarDetalleManual,
   onGestionarEtapaVinculada,
+  avisoRepresentacionProduccion = null,
+
+  puedeCrearEtapasVinculadas = false,
+  puedeEditarEtapasVinculadas = false,
+
   onMoverPedido,
   onCambiarColorTarjeta,
   puedeGestionarColumnas = false,
@@ -543,6 +548,16 @@ useEffect(() => {
                               onGestionarEtapaVinculada={
                                 onGestionarEtapaVinculada
                               }
+
+                              puedeCrearEtapasVinculadas={
+                                puedeCrearEtapasVinculadas
+                              }
+
+                              puedeEditarEtapasVinculadas={
+                                puedeEditarEtapasVinculadas
+                              }
+
+                             
                               onMoverPedido={
                                 onMoverPedido
                               }
@@ -603,9 +618,28 @@ useEffect(() => {
               pedido.produccionRepresentacionId ||
               `principal:${pedidoId}`;
 
-            return (
+          return (
+            <div key={representacionId}>
+              {avisoRepresentacionProduccion?.representacionId ===
+                representacionId && (
+                <div
+                  style={{
+                    marginBottom: "6px",
+                    padding: "7px 9px",
+                    borderRadius: "8px",
+                    border: "1px solid rgba(217, 119, 6, 0.30)",
+                    background: "#fff8e6",
+                    color: "#92400e",
+                    fontSize: "11px",
+                    fontWeight: "600",
+                    lineHeight: "1.3",
+                  }}
+                >
+                  ⚠ {avisoRepresentacionProduccion.mensaje}
+                </div>
+              )}
+
               <ProduccionCard
-                key={representacionId}
                 pedido={pedido}
                 columnas={columnas}
                 onVerPedido={onVerPedido}
@@ -615,6 +649,15 @@ useEffect(() => {
                 onGestionarEtapaVinculada={
                   onGestionarEtapaVinculada
                 }
+
+                puedeCrearEtapasVinculadas={
+                  puedeCrearEtapasVinculadas
+                }
+
+                puedeEditarEtapasVinculadas={
+                  puedeEditarEtapasVinculadas
+                }
+                            
                 onMoverPedido={onMoverPedido}
                 ordenManualActivo={
                   columna.ordenManualActivo ===
@@ -640,8 +683,9 @@ useEffect(() => {
                     pedido.id) ===
                     pedidoNuevoResaltadoId
                 }
-              />
-            );
+            />
+            </div>
+          );
           })}
           {!estaContraida && cantidadOculta > 0 && (
             <div className="produccion-column-limite-info">

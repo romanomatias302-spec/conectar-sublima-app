@@ -27,6 +27,15 @@ produccion: {
 
   gestionarColumnas: false,
   ordenManual: false,
+
+  // Restricción de vista por sector
+verSoloSector: false,
+sectorIds: [],
+
+  // Producción vinculada
+  crearEtapasVinculadas: false,
+  editarEtapasVinculadas: false,
+  eliminarEtapasVinculadas: false,
 },
 
    ventas: {

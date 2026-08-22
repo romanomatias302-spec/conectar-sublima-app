@@ -232,6 +232,62 @@ function canReadPedidos(clienteId) {
       return canModulo(clienteId, "produccion", "mover");
     }
 
+    function canCrearEtapasVinculadas(clienteId) {
+      return canModulo(
+        clienteId,
+        "produccion",
+        "crearEtapasVinculadas"
+      );
+    }
+
+    function canEditarEtapasVinculadas(clienteId) {
+      return canModulo(
+        clienteId,
+        "produccion",
+        "editarEtapasVinculadas"
+      );
+    }
+
+function canEliminarEtapasVinculadas(clienteId) {
+  let perfilActual =
+    get(
+      /databases/$(database)/documents/usuarios/$(request.auth.uid)
+    ).data;
+
+  return request.auth != null
+    && (
+      perfilActual.rol == "superadmin"
+
+      ||
+
+      (
+        perfilActual.activo == true
+
+        && perfilActual.clienteId ==
+          clienteId
+
+        && get(
+          /databases/$(database)/documents/clientes-saas/$(clienteId)
+        ).data.estado == "activo"
+
+        && (
+          perfilActual.rol == "admin"
+
+          ||
+
+          (
+            perfilActual.permisos is map
+            && perfilActual.permisos.produccion is map
+            && perfilActual
+              .permisos
+              .produccion
+              .eliminarEtapasVinculadas == true
+          )
+        )
+      )
+    );
+}
+
     function canEditarDetalleProduccion(clienteId) {
       return isSuperAdmin()
         || (
@@ -1268,7 +1324,7 @@ match /produccion_sectores/{sectorId} {
         * - sólo aceptamos los campos previstos.
         */
         allow create: if
-          canMoverProduccion(
+          canCrearEtapasVinculadas(
             request.resource.data.clienteId
           )
           && request.resource.data.clienteId ==
@@ -1308,14 +1364,27 @@ match /produccion_sectores/{sectorId} {
         * No permitimos cambiar tenant, pedido,
         * columnas de origen/reunión ni totalEtapas.
         */
-        allow update: if
+     allow update: if
+      request.resource.data.clienteId ==
+        resource.data.clienteId
+      && request.resource.data.pedidoId ==
+        resource.data.pedidoId
+      && (
+        /*
+        * A) Flujo operativo normal.
+        *
+        * Mover etapas, finalizar una etapa
+        * y tomar el flujo terminado siguen
+        * dependiendo de produccion.mover.
+        *
+        * Importante:
+        * no permitimos usar este camino
+        * para REABRIR una etapa.
+        */
+        (
           canMoverProduccion(
             resource.data.clienteId
           )
-          && request.resource.data.clienteId ==
-            resource.data.clienteId
-          && request.resource.data.pedidoId ==
-            resource.data.pedidoId
           && onlyChangesAllowed([
             "estado",
             "etapasFinalizadas",
@@ -1328,8 +1397,99 @@ match /produccion_sectores/{sectorId} {
             "activo",
             "listo_reunion",
             "reunido"
-          ];
+          ]
+          && request.resource.data.etapasFinalizadas
+            >= resource.data.etapasFinalizadas
+          && !(
+            resource.data.estado ==
+              "listo_reunion"
+            && request.resource.data.estado ==
+              "activo"
+          )
+        )
 
+        ||
+
+        /*
+        * B) Editar vínculo / reabrir.
+        *
+        * Permite:
+        * - cambiar punto de reunión;
+        * - agregar/quitar etapas sin avances;
+        * - recalcular estructura;
+        * - reabrir una etapa finalizada.
+        */
+        (
+          canEditarEtapasVinculadas(
+            resource.data.clienteId
+          )
+          && resource.data.estado != "reunido"
+          && onlyChangesAllowed([
+            "columnaReunionId",
+            "totalEtapas",
+            "etapasFinalizadas",
+            "columnasUsadas",
+            "estado",
+            "listoReunionAt",
+            "updatedAt"
+          ])
+          && request.resource.data.columnaReunionId
+            is string
+          && request.resource.data.columnaReunionId
+            != ""
+          && request.resource.data.totalEtapas
+            is number
+          && request.resource.data.totalEtapas
+            >= 2
+          && request.resource.data.etapasFinalizadas
+            is number
+          && request.resource.data.etapasFinalizadas
+            >= 0
+          && request.resource.data.columnasUsadas
+            is list
+          && request.resource.data.estado in [
+            "activo",
+            "listo_reunion"
+          ]
+          && (
+            changedKeys().hasAny([
+              "columnaReunionId",
+              "totalEtapas",
+              "columnasUsadas"
+            ])
+            || request.resource.data.etapasFinalizadas
+              < resource.data.etapasFinalizadas
+            || changedKeys().hasOnly([
+              "updatedAt"
+            ])
+          )
+        )
+
+        ||
+
+        /*
+        * C) Eliminar vínculo completo.
+        *
+        * Cancelación lógica del grupo.
+        * Nunca hacemos delete físico.
+        */
+        (
+          canEliminarEtapasVinculadas(
+            resource.data.clienteId
+          )
+          && resource.data.estado == "activo"
+          && resource.data.etapasFinalizadas == 0
+          && request.resource.data.estado ==
+            "cancelado"
+          && onlyChangesAllowed([
+            "estado",
+            "canceladoAt",
+            "canceladoPorUid",
+            "canceladoPorNombre",
+            "updatedAt"
+          ])
+        )
+      );
         /*
         * No eliminamos físicamente grupos.
         */
@@ -1353,11 +1513,17 @@ match /produccion_sectores/{sectorId} {
         /*
         * Creación de cada rama.
         */
-        allow create: if
-          canMoverProduccion(
-            request.resource.data.clienteId
-          )
-          && request.resource.data.clienteId ==
+          allow create: if
+            (
+              canCrearEtapasVinculadas(
+                request.resource.data.clienteId
+              )
+              ||
+              canEditarEtapasVinculadas(
+                request.resource.data.clienteId
+              )
+            )
+            && request.resource.data.clienteId ==
             pedidoParentClienteId(
               request.resource.data.pedidoId
             )
@@ -1410,36 +1576,124 @@ match /produccion_sectores/{sectorId} {
         * pedido o grupo.
         */
         allow update: if
-          canMoverProduccion(
-            resource.data.clienteId
+         request.resource.data.clienteId ==
+          resource.data.clienteId
+        && request.resource.data.pedidoId ==
+          resource.data.pedidoId
+        && request.resource.data.grupoVinculadoId ==
+          resource.data.grupoVinculadoId
+        && (
+          /*
+          * A) Operación normal:
+          * mover o finalizar.
+          *
+          * REABRIR queda explícitamente excluido.
+          */
+          (
+            canMoverProduccion(
+              resource.data.clienteId
+            )
+            && onlyChangesAllowed([
+              "columnaProduccionId",
+              "produccionSortOrder",
+              "sectoresProcesados",
+              "estado",
+              "updatedAt",
+              "ultimaAccionUid",
+              "ultimaAccionNombre",
+              "listaAt",
+              "listaPorUid",
+              "listaPorNombre"
+            ])
+            && request.resource.data.estado in [
+              "activa",
+              "lista"
+            ]
+            && !(
+              resource.data.estado == "lista"
+              && request.resource.data.estado ==
+                "activa"
+            )
           )
-          && request.resource.data.clienteId ==
-            resource.data.clienteId
-          && request.resource.data.pedidoId ==
-            resource.data.pedidoId
-          && request.resource.data.grupoVinculadoId ==
-            resource.data.grupoVinculadoId
-          && onlyChangesAllowed([
-            "columnaProduccionId",
-            "produccionSortOrder",
-            "sectoresProcesados",
-            "estado",
-            "updatedAt",
-            "ultimaAccionUid",
-            "ultimaAccionNombre",
-            "listaAt",
-            "listaPorUid",
-            "listaPorNombre"
-          ])
-          && request.resource.data.estado in [
-            "activa",
-            "lista"
-          ];
 
-        /*
-        * Tampoco eliminamos ramas físicamente.
-        */
-        allow delete: if false;
+          ||
+
+          /*
+          * B) Reabrir etapa.
+          *
+          * Requiere editarEtapasVinculadas.
+          */
+          (
+            canEditarEtapasVinculadas(
+              resource.data.clienteId
+            )
+            && resource.data.estado == "lista"
+            && request.resource.data.estado ==
+              "activa"
+            && onlyChangesAllowed([
+              "estado",
+              "listaAt",
+              "listaPorUid",
+              "listaPorNombre",
+              "ultimaAccionUid",
+              "ultimaAccionNombre",
+              "updatedAt"
+            ])
+            && request.resource.data.listaAt == null
+            && request.resource.data.listaPorUid == ""
+            && request.resource.data.listaPorNombre == ""
+          )
+
+          ||
+
+          /*
+          * C) Cancelar etapa como parte de
+          * Eliminar vínculo completo.
+          *
+          * La validación de que la etapa no tuvo
+          * avances se realiza también en el servicio.
+          * Aquí protegemos permiso, identidad
+          * y campos modificables.
+          */
+          (
+            canEliminarEtapasVinculadas(
+              resource.data.clienteId
+            )
+            && resource.data.estado == "activa"
+            && request.resource.data.estado ==
+              "cancelada"
+            && onlyChangesAllowed([
+              "estado",
+              "ultimaAccionUid",
+              "ultimaAccionNombre",
+              "updatedAt"
+            ])
+          )
+        );
+      /*
+      * Sólo puede eliminarse una etapa creada
+      * por error que todavía no tuvo avances.
+      */
+      allow delete: if
+        canEditarEtapasVinculadas(
+          resource.data.clienteId
+        )
+        && resource.data.estado == "activa"
+        && (
+          !(
+            resource.data.keys().hasAny([
+              "ultimaAccionUid",
+              "ultimaAccionNombre"
+            ])
+          )
+        )
+        && resource.data.sectoresProcesados
+          is list
+        && resource.data.sectoresProcesados
+          .size() == 0
+        && resource.data.listaAt == null
+        && resource.data.listaPorUid == ""
+        && resource.data.listaPorNombre == "";
       }
     
     

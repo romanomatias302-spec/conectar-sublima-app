@@ -8501,3 +8501,56 @@ body.dark-mode
    ETAPAS VINCULADAS - LAYOUT DEL MODAL - fin
    ========================================= */
    
+   /* =========================================
+   Aviso mensaje etapas vinculadas
+   ========================================= */
+
+   .produccion-card-aviso {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+
+  margin-bottom: 8px;
+  padding: 7px 9px;
+
+  border-radius: 8px;
+  border: 1px solid rgba(217, 119, 6, 0.28);
+
+  background: rgba(245, 158, 11, 0.08);
+  color: #92400e;
+
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.produccion-card-aviso-icono {
+  flex: 0 0 auto;
+
+  width: 16px;
+  height: 16px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 50%;
+
+  background: rgba(245, 158, 11, 0.16);
+
+  font-size: 10px;
+  font-weight: 800;
+}
+
+body.dark-mode .produccion-card-aviso {
+  border-color: rgba(251, 191, 36, 0.26);
+  background: rgba(245, 158, 11, 0.1);
+  color: #fcd34d;
+}
+
+body.dark-mode .produccion-card-aviso-icono {
+  background: rgba(245, 158, 11, 0.18);
+}
+   /* =========================================
+   Aviso mensaje etapas vinculadas - fin
+   ========================================= */

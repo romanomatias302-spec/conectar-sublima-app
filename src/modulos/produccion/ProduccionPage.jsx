@@ -37,6 +37,7 @@ import { agruparPedidosPorColumna } from "./produccionUtils";
 import ProduccionBoard from "./ProduccionBoard";
 import ProduccionHeader from "./ProduccionHeader";
 import ProduccionVistaSectores from "./ProduccionVistaSectores";
+import ConfiguracionProduccion from "../configuracion/ConfiguracionProduccion";
 import DetalleProduccionModal from "./detalle/DetalleProduccionModal";
 import NuevoSectorProduccionModal from "./NuevoSectorProduccionModal";
 import EtapasVinculadasModal from "./EtapasVinculadasModal";
@@ -53,8 +54,11 @@ import {
   escucharGruposVinculadosProduccion,
   escucharEtapasVinculadasProduccion,
   crearGrupoVinculadoProduccion,
+  editarGrupoVinculadoProduccion,
   moverEtapaVinculadaProduccion,
   finalizarEtapaVinculadaProduccion,
+  reabrirEtapaVinculadaProduccion,
+  cancelarGrupoVinculadoProduccion,
   tomarGrupoVinculadoProduccion,
 } from "../../firebase/produccionEtapasVinculadas";
 import {
@@ -136,6 +140,12 @@ const [sectorNuevaColumnaId, setSectorNuevaColumnaId] = useState("");
     mostrarVistaGeneralSectores,
     setMostrarVistaGeneralSectores,
   ] = useState(false);
+
+  const [
+    modoModalSectoresProduccion,
+    setModoModalSectoresProduccion,
+  ] = useState("vista");
+
 
 
 
@@ -230,19 +240,64 @@ const [
 ] = useState(false);
 
 const [
-    pedidoFlujoVinculado,
-    setPedidoFlujoVinculado,
-  ] = useState(null);
+  modoModalEtapasVinculadas,
+  setModoModalEtapasVinculadas,
+] = useState("crear");
+
+const [
+  pedidoFlujoVinculado,
+  setPedidoFlujoVinculado,
+] = useState(null);
 
   const puedeHacerEnProduccion = (accion = "ver") => {
     return puedeHacer(perfil, "produccion", accion);
   };
 
+const [
+  avisoRepresentacionProduccion,
+  setAvisoRepresentacionProduccion,
+] = useState(null);  
+
 const esAdminProduccion =
   perfil?.rol === "admin" || perfil?.rol === "superadmin";
 
 const debeVerSoloAsignados =
-  !esAdminProduccion && puedeHacerEnProduccion("verSoloAsignados");
+  !esAdminProduccion &&
+  puedeHacerEnProduccion("verSoloAsignados");
+
+const debeLimitarVistaPorSectores =
+  !esAdminProduccion &&
+  perfil?.permisos?.produccion
+    ?.verSoloSector === true;
+
+const sectoresPermitidosIds =
+  Array.isArray(
+    perfil?.permisos?.produccion
+      ?.sectorIds
+  )
+    ? perfil.permisos.produccion
+        .sectorIds.map((id) =>
+          String(id)
+        )
+    : [];
+
+const sectoresPermitidosSet =
+  new Set(sectoresPermitidosIds);
+
+const puedeCrearEtapasVinculadas =
+  puedeHacerEnProduccion(
+    "crearEtapasVinculadas"
+  );
+
+const puedeEditarEtapasVinculadas =
+  puedeHacerEnProduccion(
+    "editarEtapasVinculadas"
+  );
+
+const puedeEliminarEtapasVinculadas =
+  puedeHacerEnProduccion(
+    "eliminarEtapasVinculadas"
+  );
 
 const uidActual =
   perfil?.uid || perfil?.firebaseUid || "";
@@ -758,13 +813,114 @@ const columnasGlobalesOrdenadas = useMemo(() => {
 ]);
 
 const columnasVisibles =
-  datosVistaSector.columnasVisibles;
+  useMemo(() => {
+    if (!debeLimitarVistaPorSectores) {
+      return datosVistaSector.columnasVisibles;
+    }
+
+    const idsVisibles = new Set();
+
+    sectoresPermitidosIds.forEach(
+      (sectorId) => {
+        const indicesSector =
+          columnasGlobalesOrdenadas
+            .map((columna, index) =>
+              String(
+                columna?.sectorId || ""
+              ) === String(sectorId)
+                ? index
+                : -1
+            )
+            .filter(
+              (index) => index >= 0
+            );
+
+        if (
+          indicesSector.length === 0
+        ) {
+          return;
+        }
+
+        /*
+         * Todas las columnas pertenecientes
+         * al sector permitido.
+         */
+        indicesSector.forEach(
+          (index) => {
+            idsVisibles.add(
+              columnasGlobalesOrdenadas[
+                index
+              ].id
+            );
+          }
+        );
+
+        const primerIndice =
+          Math.min(...indicesSector);
+
+        const ultimoIndice =
+          Math.max(...indicesSector);
+
+        /*
+         * Una columna anterior como contexto.
+         */
+        if (primerIndice > 0) {
+          idsVisibles.add(
+            columnasGlobalesOrdenadas[
+              primerIndice - 1
+            ].id
+          );
+        }
+
+        /*
+         * Una columna posterior como contexto.
+         */
+        if (
+          ultimoIndice <
+          columnasGlobalesOrdenadas.length -
+            1
+        ) {
+          idsVisibles.add(
+            columnasGlobalesOrdenadas[
+              ultimoIndice + 1
+            ].id
+          );
+        }
+      }
+    );
+
+    return columnasGlobalesOrdenadas.filter(
+      (columna) =>
+        idsVisibles.has(columna.id)
+    );
+  }, [
+    debeLimitarVistaPorSectores,
+    datosVistaSector.columnasVisibles,
+    columnasGlobalesOrdenadas,
+    sectoresPermitidosIds,
+  ]);
 
 const sectorVistaSeleccionado =
   sectoresProduccion.find(
     (sector) =>
-      sector.id === sectorVistaSeleccionadoId
+      sector.id ===
+      sectorVistaSeleccionadoId
   ) || null;
+
+const columnasProductivasSinSector =
+  useMemo(() => {
+    return columnasGlobalesOrdenadas.filter(
+      (columna) =>
+        columna?.activo !== false &&
+        !columna?.esInicial &&
+        !columna?.esFinal &&
+        !columna?.sectorId
+    );
+  }, [columnasGlobalesOrdenadas]);
+
+const configuracionSectoresIncompleta =
+  sectoresProduccion.length === 0 ||
+  columnasProductivasSinSector.length > 0;  
 
 
 
@@ -1250,13 +1406,38 @@ async function manejarMoverEtapaVinculada({
     error
   );
 
-  /*
-   * Si Firestore rechazó el movimiento,
-   * restauramos la posición anterior.
-   */
   setEtapasVinculadasProduccion(
     etapasVinculadasPrevias
   );
+
+  const representacionId =
+    `vinculada:${etapaId}`;
+
+  const esColumnaOcupada =
+    error?.code ===
+      "produccion/columna-ocupada-vinculada" ||
+    String(error?.message || "")
+      .toLowerCase()
+      .includes("otra card vinculada");
+
+  setAvisoRepresentacionProduccion({
+    representacionId,
+    tipo: "warning",
+    mensaje: esColumnaOcupada
+      ? "Esta etapa ya fue realizada por otra etapa vinculada."
+      : error?.message ||
+        "No se pudo mover esta etapa vinculada.",
+  });
+
+  setTimeout(() => {
+    setAvisoRepresentacionProduccion(
+      (actual) =>
+        actual?.representacionId ===
+        representacionId
+          ? null
+          : actual
+    );
+  }, 5000);
 }
 }
 
@@ -2130,21 +2311,41 @@ async function manejarReordenManualRepresentacion({
     });
   }
 
-  function manejarSeleccionarVistaSector(sectorId) {
-    if (!vistaSectoresDisponible) return;
+function manejarSeleccionarVistaSector(
+  sectorId
+) {
+  if (!vistaSectoresDisponible) return;
 
-    setSectorVistaSeleccionadoId(sectorId);
-    setMostrarVistaGeneralSectores(false);
-    enfocarTableroProduccion();
+  if (debeLimitarVistaPorSectores) {
+    return;
   }
 
-  function manejarVistaCompletaProduccion() {
-    if (!vistaSectoresDisponible) return;
+  setSectorVistaSeleccionadoId(
+    sectorId
+  );
 
-    setSectorVistaSeleccionadoId("");
-    setMostrarVistaGeneralSectores(false);
-    enfocarTableroProduccion();
+  setMostrarVistaGeneralSectores(
+    false
+  );
+
+  enfocarTableroProduccion();
+}
+
+function manejarVistaCompletaProduccion() {
+  if (!vistaSectoresDisponible) return;
+
+  if (debeLimitarVistaPorSectores) {
+    return;
   }
+
+  setSectorVistaSeleccionadoId("");
+
+  setMostrarVistaGeneralSectores(
+    false
+  );
+
+  enfocarTableroProduccion();
+}
 
 function manejarGestionarEtapaVinculada({
   accion,
@@ -2152,14 +2353,42 @@ function manejarGestionarEtapaVinculada({
 }) {
   if (!pedido) return;
 
-  if (accion === "crear") {
-    setPedidoGestionVinculada(pedido);
-    setMostrarModalEtapasVinculadas(true);
+if (accion === "crear") {
+  if (!puedeCrearEtapasVinculadas) {
     return;
   }
 
+  setPedidoGestionVinculada(pedido);
+  setModoModalEtapasVinculadas("crear");
+  setMostrarModalEtapasVinculadas(true);
+  return;
+}
+
+if (accion === "editar") {
+  if (!puedeEditarEtapasVinculadas) {
+    return;
+  }
+
+  setPedidoGestionVinculada(pedido);
+  setModoModalEtapasVinculadas("editar");
+  setMostrarModalEtapasVinculadas(true);
+  return;
+}
+
 if (accion === "finalizar") {
   manejarFinalizarEtapaVinculada(
+    pedido
+  );
+
+  return;
+}
+
+if (accion === "reabrir") {
+  if (!puedeEditarEtapasVinculadas) {
+    return;
+  }
+
+  manejarReabrirEtapaVinculada(
     pedido
   );
 
@@ -2234,6 +2463,180 @@ async function manejarCrearEtapasVinculadas({
   setPedidoGestionVinculada(null);
 }
 
+async function manejarEditarEtapasVinculadas({
+  etapas,
+  columnaReunionId,
+}) {
+  if (!pedidoGestionVinculada) {
+    return;
+  }
+
+  if (!perfil?.clienteId) {
+    return;
+  }
+
+  const pedidoId =
+    pedidoGestionVinculada
+      .pedidoFirebaseId ||
+    pedidoGestionVinculada
+      .firebaseId ||
+    pedidoGestionVinculada.id ||
+    "";
+
+  const flujoActual =
+    pedidoGestionVinculada
+      .produccionFlujoVinculado ||
+    null;
+
+  const grupoVinculadoId =
+    flujoActual?.grupoId ||
+    pedidoGestionVinculada
+      .produccionGrupoVinculadoId ||
+    "";
+
+  const etapasActuales =
+    Array.isArray(
+      flujoActual?.ramas
+    )
+      ? flujoActual.ramas
+      : [];
+
+  if (
+    !pedidoId ||
+    !grupoVinculadoId
+  ) {
+    throw new Error(
+      "No se encontró la vinculación actual."
+    );
+  }
+
+  await editarGrupoVinculadoProduccion({
+    clienteId:
+      perfil.clienteId,
+
+    pedidoId,
+
+    grupoVinculadoId,
+
+    columnaReunionId,
+
+    etapas,
+
+    etapasActuales,
+
+    usuarioActor: {
+      uid:
+        perfil?.uid ||
+        perfil?.firebaseUid ||
+        "",
+
+      nombre:
+        perfil?.nombre ||
+        perfil?.email ||
+        "Usuario",
+    },
+  });
+
+  setMostrarModalEtapasVinculadas(
+    false
+  );
+
+  setPedidoGestionVinculada(null);
+
+  setModoModalEtapasVinculadas(
+    "crear"
+  );
+}
+
+async function manejarEliminarVinculoProduccion() {
+  if (!puedeEliminarEtapasVinculadas) {
+    const error = new Error(
+      "No tenés permiso para eliminar vínculos de producción."
+    );
+
+    error.code =
+      "produccion/sin-permiso-eliminar-vinculo";
+
+    throw error;
+  }
+
+  if (!pedidoGestionVinculada) {
+    return;
+  }
+
+  if (!perfil?.clienteId) {
+    return;
+  }
+
+  const pedidoId =
+    pedidoGestionVinculada
+      .pedidoFirebaseId ||
+    pedidoGestionVinculada
+      .firebaseId ||
+    pedidoGestionVinculada.id ||
+    "";
+
+  const flujoActual =
+    pedidoGestionVinculada
+      .produccionFlujoVinculado ||
+    null;
+
+  const grupoVinculadoId =
+    flujoActual?.grupoId ||
+    pedidoGestionVinculada
+      .produccionGrupoVinculadoId ||
+    "";
+
+  const etapasActuales =
+    Array.isArray(
+      flujoActual?.ramas
+    )
+      ? flujoActual.ramas
+      : [];
+
+  if (
+    !pedidoId ||
+    !grupoVinculadoId
+  ) {
+    throw new Error(
+      "No se encontró la vinculación actual."
+    );
+  }
+
+  await cancelarGrupoVinculadoProduccion({
+    clienteId:
+      perfil.clienteId,
+
+    pedidoId,
+
+    grupoVinculadoId,
+
+    etapasActuales,
+
+    usuarioActor: {
+      uid:
+        perfil?.uid ||
+        perfil?.firebaseUid ||
+        "",
+
+      nombre:
+        perfil?.nombre ||
+        perfil?.email ||
+        "Usuario",
+    },
+  });
+
+  setMostrarModalEtapasVinculadas(
+    false
+  );
+
+  setPedidoGestionVinculada(null);
+
+  setModoModalEtapasVinculadas(
+    "crear"
+  );
+}
+
 async function manejarFinalizarEtapaVinculada(
   pedido
 ) {
@@ -2292,6 +2695,67 @@ async function manejarFinalizarEtapaVinculada(
     );
   }
 }
+
+async function manejarReabrirEtapaVinculada(
+  pedido
+) {
+  if (!pedido) return;
+
+  const etapaId =
+    pedido.produccionEtapaVinculadaId ||
+    "";
+
+  const grupoVinculadoId =
+    pedido.produccionGrupoVinculadoId ||
+    "";
+
+  const pedidoId =
+    pedido.pedidoFirebaseId ||
+    pedido.firebaseId ||
+    pedido.id ||
+    "";
+
+  if (
+    !etapaId ||
+    !grupoVinculadoId ||
+    !pedidoId
+  ) {
+    return;
+  }
+
+  try {
+    const resultado =
+      await reabrirEtapaVinculadaProduccion({
+        etapaId,
+        grupoVinculadoId,
+        pedidoId,
+
+        usuarioActor: {
+          uid:
+            perfil?.uid ||
+            perfil?.firebaseUid ||
+            "",
+
+          nombre:
+            perfil?.nombre ||
+            perfil?.email ||
+            "Usuario",
+        },
+      });
+
+    console.log(
+      "Etapa vinculada reabierta:",
+      resultado
+    );
+  } catch (error) {
+    console.error(
+      "Error reabriendo etapa vinculada:",
+      error
+    );
+  }
+}
+
+
 
 async function manejarTomarGrupoVinculado(
   pedido
@@ -2447,7 +2911,7 @@ async function manejarTomarGrupoVinculado(
         }}
 
         puedeUsarVistaSectores={
-          sectoresProduccion.length > 0
+          !debeLimitarVistaPorSectores
         }
 
         vistaSectoresDisponible={
@@ -2459,7 +2923,18 @@ async function manejarTomarGrupoVinculado(
         }
 
         onAbrirVistaSectores={() => {
+          if (debeLimitarVistaPorSectores) {
+            return;
+          }
+
           setMostrarFiltrosProduccion(false);
+
+          setModoModalSectoresProduccion(
+            configuracionSectoresIncompleta
+              ? "configuracion"
+              : "vista"
+          );
+
           setMostrarVistaGeneralSectores(true);
         }}
       />
@@ -2568,11 +3043,15 @@ async function manejarTomarGrupoVinculado(
         </div>
       )}
 
-      {mostrarVistaGeneralSectores && (
+      {mostrarVistaGeneralSectores &&
+      !debeLimitarVistaPorSectores && (
         <div
           className="produccion-vista-modal-overlay"
           onMouseDown={(event) => {
-            if (event.target === event.currentTarget) {
+            if (
+              event.target ===
+              event.currentTarget
+            ) {
               setMostrarVistaGeneralSectores(false);
             }
           }}
@@ -2593,10 +3072,8 @@ async function manejarTomarGrupoVinculado(
                 </span>
 
                 <h3 id="produccion-vista-modal-titulo">
-                  Visión general por sectores
+                  Sectores de producción
                 </h3>
-
-              
               </div>
 
               <button
@@ -2605,33 +3082,125 @@ async function manejarTomarGrupoVinculado(
                 onClick={() => {
                   setMostrarVistaGeneralSectores(false);
                 }}
-                aria-label="Cerrar visión general"
+                aria-label="Cerrar sectores"
               >
                 ×
               </button>
             </div>
 
+            <div
+              style={{
+                display: "flex",
+                gap: "8px",
+                padding: "12px 16px",
+                borderBottom:
+                  "1px solid #e5e7eb",
+              }}
+            >
+              <button
+                type="button"
+                className={`produccion-toolbar-btn ${
+                  modoModalSectoresProduccion ===
+                  "vista"
+                    ? "activo"
+                    : ""
+                }`}
+                onClick={() =>
+                  setModoModalSectoresProduccion(
+                    "vista"
+                  )
+                }
+                disabled={
+                  sectoresProduccion.length === 0
+                }
+              >
+                Ver flujo
+              </button>
+
+              <button
+                type="button"
+                className={`produccion-toolbar-btn ${
+                  modoModalSectoresProduccion ===
+                  "configuracion"
+                    ? "activo"
+                    : ""
+                }`}
+                onClick={() =>
+                  setModoModalSectoresProduccion(
+                    "configuracion"
+                  )
+                }
+              >
+                Configurar sectores
+              </button>
+            </div>
+
+            {configuracionSectoresIncompleta && (
+              <div
+                style={{
+                  margin: "14px 16px 0",
+                  padding: "12px 14px",
+                  borderRadius: "10px",
+                  background: "#fff7ed",
+                  border: "1px solid #fed7aa",
+                  fontSize: "13px",
+                  lineHeight: 1.45,
+                }}
+              >
+                <strong>
+                  La organización por sectores todavía está incompleta.
+                </strong>
+
+                <div
+                  style={{
+                    marginTop: "4px",
+                  }}
+                >
+                  {sectoresProduccion.length ===
+                  0
+                    ? "Todavía no hay sectores creados. Crealos y asigná las etapas del flujo."
+                    : `${columnasProductivasSinSector.length} etapa${
+                        columnasProductivasSinSector.length ===
+                        1
+                          ? ""
+                          : "s"
+                      } todavía no ${
+                        columnasProductivasSinSector.length ===
+                        1
+                          ? "tiene"
+                          : "tienen"
+                      } sector asignado.`}
+                </div>
+              </div>
+            )}
+
             <div className="produccion-vista-modal-body">
-              <ProduccionVistaSectores
-                sectores={sectoresProduccion}
-                columnas={columnasGlobalesOrdenadas}
-           
-
-                
-
-               
-                sectorSeleccionadoId={
-                  sectorVistaSeleccionadoId
-                }
-                onSeleccionarSector={
-                  manejarSeleccionarVistaSector
-                }
-                onVistaCompleta={
-                  manejarVistaCompletaProduccion
-                }
-                disponible={vistaSectoresDisponible}
-                motivoBloqueo="Disponible a partir del plan Pro"
-              />
+              {modoModalSectoresProduccion ===
+              "configuracion" ? (
+                <ConfiguracionProduccion
+                  perfil={perfil}
+                />
+              ) : (
+                <ProduccionVistaSectores
+                  sectores={sectoresProduccion}
+                  columnas={
+                    columnasGlobalesOrdenadas
+                  }
+                  sectorSeleccionadoId={
+                    sectorVistaSeleccionadoId
+                  }
+                  onSeleccionarSector={
+                    manejarSeleccionarVistaSector
+                  }
+                  onVistaCompleta={
+                    manejarVistaCompletaProduccion
+                  }
+                  disponible={
+                    vistaSectoresDisponible
+                  }
+                  motivoBloqueo="Disponible a partir del plan Pro"
+                />
+              )}
             </div>
           </div>
         </div>
@@ -2673,9 +3242,7 @@ async function manejarTomarGrupoVinculado(
         onReordenarRepresentacionManual={
           manejarReordenManualRepresentacion
         }
-        onReordenarRepresentacionManual={
-          manejarReordenManualRepresentacion
-        }
+
         onCambiarColorTarjeta={manejarCambiarColorTarjeta}
         onVerPedido={onVerPedido}
         onEditarColumna={manejarEditarColumna}
@@ -2692,6 +3259,14 @@ async function manejarTomarGrupoVinculado(
         onGestionarEtapaVinculada={
           manejarGestionarEtapaVinculada
         }
+
+        puedeCrearEtapasVinculadas={
+          puedeCrearEtapasVinculadas
+        }
+
+        puedeEditarEtapasVinculadas={
+          puedeEditarEtapasVinculadas
+        }
         puedeGestionarColumnas={puedeGestionarColumnas}
         onMoverColumna={manejarMoverColumna}
         onToggleOrdenManualColumna={manejarToggleOrdenManualColumna}
@@ -2699,6 +3274,9 @@ async function manejarTomarGrupoVinculado(
         puedeMoverPedidos={puedeHacerEnProduccion("mover")}
         puedeEditarDetalleManual={puedeHacerEnProduccion("editarDetalle")}
         pedidoNuevoResaltadoId={pedidoNuevoResaltadoId}
+        avisoRepresentacionProduccion={
+          avisoRepresentacionProduccion
+        }
         
       /> 
      
@@ -2710,6 +3288,8 @@ async function manejarTomarGrupoVinculado(
             pedido={
               pedidoGestionVinculada
             }
+
+            modo={modoModalEtapasVinculadas}
 
             columnas={
               columnasGlobalesOrdenadas
@@ -2730,8 +3310,33 @@ async function manejarTomarGrupoVinculado(
             }}
 
             onGuardar={
-              manejarCrearEtapasVinculadas
+              modoModalEtapasVinculadas ===
+              "editar"
+                ? manejarEditarEtapasVinculadas
+                : manejarCrearEtapasVinculadas
             }
+
+            onEliminarVinculo={
+              manejarEliminarVinculoProduccion
+            }
+
+          puedeEliminarVinculo={
+            puedeEliminarEtapasVinculadas
+          }
+
+          onConfigurarSectores={() => {
+            setMostrarModalEtapasVinculadas(
+              false
+            );
+
+            setPedidoGestionVinculada(null);
+
+            setModoModalSectoresProduccion(
+              "configuracion"
+            );
+
+            setMostrarVistaGeneralSectores(true);
+          }}
           />
         )}
 

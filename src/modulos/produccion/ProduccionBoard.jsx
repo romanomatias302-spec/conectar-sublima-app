@@ -46,6 +46,11 @@ export default function ProduccionBoard({
   onToggleColumnaContraida,
   onEditarDetalleManual,
   onGestionarEtapaVinculada,
+  avisoRepresentacionProduccion = null,
+
+  puedeCrearEtapasVinculadas = false,
+  puedeEditarEtapasVinculadas = false,
+
   puedeGestionarColumnas,
   onMoverColumna,
   onToggleOrdenManualColumna,
@@ -54,6 +59,7 @@ export default function ProduccionBoard({
   puedeEditarDetalleManual = true,
   pedidoNuevoResaltadoId = null,
   puedeGestionarOrdenManual = false,
+  
 }) {
 
 const [columnaResaltadaId, setColumnaResaltadaId] = useState(null);
@@ -416,6 +422,19 @@ onMoverPedido?.(pedidoId, columnaDestinoId);
               onGestionarEtapaVinculada={
                 onGestionarEtapaVinculada
               }
+
+              puedeCrearEtapasVinculadas={
+                puedeCrearEtapasVinculadas
+              }
+
+              puedeEditarEtapasVinculadas={
+                puedeEditarEtapasVinculadas
+              }
+              
+              avisoRepresentacionProduccion={
+                avisoRepresentacionProduccion
+              }
+
               puedeGestionarColumnas={puedeGestionarColumnas}
               onMoverColumna={onMoverColumna}
               onToggleOrdenManualColumna={onToggleOrdenManualColumna}
@@ -439,6 +458,7 @@ onMoverPedido?.(pedidoId, columnaDestinoId);
 
               esContextoEntrada={esContextoEntrada}
               esContextoSalida={esContextoSalida}
+              
             />
           );
         })}

@@ -13,11 +13,15 @@ import {
 
 export default function EtapasVinculadasModal({
   pedido,
+  modo = "crear",
   columnas = [],
   sectores = [],
   onCerrar = () => {},
   onGuardar = async () => {},
-}) {
+  onEliminarVinculo = async () => {},
+  puedeEliminarVinculo = false,
+  onConfigurarSectores = () => {},
+  }) {
   const [
     columnasSeleccionadasIds,
     setColumnasSeleccionadasIds,
@@ -28,11 +32,60 @@ export default function EtapasVinculadasModal({
     setColumnaReunionId,
   ] = useState("");
 
-  const [guardando, setGuardando] =
-    useState(false);
+const [guardando, setGuardando] =
+  useState(false);
 
-  const [error, setError] =
-    useState("");
+const [confirmandoEliminar, setConfirmandoEliminar] =
+  useState(false);
+
+const [eliminandoVinculo, setEliminandoVinculo] =
+  useState(false);
+
+const [error, setError] =
+  useState("");
+
+const flujoActual =
+  pedido?.produccionFlujoVinculado || null;
+
+const etapasActuales =
+  Array.isArray(flujoActual?.ramas)
+    ? flujoActual.ramas
+    : [];
+
+  useEffect(() => {
+  if (modo !== "editar") {
+    return;
+  }
+
+  const columnasActualesIds =
+    etapasActuales
+      .filter(
+        (etapa) =>
+          etapa?.estado !== "cancelada"
+      )
+      .map(
+        (etapa) =>
+          String(
+            etapa?.columnaProduccionId || ""
+          )
+      )
+      .filter(Boolean);
+
+  setColumnasSeleccionadasIds(
+    columnasActualesIds
+  );
+
+  setColumnaReunionId(
+    String(
+      flujoActual?.columnaReunionId || ""
+    )
+  );
+
+  setError("");
+}, [
+  modo,
+  pedido?.produccionRepresentacionId,
+]);  
 
   /*
    * No permitimos usar como ramas
@@ -46,6 +99,14 @@ export default function EtapasVinculadasModal({
           !columna.esFinal
       );
     }, [columnas]);
+
+  const columnasDisponiblesSinSector =
+  useMemo(() => {
+    return columnasDisponibles.filter(
+      (columna) =>
+        !columna?.sectorId
+    );
+  }, [columnasDisponibles]);  
 
   const sectoresPorId =
   useMemo(() => {
@@ -268,6 +329,37 @@ const columnasDisponiblesPorSector =
         columnaReunionId
     ) || null;
 
+async function eliminarVinculoCompleto() {
+  if (!puedeEliminarVinculo) {
+    setError(
+      "No tenés permiso para eliminar vínculos de producción."
+    );
+
+    return;
+  }
+
+  try {
+    setEliminandoVinculo(true);
+    setError("");
+
+    await onEliminarVinculo();
+    } catch (errorEliminar) {
+      console.error(
+        "Error eliminando vínculo:",
+        errorEliminar
+      );
+
+      setError(
+        errorEliminar?.message ||
+          "No se pudo eliminar el vínculo."
+      );
+
+      setConfirmandoEliminar(false);
+    } finally {
+      setEliminandoVinculo(false);
+    }
+  }  
+
   async function guardar() {
     if (
       columnasSeleccionadasIds.length < 2
@@ -310,10 +402,11 @@ const columnasDisponiblesPorSector =
           }
         );
 
-      await onGuardar({
-        etapas,
-        columnaReunionId,
-      });
+    await onGuardar({
+      modo,
+      etapas,
+      columnaReunionId,
+    });
     } catch (errorGuardar) {
       console.error(
         "Error creando etapas vinculadas:",
@@ -360,9 +453,11 @@ const columnasDisponiblesPorSector =
                 Producción vinculada
               </span>
 
-              <h3>
-                Crear etapas vinculadas
-              </h3>
+            <h3>
+              {modo === "editar"
+                ? "Editar etapas vinculadas"
+                : "Crear etapas vinculadas"}
+            </h3>
 
               <p>
                 Pedido{" "}
@@ -388,6 +483,51 @@ const columnasDisponiblesPorSector =
         </div>
 
         <div className="produccion-vinculadas-body">
+
+          {columnasDisponiblesSinSector.length >
+            0 && (
+            <div
+              style={{
+                marginBottom: "12px",
+                padding: "10px 12px",
+                borderRadius: "9px",
+                background: "#fff7ed",
+                border: "1px solid #fed7aa",
+                fontSize: "12px",
+                lineHeight: 1.45,
+                display: "flex",
+                alignItems: "center",
+                justifyContent:
+                  "space-between",
+                gap: "12px",
+              }}
+            >
+              <div>
+                <strong>
+                  Hay etapas sin sector asignado.
+                </strong>
+
+                <div
+                  style={{
+                    marginTop: "2px",
+                  }}
+                >
+                  Podés crear el vínculo igualmente,
+                  pero organizar los sectores mejora
+                  la visualización del flujo.
+                </div>
+              </div>
+
+              <button
+                type="button"
+                className="produccion-vinculadas-btn secundario"
+                onClick={onConfigurarSectores}
+              >
+                Configurar sectores
+              </button>
+            </div>
+          )}
+
           <div className="produccion-vinculadas-contenido">
 
             {/* ==============================
@@ -575,11 +715,83 @@ const columnasDisponiblesPorSector =
         </div>
 
         <div className="produccion-vinculadas-footer">
+
+          {modo === "editar" &&
+            puedeEliminarVinculo && (
+            !confirmandoEliminar ? (
+              <button
+                type="button"
+                className="produccion-vinculadas-btn secundario"
+                onClick={() =>
+                  setConfirmandoEliminar(true)
+                }
+                disabled={
+                  guardando ||
+                  eliminandoVinculo
+                }
+                style={{
+                  marginRight: "auto",
+                  color: "#b91c1c",
+                }}
+              >
+                Eliminar vínculo
+              </button>
+            ) : (
+              <div
+                style={{
+                  marginRight: "auto",
+                  display: "flex",
+                  gap: "6px",
+                  alignItems: "center",
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: "12px",
+                    color: "#b91c1c",
+                  }}
+                >
+                  ¿Eliminar vínculo?
+                </span>
+
+                <button
+                  type="button"
+                  className="produccion-vinculadas-btn secundario"
+                  onClick={() =>
+                    setConfirmandoEliminar(false)
+                  }
+                  disabled={eliminandoVinculo}
+                >
+                  No
+                </button>
+
+                <button
+                  type="button"
+                  className="produccion-vinculadas-btn secundario"
+                  onClick={
+                    eliminarVinculoCompleto
+                  }
+                  disabled={eliminandoVinculo}
+                  style={{
+                    color: "#b91c1c",
+                  }}
+                >
+                  {eliminandoVinculo
+                    ? "Eliminando..."
+                    : "Sí, eliminar"}
+                </button>
+              </div>
+            )
+          )}
+
           <button
             type="button"
             className="produccion-vinculadas-btn secundario"
             onClick={onCerrar}
-            disabled={guardando}
+            disabled={
+              guardando ||
+              eliminandoVinculo
+            }
           >
             Cancelar
           </button>
@@ -595,14 +807,21 @@ const columnasDisponiblesPorSector =
               !columnaReunionId
             }
           >
-            {guardando
-              ? "Creando..."
-              : `Crear vínculo${
-                  columnasSeleccionadasIds
-                    .length >= 2
-                    ? ` (${columnasSeleccionadasIds.length})`
-                    : ""
-                }`}
+        {guardando
+          ? modo === "editar"
+            ? "Guardando..."
+            : "Creando..."
+          : modo === "editar"
+          ? `Guardar cambios${
+              columnasSeleccionadasIds.length >= 2
+                ? ` (${columnasSeleccionadasIds.length})`
+                : ""
+            }`
+          : `Crear vínculo${
+              columnasSeleccionadasIds.length >= 2
+                ? ` (${columnasSeleccionadasIds.length})`
+                : ""
+            }`}
           </button>
         </div>
       </div>
