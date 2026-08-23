@@ -8606,7 +8606,7 @@ body.dark-mode .produccion-card-aviso-icono {
 .produccion-switch-nota
   input:checked
   + .produccion-switch-nota-control {
-  background: #7c3aed;
+  background: #3ad3ed;
 }
 
 .produccion-switch-nota
