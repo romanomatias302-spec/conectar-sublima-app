@@ -20,14 +20,280 @@
 
 .acciones-lista {
   display: flex;
+  align-items: center;
   gap: 10px;
 }
 
 .buscador,
 .filtro {
-  padding: 8px;
-  border-radius: 6px;
+  height: 36px;
+  box-sizing: border-box;
+  padding: 0 10px;
+  border-radius: 8px;
   border: 1px solid #ccc;
+  font-family: inherit;
+}
+
+.pedidos-filtro-fecha-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.pedidos-filtro-fecha-btn {
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 12px;
+  border: 1px solid #d7dce3;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #475569;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease;
+    transform: translateY(-8px);  
+}
+
+.pedidos-filtro-fecha-btn:hover {
+  border-color: #b8c2cc;
+  background: #f8fafc;
+}
+
+.pedidos-filtro-fecha-btn:focus-visible {
+  outline: none;
+  border-color: #0096d1;
+  box-shadow: 0 0 0 3px rgba(0, 150, 209, 0.12);
+}
+
+.pedidos-filtro-fecha-btn.activo {
+  border-color: rgba(0, 150, 209, 0.45);
+  background: rgba(0, 150, 209, 0.07);
+  color: #007bb2;
+}
+
+.pedidos-filtro-fecha-icono {
+  font-size: 13px;
+  flex: 0 0 auto;
+}
+
+.pedidos-filtro-fecha-dot {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #0096d1;
+}
+
+.pedidos-filtro-fecha-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 270px;
+  box-sizing: border-box;
+  padding: 14px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow:
+    0 14px 35px rgba(15, 23, 42, 0.12),
+    0 3px 10px rgba(15, 23, 42, 0.05);
+  z-index: 300;
+}
+
+.pedidos-filtro-fecha-popover-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 13px;
+}
+
+.pedidos-filtro-fecha-popover-header > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pedidos-filtro-fecha-popover-header strong {
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.pedidos-filtro-fecha-popover-header span {
+  color: #64748b;
+  font-size: 11px;
+}
+
+.pedidos-filtro-fecha-cerrar {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  padding: 0;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+}
+
+.pedidos-filtro-fecha-cerrar:hover {
+  background: #f1f5f9;
+  color: #334155;
+}
+
+.pedidos-filtro-fecha-campos {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+}
+
+.pedidos-filtro-fecha-campos label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.pedidos-filtro-fecha-campos label > span {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.pedidos-filtro-fecha-campos input {
+  width: 100%;
+  min-width: 0;
+  height: 35px;
+  box-sizing: border-box;
+  padding: 0 7px;
+  border: 1px solid #dbe3ec;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #334155;
+  font-family: inherit;
+  font-size: 11px;
+}
+
+.pedidos-filtro-fecha-campos input:focus {
+  outline: none;
+  border-color: #0096d1;
+  box-shadow: 0 0 0 2px rgba(0, 150, 209, 0.1);
+}
+
+.pedidos-filtro-fecha-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 7px;
+  margin-top: 14px;
+  padding-top: 11px;
+  border-top: 1px solid #eef2f7;
+}
+
+.pedidos-filtro-fecha-actions button {
+  min-height: 32px;
+  padding: 0 11px;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pedidos-filtro-fecha-limpiar {
+  border: 1px solid #dbe3ec;
+  background: #ffffff;
+  color: #64748b;
+}
+
+.pedidos-filtro-fecha-limpiar:hover:not(:disabled) {
+  background: #f8fafc;
+  color: #334155;
+}
+
+.pedidos-filtro-fecha-limpiar:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.pedidos-filtro-fecha-aplicar {
+  border: 1px solid #0096d1;
+  background: #0096d1;
+  color: #ffffff;
+}
+
+.pedidos-filtro-fecha-aplicar:hover {
+  background: #007fb3;
+}
+
+body.dark-mode .pedidos-filtro-fecha-btn {
+  background: #1f1f1f;
+  border-color: #4b5563;
+  color: #e5e7eb;
+}
+
+body.dark-mode .pedidos-filtro-fecha-btn:hover {
+  background: #272727;
+}
+
+body.dark-mode .pedidos-filtro-fecha-popover {
+  background: #262626;
+  border-color: #3f3f46;
+}
+
+body.dark-mode
+  .pedidos-filtro-fecha-popover-header strong {
+  color: #f1f5f9;
+}
+
+body.dark-mode
+  .pedidos-filtro-fecha-popover-header span,
+body.dark-mode
+  .pedidos-filtro-fecha-campos label > span {
+  color: #aeb8c5;
+}
+
+body.dark-mode
+  .pedidos-filtro-fecha-campos input {
+  background: #1f1f1f;
+  border-color: #4b5563;
+  color: #e5e7eb;
+  color-scheme: dark;
+}
+
+body.dark-mode .pedidos-filtro-fecha-cerrar {
+  color: #aeb8c5;
+}
+
+body.dark-mode
+  .pedidos-filtro-fecha-cerrar:hover {
+  background: #333333;
+  color: #ffffff;
+}
+
+body.dark-mode
+  .pedidos-filtro-fecha-actions {
+  border-top-color: #3f3f46;
+}
+
+body.dark-mode
+  .pedidos-filtro-fecha-limpiar {
+  background: transparent;
+  border-color: #4b5563;
+  color: #cbd5e1;
 }
 
 .btn-nuevo {
@@ -38,6 +304,7 @@
   padding: 8px 14px;
   cursor: pointer;
   font-weight: 600;
+  white-space: nowrap;
 }
 
 .tabla-pedidos {
@@ -525,15 +792,36 @@ body.dark-mode .estado-select.cancelado { background-color: #e74c3c !important; 
     border-radius: 10px;
   }
 
-  .acciones-lista .filtro {
-    width: 100%;
-    height: 38px;
-    font-size: 12px;
-    border-radius: 10px;
-    padding: 0 8px;
-  }
+.acciones-lista .filtro {
+  width: 100%;
+  height: 38px;
+  font-size: 12px;
+  border-radius: 10px;
+  padding: 0 8px;
+}
 
-  .acciones-lista .btn-nuevo {
+.pedidos-filtro-fecha-wrap {
+  width: 100%;
+}
+
+.pedidos-filtro-fecha-btn {
+  width: 100%;
+  height: 38px;
+}
+
+.pedidos-filtro-fecha-popover {
+  left: 0;
+  right: auto;
+  width: min(290px, calc(100vw - 36px));
+}
+
+.pedidos-filtro-fechas input {
+  flex: 1;
+  width: auto;
+  min-width: 0;
+}
+
+.acciones-lista .btn-nuevo {
     grid-column: 1 / -1;
     width: 100%;
     height: 40px;

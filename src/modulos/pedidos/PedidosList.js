@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   collection,
   getDocs,
@@ -21,6 +21,10 @@ import ProduccionEstadoCell from "../produccion/ProduccionEstadoCell";
 import { escucharColumnasProduccion } from "../../firebase/produccionColumnas";
 import { sincronizarPedidoDesdeEstadoManual } from "../../firebase/produccionPedidos";
 import { puedeHacer } from "../../utils/permisos";
+import {
+  FaCalendarAlt,
+  FaTimes,
+} from "react-icons/fa";
 
 export default function PedidosList({
   perfil,
@@ -31,6 +35,12 @@ export default function PedidosList({
   const [pedidos, setPedidos] = useState([]);
   const [busqueda, setBusqueda] = useState("");
   const [estadoFiltro, setEstadoFiltro] = useState("");
+  const [fechaDesde, setFechaDesde] = useState("");
+  const [fechaHasta, setFechaHasta] = useState("");
+  const [mostrarFiltroFecha, setMostrarFiltroFecha] = useState(false);
+
+  const filtroFechaRef = useRef(null);
+
   const [mostrarModal, setMostrarModal] = useState(false);
   const [pedidoEditar, setPedidoEditar] = useState(null);
 
@@ -42,8 +52,6 @@ export default function PedidosList({
   const [ultimoDoc, setUltimoDoc] = useState(null);
   const [hayMas, setHayMas] = useState(true);
 
-  const [buscando, setBuscando] = useState(false);
-  const [modoBusqueda, setModoBusqueda] = useState(false);
   const [columnasProduccion, setColumnasProduccion] = useState([]);
 
   const PAGE_SIZE = 100;
@@ -136,84 +144,14 @@ export default function PedidosList({
     }
   };
 
-  const buscarPedidosFirestore = async () => {
-    try {
-      if (!perfil) return;
 
-      const texto = normalizarTexto(busqueda);
 
-      if (!texto) {
-        setModoBusqueda(false);
-        cargarPedidos();
-        return;
-      }
-
-      setBuscando(true);
-      setModoBusqueda(true);
-
-      const pedidosRef = collection(db, "pedidos");
-
-      let q;
-
-      // búsqueda por número exacto de pedido
-      if (/^\d+$/.test(texto)) {
-        q =
-          perfil.rol === "superadmin"
-            ? query(
-                pedidosRef,
-                where("id", "==", texto),
-                limit(20)
-              )
-            : query(
-                pedidosRef,
-                where("clienteId", "==", perfil.clienteId),
-                where("id", "==", texto),
-                limit(20)
-              );
-      } else {
-        // búsqueda por cliente (prefijo)
-        q =
-          perfil.rol === "superadmin"
-            ? query(
-                pedidosRef,
-                orderBy("clienteBusqueda"),
-                where("clienteBusqueda", ">=", texto),
-                where("clienteBusqueda", "<=", texto + "\uf8ff"),
-                limit(100)
-              )
-            : query(
-                pedidosRef,
-                where("clienteId", "==", perfil.clienteId),
-                orderBy("clienteBusqueda"),
-                where("clienteBusqueda", ">=", texto),
-                where("clienteBusqueda", "<=", texto + "\uf8ff"),
-                limit(100)
-              );
-      }
-
-      console.log("BUSQUEDA TEXTO:", texto);
-      console.log("MODO BUSQUEDA:", /^\d+$/.test(texto) ? "por id" : "por cliente");
-
-      const snapshot = await getDocs(q);
-
-      console.log("RESULTADOS BUSQUEDA:", snapshot.docs.length);
-
-      const lista = snapshot.docs.map((docu) => ({
-        firebaseId: docu.id,
-        ...docu.data(),
-      }));
-
-      setPedidos(lista);
-      setHayMas(false);
-      setUltimoDoc(null);
-    } catch (error) {
-      console.error("Error al buscar pedidos:", error);
-    } finally {
-      setBuscando(false);
-    }
-  };
-
-  const normalizarTexto = (texto) => (texto || "").trim().toLowerCase();
+  const normalizarTexto = (texto) =>
+    String(texto || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .trim()
+      .toLowerCase();
 
   const obtenerNombreEtapaPedido = (pedido) => {
     if (pedido.estado === "Cancelado") return "Cancelado";
@@ -256,13 +194,30 @@ export default function PedidosList({
     };
   }, [perfil]);
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      buscarPedidosFirestore();
-    }, 400);
+useEffect(() => {
+  if (!mostrarFiltroFecha) return;
 
-    return () => clearTimeout(timer);
-  }, [busqueda]);
+  const manejarClickFueraFiltroFecha = (event) => {
+    if (
+      filtroFechaRef.current &&
+      !filtroFechaRef.current.contains(event.target)
+    ) {
+      setMostrarFiltroFecha(false);
+    }
+  };
+
+  document.addEventListener(
+    "mousedown",
+    manejarClickFueraFiltroFecha
+  );
+
+  return () => {
+    document.removeEventListener(
+      "mousedown",
+      manejarClickFueraFiltroFecha
+    );
+  };
+}, [mostrarFiltroFecha]);
 
   useEffect(() => {
   if (!abrirNuevo) return;
@@ -271,6 +226,8 @@ export default function PedidosList({
   setPedidoEditar(null);
   setMostrarModal(true);
 }, [abrirNuevo, puedeCrearPedidos]);
+
+
 
   const eliminarPedido = async (firebaseId) => {
     if (!puedeEliminarPedidos) return;
@@ -325,12 +282,62 @@ export default function PedidosList({
     }
   };
 
-  const pedidosFiltrados = pedidos.filter((p) => {
-    if (!estadoFiltro) return true;
+const pedidosFiltrados = pedidos.filter((p) => {
+  const textoBusqueda =
+    normalizarTexto(busqueda);
 
-    const etapaActual = obtenerNombreEtapaPedido(p);
-    return etapaActual === estadoFiltro;
-  });
+  if (textoBusqueda) {
+    const camposBusqueda = [
+      p.id,
+      p.numeroPedido,
+      p.numero,
+      p.cliente,
+      p.clienteNombre,
+      p.nombreCliente,
+      p.clienteBusqueda,
+      p.clienteDNI,
+    ].map(normalizarTexto);
+
+    const coincideBusqueda =
+      camposBusqueda.some((valor) =>
+        valor.includes(textoBusqueda)
+      );
+
+    if (!coincideBusqueda) {
+      return false;
+    }
+  }
+
+  if (estadoFiltro) {
+    const etapaActual =
+      obtenerNombreEtapaPedido(p);
+
+    if (etapaActual !== estadoFiltro) {
+      return false;
+    }
+  }
+
+  const fechaPedido =
+    String(p.fechaPedido || "");
+
+  if (
+    fechaDesde &&
+    (!fechaPedido ||
+      fechaPedido < fechaDesde)
+  ) {
+    return false;
+  }
+
+  if (
+    fechaHasta &&
+    (!fechaPedido ||
+      fechaPedido > fechaHasta)
+  ) {
+    return false;
+  }
+
+  return true;
+});
 
   const manejarOrden = (campo) => {
     if (ordenCampo === campo) {
@@ -377,15 +384,13 @@ export default function PedidosList({
         <div className="acciones-lista">
           <input
             type="text"
-            placeholder="Buscar por cliente o código..."
+            placeholder="Buscar cliente o N° de pedido..."
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
             className="buscador"
           />
 
-          {buscando && (
-            <p style={{ marginTop: "10px", color: "#666" }}>Buscando pedidos...</p>
-          )}
+
 
           <select
             value={estadoFiltro}
@@ -401,9 +406,116 @@ export default function PedidosList({
             ))}
 
             <option value="Cancelado">Cancelado</option>
-          </select>
+            </select>
 
-          {puedeCrearPedidos && (
+            <div
+              ref={filtroFechaRef}
+              className="pedidos-filtro-fecha-wrap"
+            >
+              <button
+                type="button"
+                className={`pedidos-filtro-fecha-btn ${
+                  fechaDesde || fechaHasta ? "activo" : ""
+                }`}
+                onClick={() =>
+                  setMostrarFiltroFecha((prev) => !prev)
+                }
+                aria-expanded={mostrarFiltroFecha}
+                aria-haspopup="dialog"
+              >
+                <FaCalendarAlt
+                  className="pedidos-filtro-fecha-icono"
+                  aria-hidden="true"
+                />
+
+                <span>Fecha</span>
+
+                {(fechaDesde || fechaHasta) && (
+                  <span
+                    className="pedidos-filtro-fecha-dot"
+                    aria-hidden="true"
+                  />
+                )}
+              </button>
+
+              {mostrarFiltroFecha && (
+                <div
+                  className="pedidos-filtro-fecha-popover"
+                  role="dialog"
+                  aria-label="Filtrar pedidos por fecha"
+                >
+                  <div className="pedidos-filtro-fecha-popover-header">
+                    <div>
+                      <strong>Fecha del pedido</strong>
+                      <span>Seleccioná un rango</span>
+                    </div>
+
+                    <button
+                      type="button"
+                      className="pedidos-filtro-fecha-cerrar"
+                      onClick={() =>
+                        setMostrarFiltroFecha(false)
+                      }
+                      aria-label="Cerrar filtro"
+                    >
+                      <FaTimes />
+                    </button>
+                  </div>
+
+                  <div className="pedidos-filtro-fecha-campos">
+                    <label>
+                      <span>Desde</span>
+
+                      <input
+                        type="date"
+                        value={fechaDesde}
+                        onChange={(e) =>
+                          setFechaDesde(e.target.value)
+                        }
+                      />
+                    </label>
+
+                    <label>
+                      <span>Hasta</span>
+
+                      <input
+                        type="date"
+                        value={fechaHasta}
+                        onChange={(e) =>
+                          setFechaHasta(e.target.value)
+                        }
+                      />
+                    </label>
+                  </div>
+
+                  <div className="pedidos-filtro-fecha-actions">
+                    <button
+                      type="button"
+                      className="pedidos-filtro-fecha-limpiar"
+                      disabled={!fechaDesde && !fechaHasta}
+                      onClick={() => {
+                        setFechaDesde("");
+                        setFechaHasta("");
+                      }}
+                    >
+                      Limpiar
+                    </button>
+
+                    <button
+                      type="button"
+                      className="pedidos-filtro-fecha-aplicar"
+                      onClick={() =>
+                        setMostrarFiltroFecha(false)
+                      }
+                    >
+                      Aplicar
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {puedeCrearPedidos && (
             <button
               className="btn-nuevo"
               onClick={() => {
@@ -481,7 +593,7 @@ export default function PedidosList({
         <thead>
           <tr>
             <th onClick={() => manejarOrden("id")} style={{ cursor: "pointer" }}>
-              ID Pedido {ordenCampo === "id" ? (ordenDireccion === "asc" ? "▲" : "▼") : ""}
+              N° de pedido {ordenCampo === "id" ? (ordenDireccion === "asc" ? "▲" : "▼") : ""}
             </th>
             <th onClick={() => manejarOrden("cliente")} style={{ cursor: "pointer" }}>
               Cliente {ordenCampo === "cliente" ? (ordenDireccion === "asc" ? "▲" : "▼") : ""}
@@ -567,7 +679,7 @@ export default function PedidosList({
         </p>
       )}
 
-      {!loading && !modoBusqueda && hayMas && (
+      {!loading && hayMas && (
         <div style={{ textAlign: "center", marginTop: "20px" }}>
           <button className="btn-secundario" onClick={cargarMasPedidos} disabled={loadingMas}>
             {loadingMas ? "Cargando..." : "Cargar más"}
