@@ -60,6 +60,23 @@ export default function PedidosList({
   const puedeEditarPedidos = puedeHacer(perfil, "pedidos", "editar");
   const puedeEliminarPedidos = puedeHacer(perfil, "pedidos", "eliminar");
 
+  const esAdminPedidos =
+    perfil?.rol === "admin" ||
+    perfil?.rol === "superadmin";
+
+  const debeVerSoloAsignados =
+    !esAdminPedidos &&
+    puedeHacer(
+      perfil,
+      "produccion",
+      "verSoloAsignados"
+    );
+
+  const uidActual =
+    perfil?.uid ||
+    perfil?.firebaseUid ||
+    "";
+
   const cargarPedidos = () => {
     if (!perfil) return () => {};
 
@@ -283,6 +300,19 @@ useEffect(() => {
   };
 
 const pedidosFiltrados = pedidos.filter((p) => {
+  if (debeVerSoloAsignados) {
+    if (!uidActual) {
+      return false;
+    }
+
+    if (
+      p.produccionAsignadoUid !==
+      uidActual
+    ) {
+      return false;
+    }
+  }
+
   const textoBusqueda =
     normalizarTexto(busqueda);
 
