@@ -625,6 +625,7 @@ export function escucharPedidosProduccionFinalizadosRecientes(clienteId, callbac
 export async function actualizarDetalleManualProduccion({
   pedidoId,
   produccionNotaCorta = "",
+  produccionMostrarNotaCorta = false,
   produccionNotaLarga = "",
   produccionImagenPortada = "",
   produccionImagenPortadaThumb = "",
@@ -648,8 +649,14 @@ export async function actualizarDetalleManualProduccion({
     : [];
 
   await updateDoc(ref, {
-    produccionNotaCorta: produccionNotaCorta || "",
-    produccionNotaLarga: produccionNotaLarga || "",
+    produccionNotaCorta:
+      produccionNotaCorta || "",
+
+    produccionMostrarNotaCorta:
+      produccionMostrarNotaCorta === true,
+
+    produccionNotaLarga:
+      produccionNotaLarga || "",
     produccionImagenPortada: produccionImagenPortada || "",
     produccionImagenPortadaOrigen: produccionImagenPortada ? "pedido" : "",
     produccionImagenPortadaThumb:

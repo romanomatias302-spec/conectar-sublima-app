@@ -162,6 +162,13 @@ export default function DetalleProduccionModal({
   );
 
   const [
+    mostrarNotaCortaEnTarjeta,
+    setMostrarNotaCortaEnTarjeta,
+  ] = useState(
+    pedido?.produccionMostrarNotaCorta === true
+  );
+
+  const [
     notaLarga,
     setNotaLarga,
   ] = useState(
@@ -681,6 +688,9 @@ export default function DetalleProduccionModal({
         produccionNotaCorta:
           notaCorta,
 
+        produccionMostrarNotaCorta:
+          mostrarNotaCortaEnTarjeta,
+
         produccionNotaLarga:
           notaLarga,
 
@@ -938,22 +948,44 @@ export default function DetalleProduccionModal({
           <div className="produccion-modal-section">
             <h4>Notas internas</h4>
 
+          <div className="produccion-nota-corta-header">
             <label>
               Nota corta
             </label>
 
-            <input
-              type="text"
-              maxLength={60}
-              value={notaCorta}
-              onChange={(event) =>
-                setNotaCorta(
-                  event.target.value
-                )
-              }
-              className="produccion-modal-input"
-              placeholder="Ej: Mandar hoy / Esperar tela / Revisar logo"
-            />
+            <label className="produccion-switch-nota">
+              <input
+                type="checkbox"
+                checked={
+                  mostrarNotaCortaEnTarjeta
+                }
+                onChange={(event) =>
+                  setMostrarNotaCortaEnTarjeta(
+                    event.target.checked
+                  )
+                }
+              />
+
+              <span className="produccion-switch-nota-control" />
+
+              <span className="produccion-switch-nota-texto">
+                Ver en tarjeta
+              </span>
+            </label>
+          </div>
+
+          <input
+            type="text"
+            maxLength={60}
+            value={notaCorta}
+            onChange={(event) =>
+              setNotaCorta(
+                event.target.value
+              )
+            }
+            className="produccion-modal-input"
+            placeholder="Ej: Club Los Pumas / Mandar hoy / Revisar logo"
+          />
 
             <label>
               Nota larga

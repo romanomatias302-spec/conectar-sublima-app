@@ -716,8 +716,19 @@ const usuarioVisible =
           <div className="produccion-card-main">
             <div className="produccion-card-desktop-info">
               <div className="produccion-card-cliente">
-                {pedido.cliente || pedido.clienteNombre || pedido.nombreCliente || "Cliente sin nombre"}
+                {pedido.cliente ||
+                  pedido.clienteNombre ||
+                  pedido.nombreCliente ||
+                  "Cliente sin nombre"}
               </div>
+
+              {pedido.produccionMostrarNotaCorta ===
+                true &&
+                pedido.produccionNotaCorta && (
+                  <div className="produccion-card-nota-corta-visible">
+                    {pedido.produccionNotaCorta}
+                  </div>
+                )}
 
               <div className={`produccion-card-entrega-progress entrega-${entregaProgreso.estado}`}>
                 <div
@@ -733,9 +744,20 @@ const usuarioVisible =
                 #{pedido.id || pedido.numeroPedido || pedido.numero || "S/N"}
               </span>
 
-              <span className="produccion-card-cliente produccion-card-cliente-mobile">
-                {pedido.cliente || pedido.clienteNombre || pedido.nombreCliente || "Cliente sin nombre"}
-              </span>
+            <span className="produccion-card-cliente produccion-card-cliente-mobile">
+              {pedido.cliente ||
+                pedido.clienteNombre ||
+                pedido.nombreCliente ||
+                "Cliente sin nombre"}
+            </span>
+
+            {pedido.produccionMostrarNotaCorta ===
+              true &&
+              pedido.produccionNotaCorta && (
+                <span className="produccion-card-nota-corta-mobile">
+                  {pedido.produccionNotaCorta}
+                </span>
+              )}
             </div>
 
               <div className={`produccion-card-entrega-progress produccion-card-entrega-mobile entrega-${entregaProgreso.estado}`}>

@@ -8554,3 +8554,107 @@ body.dark-mode .produccion-card-aviso-icono {
    /* =========================================
    Aviso mensaje etapas vinculadas - fin
    ========================================= */
+
+      /* =========================================
+   Nuevos estilos para cards 
+   ========================================= */
+
+   .produccion-nota-corta-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.produccion-switch-nota {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.produccion-switch-nota input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.produccion-switch-nota-control {
+  position: relative;
+  width: 34px;
+  height: 19px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: #cbd5e1;
+  transition: background 0.18s ease;
+}
+
+.produccion-switch-nota-control::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.22);
+  transition: transform 0.18s ease;
+}
+
+.produccion-switch-nota
+  input:checked
+  + .produccion-switch-nota-control {
+  background: #7c3aed;
+}
+
+.produccion-switch-nota
+  input:checked
+  + .produccion-switch-nota-control::after {
+  transform: translateX(15px);
+}
+
+.produccion-switch-nota-texto {
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.produccion-card-nota-corta-visible {
+  margin-top: 3px;
+  margin-bottom: 6px;
+  font-size: 12px;
+  line-height: 1.3;
+  font-weight: 600;
+  color: #64748b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.produccion-card-nota-corta-mobile {
+  display: block;
+  width: 100%;
+  margin-top: 2px;
+  font-size: 11px;
+  line-height: 1.25;
+  font-weight: 600;
+  color: #64748b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body.dark-mode
+  .produccion-switch-nota-texto,
+body.dark-mode
+  .produccion-card-nota-corta-visible,
+body.dark-mode
+  .produccion-card-nota-corta-mobile {
+  color: #cbd5e1;
+}
+
+      /* =========================================
+   Nuevos estilos para cards - fin
+   ========================================= */

@@ -633,10 +633,15 @@ function filtrarPedidosPorEtiqueta(lista, etiquetaId) {
   );
 }
 
-function filtrarPedidosPorBusqueda(lista, textoBusqueda) {
+function filtrarPedidosPorBusqueda(
+  lista,
+  textoBusqueda
+) {
   if (!Array.isArray(lista)) return [];
 
-  const texto = String(textoBusqueda || "")
+  const texto = String(
+    textoBusqueda || ""
+  )
     .trim()
     .toLowerCase();
 
@@ -657,9 +662,15 @@ function filtrarPedidosPorBusqueda(lista, textoBusqueda) {
         ""
     ).toLowerCase();
 
+    const notaCorta = String(
+      pedido.produccionNotaCorta ||
+        ""
+    ).toLowerCase();
+
     return (
       numeroPedido.includes(texto) ||
-      cliente.includes(texto)
+      cliente.includes(texto) ||
+      notaCorta.includes(texto)
     );
   });
 }

@@ -328,6 +328,7 @@ function canUpdatePedidoProduccion(clienteId) {
       return canEditarDetalleProduccion(clienteId)
         && onlyChangesAllowed([
           "produccionNotaCorta",
+          "produccionMostrarNotaCorta",
           "produccionNotaLarga",
           "produccionMetros",
 
@@ -383,6 +384,7 @@ function canUpdatePedidos(clienteId) {
         || (
           onlyChangesAllowed([
             "produccionNotaCorta",
+            "produccionMostrarNotaCorta",
             "produccionNotaLarga",
             "produccionMetros",
             "produccionImagenPortada",
