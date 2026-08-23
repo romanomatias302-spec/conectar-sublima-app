@@ -1712,16 +1712,22 @@ body.dark-mode .pfm-ref-img{
 
 body.printing-producto .pfm-static-talle-name {
   font-size: 14px !important;
+  color: #1f2937 !important;
 }
 
 body.printing-producto .pfm-static-talle-qty {
   font-size: 14px !important;
+  font-weight: 800 !important;
   padding: 5px 9px !important;
+  color: #1f2937 !important;
+  background: #f1f5f9 !important;
+  border: 1px solid #cbd5e1 !important;
 }
 
 body.printing-producto .pfm-static-talle-detail {
   font-size: 14px !important;
   line-height: 1.4 !important;
+  color: #334155 !important;
   max-height: none !important;
   overflow: visible !important;
 }
@@ -1729,6 +1735,21 @@ body.printing-producto .pfm-static-talle-detail {
 body.printing-producto .pfm-static-talle-chip {
   min-height: 48px !important;
   padding: 9px 10px !important;
+}
+
+body.printing-producto .pfm-static-zona-code {
+  color: #1f2937 !important;
+  background: #f1f5f9 !important;
+  border: 1px solid #cbd5e1 !important;
+  font-weight: 800 !important;
+}
+
+body.printing-producto .pfm-static-zona-text {
+  color: #334155 !important;
+}
+
+body.printing-producto .pfm-static-zona-group-title {
+  color: #1f2937 !important;
 }
 }
 

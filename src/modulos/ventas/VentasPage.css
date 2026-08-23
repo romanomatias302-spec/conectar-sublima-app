@@ -4175,11 +4175,12 @@ margin-top:20px;
     text-overflow: unset !important;
   }
 
-  .cotizacion-print-items th {
-    background: #f8fafc;
-    font-size: 14px;
-    font-weight: 700;
-  }
+.cotizacion-print-items th {
+  background: #f8fafc;
+  color: #334155 !important;
+  font-size: 14px;
+  font-weight: 800;
+}
 
   .print-col-producto {
     width: 52%;
