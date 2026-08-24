@@ -25,10 +25,15 @@ import {
 } from "../../firebase/ventas";
 import { formatearMoneda, obtenerConfigMonedaDesdePerfil } from "../../utils/moneda";
 import { fechaHoyNegocio } from "../../utils/fechas";
+import {
+  crearPedidoBase,
+  crearProductosPedidoDesdeVenta,
+} from "../../firebase/pedidos";
 import "./VentasPage.css";
 import { puedeHacer } from "../../utils/permisos";
 import ProductoSelectorModal from "../../components/ProductoSelectorModal/ProductoSelectorModal";
 import { Eye, Paperclip, ReceiptText } from "lucide-react";
+
 
 
 export default function VentaDetalle({ perfil, ventaId, onVolver, onVerPedido }) {
@@ -93,6 +98,24 @@ const puedeVerVentas =
 
 const puedeEditarVentas =
   puedeHacer(perfil, "ventas", "editar");
+
+const puedeCrearPedidos =
+  puedeHacer(perfil, "pedidos", "crear");
+
+const [
+  creandoPedidoDesdeVenta,
+  setCreandoPedidoDesdeVenta,
+] = useState(false);
+
+const [
+  mostrarCrearPedidoDesdeVenta,
+  setMostrarCrearPedidoDesdeVenta,
+] = useState(false);
+
+const [
+  fechaEntregaNuevoPedido,
+  setFechaEntregaNuevoPedido,
+] = useState("");
 
 const puedeAnularVentas =
   puedeHacer(perfil, "ventas", "anular");
@@ -323,6 +346,129 @@ const puedeAnularVentas =
         }
     };
 
+const abrirCrearPedidoDesdeVenta = () => {
+  if (!venta) return;
+  if (!puedeCrearPedidos) return;
+  if (ventaAnulada) return;
+
+  if (venta.pedidoRefId) {
+    setError(
+      "Esta venta ya tiene un pedido asociado."
+    );
+    return;
+  }
+
+  setFechaEntregaNuevoPedido("");
+  setError("");
+  setExito("");
+  setMostrarCrearPedidoDesdeVenta(true);
+};
+
+const crearPedidoDesdeVenta = async () => {
+  try {
+    if (!venta) return;
+    if (!puedeCrearPedidos) return;
+    if (ventaAnulada) return;
+
+    /*
+     * Protección contra duplicados.
+     */
+    if (venta.pedidoRefId) {
+      setMostrarCrearPedidoDesdeVenta(false);
+
+      setError(
+        "Esta venta ya tiene un pedido asociado."
+      );
+
+      return;
+    }
+
+    setCreandoPedidoDesdeVenta(true);
+    setError("");
+    setExito("");
+
+    const pedidoCreado =
+      await crearPedidoBase({
+        perfil,
+
+        clienteNombre:
+          venta.clienteNombre || "",
+
+        clienteDNI:
+          venta.clienteDNI ||
+          venta.clienteDocumento ||
+          "",
+
+        fechaPedido:
+          fechaHoyNegocio(perfil),
+
+        fechaEntrega:
+          fechaEntregaNuevoPedido || "",
+
+        origen: "venta",
+
+        ventaRefId:
+          venta.firebaseId,
+
+        ventaVisibleId:
+          String(
+            venta.numeroVenta || ""
+          ),
+      });
+
+    const resultadoProductos =
+      await crearProductosPedidoDesdeVenta({
+        pedidoId:
+          pedidoCreado.firebaseId,
+
+        ventaId:
+          venta.firebaseId,
+
+        itemsVenta:
+          items,
+
+        perfil,
+      });  
+
+    await actualizarPedidoAsociadoDeVenta({
+      ventaId: venta.firebaseId,
+      pedidoAsociado: pedidoCreado,
+    });
+
+    setMostrarCrearPedidoDesdeVenta(false);
+    setFechaEntregaNuevoPedido("");
+
+    await cargarVentaCompleta();
+    await cargarPedidos();
+
+    setPedidoRefId(
+      pedidoCreado.firebaseId
+    );
+
+    setExito(
+      resultadoProductos.creados > 0
+        ? `Pedido #${pedidoCreado.id} creado con ${resultadoProductos.creados} ${
+            resultadoProductos.creados === 1
+              ? "producto"
+              : "productos"
+          }.`
+        : `Pedido #${pedidoCreado.id} creado y asociado correctamente.`
+    );
+  } catch (err) {
+    console.error(
+      "Error creando pedido desde venta:",
+      err
+    );
+
+    setError(
+      err.message ||
+        "No se pudo crear el pedido."
+    );
+  } finally {
+    setCreandoPedidoDesdeVenta(false);
+  }
+};
+
   const guardarPedidoAsociado = async () => {
     try {
       if (!puedeEditarVentas) return;
@@ -345,6 +491,8 @@ const puedeAnularVentas =
       setGuardandoPedido(false);
     }
   };
+
+
 
   const abrirSelectorPrecio = () => {
     setModalPrecioAbierto(true);
@@ -878,15 +1026,38 @@ const puedeAnularVentas =
                 )}
               </div>
 
-                <button
-                  className="btn btn-primary"
-                  onClick={guardarPedidoAsociado}
-                  disabled={guardandoPedido || ventaAnulada || !puedeEditarVentas || !!venta?.pedidoRefId || !pedidoRefId}
-                >
-                  {guardandoPedido ? "Guardando..." : "Guardar"}
-                </button>
+              <button
+                className="btn btn-primary"
+                onClick={guardarPedidoAsociado}
+                disabled={
+                  guardandoPedido ||
+                  ventaAnulada ||
+                  !puedeEditarVentas ||
+                  !!venta?.pedidoRefId ||
+                  !pedidoRefId
+                }
+              >
+                {guardandoPedido
+                  ? "Guardando..."
+                  : "Guardar"}
+              </button>
 
-                {venta?.pedidoRefId && (
+              {!venta?.pedidoRefId &&
+                puedeCrearPedidos && (
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={abrirCrearPedidoDesdeVenta}
+                    disabled={
+                      creandoPedidoDesdeVenta ||
+                      ventaAnulada
+                    }
+                  >
+                    Crear pedido
+                  </button>
+              )}
+
+              {venta?.pedidoRefId && (
                   <button
                     className="btn btn-secondary"
                     type="button"
@@ -1451,6 +1622,84 @@ const puedeAnularVentas =
           </div>
         </aside>
       </div>
+
+      {mostrarCrearPedidoDesdeVenta && (
+        <div
+          className="ventas-crear-pedido-overlay"
+          onClick={() => {
+            if (!creandoPedidoDesdeVenta) {
+              setMostrarCrearPedidoDesdeVenta(false);
+            }
+          }}
+        >
+          <div
+            className="ventas-crear-pedido-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="ventas-crear-pedido-header">
+              <h3>Crear pedido</h3>
+
+              <p>
+                Se creará un nuevo pedido para{" "}
+                <strong>
+                  {venta.clienteNombre ||
+                    "el cliente seleccionado"}
+                </strong>
+                .
+              </p>
+            </div>
+
+            <div className="ventas-field">
+              <label>Fecha de entrega</label>
+
+              <input
+                type="date"
+                value={fechaEntregaNuevoPedido}
+                min={fechaHoyNegocio(perfil)}
+                onChange={(e) =>
+                  setFechaEntregaNuevoPedido(
+                    e.target.value
+                  )
+                }
+                disabled={creandoPedidoDesdeVenta}
+              />
+
+              <small className="ventas-crear-pedido-ayuda">
+                Opcional. Podés definirla después.
+              </small>
+            </div>
+
+            <div className="ventas-crear-pedido-info">
+             Se creará en Producción y quedará asociado a la venta.
+            </div>
+
+            <div className="ventas-crear-pedido-actions">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                disabled={creandoPedidoDesdeVenta}
+                onClick={() => {
+                  setMostrarCrearPedidoDesdeVenta(false);
+                  setFechaEntregaNuevoPedido("");
+                }}
+              >
+                Cancelar
+              </button>
+
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={creandoPedidoDesdeVenta}
+                onClick={crearPedidoDesdeVenta}
+              >
+                {creandoPedidoDesdeVenta
+                  ? "Creando..."
+                  : "Crear pedido"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <ProductoSelectorModal
         open={modalPrecioAbierto}
         perfil={perfil}

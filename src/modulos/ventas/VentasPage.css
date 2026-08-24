@@ -4833,3 +4833,111 @@ margin-top:20px;
    VENTA DETALLE - RECIBO DE PAGO - fin
    ===================================================== */
 
+      /* =====================================================
+   Minimodal crear pedido y asociar a venta 
+   ===================================================== */
+
+.ventas-crear-pedido-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 20px;
+  box-sizing: border-box;
+
+  background: rgba(15, 23, 42, 0.42);
+}
+
+.ventas-crear-pedido-modal {
+  width: 100%;
+  max-width: 420px;
+  box-sizing: border-box;
+
+  padding: 20px;
+
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+
+  box-shadow:
+    0 20px 50px rgba(15, 23, 42, 0.18),
+    0 4px 14px rgba(15, 23, 42, 0.08);
+}
+
+.ventas-crear-pedido-header {
+  margin-bottom: 18px;
+}
+
+.ventas-crear-pedido-header h3 {
+  margin: 0 0 6px;
+
+  color: #0f172a;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.ventas-crear-pedido-header p {
+  margin: 0;
+
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.ventas-crear-pedido-ayuda {
+  display: block;
+  margin-top: 6px;
+
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.ventas-crear-pedido-info {
+  margin-top: 14px;
+  padding: 10px 11px;
+
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+
+  color: #475569;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.ventas-crear-pedido-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+
+  margin-top: 20px;
+}
+
+body.dark-mode .ventas-crear-pedido-modal {
+  background: #262626;
+  border-color: #414141;
+}
+
+body.dark-mode .ventas-crear-pedido-header h3 {
+  color: #f1f5f9;
+}
+
+body.dark-mode .ventas-crear-pedido-header p,
+body.dark-mode .ventas-crear-pedido-ayuda {
+  color: #aeb8c5;
+}
+
+body.dark-mode .ventas-crear-pedido-info {
+  background: #1f1f1f;
+  border-color: #414141;
+  color: #cbd5e1;
+}
+
+      /* =====================================================
+   Minimodal crear pedido y asociar a venta  - fin
+   ===================================================== */

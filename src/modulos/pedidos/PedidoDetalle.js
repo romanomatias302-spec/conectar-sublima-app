@@ -19,6 +19,8 @@ onSnapshot,
 query,
 where,
 limit,
+addDoc,
+serverTimestamp,
 } from "firebase/firestore";
 
 
@@ -97,12 +99,35 @@ const [errorImpresion, setErrorImpresion] = useState("");
       collection(db, `pedidos/${pedido.firebaseId}/productos`)
     );
 
-    const lista = snapshot.docs.map((docu) => ({
-      id: docu.id,
-      ...docu.data(),
-    }));
+const lista = snapshot.docs
+  .map((docu) => ({
+    id: docu.id,
+    ...docu.data(),
+  }))
+  .sort((a, b) => {
+    const nombreA = String(
+      a.productoNombre ||
+        a.producto ||
+        ""
+    ).trim();
 
-    setProductos(lista);
+    const nombreB = String(
+      b.productoNombre ||
+        b.producto ||
+        ""
+    ).trim();
+
+    return nombreA.localeCompare(
+      nombreB,
+      "es",
+      {
+        numeric: true,
+        sensitivity: "base",
+      }
+    );
+  });
+
+setProductos(lista);
   };
 
 useEffect(() => {
@@ -195,6 +220,43 @@ useEffect(() => {
     setSoloVer(false);
     setMostrarModal(true);
   };
+
+  const manejarDuplicarProducto = async (producto) => {
+  if (!puedeEditarPedidos) return;
+  if (!pedido?.firebaseId) return;
+  if (!producto?.id) return;
+
+  try {
+    const {
+      id,
+      createdAt,
+      updatedAt,
+      ...datosProducto
+    } = producto;
+
+    await addDoc(
+      collection(
+        db,
+        `pedidos/${pedido.firebaseId}/productos`
+      ),
+      {
+        ...datosProducto,
+
+        duplicadoDeProductoId: id,
+
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      }
+    );
+
+    await cargarProductos();
+  } catch (error) {
+    console.error(
+      "Error duplicando producto:",
+      error
+    );
+  }
+};
 
   // 🗑️ Eliminar producto
   const manejarEliminarProducto = async (id) => {
@@ -520,8 +582,21 @@ case "tallesResumen": {
         return (
           <ActionMenu
             onVer={() => manejarVerProducto(producto)}
-            onEditar={puedeEditarPedidos ? () => manejarEditarProducto(producto) : undefined}
-            onEliminar={puedeEditarPedidos ? () => manejarEliminarProducto(producto.id) : undefined}
+            onEditar={
+              puedeEditarPedidos
+                ? () => manejarEditarProducto(producto)
+                : undefined
+            }
+            onDuplicar={
+              puedeEditarPedidos
+                ? () => manejarDuplicarProducto(producto)
+                : undefined
+            }
+            onEliminar={
+              puedeEditarPedidos
+                ? () => manejarEliminarProducto(producto.id)
+                : undefined
+            }
           />
         );
 

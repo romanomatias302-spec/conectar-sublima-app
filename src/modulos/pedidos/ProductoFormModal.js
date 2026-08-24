@@ -268,7 +268,7 @@ const modoSoloLecturaReal = !modoEdicionLocal && soloVer;
         productoNombre: productoEditando.productoNombre || "",
         color: productoEditando.color || "",
         detalle: productoEditando.detalle || "",
-        cantidad: productoEditando.cantidad || 1,
+        cantidad: productoEditando.cantidad ?? 1,
         zonas: productoEditando.zonas || {},
         talles: productoEditando.talles || {},
         detallePorTalle: productoEditando.detallePorTalle || {},

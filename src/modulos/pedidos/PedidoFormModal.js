@@ -7,17 +7,12 @@ import {
   doc,
   query,
   where,
-  runTransaction,
   serverTimestamp,
 } from "firebase/firestore";
 import { db } from "../../firebase";
 import "./PedidoFormModal.css";
-import {
-  asegurarColumnasBaseProduccion,
-  obtenerColumnaInicialProduccion,
-} from "../../firebase/produccionColumnas";
 import { puedeHacer } from "../../utils/permisos";
-import { registrarUsoSaas } from "../../firebase/saasUso";
+import { crearPedidoBase } from "../../firebase/pedidos";
 
 export default function PedidoFormModal({ onClose, onPedidoCreado, pedido, perfil }) {
   const [clientes, setClientes] = useState([]);
@@ -125,34 +120,7 @@ useEffect(() => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const obtenerSiguienteNumeroPedido = async () => {
-    if (!perfil?.clienteId) {
-      throw new Error("No se encontró clienteId para generar el número de pedido.");
-    }
 
-    const clienteSaasRef = doc(db, "clientes-saas", perfil.clienteId);
-
-    const nuevoNumero = await runTransaction(db, async (transaction) => {
-      const clienteSnap = await transaction.get(clienteSaasRef);
-
-      if (!clienteSnap.exists()) {
-        throw new Error("No existe el cliente SaaS asociado.");
-      }
-
-      const data = clienteSnap.data();
-      const ultimoNumeroPedido = Number(data.ultimoNumeroPedido || 0);
-      const siguienteNumero = ultimoNumeroPedido + 1;
-
-      transaction.update(clienteSaasRef, {
-        ultimoNumeroPedido: siguienteNumero,
-        updatedAt: serverTimestamp(),
-      });
-
-      return siguienteNumero;
-    });
-
-    return nuevoNumero.toString();
-  };
 
   const crearClienteDesdePedido = async () => {
   const nombreLimpio = nuevoCliente.nombre.trim();
@@ -300,66 +268,14 @@ const guardarPedido = async () => {
       }
 
       
-      // 🔹 CREAR nuevo pedido
-      const nuevoID =
-        perfil?.rol === "superadmin"
-          ? Date.now().toString()
-          : await obtenerSiguienteNumeroPedido();
-
-      await asegurarColumnasBaseProduccion(perfil?.clienteId || "");
-      const columnaInicial = await obtenerColumnaInicialProduccion(perfil?.clienteId || "");
-
-      if (!columnaInicial) {
-        throw new Error("No se encontró la columna inicial de producción.");
-      }
-
-      const nuevoPedidoData = {
-        id: nuevoID,
-        cliente: formData.cliente,
-        clienteBusqueda: (formData.cliente || "").trim().toLowerCase(),
+    // 🔹 CREAR nuevo pedido
+    const pedidoCreado =
+      await crearPedidoBase({
+        perfil,
+        clienteNombre: formData.cliente,
         clienteDNI: formData.clienteDNI,
         fechaPedido: formData.fechaPedido,
         fechaEntrega: formData.fechaEntrega,
-        estado: formData.estado,
-        clienteId: perfil?.clienteId || "",
-        sucursalId: perfil?.sucursalDefaultId || "principal",
-        sucursalNombre: perfil?.sucursalDefaultNombre || "Sucursal principal",
-
-        creadoPorUid: perfil?.uid || perfil?.firebaseUid || "",
-        creadoPorNombre: perfil?.nombre || perfil?.displayName || perfil?.email || "",
-        creadoPorEmail: perfil?.email || "",
-        usuarioNombre: perfil?.nombre || perfil?.displayName || perfil?.email || "",
-
-        // ✅ campos resumen para escalabilidad futura
-        cantidadItems: 0,
-        totalUnidades: 0,
-        montoTotal: 0,
-        estadoPago: "Pendiente",
-
-        // ✅ producción
-        columnaProduccionId: columnaInicial.id,
-        progresoProduccion: 0,
-        estadoProduccion: "pendiente",
-        produccionFinalizada: false,
-        produccionActualizadoAt: serverTimestamp(),
-        ultimaAccionProduccionPor: null,
-        ultimaAccionProduccionPorNombre: null,
-        ultimaAccionProduccionAt: null,
-
-        // ✅ timestamps para orden y paginación
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      };
-
-      const docRef = await addDoc(pedidosRef, nuevoPedidoData);
-
-      console.log("USO SAAS pedido", {
-        clienteId: perfil?.clienteId,
-      });
-
-      await registrarUsoSaas({
-        clienteId: perfil?.clienteId,
-        pedidos: 1,
       });
 
       // ✅ Mostrar mensaje de éxito antes de redirigir
@@ -367,12 +283,9 @@ const guardarPedido = async () => {
       setExito(true);
 
       setTimeout(() => {
-        if (onPedidoCreado) {
-          onPedidoCreado({
-            firebaseId: docRef.id,
-            ...nuevoPedidoData,
-          });
-        }
+      if (onPedidoCreado) {
+        onPedidoCreado(pedidoCreado);
+      }
         onClose();
       }, 1500);
     } catch (err) {
