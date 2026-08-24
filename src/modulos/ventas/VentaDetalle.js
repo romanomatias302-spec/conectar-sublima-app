@@ -1640,7 +1640,7 @@ const crearPedidoDesdeVenta = async () => {
               <h3>Crear pedido</h3>
 
               <p>
-                Nuevo pedido para{" "}
+                Para{" "}
                 <strong>
                   {venta.clienteNombre ||
                     "el cliente seleccionado"}
