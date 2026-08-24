@@ -1640,7 +1640,7 @@ const crearPedidoDesdeVenta = async () => {
               <h3>Crear pedido</h3>
 
               <p>
-                Se creará un nuevo pedido para{" "}
+                Nuevo pedido para{" "}
                 <strong>
                   {venta.clienteNombre ||
                     "el cliente seleccionado"}
@@ -1664,9 +1664,7 @@ const crearPedidoDesdeVenta = async () => {
                 disabled={creandoPedidoDesdeVenta}
               />
 
-              <small className="ventas-crear-pedido-ayuda">
-                Opcional. Podés definirla después.
-              </small>
+
             </div>
 
             <div className="ventas-crear-pedido-info">
