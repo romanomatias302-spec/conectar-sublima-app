@@ -3374,6 +3374,30 @@ transition:none !important;
   z-index: 90000 !important;
 }
 
+/*
+ * Cuando el menú de una columna está abierto,
+ * toda esa columna queda por encima de las cards.
+ */
+.produccion-column:has(.produccion-columna-menu) {
+  position: relative;
+  z-index: 300000 !important;
+}
+
+.produccion-column:has(.produccion-columna-menu)
+  .produccion-column-header {
+  z-index: 300001 !important;
+}
+
+.produccion-column:has(.produccion-columna-menu)
+  .produccion-columna-menu-wrap {
+  z-index: 300002 !important;
+}
+
+.produccion-column:has(.produccion-columna-menu)
+  .produccion-columna-menu {
+  z-index: 300003 !important;
+}
+
 .produccion-column:has(.produccion-columna-menu) .produccion-card-cover img:hover {
   transform: none !important;
   box-shadow: none !important;
@@ -7897,25 +7921,49 @@ body.dark-mode
   position: relative;
 }
 
-
 /*
- * La card que tiene abierto el ActionMenu
- * debe quedar por encima de sus hermanas.
+ * Sólo la card que realmente tiene abierto
+ * su ActionMenu sube de capa.
  */
 .produccion-card:has(
-  .produccion-card-action-menu
+  .produccion-card-menu-trigger.active
 ) {
   position: relative;
+  z-index: 150000 !important;
 }
 
-
 /*
- * Menú de acciones.
+ * Contenedor del ActionMenu de la card.
+ */
+/*
+ * Por defecto, el ActionMenu de cada card
+ * permanece en su capa normal.
  */
 .produccion-card-action-menu {
   position: relative;
-  z-index: 10000;
+  z-index: 5;
 }
+
+/*
+ * Sólo el contenedor perteneciente a la card
+ * cuyo menú está abierto sube de capa.
+ */
+.produccion-card:has(
+  .produccion-card-menu-trigger.active
+) .produccion-card-action-menu {
+  z-index: 150001 !important;
+}
+
+/*
+ * Dropdown de la card abierta.
+ */
+.produccion-card:has(
+  .produccion-card-menu-trigger.active
+) .action-menu-dropdown.fixed {
+  z-index: 150002 !important;
+}
+
+
 
 
 /*
