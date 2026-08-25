@@ -610,7 +610,7 @@ export function escucharPedidosProduccionFinalizadosRecientes(clienteId, callbac
               )
             );
           })
-        .slice(0, 10);
+        
 
       callback(pedidos);
     },
