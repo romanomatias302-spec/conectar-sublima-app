@@ -779,6 +779,29 @@ exports.crearPreferenciaMercadoPago = onRequest(
 
       const cliente = clienteSnap.data();
 
+      const paisCliente = String(
+        cliente.pais || ""
+      )
+        .trim()
+        .toLowerCase();
+
+      const monedaCliente = String(
+        cliente.moneda || ""
+      )
+        .trim()
+        .toUpperCase();
+
+      if (
+        paisCliente !== "argentina" ||
+        monedaCliente !== "ARS"
+      ) {
+        res.status(409).json({
+          error:
+            "Mercado Pago está habilitado únicamente para cuentas de Argentina configuradas en ARS.",
+        });
+        return;
+      }
+
       const movimientosSnap = await db
         .collection("saas_pagos")
         .where("clienteSaasId", "==", clienteSaasId)

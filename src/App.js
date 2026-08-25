@@ -294,10 +294,12 @@ useEffect(() => {
                 : "";
 
             if (["suspendido", "bloqueado", "inactivo"].includes(estadoCliente)) {
-              setClienteBloqueado({
-                id: dataPerfil.clienteId,
-                nombre: clienteSaasData.nombre || "",
-              });
+           setClienteBloqueado({
+              id: dataPerfil.clienteId,
+              nombre: clienteSaasData.nombre || "",
+              pais: clienteSaasData.pais || "",
+              moneda: clienteSaasData.moneda || "",
+            });
 
               setPerfil(null);
               setMensajeBloqueo("Tu cuenta se encuentra suspendida.");
@@ -552,6 +554,28 @@ irAVista("venta-detalle", {
       try {
         if (!clienteBloqueado?.id) return;
 
+        const pais = String(
+          clienteBloqueado?.pais || ""
+        )
+          .trim()
+          .toLowerCase();
+
+        const moneda = String(
+          clienteBloqueado?.moneda || ""
+        )
+          .trim()
+          .toUpperCase();
+
+        if (
+          pais !== "argentina" ||
+          moneda !== "ARS"
+        ) {
+          alert(
+            "El pago online con Mercado Pago está disponible actualmente para cuentas de Argentina en ARS. Contactá al administrador para regularizar tu suscripción."
+          );
+          return;
+        }
+
         setPagandoCuentaBloqueada(true);
 
         const pagosRef = collection(db, "saas_pagos");
@@ -631,6 +655,22 @@ irAVista("venta-detalle", {
       }
     };
 
+    const paisCuentaBloqueada = String(
+      clienteBloqueado?.pais || ""
+    )
+      .trim()
+      .toLowerCase();
+
+    const monedaCuentaBloqueada = String(
+      clienteBloqueado?.moneda || ""
+    )
+      .trim()
+      .toUpperCase();
+
+    const puedePagarCuentaBloqueadaConMercadoPago =
+      paisCuentaBloqueada === "argentina" &&
+      monedaCuentaBloqueada === "ARS";
+
     if (esRutaActivacion) {
       return <ActivarCuenta />;
     }
@@ -666,41 +706,50 @@ if (!perfil && errorConexionPerfil) {
   );
 }
 
-      if (mensajeBloqueo) {
-        return (
-          <div className="saas-bloqueo-page">
-            <div className="saas-bloqueo-card">
-              <h2>Cuenta suspendida</h2>
+if (mensajeBloqueo) {
+  return (
+    <div className="saas-bloqueo-page">
+      <div className="saas-bloqueo-card">
+        <h2>Cuenta suspendida</h2>
 
-              <p>
-                Tu cuenta se encuentra suspendida. Podés regularizar el acceso desde
-                el botón de pago.
-              </p>
+        {puedePagarCuentaBloqueadaConMercadoPago ? (
+          <>
+            <p>
+              Tu cuenta se encuentra suspendida. Podés regularizar el acceso
+              realizando el pago pendiente.
+            </p>
 
-              {clienteBloqueado?.id && (
-                <button
-                  type="button"
-                  className="saas-bloqueo-pagar"
-                  onClick={iniciarPagoCuentaBloqueada}
-                  disabled={pagandoCuentaBloqueada}
-                >
-                  {pagandoCuentaBloqueada
-                    ? "Abriendo pago..."
-                    : "Pagar y reactivar"}
-                </button>
-              )}
-
+            {clienteBloqueado?.id && (
               <button
                 type="button"
-                className="saas-bloqueo-salir"
-                onClick={() => signOut(auth)}
+                className="saas-bloqueo-pagar"
+                onClick={iniciarPagoCuentaBloqueada}
+                disabled={pagandoCuentaBloqueada}
               >
-                Cerrar sesión
+                {pagandoCuentaBloqueada
+                  ? "Abriendo pago..."
+                  : "Pagar y reactivar"}
               </button>
-            </div>
-          </div>
-        );
-      }
+            )}
+          </>
+        ) : (
+          <p>
+            Tu cuenta se encuentra suspendida. Para regularizar tu suscripción,
+            contactá al administrador.
+          </p>
+        )}
+
+        <button
+          type="button"
+          className="saas-bloqueo-salir"
+          onClick={() => signOut(auth)}
+        >
+          Cerrar sesión
+        </button>
+      </div>
+    </div>
+  );
+}
 
       if (!perfil) {
         return (
