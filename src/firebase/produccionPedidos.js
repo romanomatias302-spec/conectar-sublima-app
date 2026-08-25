@@ -105,8 +105,7 @@ export function escucharPedidosProduccionActivos(clienteId, callback) {
               b.firebaseId || b.id || ""
             )
           );
-        })
-        .slice(0, 100);
+        });
 
       callback(pedidos);
     },
@@ -172,8 +171,7 @@ export async function obtenerPedidosProduccionActivos(clienteId) {
       b.firebaseId || b.id || ""
     )
   );
-})
-.slice(0, 100);
+});
 
   return {
     pedidos,
