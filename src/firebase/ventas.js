@@ -553,6 +553,133 @@ export async function obtenerVentasPaginadas({ perfil, ultimoDoc = null, pageSiz
   };
 }
 
+export async function buscarVentasGlobales({
+  perfil,
+  textoBusqueda,
+}) {
+  const textoOriginal = String(textoBusqueda || "").trim();
+
+  if (!textoOriginal) {
+    return [];
+  }
+
+  if (!perfil?.clienteId && perfil?.rol !== "superadmin") {
+    return [];
+  }
+
+  const ventasRef = collection(db, "ventas");
+
+  const consultas = [];
+
+  const crearQueryTenant = (...constraints) => {
+    if (perfil?.rol === "superadmin") {
+      return query(
+        ventasRef,
+        ...constraints
+      );
+    }
+
+    return query(
+      ventasRef,
+      where("clienteId", "==", perfil.clienteId),
+      ...constraints
+    );
+  };
+
+  /*
+   * N° de venta.
+   *
+   * numeroVenta actualmente se guarda como string.
+   */
+  consultas.push(
+    getDocs(
+      crearQueryTenant(
+        where("numeroVenta", "==", textoOriginal),
+        limit(50)
+      )
+    )
+  );
+
+  /*
+   * Documento / DNI.
+   */
+  consultas.push(
+    getDocs(
+      crearQueryTenant(
+        where("clienteDNI", "==", textoOriginal),
+        limit(50)
+      )
+    )
+  );
+
+  /*
+   * Pedido asociado.
+   */
+  consultas.push(
+    getDocs(
+      crearQueryTenant(
+        where("pedidoVisibleId", "==", textoOriginal),
+        limit(50)
+      )
+    )
+  );
+
+  /*
+   * Cliente.
+   *
+   * Firestore no soporta "contains" ni búsqueda
+   * case-insensitive de forma nativa.
+   *
+   * Con la estructura actual podemos hacer búsqueda
+   * por comienzo del nombre.
+   */
+  consultas.push(
+    getDocs(
+      crearQueryTenant(
+        orderBy("clienteNombre"),
+        where("clienteNombre", ">=", textoOriginal),
+        where(
+          "clienteNombre",
+          "<=",
+          textoOriginal + "\uf8ff"
+        ),
+        limit(50)
+      )
+    )
+  );
+
+  const resultados = await Promise.allSettled(consultas);
+
+  const mapa = new Map();
+
+  resultados.forEach((resultado) => {
+    if (resultado.status !== "fulfilled") {
+      console.warn(
+        "Una consulta de búsqueda de ventas no pudo ejecutarse:",
+        resultado.reason
+      );
+      return;
+    }
+
+    resultado.value.docs.forEach((docu) => {
+      mapa.set(docu.id, {
+        firebaseId: docu.id,
+        ...docu.data(),
+      });
+    });
+  });
+
+  return Array.from(mapa.values()).sort((a, b) => {
+    const fechaA =
+      a.createdAt?.toMillis?.() || 0;
+
+    const fechaB =
+      b.createdAt?.toMillis?.() || 0;
+
+    return fechaB - fechaA;
+  });
+}
+
 export async function obtenerPagosDeVenta(ventaId) {
   const pagosRef = collection(db, "ventas", ventaId, "pagos");
   const q = query(pagosRef, orderBy("createdAt", "desc"));
