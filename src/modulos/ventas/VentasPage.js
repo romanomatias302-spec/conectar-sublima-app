@@ -372,10 +372,13 @@ export default function VentasPage({
   cotizacionInicial = null,
   itemsCotizacion = [],
 }) {
-  const [clientes, setClientes] = useState([]);
-  const [pedidos, setPedidos] = useState([]);
-  
-  const [usuarios, setUsuarios] = useState([]);
+const [clientes, setClientes] = useState([]);
+const [pedidos, setPedidos] = useState([]);
+
+const [pedidosBusquedaGlobal, setPedidosBusquedaGlobal] = useState([]);
+const [buscandoPedidos, setBuscandoPedidos] = useState(false);
+
+const [usuarios, setUsuarios] = useState([]);
 const [vendedorUid, setVendedorUid] = useState("");
 
 const [busquedaCliente, setBusquedaCliente] = useState("");
@@ -625,14 +628,197 @@ setCotizacionImportadaId(cotizacionInicial.firebaseId);
     });
   }, [clientes, busquedaCliente]);
 
-  const pedidosFiltrados = useMemo(() => {
-  const texto = (busquedaPedido || "").trim().toLowerCase();
-  if (!texto) return pedidos;
+  async function buscarPedidosGlobalmente(textoOriginal) {
+  const texto = String(textoOriginal || "")
+    .trim()
+    .toLowerCase();
 
-  return pedidos.filter((p) => {
-    const numero = String(p.id || "").toLowerCase();
-    const cliente = String(p.cliente || p.clienteNombre || "").toLowerCase();
-    const fecha = String(p.fechaPedido || p.fechaEntrega || "").toLowerCase();
+  if (!texto || !perfil) {
+    return [];
+  }
+
+  const pedidosRef = collection(db, "pedidos");
+
+  const crearQueryTenant = (...constraints) => {
+    if (perfil.rol === "superadmin") {
+      return query(
+        pedidosRef,
+        ...constraints
+      );
+    }
+
+    return query(
+      pedidosRef,
+      where("clienteId", "==", perfil.clienteId),
+      ...constraints
+    );
+  };
+
+  const consultas = [];
+
+  /*
+   * Permite buscar:
+   * 7
+   * #7
+   */
+  const posibleNumero = texto
+    .replace(/^#/, "")
+    .trim();
+
+  if (/^\d+$/.test(posibleNumero)) {
+    consultas.push(
+      getDocs(
+        crearQueryTenant(
+          where("id", "==", posibleNumero),
+          limit(20)
+        )
+      )
+    );
+  }
+
+  /*
+   * Búsqueda global por nombre de cliente.
+   * Los pedidos se guardan con clienteBusqueda
+   * normalizado en minúsculas.
+   */
+  consultas.push(
+    getDocs(
+      crearQueryTenant(
+        orderBy("clienteBusqueda"),
+        where(
+          "clienteBusqueda",
+          ">=",
+          texto
+        ),
+        where(
+          "clienteBusqueda",
+          "<=",
+          texto + "\uf8ff"
+        ),
+        limit(50)
+      )
+    )
+  );
+
+  const resultados =
+    await Promise.allSettled(consultas);
+
+  const mapa = new Map();
+
+  resultados.forEach((resultado) => {
+    if (resultado.status !== "fulfilled") {
+      console.warn(
+        "Una consulta de búsqueda de pedidos no pudo ejecutarse:",
+        resultado.reason
+      );
+      return;
+    }
+
+    resultado.value.docs.forEach((docu) => {
+      mapa.set(docu.id, {
+        firebaseId: docu.id,
+        ...docu.data(),
+      });
+    });
+  });
+
+  return Array.from(mapa.values()).sort(
+    (a, b) => {
+      const fechaA =
+        a.createdAt?.toMillis?.() || 0;
+
+      const fechaB =
+        b.createdAt?.toMillis?.() || 0;
+
+      return fechaB - fechaA;
+    }
+  );
+}
+
+useEffect(() => {
+  const texto = String(
+    busquedaPedido || ""
+  ).trim();
+
+  /*
+   * Si no hay texto o ya seleccionamos un pedido,
+   * no necesitamos seguir consultando Firestore.
+   */
+  if (!texto || pedidoRefId) {
+    setPedidosBusquedaGlobal([]);
+    setBuscandoPedidos(false);
+    return;
+  }
+
+  let cancelada = false;
+
+  const timer = setTimeout(async () => {
+    try {
+      setBuscandoPedidos(true);
+
+      const resultados =
+        await buscarPedidosGlobalmente(texto);
+
+      if (cancelada) return;
+
+      setPedidosBusquedaGlobal(resultados);
+    } catch (errorBusqueda) {
+      if (cancelada) return;
+
+      console.error(
+        "Error buscando pedidos globalmente:",
+        errorBusqueda
+      );
+
+      setPedidosBusquedaGlobal([]);
+    } finally {
+      if (!cancelada) {
+        setBuscandoPedidos(false);
+      }
+    }
+  }, 350);
+
+  return () => {
+    cancelada = true;
+    clearTimeout(timer);
+  };
+}, [
+  busquedaPedido,
+  pedidoRefId,
+  perfil,
+]);
+
+const pedidosFiltrados = useMemo(() => {
+  const texto = String(
+    busquedaPedido || ""
+  )
+    .trim()
+    .toLowerCase();
+
+  if (!texto) {
+    return pedidos;
+  }
+
+  /*
+   * Primero usamos los últimos 50 ya cargados.
+   * Así la respuesta visual es inmediata.
+   */
+  const locales = pedidos.filter((p) => {
+    const numero = String(
+      p.id || ""
+    ).toLowerCase();
+
+    const cliente = String(
+      p.cliente ||
+      p.clienteNombre ||
+      ""
+    ).toLowerCase();
+
+    const fecha = String(
+      p.fechaPedido ||
+      p.fechaEntrega ||
+      ""
+    ).toLowerCase();
 
     return (
       numero.includes(texto) ||
@@ -640,17 +826,68 @@ setCotizacionImportadaId(cotizacionInicial.firebaseId);
       fecha.includes(texto)
     );
   });
-}, [pedidos, busquedaPedido]);
+
+  /*
+   * Fusionamos los resultados locales
+   * con los encontrados en todo Firestore.
+   */
+  const mapa = new Map();
+
+  [
+    ...locales,
+    ...pedidosBusquedaGlobal,
+  ].forEach((pedido) => {
+    if (!pedido?.firebaseId) return;
+
+    mapa.set(
+      pedido.firebaseId,
+      pedido
+    );
+  });
+
+  return Array.from(mapa.values());
+}, [
+  pedidos,
+  busquedaPedido,
+  pedidosBusquedaGlobal,
+]);
 
   const clienteSeleccionado = useMemo(
     () => clientes.find((c) => c.firebaseId === clienteRefId) || null,
     [clientes, clienteRefId]
   );
 
-  const pedidoSeleccionado = useMemo(
-    () => pedidos.find((p) => p.firebaseId === pedidoRefId) || null,
-    [pedidos, pedidoRefId]
-  );
+  const pedidosDisponibles = useMemo(() => {
+  const mapa = new Map();
+
+  [
+    ...pedidos,
+    ...pedidosBusquedaGlobal,
+  ].forEach((pedido) => {
+    if (!pedido?.firebaseId) return;
+
+    mapa.set(
+      pedido.firebaseId,
+      pedido
+    );
+  });
+
+  return Array.from(mapa.values());
+}, [
+  pedidos,
+  pedidosBusquedaGlobal,
+]);
+
+const pedidoSeleccionado = useMemo(
+  () =>
+    pedidosDisponibles.find(
+      (p) => p.firebaseId === pedidoRefId
+    ) || null,
+  [
+    pedidosDisponibles,
+    pedidoRefId,
+  ]
+);
 
   const vendedorSeleccionado = useMemo(
   () => usuarios.find((u) => u.uid === vendedorUid) || null,
@@ -1387,6 +1624,18 @@ const aplicarProductoSeleccionado = (datosPrecio) => {
                       >
                         Sin pedido asociado
                       </button>
+
+                      {buscandoPedidos && (
+                        <div
+                          style={{
+                            padding: "8px 12px",
+                            fontSize: "13px",
+                            opacity: 0.7,
+                          }}
+                        >
+                          Buscando pedidos...
+                        </div>
+                      )}
 
                       {pedidosFiltrados.slice(0, 8).map((p) => (
                         <button

@@ -1,18 +1,11 @@
 
 import React, { useEffect, useState } from "react";
-import {
-  collection,
-  query,
-  orderBy,
-  limit,
-  getDocs,
-  where,
-  startAfter,
-} from "firebase/firestore";
+
 import { db } from "../../firebase";
 import {
   obtenerVentasPaginadas,
   escucharVentasRecientes,
+  buscarVentasGlobales,
 } from "../../firebase/ventas";
 import "./VentasPage.css";
 import { formatearMoneda, obtenerConfigMonedaDesdePerfil } from "../../utils/moneda";
@@ -86,63 +79,7 @@ export default function VentasList({ perfil, onVer = () => {}, onEditar = () => 
     }
   }
 
-  async function buscarVentasEnFirestore(textoOriginal) {
-    try {
-      const texto = normalizarTexto(textoOriginal);
-      if (!texto) {
-        setVentasFiltradas(ventas);
-        return;
-      }
 
-      const ventasRef = collection(db, "ventas");
-      let q;
-
-      if (/^\d+$/.test(texto)) {
-        q =
-          perfil?.rol === "superadmin"
-            ? query(
-                ventasRef,
-                where("numeroVenta", "==", texto),
-                limit(20)
-              )
-            : query(
-                ventasRef,
-                where("clienteId", "==", perfil?.clienteId),
-                where("numeroVenta", "==", texto),
-                limit(20)
-              );
-      } else {
-        q =
-          perfil?.rol === "superadmin"
-            ? query(
-                ventasRef,
-                orderBy("clienteNombre"),
-                where("clienteNombre", ">=", textoOriginal),
-                where("clienteNombre", "<=", textoOriginal + "\uf8ff"),
-                limit(50)
-              )
-            : query(
-                ventasRef,
-                where("clienteId", "==", perfil?.clienteId),
-                orderBy("clienteNombre"),
-                where("clienteNombre", ">=", textoOriginal),
-                where("clienteNombre", "<=", textoOriginal + "\uf8ff"),
-                limit(50)
-              );
-      }
-
-      const snap = await getDocs(q);
-
-      const lista = snap.docs.map((docu) => ({
-        firebaseId: docu.id,
-        ...docu.data(),
-      }));
-
-      setVentasFiltradas(lista);
-    } catch (e) {
-      console.error("Error buscando ventas:", e);
-    }
-  }
 
 
 
@@ -170,39 +107,94 @@ useEffect(() => {
   return () => unsubscribe();
 }, [perfil]);
 
-  useEffect(() => {
-    const texto = normalizarTexto(busqueda);
+useEffect(() => {
+  const texto = normalizarTexto(busqueda);
 
-    if (!texto) {
-      setVentasFiltradas(ventas);
-      return;
-    }
+  if (!texto) {
+    setVentasFiltradas(ventas);
+    return;
+  }
 
-    const local = ventas.filter((v) => {
-      const numero = (v.numeroVenta || "").toString().toLowerCase();
-      const cliente = (v.clienteNombre || "").toLowerCase();
-      const dni = (v.clienteDNI || "").toString().toLowerCase();
-      const pedido = (v.pedidoVisibleId || "").toString().toLowerCase();
+  /*
+   * Mostramos inmediatamente las coincidencias
+   * que ya tenemos cargadas.
+   *
+   * Esto hace que el buscador se sienta rápido,
+   * pero NO termina acá.
+   */
+  const locales = ventas.filter((v) => {
+    const numero = normalizarTexto(v.numeroVenta);
+    const cliente = normalizarTexto(v.clienteNombre);
+    const dni = normalizarTexto(v.clienteDNI);
+    const pedido = normalizarTexto(v.pedidoVisibleId);
 
-      return (
-        numero.includes(texto) ||
-        cliente.includes(texto) ||
-        dni.includes(texto) ||
-        pedido.includes(texto)
+    return (
+      numero.includes(texto) ||
+      cliente.includes(texto) ||
+      dni.includes(texto) ||
+      pedido.includes(texto)
+    );
+  });
+
+  setVentasFiltradas(locales);
+
+  let cancelada = false;
+
+  const timer = setTimeout(async () => {
+    try {
+      const remotas = await buscarVentasGlobales({
+        perfil,
+        textoBusqueda: busqueda,
+      });
+
+      if (cancelada) return;
+
+      /*
+       * Fusionamos resultados locales + Firestore.
+       * firebaseId impide ventas duplicadas.
+       */
+      const mapa = new Map();
+
+      [...locales, ...remotas].forEach((venta) => {
+        if (venta?.firebaseId) {
+          mapa.set(venta.firebaseId, venta);
+        }
+      });
+
+      const combinadas = Array.from(
+        mapa.values()
+      ).sort((a, b) => {
+        const fechaA =
+          a.createdAt?.toMillis?.() || 0;
+
+        const fechaB =
+          b.createdAt?.toMillis?.() || 0;
+
+        return fechaB - fechaA;
+      });
+
+      setVentasFiltradas(combinadas);
+    } catch (error) {
+      if (cancelada) return;
+
+      console.error(
+        "Error buscando ventas globalmente:",
+        error
       );
-    });
 
-    if (local.length > 0) {
-      setVentasFiltradas(local);
-      return;
+      /*
+       * Ante un error conservamos resultados locales.
+       * Nunca dejamos inutilizable el listado.
+       */
+      setVentasFiltradas(locales);
     }
+  }, 350);
 
-    const timer = setTimeout(() => {
-      buscarVentasEnFirestore(busqueda);
-    }, 350);
-
-    return () => clearTimeout(timer);
-  }, [busqueda, ventas]);
+  return () => {
+    cancelada = true;
+    clearTimeout(timer);
+  };
+}, [busqueda, ventas, perfil]);
 
   return (
     <div className="ventas-page">
