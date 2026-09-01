@@ -283,3 +283,34 @@ body.pedido-modal-abierto .produccion-columna-btn {
   z-index: 99991 !important;
 }
 
+/* =========================================================
+   CREAR CLIENTE DESDE PEDIDO
+   Ajuste para pantallas con poca altura
+   ========================================================= */
+
+.cliente-mini-overlay {
+  overflow-y: auto;
+  align-items: flex-start;
+  padding-top: 24px;
+  padding-bottom: 24px;
+  box-sizing: border-box;
+}
+
+.cliente-mini-modal {
+  max-height: calc(100dvh - 48px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  box-sizing: border-box;
+}
+
+@media (max-height: 720px) {
+  .cliente-mini-overlay {
+    padding-top: 12px;
+    padding-bottom: 12px;
+  }
+
+  .cliente-mini-modal {
+    max-height: calc(100dvh - 24px);
+  }
+}
+
