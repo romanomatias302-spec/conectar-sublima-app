@@ -1,0 +1,17 @@
+node_modules/
+runs/
+logs/
+credentials/
+credenciales/
+keys/
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+*.json
+!package.json
+!package-lock.json
+*.jsonl
+*.log

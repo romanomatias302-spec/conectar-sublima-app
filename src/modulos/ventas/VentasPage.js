@@ -388,6 +388,7 @@ const [clienteRefId, setClienteRefId] = useState("");
 const [busquedaPedido, setBusquedaPedido] = useState("");
 const [mostrarDropdownPedido, setMostrarDropdownPedido] = useState(false);
 const [pedidoRefId, setPedidoRefId] = useState("");
+const [pedidoConservado, setPedidoConservado] = useState(null);
 
   const [fechaVenta, setFechaVenta] = useState(() => fechaHoyNegocio(perfil));
   const [items, setItems] = useState([itemVacio()]);
@@ -633,7 +634,7 @@ setCotizacionImportadaId(cotizacionInicial.firebaseId);
     .trim()
     .toLowerCase();
 
-  if (!texto || !perfil) {
+  if (!texto || !perfil || (!perfil.clienteId && perfil.rol !== "superadmin")) {
     return [];
   }
 
@@ -666,10 +667,15 @@ setCotizacionImportadaId(cotizacionInicial.firebaseId);
     .trim();
 
   if (/^\d+$/.test(posibleNumero)) {
+    const numeroSeguro = /^(0|[1-9]\d*)$/.test(posibleNumero) &&
+      Number.isSafeInteger(Number(posibleNumero)) &&
+      String(Number(posibleNumero)) === posibleNumero;
     consultas.push(
       getDocs(
         crearQueryTenant(
-          where("id", "==", posibleNumero),
+          numeroSeguro
+            ? where("id", "in", [posibleNumero, Number(posibleNumero)])
+            : where("id", "==", posibleNumero),
           limit(20)
         )
       )
@@ -751,6 +757,8 @@ useEffect(() => {
   }
 
   let cancelada = false;
+  setPedidosBusquedaGlobal([]);
+  setBuscandoPedidos(true);
 
   const timer = setTimeout(async () => {
     try {
@@ -845,7 +853,13 @@ const pedidosFiltrados = useMemo(() => {
     );
   });
 
-  return Array.from(mapa.values());
+  const numeroBuscado = texto.replace(/^#/, "").trim();
+  const esBusquedaNumerica = /^\d+$/.test(numeroBuscado);
+  return Array.from(mapa.values()).sort((a, b) => {
+    const exactoA = esBusquedaNumerica && String(a.id ?? "") === numeroBuscado;
+    const exactoB = esBusquedaNumerica && String(b.id ?? "") === numeroBuscado;
+    return Number(exactoB) - Number(exactoA);
+  });
 }, [
   pedidos,
   busquedaPedido,
@@ -857,12 +871,24 @@ const pedidosFiltrados = useMemo(() => {
     [clientes, clienteRefId]
   );
 
+  // Las coincidencias exactas no comparten el límite visual de sugerencias.
+  const pedidosVisibles = useMemo(() => {
+    const numero = busquedaPedido.trim().replace(/^#/, "").trim();
+    const esExacto = (pedido) => /^\d+$/.test(numero) &&
+      String(pedido.id ?? "") === numero;
+    return [
+      ...pedidosFiltrados.filter(esExacto),
+      ...pedidosFiltrados.filter((pedido) => !esExacto(pedido)).slice(0, 8),
+    ];
+  }, [pedidosFiltrados, busquedaPedido]);
+
   const pedidosDisponibles = useMemo(() => {
   const mapa = new Map();
 
   [
     ...pedidos,
     ...pedidosBusquedaGlobal,
+    pedidoConservado,
   ].forEach((pedido) => {
     if (!pedido?.firebaseId) return;
 
@@ -876,16 +902,20 @@ const pedidosFiltrados = useMemo(() => {
 }, [
   pedidos,
   pedidosBusquedaGlobal,
+  pedidoConservado,
 ]);
 
 const pedidoSeleccionado = useMemo(
   () =>
     pedidosDisponibles.find(
       (p) => p.firebaseId === pedidoRefId
+        && (perfil?.rol === "superadmin" || p.clienteId === perfil?.clienteId)
     ) || null,
   [
     pedidosDisponibles,
     pedidoRefId,
+    perfil?.rol,
+    perfil?.clienteId,
   ]
 );
 
@@ -967,6 +997,7 @@ const total = useMemo(
     setBusquedaCliente("");
     setClienteRefId("");
     setPedidoRefId("");
+    setPedidoConservado(null);
     setMostrarDropdownCliente(false);
     setBusquedaPedido("");
     setMostrarDropdownPedido(false);
@@ -1009,6 +1040,7 @@ const usarPedidoEnVenta = (pedido) => {
   if (!pedido?.firebaseId) return;
 
   setPedidoRefId(pedido.firebaseId);
+  setPedidoConservado(pedido);
   setBusquedaPedido(
     `#${pedido.id || "-"} - ${
       pedido.cliente || pedido.clienteNombre || "Sin cliente"
@@ -1241,6 +1273,7 @@ if (cliente) {
 }
 
   setPedidoRefId(pedidoInicial?.firebaseId || "");
+  setPedidoConservado(pedidoInicial || null);
   setBusquedaPedido(
     pedidoInicial
       ? `#${pedidoInicial.id || "-"} - ${
@@ -1302,6 +1335,11 @@ const aplicarProductoSeleccionado = (datosPrecio) => {
       setGuardando(true);
       setError("");
       setExito("");
+
+      if (pedidoRefId && !pedidoSeleccionado) {
+        setError("No se pudo resolver el pedido asociado. Volvé a seleccionarlo o elegí Sin pedido asociado antes de guardar.");
+        return;
+      }
 
       const cliente = clientes.find((c) => c.firebaseId === clienteRefId);
       if (!cliente) {
@@ -1607,6 +1645,8 @@ const aplicarProductoSeleccionado = (datosPrecio) => {
                     onChange={(e) => {
                       setBusquedaPedido(e.target.value);
                       setPedidoRefId("");
+                      setPedidoConservado(null);
+                      setPedidosBusquedaGlobal([]);
                       setMostrarDropdownPedido(true);
                     }}
                     disabled={!puedeCrearVentas}
@@ -1618,6 +1658,7 @@ const aplicarProductoSeleccionado = (datosPrecio) => {
                         type="button"
                         onClick={() => {
                           setPedidoRefId("");
+                          setPedidoConservado(null);
                           setBusquedaPedido("");
                           setMostrarDropdownPedido(false);
                         }}
@@ -1637,7 +1678,7 @@ const aplicarProductoSeleccionado = (datosPrecio) => {
                         </div>
                       )}
 
-                      {pedidosFiltrados.slice(0, 8).map((p) => (
+                      {pedidosVisibles.map((p) => (
                         <button
                           key={p.firebaseId}
                           type="button"

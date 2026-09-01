@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
 import { db } from "../../firebase";
 import {
@@ -12,7 +12,7 @@ import { formatearMoneda, obtenerConfigMonedaDesdePerfil } from "../../utils/mon
 
 export default function VentasList({ perfil, onVer = () => {}, onEditar = () => {} }) {
   const [ventas, setVentas] = useState([]);
-  const [ventasFiltradas, setVentasFiltradas] = useState([]);
+  const [busquedaRemota, setBusquedaRemota] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadingMas, setLoadingMas] = useState(false);
   const [busqueda, setBusqueda] = useState("");
@@ -44,7 +44,6 @@ export default function VentasList({ perfil, onVer = () => {}, onEditar = () => 
       console.log("PERFIL LISTADO VENTAS:", perfil);
 
       setVentas(res.ventas);
-      setVentasFiltradas(res.ventas);
       setUltimoDoc(res.ultimoDoc);
       setHayMas(res.hayMas);
     } catch (e) {
@@ -69,7 +68,6 @@ export default function VentasList({ perfil, onVer = () => {}, onEditar = () => 
       const acumuladas = [...ventas, ...res.ventas];
 
       setVentas(acumuladas);
-      setVentasFiltradas(acumuladas);
       setUltimoDoc(res.ultimoDoc);
       setHayMas(res.hayMas);
     } catch (e) {
@@ -92,8 +90,9 @@ useEffect(() => {
     perfil,
     pageSize: PAGE_SIZE,
     onData: (res) => {
+      // Pendiente para otra etapa: este listener aún reemplaza páginas cargadas.
+      // No debe escribir resultados de búsqueda ni utilizar su cursor.
       setVentas(res.ventas);
-      setVentasFiltradas(res.ventas);
       setUltimoDoc(res.ultimoDoc);
       setHayMas(res.hayMas);
       setLoading(false);
@@ -107,94 +106,94 @@ useEffect(() => {
   return () => unsubscribe();
 }, [perfil]);
 
-useEffect(() => {
-  const texto = normalizarTexto(busqueda);
+  const ambitoBusqueda = JSON.stringify([perfil?.clienteId, perfil?.rol]);
+  const textoBusqueda = busqueda.trim();
+  const resultadoActual = busquedaRemota?.texto === textoBusqueda &&
+    busquedaRemota?.ambito === ambitoBusqueda ? busquedaRemota : null;
 
-  if (!texto) {
-    setVentasFiltradas(ventas);
-    return;
-  }
-
-  /*
-   * Mostramos inmediatamente las coincidencias
-   * que ya tenemos cargadas.
-   *
-   * Esto hace que el buscador se sienta rápido,
-   * pero NO termina acá.
-   */
-  const locales = ventas.filter((v) => {
-    const numero = normalizarTexto(v.numeroVenta);
-    const cliente = normalizarTexto(v.clienteNombre);
-    const dni = normalizarTexto(v.clienteDNI);
-    const pedido = normalizarTexto(v.pedidoVisibleId);
-
-    return (
-      numero.includes(texto) ||
-      cliente.includes(texto) ||
-      dni.includes(texto) ||
-      pedido.includes(texto)
-    );
-  });
-
-  setVentasFiltradas(locales);
-
-  let cancelada = false;
-
-  const timer = setTimeout(async () => {
-    try {
-      const remotas = await buscarVentasGlobales({
-        perfil,
-        textoBusqueda: busqueda,
-      });
-
-      if (cancelada) return;
-
-      /*
-       * Fusionamos resultados locales + Firestore.
-       * firebaseId impide ventas duplicadas.
-       */
-      const mapa = new Map();
-
-      [...locales, ...remotas].forEach((venta) => {
-        if (venta?.firebaseId) {
-          mapa.set(venta.firebaseId, venta);
-        }
-      });
-
-      const combinadas = Array.from(
-        mapa.values()
-      ).sort((a, b) => {
-        const fechaA =
-          a.createdAt?.toMillis?.() || 0;
-
-        const fechaB =
-          b.createdAt?.toMillis?.() || 0;
-
-        return fechaB - fechaA;
-      });
-
-      setVentasFiltradas(combinadas);
-    } catch (error) {
-      if (cancelada) return;
-
-      console.error(
-        "Error buscando ventas globalmente:",
-        error
-      );
-
-      /*
-       * Ante un error conservamos resultados locales.
-       * Nunca dejamos inutilizable el listado.
-       */
-      setVentasFiltradas(locales);
+  useEffect(() => {
+    const texto = busqueda.trim();
+    if (!texto || (!perfil?.clienteId && perfil?.rol !== "superadmin")) {
+      setBusquedaRemota(null);
+      return;
     }
-  }, 350);
 
-  return () => {
-    cancelada = true;
-    clearTimeout(timer);
-  };
-}, [busqueda, ventas, perfil]);
+    let cancelada = false;
+    const contexto = { texto, ambito: ambitoBusqueda };
+    setBusquedaRemota({ ...contexto, ventas: [], buscando: true, errorTecnico: false });
+
+    const timer = setTimeout(async () => {
+      try {
+        const resultado = await buscarVentasGlobales({
+          perfil,
+          textoBusqueda: texto,
+          incluirDiagnostico: true,
+        });
+        if (cancelada) return;
+
+        if (resultado.limiteAlcanzado) {
+          console.warn(
+            "Una consulta de búsqueda de ventas alcanzó su límite. Los resultados encontrados se conservan."
+          );
+        }
+        if (resultado.consultasFallidas.length) {
+          console.warn(
+            "La búsqueda de ventas terminó con consultas parciales fallidas:",
+            resultado.consultasFallidas
+          );
+        }
+        setBusquedaRemota({
+          ...contexto,
+          ventas: resultado.ventas,
+          buscando: false,
+          errorTecnico: resultado.consultasFallidas.length > 0,
+        });
+      } catch (error) {
+        if (cancelada) return;
+        console.error("Error buscando ventas globalmente:", error);
+        setBusquedaRemota({
+          ...contexto,
+          ventas: [],
+          buscando: false,
+          errorTecnico: true,
+        });
+      }
+    }, 350);
+
+    return () => {
+      cancelada = true;
+      clearTimeout(timer);
+    };
+  }, [busqueda, perfil, ambitoBusqueda]);
+
+  const ventasFiltradas = useMemo(() => {
+    const texto = normalizarTexto(busqueda);
+    if (!texto) return ventas;
+
+    const locales = ventas.filter((v) =>
+      (perfil?.rol === "superadmin" || v.clienteId === perfil?.clienteId) &&
+      [v.numeroVenta, v.clienteNombre, v.clienteDNI, v.pedidoVisibleId]
+        .some((valor) => normalizarTexto(valor).includes(texto))
+    );
+    const mapa = new Map();
+    [...locales, ...(resultadoActual?.ventas || [])].forEach((venta) => {
+      if (venta?.firebaseId) mapa.set(venta.firebaseId, venta);
+    });
+    return Array.from(mapa.values()).sort((a, b) =>
+      (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0)
+    );
+  }, [busqueda, ventas, resultadoActual, perfil?.rol, perfil?.clienteId]);
+
+  const busquedaFinalizada = Boolean(
+    textoBusqueda && resultadoActual && !resultadoActual.buscando
+  );
+  const busquedaSinResultados = busquedaFinalizada && ventasFiltradas.length === 0;
+  const busquedaConErrorVisible = busquedaSinResultados && resultadoActual.errorTecnico;
+  const mensajeListaVacia = textoBusqueda
+    ? busquedaSinResultados && !busquedaConErrorVisible
+      ? `No encontramos ventas que coincidan con «${textoBusqueda}».`
+      : ""
+    : "No se encontraron ventas.";
 
   return (
     <div className="ventas-page">
@@ -216,6 +215,12 @@ useEffect(() => {
           </div>
         </div>
 
+        {textoBusqueda && resultadoActual?.buscando && <p role="status">Buscando ventas...</p>}
+        {busquedaConErrorVisible && (
+          <p className="ventas-alert ventas-alert-error" role="alert">
+            No pudimos completar la búsqueda. Intentá nuevamente.
+          </p>
+        )}
         {loading && <p style={{ marginTop: "16px" }}>Cargando ventas...</p>}
 
 {!loading && (
@@ -330,9 +335,9 @@ useEffect(() => {
         );
       })}
 
-      {ventasFiltradas.length === 0 && (
-        <p className="ventas-mobile-empty">
-          No se encontraron ventas
+      {ventasFiltradas.length === 0 && mensajeListaVacia && (
+        <p className="ventas-mobile-empty" role={textoBusqueda ? "status" : undefined}>
+          {mensajeListaVacia}
         </p>
       )}
     </div>
@@ -400,10 +405,10 @@ useEffect(() => {
                   );
                 })}
 
-                {ventasFiltradas.length === 0 && (
+                {ventasFiltradas.length === 0 && mensajeListaVacia && (
                   <tr>
                     <td colSpan="8" style={{ textAlign: "center", padding: "18px" }}>
-                      No se encontraron ventas.
+                      <span role={textoBusqueda ? "status" : undefined}>{mensajeListaVacia}</span>
                     </td>
                   </tr>
                 )}
@@ -413,7 +418,7 @@ useEffect(() => {
           </>
           )}
 
-        {!loading && !busqueda && hayMas && (
+        {!loading && !textoBusqueda && hayMas && (
           <div style={{ textAlign: "center", marginTop: "18px" }}>
             <button
               className="btn btn-secondary"
