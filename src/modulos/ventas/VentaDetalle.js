@@ -41,6 +41,8 @@ export default function VentaDetalle({ perfil, ventaId, onVolver, onVerPedido })
   const [items, setItems] = useState([]);
   const [pagos, setPagos] = useState([]);
   const [pedidos, setPedidos] = useState([]);
+  const [pedidosCargados, setPedidosCargados] = useState(false);
+  const [pedidoHistorico, setPedidoHistorico] = useState(null);
   const [configNegocio, setConfigNegocio] = useState({
   nombreVisible: "",
   logoUrl: "",
@@ -154,6 +156,7 @@ const puedeAnularVentas =
   };
 
   const cargarPedidos = async () => {
+    setPedidosCargados(false);
     try {
       if (!perfil) return;
 
@@ -179,6 +182,8 @@ const puedeAnularVentas =
       );
     } catch (err) {
       console.error(err);
+    } finally {
+      setPedidosCargados(true);
     }
   };
 
@@ -209,10 +214,60 @@ const puedeAnularVentas =
     cargarConfigNegocio();
   }, [ventaId, perfil]);
 
-  const pedidoSeleccionado = useMemo(
-    () => pedidos.find((p) => p.firebaseId === pedidoRefId) || null,
-    [pedidos, pedidoRefId]
-  );
+  const ambitoPedido = JSON.stringify([perfil?.clienteId, perfil?.rol]);
+  const pedidoReciente = pedidos.find((p) => p.firebaseId === venta?.pedidoRefId);
+
+  useEffect(() => {
+    setPedidoHistorico(null);
+    const refId = venta?.pedidoRefId;
+    if (!refId || venta?.firebaseId !== ventaId || !pedidosCargados || pedidoReciente) return;
+    if (!perfil?.clienteId && perfil?.rol !== "superadmin") return;
+    if (perfil?.rol !== "superadmin" && venta.clienteId !== perfil.clienteId) return;
+
+    let cancelada = false;
+    const resolverPedido = async () => {
+      try {
+        const snap = await getDoc(doc(db, "pedidos", refId));
+        if (cancelada) return;
+        if (!snap.exists()) {
+          console.warn("El pedido asociado no existe:", { ventaId, pedidoRefId: refId });
+          return;
+        }
+        const pedido = { ...snap.data(), firebaseId: snap.id };
+        if (perfil?.rol !== "superadmin" && pedido.clienteId !== perfil.clienteId) {
+          console.warn("El pedido asociado no pertenece al tenant actual:", { ventaId, pedidoRefId: refId });
+          return;
+        }
+        setPedidoHistorico({ ventaId, ambito: ambitoPedido, pedido });
+      } catch (errorPedido) {
+        if (!cancelada) {
+          console.warn("No se pudo resolver el pedido asociado:", { ventaId, pedidoRefId: refId }, errorPedido);
+        }
+      }
+    };
+    resolverPedido();
+    return () => { cancelada = true; };
+  }, [ventaId, venta?.firebaseId, venta?.pedidoRefId, venta?.clienteId,
+    pedidosCargados, pedidoReciente, perfil?.clienteId, perfil?.rol, ambitoPedido]);
+
+  const pedidoSeleccionado = useMemo(() => {
+    const reciente = pedidos.find((p) => p.firebaseId === pedidoRefId);
+    const historico = pedidoHistorico?.ventaId === ventaId &&
+      pedidoHistorico?.ambito === ambitoPedido &&
+      pedidoHistorico?.pedido.firebaseId === pedidoRefId
+      ? pedidoHistorico.pedido : null;
+    const pedido = reciente || historico;
+    return pedido && (perfil?.rol === "superadmin" || pedido.clienteId === perfil?.clienteId)
+      ? pedido : null;
+  }, [pedidos, pedidoRefId, pedidoHistorico, ventaId, ambitoPedido, perfil?.rol, perfil?.clienteId]);
+
+  // La referencia persistida sigue visible aunque el documento esté cargando,
+  // haya sido eliminado o no pueda leerse. Nunca se borra la asociación aquí.
+  const textoPedidoPersistido = pedidoSeleccionado
+    ? `#${pedidoSeleccionado.id || venta?.pedidoVisibleId || "-"} - ${
+        pedidoSeleccionado.cliente || pedidoSeleccionado.clienteNombre || "Sin cliente"
+      } - ${pedidoSeleccionado.fechaPedido || pedidoSeleccionado.fechaEntrega || "-"}`
+    : venta?.pedidoVisibleId ? `#${venta.pedidoVisibleId}` : "Pedido asociado";
 
     const pedidosFiltrados = useMemo(() => {
       const texto = (busquedaPedido || "").trim().toLowerCase();
@@ -988,7 +1043,7 @@ const crearPedidoDesdeVenta = async () => {
               <div className="ventas-top-editable-pedido-row">
               <div className="ventas-pedido-buscador ventas-pedido-buscador-detalle">
                 <input
-                  value={busquedaPedido}
+                  value={venta.pedidoRefId ? textoPedidoPersistido : busquedaPedido}
                   placeholder="Buscar pedido por número, cliente o fecha..."
                   disabled={ventaAnulada || !puedeEditarVentas || !!venta?.pedidoRefId}
                   onFocus={() => {

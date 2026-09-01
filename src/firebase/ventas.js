@@ -228,6 +228,7 @@ const sucursalNombre = perfil?.sucursalDefaultNombre || "Sucursal principal";
     fechaVenta,
     clienteRefId: cliente.firebaseId,
     clienteNombre: cliente.nombre || "",
+    clienteNombreBusqueda: String(cliente.nombre || "").trim().toLowerCase(),
     clienteDNI: cliente.dni || "",
     vendedorUid: vendedor?.uid || "",
     vendedorNombre: vendedor?.nombre || "",
@@ -556,20 +557,31 @@ export async function obtenerVentasPaginadas({ perfil, ultimoDoc = null, pageSiz
 export async function buscarVentasGlobales({
   perfil,
   textoBusqueda,
+  incluirDiagnostico = false,
 }) {
   const textoOriginal = String(textoBusqueda || "").trim();
+  const vacio = { ventas: [], consultasFallidas: [], limiteAlcanzado: false };
 
   if (!textoOriginal) {
-    return [];
+    return incluirDiagnostico ? vacio : [];
   }
 
   if (!perfil?.clienteId && perfil?.rol !== "superadmin") {
-    return [];
+    return incluirDiagnostico ? vacio : [];
   }
 
   const ventasRef = collection(db, "ventas");
 
   const consultas = [];
+  const agregarConsulta = (campo, ...constraints) => {
+    // También aislamos errores síncronos de construcción de cada consulta.
+    consultas.push({
+      campo,
+      promesa: Promise.resolve().then(() =>
+        getDocs(crearQueryTenant(...constraints, limit(50)))
+      ),
+    });
+  };
 
   const crearQueryTenant = (...constraints) => {
     if (perfil?.rol === "superadmin") {
@@ -591,38 +603,26 @@ export async function buscarVentasGlobales({
    *
    * numeroVenta actualmente se guarda como string.
    */
-  consultas.push(
-    getDocs(
-      crearQueryTenant(
-        where("numeroVenta", "==", textoOriginal),
-        limit(50)
-      )
-    )
+  // Solo admitimos la variante numérica si no cambia el formato ni la precisión.
+  const numeroSeguro = /^(0|[1-9]\d*)$/.test(textoOriginal) &&
+    Number.isSafeInteger(Number(textoOriginal)) &&
+    String(Number(textoOriginal)) === textoOriginal;
+  agregarConsulta(
+    "numeroVenta",
+    numeroSeguro
+      ? where("numeroVenta", "in", [textoOriginal, Number(textoOriginal)])
+      : where("numeroVenta", "==", textoOriginal)
   );
 
   /*
    * Documento / DNI.
    */
-  consultas.push(
-    getDocs(
-      crearQueryTenant(
-        where("clienteDNI", "==", textoOriginal),
-        limit(50)
-      )
-    )
-  );
+  agregarConsulta("clienteDNI", where("clienteDNI", "==", textoOriginal));
 
   /*
    * Pedido asociado.
    */
-  consultas.push(
-    getDocs(
-      crearQueryTenant(
-        where("pedidoVisibleId", "==", textoOriginal),
-        limit(50)
-      )
-    )
-  );
+  agregarConsulta("pedidoVisibleId", where("pedidoVisibleId", "==", textoOriginal));
 
   /*
    * Cliente.
@@ -633,34 +633,42 @@ export async function buscarVentasGlobales({
    * Con la estructura actual podemos hacer búsqueda
    * por comienzo del nombre.
    */
-  consultas.push(
-    getDocs(
-      crearQueryTenant(
-        orderBy("clienteNombre"),
-        where("clienteNombre", ">=", textoOriginal),
-        where(
-          "clienteNombre",
-          "<=",
-          textoOriginal + "\uf8ff"
-        ),
-        limit(50)
-      )
-    )
+  const textoNormalizado = textoOriginal.toLowerCase();
+  agregarConsulta(
+    "clienteNombreBusqueda",
+    orderBy("clienteNombreBusqueda"),
+    where("clienteNombreBusqueda", ">=", textoNormalizado),
+    where("clienteNombreBusqueda", "<=", textoNormalizado + "\uf8ff")
+  );
+  // Compatibilidad sin backfill: preservamos la consulta anterior sobre el nombre
+  // comercial. En históricos sin campo derivado sigue siendo sensible al caso.
+  agregarConsulta(
+    "clienteNombre",
+    orderBy("clienteNombre"),
+    where("clienteNombre", ">=", textoOriginal),
+    where("clienteNombre", "<=", textoOriginal + "\uf8ff")
   );
 
-  const resultados = await Promise.allSettled(consultas);
+  const resultados = await Promise.allSettled(consultas.map((c) => c.promesa));
 
   const mapa = new Map();
+  const consultasFallidas = [];
+  let limiteAlcanzado = false;
 
-  resultados.forEach((resultado) => {
+  resultados.forEach((resultado, index) => {
     if (resultado.status !== "fulfilled") {
+      consultasFallidas.push({
+        campo: consultas[index].campo,
+        codigo: resultado.reason?.code || "unknown",
+      });
       console.warn(
-        "Una consulta de búsqueda de ventas no pudo ejecutarse:",
+        `Falló la búsqueda de ventas por ${consultas[index].campo}:`,
         resultado.reason
       );
       return;
     }
 
+    if (resultado.value.docs.length === 50) limiteAlcanzado = true;
     resultado.value.docs.forEach((docu) => {
       mapa.set(docu.id, {
         firebaseId: docu.id,
@@ -669,7 +677,7 @@ export async function buscarVentasGlobales({
     });
   });
 
-  return Array.from(mapa.values()).sort((a, b) => {
+  const ventas = Array.from(mapa.values()).sort((a, b) => {
     const fechaA =
       a.createdAt?.toMillis?.() || 0;
 
@@ -678,6 +686,9 @@ export async function buscarVentasGlobales({
 
     return fechaB - fechaA;
   });
+  return incluirDiagnostico
+    ? { ventas, consultasFallidas, limiteAlcanzado }
+    : ventas;
 }
 
 export async function obtenerPagosDeVenta(ventaId) {

@@ -1,0 +1,12 @@
+{
+  "name": "zalfro-backfill-busqueda",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Backfill local y acotado de campos derivados de búsqueda",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "test": "node --test backfill.test.cjs",
+    "check": "node --check backfill.cjs && node --check backfill.test.cjs"
+  },
+  "dependencies": { "firebase-admin": "13.10.0" }
+}
