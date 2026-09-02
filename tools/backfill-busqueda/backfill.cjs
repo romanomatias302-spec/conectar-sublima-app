@@ -32,7 +32,7 @@ function documentId(value) {
 }
 
 function parseArgs(argv) {
-  const flags = new Set(['--apply', '--dry-run', '--reconcile-only', '--help']);
+  const flags = new Set(['--apply', '--dry-run', '--reconcile-only', '--inventory-global', '--help']);
   const values = new Set(['--tenant', '--project', '--database', '--page-size',
     '--confirm-tenant', '--max-updates', '--run-dir', '--resume', '--max-pages',
     '--conflict-retries', '--after-ventas', '--after-pedidos']);
@@ -53,9 +53,24 @@ function parseArgs(argv) {
     if (Object.keys(options).length !== 1) throw new Error('--help debe usarse solo.');
     return { help: true };
   }
-  if (options['--tenant'] !== TENANT) throw new Error('Tenant obligatorio y único autorizado: elgol.');
   if (options['--project'] !== PROJECT) throw new Error(`Proyecto obligatorio y único autorizado: ${PROJECT}.`);
   if ((options['--database'] || DATABASE) !== DATABASE) throw new Error('Solo se permite la base (default).');
+  const inventoryGlobal = options['--inventory-global'] === true;
+  if (inventoryGlobal) {
+    const allowed = new Set(['--inventory-global', '--project', '--database', '--page-size']);
+    const incompatible = Object.keys(options).filter(key => !allowed.has(key));
+    if (incompatible.length) {
+      throw new Error(`--inventory-global no admite: ${incompatible.join(', ')}.`);
+    }
+    return {
+      project: PROJECT, database: DATABASE, inventoryGlobal: true, apply: false,
+      reconcileOnly: false,
+      pageSize: integer(options['--page-size'] || 100, '--page-size', 1, 500),
+      runDir: null,
+    };
+  }
+  if (!options['--tenant']) throw new Error('--tenant es obligatorio.');
+  const tenant = documentId(options['--tenant']);
   const apply = options['--apply'] === true;
   const reconcileOnly = options['--reconcile-only'] === true;
   if (apply && options['--dry-run']) throw new Error('--apply y --dry-run son incompatibles.');
@@ -65,7 +80,9 @@ function parseArgs(argv) {
   if (reconcileOnly && (!options['--resume'] || options['--run-dir'])) {
     throw new Error('--reconcile-only exige --resume y no admite --run-dir.');
   }
-  if (apply && options['--confirm-tenant'] !== TENANT) throw new Error('--apply exige --confirm-tenant elgol.');
+  if (apply && options['--confirm-tenant'] !== tenant) {
+    throw new Error('--apply exige --confirm-tenant idéntico a --tenant.');
+  }
   if (apply && !options['--max-updates']) throw new Error('--apply exige --max-updates.');
   if (apply && Boolean(options['--run-dir']) === Boolean(options['--resume'])) {
     throw new Error('--apply exige exactamente uno de --run-dir o --resume.');
@@ -81,7 +98,8 @@ function parseArgs(argv) {
     throw new Error('Los cursores manuales son exclusivos del dry-run; apply solo reanuda su checkpoint.');
   }
   return {
-    project: PROJECT, database: DATABASE, tenant: TENANT, apply, reconcileOnly,
+    project: PROJECT, database: DATABASE, tenant, confirmTenant: options['--confirm-tenant'] || null,
+    apply, reconcileOnly,
     pageSize: integer(options['--page-size'] || 100, '--page-size', 1, 500),
     maxUpdates: apply ? integer(options['--max-updates'], '--max-updates') : reconcileOnly ? null : 0,
     maxPages: options['--max-pages'] ? integer(options['--max-pages'], '--max-pages') : null,
@@ -93,9 +111,181 @@ function parseArgs(argv) {
   };
 }
 
+function emptyInventoryCounts() {
+  return {
+    ventasExaminadas: 0, ventasCandidatas: 0,
+    pedidosExaminados: 0, pedidosCandidatos: 0,
+    fuentesInvalidas: 0, derivadosTipoInesperado: 0, errores: 0,
+  };
+}
+
+function inventoryClassification(collection, data) {
+  if (!has(FIELDS, collection)) throw new Error('Colección no autorizada.');
+  const { source, target } = FIELDS[collection];
+  if (has(data, target) && typeof data[target] !== 'string') return 'invalidTarget';
+  if (typeof data[source] !== 'string' || !data[source].trim()) return 'invalidSource';
+  if (has(data, target) && data[target].trim()) return 'existing';
+  return 'candidate';
+}
+
+function tenantName(data) {
+  for (const field of ['nombreVisible', 'nombre', 'nombreCliente']) {
+    if (typeof data[field] === 'string' && data[field].trim()) return data[field];
+  }
+  return null;
+}
+
+function registeredTenant(snapshot) {
+  documentId(snapshot.id);
+  const data = snapshot.data || {};
+  const identityMismatch = has(data, 'clienteId') && data.clienteId !== snapshot.id;
+  const estado = has(data, 'estado') ? data.estado : null;
+  const estadoSuscripcion = has(data, 'estadoSuscripcion') ? data.estadoSuscripcion : null;
+  return {
+    clienteId: snapshot.id,
+    nombre: tenantName(data),
+    estado,
+    estadoSuscripcion,
+    elegibleParaApplyPosterior: estado === 'activo' && estadoSuscripcion !== 'cancelado' && !identityMismatch,
+    anomaliaIdentidad: identityMismatch,
+    clienteIdInterno: has(data, 'clienteId') ? data.clienteId : null,
+    ...emptyInventoryCounts(),
+  };
+}
+
+function invalidTenantIdReason(data) {
+  if (!has(data, 'clienteId')) return 'missing';
+  if (typeof data.clienteId !== 'string') return 'unexpected-type';
+  if (!data.clienteId.trim()) return 'empty';
+  return null;
+}
+
+async function runInventory(config, adapter, { log = console.log, now = () => new Date() } = {}) {
+  if (config.project !== PROJECT || config.database !== DATABASE || config.inventoryGlobal !== true ||
+      config.apply || config.reconcileOnly || config.runDir !== null) {
+    throw new Error('Ámbito de inventario no autorizado.');
+  }
+  integer(config.pageSize, 'pageSize', 1, 500);
+  const startedAt = now().toISOString();
+  const tenants = new Map();
+  const orphans = new Map();
+  const invalidTenantIds = { missing: 0, empty: 0, unexpectedType: 0 };
+  const complete = { clientesSaas: false, ventas: false, pedidos: false };
+  const errors = [];
+  const totals = {
+    ventasExaminadas: 0, ventasCandidatas: 0,
+    pedidosExaminados: 0, pedidosCandidatos: 0,
+    documentosHuerfanos: 0, documentosClienteIdInvalido: 0,
+    fuentesInvalidas: 0, derivadosTipoInesperado: 0,
+  };
+
+  async function paginate(label, readPage, consume) {
+    let cursor = null;
+    try {
+      while (true) {
+        const docs = await readPage(cursor, config.pageSize);
+        if (!Array.isArray(docs) || docs.length > config.pageSize) {
+          throw new Error('Página fuera del límite autorizado.');
+        }
+        for (const snapshot of docs) {
+          documentId(snapshot.id);
+          consume(snapshot);
+          cursor = snapshot.id;
+        }
+        log(`Inventario ${label}: página examinada; documentos=${docs.length}; cursor=${cursor || '-'}.`);
+        if (docs.length < config.pageSize) {
+          complete[label] = true;
+          break;
+        }
+      }
+    } catch (error) {
+      errors.push({ collection: label === 'clientesSaas' ? 'clientes-saas' : label,
+        cursor, message: String(error.message || error) });
+      log(`ERROR inventario ${label}: ${error.message || error}`);
+    }
+  }
+
+  await paginate('clientesSaas', (cursor, size) => adapter.pageTenants(cursor, size), snapshot => {
+    const tenant = registeredTenant(snapshot);
+    if (tenants.has(tenant.clienteId)) throw new Error(`Tenant duplicado: ${tenant.clienteId}.`);
+    tenants.set(tenant.clienteId, tenant);
+  });
+
+  for (const collection of COLLECTIONS) {
+    await paginate(collection, (cursor, size) => adapter.pageCollection(collection, cursor, size), snapshot => {
+      const data = snapshot.data || {};
+      const examinedKey = collection === 'ventas' ? 'ventasExaminadas' : 'pedidosExaminados';
+      const candidatesKey = collection === 'ventas' ? 'ventasCandidatas' : 'pedidosCandidatos';
+      totals[examinedKey]++;
+      const invalidReason = invalidTenantIdReason(data);
+      let bucket = null;
+      if (invalidReason) {
+        totals.documentosClienteIdInvalido++;
+        invalidTenantIds[invalidReason === 'unexpected-type' ? 'unexpectedType' : invalidReason]++;
+      } else if (tenants.has(data.clienteId)) {
+        bucket = tenants.get(data.clienteId);
+      } else {
+        totals.documentosHuerfanos++;
+        if (!orphans.has(data.clienteId)) {
+          orphans.set(data.clienteId, { clienteId: data.clienteId, ...emptyInventoryCounts() });
+        }
+        bucket = orphans.get(data.clienteId);
+      }
+      if (bucket) bucket[examinedKey]++;
+      const classification = inventoryClassification(collection, data);
+      if (classification === 'candidate') {
+        totals[candidatesKey]++;
+        if (bucket) bucket[candidatesKey]++;
+      } else if (classification === 'invalidSource') {
+        totals.fuentesInvalidas++;
+        if (bucket) bucket.fuentesInvalidas++;
+      } else if (classification === 'invalidTarget') {
+        totals.derivadosTipoInesperado++;
+        if (bucket) bucket.derivadosTipoInesperado++;
+      }
+    });
+  }
+
+  const tenantRows = [...tenants.values()].sort((a, b) => a.clienteId.localeCompare(b.clienteId));
+  const orphanRows = [...orphans.values()].sort((a, b) => a.clienteId.localeCompare(b.clienteId));
+  const inactiveStates = new Set(['suspendido', 'inactivo', 'bloqueado']);
+  const eligibleActiveCandidates = tenantRows.filter(t => t.elegibleParaApplyPosterior &&
+    t.ventasCandidatas + t.pedidosCandidatos > 0);
+  const inactiveCandidates = tenantRows.filter(t => inactiveStates.has(t.estado) &&
+    t.ventasCandidatas + t.pedidosCandidatos > 0);
+  const global = {
+    tenantsRegistrados: tenantRows.length,
+    tenantsActivos: tenantRows.filter(t => t.estado === 'activo').length,
+    tenantsSuspendidosInactivos: tenantRows.filter(t => inactiveStates.has(t.estado)).length,
+    tenantsEstadoDesconocido: tenantRows.filter(t => t.estado !== 'activo' && !inactiveStates.has(t.estado)).length,
+    tenantsElegibles: tenantRows.filter(t => t.elegibleParaApplyPosterior).length,
+    tenantsConCandidatos: tenantRows.filter(t => t.ventasCandidatas + t.pedidosCandidatos > 0).length,
+    tenantsActivosConCandidatos: eligibleActiveCandidates.length,
+    tenantsSuspendidosInactivosConCandidatos: inactiveCandidates.length,
+    ventasCandidatasTenantsActivos: eligibleActiveCandidates.reduce((n, t) => n + t.ventasCandidatas, 0),
+    pedidosCandidatosTenantsActivos: eligibleActiveCandidates.reduce((n, t) => n + t.pedidosCandidatos, 0),
+    ventasCandidatasTenantsSuspendidosInactivos: inactiveCandidates.reduce((n, t) => n + t.ventasCandidatas, 0),
+    pedidosCandidatosTenantsSuspendidosInactivos: inactiveCandidates.reduce((n, t) => n + t.pedidosCandidatos, 0),
+    ...totals,
+    errores: errors.length,
+  };
+  const finishedAt = now().toISOString();
+  return {
+    project: PROJECT, database: DATABASE, mode: 'INVENTORY-GLOBAL',
+    startedAt, finishedAt, complete, definitive: Object.values(complete).every(Boolean),
+    warning: 'Recorrido paginado de solo lectura; no es una snapshot transaccional global.',
+    tenants: tenantRows,
+    activeTenantsWithCandidates: eligibleActiveCandidates.sort((a, b) =>
+      (b.ventasCandidatas + b.pedidosCandidatos) - (a.ventasCandidatas + a.pedidosCandidatos) ||
+      a.clienteId.localeCompare(b.clienteId)),
+    orphans: orphanRows, invalidTenantIds, global, errors,
+  };
+}
+
 function classify(collection, data, tenant = TENANT) {
   if (!has(FIELDS, collection)) throw new Error('Colección no autorizada.');
-  if (tenant !== TENANT || data.clienteId !== tenant) throw new Error('Inconsistencia de tenant: ejecución detenida.');
+  documentId(tenant);
+  if (data.clienteId !== tenant) throw new Error('Inconsistencia de tenant: ejecución detenida.');
   const { source, target } = FIELDS[collection];
   if (has(data, target) && typeof data[target] !== 'string') return { reason: 'invalidTarget' };
   if (typeof data[source] !== 'string' || !data[source].trim()) return { reason: 'invalidSource' };
@@ -107,7 +297,7 @@ function classify(collection, data, tenant = TENANT) {
 function initialState(config) {
   return {
     version: VERSION, runId: crypto.randomUUID(), project: PROJECT, database: DATABASE,
-    tenant: TENANT, maxUpdates: config.maxUpdates, reserved: 0, pending: null,
+    tenant: config.tenant, maxUpdates: config.maxUpdates, reserved: 0, pending: null,
     cursors: { ...config.after }, completed: { ventas: false, pedidos: false },
     counts: Object.fromEntries(COLLECTIONS.map(c => [c, {
       examined: 0, candidates: 0, existing: 0, invalidSource: 0, invalidTarget: 0,
@@ -118,7 +308,7 @@ function initialState(config) {
 
 function validateState(state, config) {
   if (state.version !== VERSION || state.project !== PROJECT || state.database !== DATABASE ||
-      state.tenant !== TENANT || state.maxUpdates !== config.maxUpdates || typeof state.runId !== 'string') {
+      state.tenant !== config.tenant || state.maxUpdates !== config.maxUpdates || typeof state.runId !== 'string') {
     throw new Error('Checkpoint incompatible: proyecto, base, tenant, versión o límite.');
   }
   integer(state.reserved, 'reserved', 0, config.maxUpdates);
@@ -279,12 +469,13 @@ function inspectPending(pending, current, config) {
 
 async function reconcileOnly(config, adapter, { store, log = console.log } = {}) {
   if (!config.reconcileOnly || config.apply || !store) throw new Error('Modo reconcile-only inválido.');
-  if (config.project !== PROJECT || config.database !== DATABASE || config.tenant !== TENANT) {
+  if (config.project !== PROJECT || config.database !== DATABASE) {
     throw new Error('Ámbito no autorizado.');
   }
+  documentId(config.tenant);
   const state = validateState(store.state, { ...config, maxUpdates: store.state.maxUpdates });
   if (!state.pending) {
-    return { project: PROJECT, database: DATABASE, tenant: TENANT, mode: 'RECONCILE-ONLY',
+    return { project: PROJECT, database: DATABASE, tenant: config.tenant, mode: 'RECONCILE-ONLY',
       status: 'no-pending', reconciled: false, collection: null, id: null,
       reserved: state.reserved, pending: false };
   }
@@ -309,7 +500,7 @@ async function reconcileOnly(config, adapter, { store, log = console.log } = {})
     throw new Error('La reconciliación intentó alterar reservas o cursores.');
   }
   log(`Reconciliación ${observation.status}: ${pending.collection}/${pending.id}.`);
-  return { project: PROJECT, database: DATABASE, tenant: TENANT, mode: 'RECONCILE-ONLY',
+  return { project: PROJECT, database: DATABASE, tenant: config.tenant, mode: 'RECONCILE-ONLY',
     status: observation.status, reconciled: observation.reconciled,
     collection: pending.collection, id: pending.id, reserved: state.reserved,
     pending: Boolean(state.pending) };
@@ -335,22 +526,54 @@ function printReconcileReport(result, log = console.log) {
 }
 
 function report(config, state, errors, complete, stopReason, pages) {
-  return { project: PROJECT, database: DATABASE, tenant: TENANT,
+  return { project: PROJECT, database: DATABASE, tenant: config.tenant,
     mode: config.apply ? 'APPLY' : 'DRY-RUN', counts: clone(state.counts), errors,
     writes: COLLECTIONS.reduce((n, c) => n + state.counts[c].updated, 0),
     reserved: state.reserved, pending: Boolean(state.pending), complete, stopReason, pages, cursors: { ...state.cursors },
     partialStart: COLLECTIONS.some(c => config.after[c] !== null) };
 }
 
+async function validateTenantEligibility(tenant, adapter) {
+  documentId(tenant);
+  if (!adapter || typeof adapter.readTenant !== 'function') {
+    throw new Error('La validación exige lectura canónica del tenant.');
+  }
+  const snapshot = await adapter.readTenant(tenant);
+  if (!snapshot) throw new Error(`Tenant inexistente: ${tenant}.`);
+  if (snapshot.id !== tenant) throw new Error('El document ID del tenant no coincide exactamente.');
+  const data = snapshot.data || {};
+  if (has(data, 'clienteId') && data.clienteId !== snapshot.id) {
+    throw new Error('Anomalía de identidad en clientes-saas.');
+  }
+  if (data.estado !== 'activo') {
+    throw new Error(`Tenant no activo: estado=${has(data, 'estado') ? JSON.stringify(data.estado) : 'ausente'}.`);
+  }
+  if (data.estadoSuscripcion === 'cancelado') {
+    throw new Error('Tenant con suscripción cancelada.');
+  }
+  return { id: snapshot.id, estado: data.estado, estadoSuscripcion: data.estadoSuscripcion || null };
+}
+
+async function validateApplyTenant(config, adapter) {
+  if (!config.apply) throw new Error('Validación administrativa exclusiva de apply.');
+  documentId(config.tenant);
+  if (config.confirmTenant !== config.tenant) {
+    throw new Error('Confirmación de tenant inconsistente.');
+  }
+  return validateTenantEligibility(config.tenant, adapter);
+}
+
 async function run(config, adapter, { store = null, log = console.log, shouldStop = () => false } = {}) {
   // Defensa adicional para consumidores programáticos; validar ANTES de consultar.
-  if (config.project !== PROJECT || config.database !== DATABASE || config.tenant !== TENANT) throw new Error('Ámbito no autorizado.');
+  if (config.project !== PROJECT || config.database !== DATABASE) throw new Error('Ámbito no autorizado.');
+  documentId(config.tenant);
   integer(config.pageSize, 'pageSize', 1, 500);
   if (config.apply) {
     integer(config.maxUpdates, 'maxUpdates');
     integer(config.conflictRetries, 'conflictRetries', 0, 5);
   }
   if (config.apply && !store) throw new Error('Apply requiere registro durable.');
+  if (config.apply) await validateApplyTenant(config, adapter);
   const state = config.apply ? validateState(store.state, config) : initialState(config);
   let pages = 0, stopReason = '', errors = 0;
   try {
@@ -406,7 +629,7 @@ function createAdapter(db, FieldPath) {
   return {
     async page(collection, tenant, cursor, size) {
       checkCollection(collection);
-      if (tenant !== TENANT) throw new Error('Tenant no autorizado.');
+      documentId(tenant);
       integer(size, 'page-size', 1, 500);
       const fields = FIELDS[collection];
       let query = db.collection(collection).where('clienteId', '==', tenant)
@@ -417,6 +640,10 @@ function createAdapter(db, FieldPath) {
     async read(collection, id) {
       checkCollection(collection);
       return convert(await db.collection(collection).doc(documentId(id)).get());
+    },
+    async readTenant(tenant) {
+      const snap = await db.collection('clientes-saas').doc(documentId(tenant)).get();
+      return snap.exists ? { id: snap.id, data: snap.data() } : null;
     },
     async update(collection, id, field, value, updateTime) {
       checkCollection(collection);
@@ -437,6 +664,52 @@ function createReadAdapter(db) {
   };
 }
 
+function createInventoryAdapter(db, FieldPath) {
+  const convert = snap => ({ id: snap.id, data: snap.data() });
+  const paged = async (collection, fields, cursor, size) => {
+    integer(size, 'page-size', 1, 500);
+    let query = db.collection(collection).orderBy(FieldPath.documentId()).select(...fields).limit(size);
+    if (cursor !== null) query = query.startAfter(documentId(cursor));
+    return (await query.get()).docs.map(convert);
+  };
+  return {
+    pageTenants(cursor, size) {
+      return paged('clientes-saas', ['clienteId', 'nombreVisible', 'nombre', 'nombreCliente',
+        'estado', 'estadoSuscripcion'], cursor, size);
+    },
+    pageCollection(collection, cursor, size) {
+      if (!has(FIELDS, collection)) return Promise.reject(new Error('Colección no autorizada.'));
+      const fields = FIELDS[collection];
+      return paged(collection, ['clienteId', fields.source, fields.target], cursor, size);
+    },
+  };
+}
+
+function printInventoryReport(result, log = console.log) {
+  log(`Proyecto: ${result.project}\nBase: ${result.database}\nModo: ${result.mode}`);
+  log(`Hora de inicio: ${result.startedAt}\nHora de finalización: ${result.finishedAt}`);
+  log(`Advertencia: ${result.warning}`);
+  for (const tenant of result.tenants) {
+    log(`Tenant: ${tenant.clienteId}\nNombre: ${tenant.nombre === null ? '(sin nombre)' : tenant.nombre}\nEstado: ${tenant.estado === null ? '(ausente)' : String(tenant.estado)}\nEstado de suscripción: ${tenant.estadoSuscripcion === null ? '(ausente)' : String(tenant.estadoSuscripcion)}\nElegible para apply posterior: ${tenant.elegibleParaApplyPosterior ? 'sí' : 'no'}\nVentas examinadas: ${tenant.ventasExaminadas}\nVentas candidatas: ${tenant.ventasCandidatas}\nPedidos examinados: ${tenant.pedidosExaminados}\nPedidos candidatos: ${tenant.pedidosCandidatos}\nFuentes inválidas: ${tenant.fuentesInvalidas}\nDerivados con tipo inesperado: ${tenant.derivadosTipoInesperado}\nErrores: ${tenant.errores}${tenant.anomaliaIdentidad ? `\nAnomalía de identidad: clienteId interno=${JSON.stringify(tenant.clienteIdInterno)}; document ID=${tenant.clienteId}` : ''}`);
+  }
+  for (const orphan of result.orphans) {
+    log(`Tenant huérfano: ${orphan.clienteId}\nVentas examinadas: ${orphan.ventasExaminadas}\nVentas candidatas: ${orphan.ventasCandidatas}\nPedidos examinados: ${orphan.pedidosExaminados}\nPedidos candidatos: ${orphan.pedidosCandidatos}\nFuentes inválidas: ${orphan.fuentesInvalidas}\nDerivados con tipo inesperado: ${orphan.derivadosTipoInesperado}\nErrores: ${orphan.errores}`);
+  }
+  const g = result.global;
+  log(`Resumen global:\nTenants registrados: ${g.tenantsRegistrados}\nTenants activos: ${g.tenantsActivos}\nTenants suspendidos/inactivos: ${g.tenantsSuspendidosInactivos}\nTenants con estado desconocido: ${g.tenantsEstadoDesconocido}\nTenants elegibles para eventual apply: ${g.tenantsElegibles}\nTenants con candidatos: ${g.tenantsConCandidatos}\nTenants activos con candidatos: ${g.tenantsActivosConCandidatos}\nTenants suspendidos/inactivos con candidatos: ${g.tenantsSuspendidosInactivosConCandidatos}\nTotal ventas examinadas: ${g.ventasExaminadas}\nTotal ventas candidatas: ${g.ventasCandidatas}\nTotal pedidos examinados: ${g.pedidosExaminados}\nTotal pedidos candidatos: ${g.pedidosCandidatos}\nVentas candidatas de tenants activos: ${g.ventasCandidatasTenantsActivos}\nPedidos candidatos de tenants activos: ${g.pedidosCandidatosTenantsActivos}\nVentas candidatas de tenants suspendidos/inactivos: ${g.ventasCandidatasTenantsSuspendidosInactivos}\nPedidos candidatos de tenants suspendidos/inactivos: ${g.pedidosCandidatosTenantsSuspendidosInactivos}\nDocumentos huérfanos: ${g.documentosHuerfanos}\nDocumentos con clienteId inválido: ${g.documentosClienteIdInvalido}\n- clienteId faltante: ${result.invalidTenantIds.missing}\n- clienteId vacío: ${result.invalidTenantIds.empty}\n- clienteId con tipo inesperado: ${result.invalidTenantIds.unexpectedType}\nFuentes inválidas: ${g.fuentesInvalidas}\nDerivados con tipo inesperado: ${g.derivadosTipoInesperado}\nErrores: ${g.errores}\nRecorrido completo de clientes-saas: ${result.complete.clientesSaas ? 'sí' : 'no'}\nRecorrido completo de ventas: ${result.complete.ventas ? 'sí' : 'no'}\nRecorrido completo de pedidos: ${result.complete.pedidos ? 'sí' : 'no'}\nTotales definitivos: ${result.definitive ? 'sí' : 'no'}`);
+  for (const error of result.errors) {
+    log(`Error técnico: colección=${error.collection}; cursor=${error.cursor || '-'}; detalle=${error.message}`);
+  }
+  log('Escrituras en Firestore: 0\nCheckpoints/journals/run-dir: 0\nReservas/pending: 0');
+  log('TENANTS ACTIVOS CON CANDIDATOS');
+  log('clienteId | nombre | ventas candidatas | pedidos candidatos');
+  if (!result.activeTenantsWithCandidates.length) log('(ninguno)');
+  for (const tenant of result.activeTenantsWithCandidates) {
+    const cell = value => String(value === null ? '' : value).replace(/\r?\n/g, ' ').replace(/\|/g, '\\|');
+    log(`${cell(tenant.clienteId)} | ${cell(tenant.nombre)} | ${tenant.ventasCandidatas} | ${tenant.pedidosCandidatos}`);
+  }
+}
+
 function printReport(result, log = console.log) {
   const sum = key => COLLECTIONS.reduce((n, c) => n + result.counts[c][key], 0);
   log(`Proyecto: ${result.project}\nBase: ${result.database}\nTenant: ${result.tenant}\nModo: ${result.mode}`);
@@ -451,7 +724,7 @@ function printReport(result, log = console.log) {
 async function main(argv = process.argv.slice(2), dependencies = {}) {
   const config = parseArgs(argv); // Ningún SDK/credencial se carga antes de esto.
   if (config.help) {
-    console.log('Uso: node backfill.cjs --project conectarsublimados-7881e --tenant elgol [--dry-run] [--page-size 100]\nApply exige --apply --confirm-tenant elgol --max-updates N y --run-dir DIR o --resume DIR.\nReconciliar exige --reconcile-only --resume DIR. Ver README.md.');
+    console.log('Uso:\nInventario global: node backfill.cjs --project conectarsublimados-7881e --inventory-global [--page-size 100]\nDry-run por tenant: node backfill.cjs --project conectarsublimados-7881e --tenant CLIENTE_ID [--dry-run] [--page-size 100]\nApply exige --tenant CLIENTE_ID --apply --confirm-tenant CLIENTE_ID --max-updates N y --run-dir DIR o --resume DIR.\nReconciliar exige --tenant CLIENTE_ID --reconcile-only --resume DIR. Ver README.md.');
     return 0;
   }
   if (process.env.FIRESTORE_EMULATOR_HOST) throw new Error('Emulador detectado: este CLI solo admite destino explícito real. Usar tests con adaptador simulado.');
@@ -460,7 +733,6 @@ async function main(argv = process.argv.slice(2), dependencies = {}) {
   process.on('SIGINT', stop);
   process.on('SIGTERM', stop);
   try {
-    if (config.apply || config.reconcileOnly) store = openStore(config);
     let adapter;
     if (dependencies.adapterFactory) adapter = await dependencies.adapterFactory(config);
     else {
@@ -468,9 +740,16 @@ async function main(argv = process.argv.slice(2), dependencies = {}) {
       const { getFirestore, FieldPath } = require('firebase-admin/firestore');
       app = { instance: initializeApp({ projectId: PROJECT, credential: applicationDefault() }), deleteApp };
       db = getFirestore(app.instance, DATABASE);
-      adapter = config.reconcileOnly ? createReadAdapter(db) : createAdapter(db, FieldPath);
+      adapter = config.inventoryGlobal ? createInventoryAdapter(db, FieldPath)
+        : config.reconcileOnly ? createReadAdapter(db) : createAdapter(db, FieldPath);
     }
-    if (config.reconcileOnly) {
+    if (config.apply) await validateApplyTenant(config, adapter);
+    if (config.apply || config.reconcileOnly) store = openStore(config);
+    if (config.inventoryGlobal) {
+      const result = await runInventory(config, adapter);
+      printInventoryReport(result);
+      return result.global.errores ? 1 : result.definitive ? 0 : 2;
+    } else if (config.reconcileOnly) {
       const result = await reconcileOnly(config, adapter, { store });
       printReconcileReport(result);
       return result.reconciled || result.status === 'no-pending' ? 0 : 2;
@@ -490,7 +769,9 @@ async function main(argv = process.argv.slice(2), dependencies = {}) {
 
 module.exports = { PROJECT, DATABASE, TENANT, FIELDS, parseArgs, classify, initialState,
   validateState, openStore, inspectPending, reconcileOnly, printReconcileReport,
-  createAdapter, createReadAdapter, run, printReport, main };
+  inventoryClassification, registeredTenant, runInventory, printInventoryReport,
+  validateTenantEligibility, validateApplyTenant,
+  createAdapter, createReadAdapter, createInventoryAdapter, run, printReport, main };
 if (require.main === module) main().then(code => { process.exitCode = code; }).catch(error => {
   console.error(`Abortado: ${error.message}`);
   process.exitCode = 1;

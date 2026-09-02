@@ -6,7 +6,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { PROJECT, TENANT, FIELDS, parseArgs, classify, initialState, validateState, openStore,
-  reconcileOnly, createAdapter, createReadAdapter, run, printReport, main } = require('./backfill.cjs');
+  reconcileOnly, createAdapter, createReadAdapter, createInventoryAdapter, runInventory,
+  printInventoryReport, validateTenantEligibility, validateApplyTenant, run, printReport, main } = require('./backfill.cjs');
 
 const base = ['--tenant', TENANT, '--project', PROJECT];
 const dry = (extra = []) => parseArgs([...base, ...extra]);
@@ -14,6 +15,11 @@ const apply = (extra = []) => parseArgs([...base, '--apply', '--confirm-tenant',
   '--max-updates', '100', '--run-dir', 'unused-test-run', ...extra]);
 const reconcile = (extra = []) => parseArgs([...base, '--reconcile-only', '--resume',
   'unused-test-run', ...extra]);
+const inventory = (extra = []) => parseArgs(['--project', PROJECT, '--inventory-global', ...extra]);
+const tenantBase = tenant => ['--tenant', tenant, '--project', PROJECT];
+const tenantDry = (tenant, extra = []) => parseArgs([...tenantBase(tenant), ...extra]);
+const tenantApply = (tenant, extra = []) => parseArgs([...tenantBase(tenant), '--apply',
+  '--confirm-tenant', tenant, '--max-updates', '100', '--run-dir', `unused-${tenant}`, ...extra]);
 const copy = value => JSON.parse(JSON.stringify(value));
 const silent = () => {};
 const sale = (source = '  Megan FOX  ', rest = {}) => ({ clienteId: TENANT, clienteNombre: source, ...rest });
@@ -26,10 +32,12 @@ function memoryStore(config, saved) {
 
 function memoryAdapter(seed = {}) {
   let clock = 1;
+  const tenantDocs = new Map(Object.entries(seed.tenants || { [TENANT]: { estado: 'activo' } })
+    .map(([id, data]) => [id, { id, data: copy(data) }]));
   const docs = Object.fromEntries(Object.keys(FIELDS).map(c => [c, new Map(
     Object.entries(seed[c] || {}).map(([id, data]) => [id, { id, data: copy(data), updateTime: { seconds: clock++, nanoseconds: 0 } }]))]));
   return {
-    docs, pages: [], reads: [], writes: [], beforeUpdate: null,
+    docs, tenantDocs, pages: [], reads: [], tenantReads: [], writes: [], beforeUpdate: null,
     change(c, id, changes) {
       const snap = docs[c].get(id);
       Object.assign(snap.data, changes);
@@ -41,6 +49,10 @@ function memoryAdapter(seed = {}) {
         .sort((a, b) => a.id.localeCompare(b.id)).slice(0, size).map(copy);
     },
     async read(c, id) { this.reads.push({ c, id }); return docs[c].has(id) ? copy(docs[c].get(id)) : null; },
+    async readTenant(id) {
+      this.tenantReads.push(id);
+      return tenantDocs.has(id) ? copy(tenantDocs.get(id)) : null;
+    },
     async update(c, id, field, value, version) {
       if (this.beforeUpdate) await this.beforeUpdate(c, id, field, value);
       const snap = docs[c].get(id);
@@ -53,6 +65,238 @@ function memoryAdapter(seed = {}) {
     },
   };
 }
+
+function memoryInventoryAdapter(seed = {}) {
+  const tenants = new Map(Object.entries(seed.tenants || {}).map(([id, data]) => [id, { id, data: copy(data) }]));
+  const collections = Object.fromEntries(Object.keys(FIELDS).map(collection => [collection,
+    new Map(Object.entries(seed[collection] || {}).map(([id, data]) => [id, { id, data: copy(data) }]))]));
+  const calls = [];
+  const page = (map, cursor, size) => [...map.values()].filter(doc => !cursor || doc.id > cursor)
+    .sort((a, b) => a.id.localeCompare(b.id)).slice(0, size).map(copy);
+  return {
+    calls,
+    async pageTenants(cursor, size) {
+      calls.push({ kind: 'tenants', cursor, size });
+      return page(tenants, cursor, size);
+    },
+    async pageCollection(collection, cursor, size) {
+      calls.push({ kind: collection, cursor, size });
+      return page(collections[collection], cursor, size);
+    },
+  };
+}
+
+test('inventory-global: argumentos aislados y no existe apply global', () => {
+  const config = inventory(['--page-size', '25']);
+  assert.equal(config.inventoryGlobal, true);
+  assert.equal(config.apply, false);
+  assert.equal(config.reconcileOnly, false);
+  assert.equal(config.pageSize, 25);
+  assert.equal(config.runDir, null);
+  for (const args of [
+    ['--project', PROJECT, '--inventory-global', '--tenant', TENANT],
+    ['--project', PROJECT, '--inventory-global', '--dry-run'],
+    ['--project', PROJECT, '--inventory-global', '--apply'],
+    ['--project', PROJECT, '--inventory-global', '--resume', 'run'],
+    ['--project', PROJECT, '--inventory-global', '--run-dir', 'run'],
+    ['--project', PROJECT, '--inventory-global', '--max-pages', '1'],
+  ]) assert.throws(() => parseArgs(args), /inventory-global/);
+  assert.throws(() => parseArgs(['--project', PROJECT, '--apply-global']), /desconocido/);
+});
+
+test('inventory-global clasifica múltiples tenants, huérfanos y anomalías sin hardcodear elgol', async () => {
+  const adapter = memoryInventoryAdapter({
+    tenants: {
+      elgol: { nombre: 'El Gol', estado: 'activo' },
+      activo: { nombreVisible: 'Activo visible', nombre: 'Ignorado', estado: 'activo' },
+      inactivo: { nombre: 'Inactivo', estado: 'inactivo' },
+      sinestado: { nombreCliente: 'Sin estado' },
+      cancelado: { nombre: 'Cancelado', estado: 'activo', estadoSuscripcion: 'cancelado' },
+      identidad: { nombre: 'Identidad', estado: 'activo', clienteId: 'otro' },
+    },
+    ventas: {
+      '01-elgol': { clienteId: 'elgol', clienteNombre: 'Megan', clienteNombreBusqueda: 'megan' },
+      '02-activo': { clienteId: 'activo', clienteNombre: 'Ana' },
+      '03-huerfano': { clienteId: 'huerfano', clienteNombre: 'Hugo' },
+      '04-faltante': { clienteNombre: 'Falta ID' },
+      '05-vacio': { clienteId: '  ', clienteNombre: 'Vacío' },
+      '06-tipo': { clienteId: 42, clienteNombre: 'Número' },
+      '07-fuente': { clienteId: 'activo', clienteNombre: '   ' },
+      '08-derivado': { clienteId: 'activo', clienteNombre: 'Ana', clienteNombreBusqueda: null },
+    },
+    pedidos: {
+      '01-elgol': { clienteId: 'elgol', cliente: 'Megan', clienteBusqueda: 'megan' },
+      '02-inactivo': { clienteId: 'inactivo', cliente: 'Pedro' },
+    },
+  });
+  const times = [new Date('2026-09-01T10:00:00.000Z'), new Date('2026-09-01T10:01:00.000Z')];
+  const result = await runInventory(inventory(['--page-size', '1']), adapter,
+    { log: silent, now: () => times.shift() });
+  assert.equal(result.definitive, true);
+  assert.deepEqual(result.complete, { clientesSaas: true, ventas: true, pedidos: true });
+  assert.equal(result.startedAt, '2026-09-01T10:00:00.000Z');
+  assert.equal(result.finishedAt, '2026-09-01T10:01:00.000Z');
+  assert.equal(result.global.tenantsRegistrados, 6);
+  assert.equal(result.global.tenantsActivos, 4);
+  assert.equal(result.global.tenantsSuspendidosInactivos, 1);
+  assert.equal(result.global.tenantsEstadoDesconocido, 1);
+  assert.equal(result.global.tenantsElegibles, 2);
+  assert.equal(result.global.tenantsConCandidatos, 2);
+  assert.equal(result.global.tenantsActivosConCandidatos, 1);
+  assert.equal(result.global.tenantsSuspendidosInactivosConCandidatos, 1);
+  assert.equal(result.global.ventasCandidatasTenantsActivos, 1);
+  assert.equal(result.global.pedidosCandidatosTenantsActivos, 0);
+  assert.equal(result.global.ventasCandidatasTenantsSuspendidosInactivos, 0);
+  assert.equal(result.global.pedidosCandidatosTenantsSuspendidosInactivos, 1);
+  assert.equal(result.global.ventasExaminadas, 8);
+  assert.equal(result.global.pedidosExaminados, 2);
+  assert.equal(result.global.ventasCandidatas, 5);
+  assert.equal(result.global.pedidosCandidatos, 1);
+  assert.equal(result.global.documentosHuerfanos, 1);
+  assert.equal(result.global.documentosClienteIdInvalido, 3);
+  assert.deepEqual(result.invalidTenantIds, { missing: 1, empty: 1, unexpectedType: 1 });
+  assert.equal(result.global.fuentesInvalidas, 1);
+  assert.equal(result.global.derivadosTipoInesperado, 1);
+  const elgol = result.tenants.find(tenant => tenant.clienteId === 'elgol');
+  assert.equal(elgol.ventasCandidatas, 0);
+  assert.equal(elgol.pedidosCandidatos, 0);
+  const activo = result.tenants.find(tenant => tenant.clienteId === 'activo');
+  assert.equal(activo.nombre, 'Activo visible');
+  assert.equal(activo.ventasCandidatas, 1);
+  assert.equal(activo.fuentesInvalidas, 1);
+  assert.equal(activo.derivadosTipoInesperado, 1);
+  assert.equal(result.tenants.find(tenant => tenant.clienteId === 'inactivo').elegibleParaApplyPosterior, false);
+  assert.equal(result.tenants.find(tenant => tenant.clienteId === 'sinestado').elegibleParaApplyPosterior, false);
+  assert.equal(result.tenants.find(tenant => tenant.clienteId === 'cancelado').elegibleParaApplyPosterior, false);
+  const identidad = result.tenants.find(tenant => tenant.clienteId === 'identidad');
+  assert.equal(identidad.anomaliaIdentidad, true);
+  assert.equal(identidad.clienteIdInterno, 'otro');
+  assert.equal(identidad.elegibleParaApplyPosterior, false);
+  assert.equal(result.orphans[0].clienteId, 'huerfano');
+  assert.equal(result.orphans[0].ventasCandidatas, 1);
+  assert.deepEqual(result.activeTenantsWithCandidates.map(tenant => tenant.clienteId), ['activo']);
+  assert.ok(adapter.calls.filter(call => call.kind === 'ventas').length > 1);
+  assert.ok(adapter.calls.every(call => call.size === 1));
+  for (const forbidden of ['reserved', 'pending', 'runDir', 'checkpoint', 'journal']) {
+    assert.equal(Object.prototype.hasOwnProperty.call(result, forbidden), false);
+  }
+});
+
+test('inventory-global continúa tras fallo parcial y marca totales no definitivos', async () => {
+  const adapter = memoryInventoryAdapter({
+    tenants: { elgol: { estado: 'activo' } },
+    ventas: { a: { clienteId: 'elgol', clienteNombre: 'Ana' }, b: { clienteId: 'elgol', clienteNombre: 'Beto' } },
+    pedidos: { a: { clienteId: 'elgol', cliente: 'Ana' } },
+  });
+  const original = adapter.pageCollection.bind(adapter);
+  adapter.pageCollection = async (collection, cursor, size) => {
+    if (collection === 'ventas' && cursor === 'a') throw new Error('lectura simulada fallida');
+    return original(collection, cursor, size);
+  };
+  const result = await runInventory(inventory(['--page-size', '1']), adapter, { log: silent });
+  assert.equal(result.complete.clientesSaas, true);
+  assert.equal(result.complete.ventas, false);
+  assert.equal(result.complete.pedidos, true);
+  assert.equal(result.definitive, false);
+  assert.equal(result.global.errores, 1);
+  assert.equal(result.errors[0].collection, 'ventas');
+  assert.equal(result.global.ventasExaminadas, 1);
+  assert.equal(result.global.pedidosExaminados, 1);
+});
+
+test('inventory-global resume activos/inactivos y ordena activos elegibles por candidatos', async () => {
+  const result = await runInventory(inventory(), memoryInventoryAdapter({
+    tenants: {
+      activoA: { nombre: 'Activo A', estado: 'activo' },
+      activoB: { nombre: 'Activo B', estado: 'activo' },
+      suspendido: { nombre: 'Suspendido', estado: 'suspendido' },
+    },
+    ventas: {
+      a1: { clienteId: 'activoA', clienteNombre: 'A' },
+      b1: { clienteId: 'activoB', clienteNombre: 'B' },
+      b2: { clienteId: 'activoB', clienteNombre: 'B' },
+      s1: { clienteId: 'suspendido', clienteNombre: 'S' },
+    },
+    pedidos: {
+      a1: { clienteId: 'activoA', cliente: 'A' },
+      a2: { clienteId: 'activoA', cliente: 'A' },
+      s1: { clienteId: 'suspendido', cliente: 'S' },
+    },
+  }), { log: silent });
+  assert.equal(result.global.tenantsActivosConCandidatos, 2);
+  assert.equal(result.global.tenantsSuspendidosInactivosConCandidatos, 1);
+  assert.equal(result.global.ventasCandidatasTenantsActivos, 3);
+  assert.equal(result.global.pedidosCandidatosTenantsActivos, 2);
+  assert.equal(result.global.ventasCandidatasTenantsSuspendidosInactivos, 1);
+  assert.equal(result.global.pedidosCandidatosTenantsSuspendidosInactivos, 1);
+  assert.deepEqual(result.activeTenantsWithCandidates.map(tenant => tenant.clienteId), ['activoA', 'activoB']);
+});
+
+test('adaptador inventory-global expone solo lecturas paginadas y proyecciones mínimas', async () => {
+  const calls = [];
+  const query = {};
+  for (const method of ['orderBy', 'select', 'limit', 'startAfter']) {
+    query[method] = (...args) => { calls.push([method, ...args]); return query; };
+  }
+  query.get = async () => ({ docs: [{ id: 'a', data: () => ({ estado: 'activo' }) }] });
+  const db = { collection(name) { calls.push(['collection', name]); return query; } };
+  const adapter = createInventoryAdapter(db, { documentId: () => '__name__' });
+  assert.deepEqual(Object.keys(adapter), ['pageTenants', 'pageCollection']);
+  for (const forbidden of ['update', 'set', 'create', 'delete', 'batch', 'transaction']) {
+    assert.equal(Object.prototype.hasOwnProperty.call(adapter, forbidden), false);
+  }
+  await adapter.pageTenants(null, 10);
+  assert.deepEqual(calls, [['collection', 'clientes-saas'], ['orderBy', '__name__'],
+    ['select', 'clienteId', 'nombreVisible', 'nombre', 'nombreCliente', 'estado', 'estadoSuscripcion'], ['limit', 10]]);
+  calls.length = 0;
+  await adapter.pageCollection('ventas', 'cursor', 5);
+  assert.deepEqual(calls, [['collection', 'ventas'], ['orderBy', '__name__'],
+    ['select', 'clienteId', 'clienteNombre', 'clienteNombreBusqueda'], ['limit', 5], ['startAfter', 'cursor']]);
+  await assert.rejects(adapter.pageCollection('pagos', null, 5));
+});
+
+test('inventory-global vía main no abre run-dir ni usa estado de apply', async () => {
+  const adapter = memoryInventoryAdapter({ tenants: { elgol: { estado: 'activo' } } });
+  const originalLog = console.log;
+  const originalOpen = fs.openSync;
+  const originalMkdir = fs.mkdirSync;
+  const originalRename = fs.renameSync;
+  console.log = silent;
+  fs.openSync = () => { throw new Error('inventory-global intentó abrir checkpoint/journal/lock'); };
+  fs.mkdirSync = () => { throw new Error('inventory-global intentó crear run-dir'); };
+  fs.renameSync = () => { throw new Error('inventory-global intentó actualizar checkpoint'); };
+  try {
+    const code = await main(['--project', PROJECT, '--inventory-global', '--page-size', '2'], {
+      adapterFactory(config) {
+        assert.equal(config.runDir, null);
+        return adapter;
+      },
+    });
+    assert.equal(code, 0);
+  } finally {
+    console.log = originalLog;
+    fs.openSync = originalOpen;
+    fs.mkdirSync = originalMkdir;
+    fs.renameSync = originalRename;
+  }
+});
+
+test('reporte inventory-global explicita alcance, completitud y cero estado de escritura', async () => {
+  const result = await runInventory(inventory(), memoryInventoryAdapter({
+    tenants: { elgol: { nombre: 'El Gol', estado: 'activo' } },
+  }), { log: silent });
+  const lines = [];
+  printInventoryReport(result, line => lines.push(line));
+  const output = lines.join('\n');
+  for (const fragment of ['Modo: INVENTORY-GLOBAL', 'Tenant: elgol',
+    'Tenants registrados: 1', 'Recorrido completo de clientes-saas: sí',
+    'Recorrido completo de ventas: sí', 'Recorrido completo de pedidos: sí',
+    'Totales definitivos: sí', 'Escrituras en Firestore: 0',
+    'Checkpoints/journals/run-dir: 0', 'Reservas/pending: 0',
+    'TENANTS ACTIVOS CON CANDIDATOS',
+    'clienteId | nombre | ventas candidatas | pedidos candidatos',
+    'no es una snapshot transaccional global']) assert.ok(output.includes(fragment), fragment);
+});
 
 test('ventas y pedidos: elegibilidad, omisión y normalización exacta', () => {
   for (const c of Object.keys(FIELDS)) {
@@ -78,7 +322,8 @@ test('argumentos: dry-run por defecto y barreras de ámbito/escritura', () => {
   assert.equal(dry().apply, false);
   assert.equal(dry().pageSize, 100);
   assert.equal(dry(['--page-size', '1']).pageSize, 1);
-  for (const args of [[], ['--project', PROJECT], ['--tenant', 'otro', '--project', PROJECT],
+  assert.equal(tenantDry('otro').tenant, 'otro');
+  for (const args of [[], ['--project', PROJECT], ['--tenant', 'con/barra', '--project', PROJECT],
     ['--tenant', TENANT, '--project', 'otro'], [...base, '--database', 'otra'],
     [...base, '--apply'], [...base, '--apply', '--confirm-tenant', 'otro'],
     [...base, '--apply', '--confirm-tenant', TENANT, '--run-dir', 'unused'],
@@ -104,12 +349,114 @@ test('argumentos: dry-run por defecto y barreras de ámbito/escritura', () => {
 
 test('tenant/proyecto inválidos abortan antes de inicializar el adaptador', async () => {
   let factories = 0;
-  for (const args of [['--tenant', 'otro', '--project', PROJECT], ['--tenant', TENANT, '--project', 'otro']]) {
+  for (const args of [['--tenant', 'con/barra', '--project', PROJECT], ['--tenant', TENANT, '--project', 'otro']]) {
     await assert.rejects(main(args, { adapterFactory() { factories++; throw new Error('no debe entrar'); } }));
   }
   assert.equal(factories, 0);
   assert.throws(() => classify('ventas', sale('Nombre', { clienteId: 'otro' })));
   assert.throws(() => classify('pagos', sale()));
+});
+
+test('dry-run individual admite un tenant distinto de elgol y sigue aislado', async () => {
+  const tenant = 'cliente-activo';
+  const adapter = memoryAdapter({ ventas: {
+    a: { clienteId: tenant, clienteNombre: 'Ana' },
+    b: sale('Megan'),
+  } });
+  const result = await run(tenantDry(tenant), adapter, { log: silent });
+  assert.equal(result.tenant, tenant);
+  assert.equal(result.counts.ventas.examined, 1);
+  assert.equal(result.counts.ventas.candidates, 1);
+  assert.equal(result.writes, 0);
+  assert.equal(adapter.tenantReads.length, 0);
+  assert.ok(adapter.pages.every(page => page.tenant === tenant));
+});
+
+test('apply de tenant activo registrado valida identidad y procesa solo ese tenant', async () => {
+  const tenant = 'cliente-activo';
+  const config = tenantApply(tenant);
+  const adapter = memoryAdapter({
+    tenants: { [tenant]: { estado: 'activo' } },
+    ventas: {
+      a: { clienteId: tenant, clienteNombre: 'Ana' },
+      b: sale('Megan'),
+    },
+  });
+  const result = await run(config, adapter, { store: memoryStore(config), log: silent });
+  assert.equal(result.errors, 0);
+  assert.equal(result.writes, 1);
+  assert.deepEqual(adapter.tenantReads, [tenant]);
+  assert.deepEqual(adapter.writes.map(write => write.id), ['a']);
+  assert.equal(adapter.docs.ventas.get('a').data.clienteNombreBusqueda, 'ana');
+  assert.equal(adapter.docs.ventas.get('b').data.clienteNombreBusqueda, undefined);
+});
+
+test('apply rechaza confirmación distinta antes de crear configuración ejecutable', () => {
+  assert.throws(() => parseArgs([...tenantBase('cliente-activo'), '--apply',
+    '--confirm-tenant', 'otro', '--max-updates', '1', '--run-dir', 'run']),
+  /idéntico/);
+});
+
+test('apply rechaza tenant inexistente, suspendido, inactivo, sin estado, cancelado o con identidad anómala', async () => {
+  const tenant = 'cliente-restringido';
+  const cases = [
+    { label: 'huérfano/inexistente', tenants: {}, pattern: /inexistente/ },
+    { label: 'suspendido', tenants: { [tenant]: { estado: 'suspendido' } }, pattern: /no activo/ },
+    { label: 'inactivo', tenants: { [tenant]: { estado: 'inactivo' } }, pattern: /no activo/ },
+    { label: 'estado ausente', tenants: { [tenant]: {} }, pattern: /ausente/ },
+    { label: 'suscripción cancelada', tenants: { [tenant]: { estado: 'activo', estadoSuscripcion: 'cancelado' } }, pattern: /cancelada/ },
+    { label: 'identidad anómala', tenants: { [tenant]: { estado: 'activo', clienteId: 'otro' } }, pattern: /identidad/ },
+  ];
+  for (const current of cases) {
+    const config = tenantApply(tenant);
+    const adapter = memoryAdapter({ tenants: current.tenants,
+      ventas: { a: { clienteId: tenant, clienteNombre: 'Ana' } } });
+    const store = memoryStore(config);
+    await assert.rejects(run(config, adapter, { store, log: silent }), current.pattern, current.label);
+    assert.equal(adapter.writes.length, 0, current.label);
+    assert.equal(store.state.reserved, 0, current.label);
+    assert.equal(store.saved, undefined, current.label);
+  }
+});
+
+test('validación apply exige document ID exacto y lectura canónica', async () => {
+  const tenant = 'cliente-activo';
+  const config = tenantApply(tenant);
+  await assert.rejects(validateApplyTenant(config, {
+    async readTenant() { return { id: 'otro', data: { estado: 'activo' } }; },
+  }), /document ID/);
+  await assert.rejects(validateApplyTenant(config, {}), /lectura canónica/);
+  const adapter = memoryAdapter({ tenants: { [tenant]: { estado: 'activo' } } });
+  const eligibility = await validateTenantEligibility(tenant, adapter);
+  assert.equal(eligibility.id, tenant);
+});
+
+test('CLI aborta apply no autorizado antes de abrir el run-dir', async () => {
+  const tenant = 'tenant-inexistente';
+  const adapter = memoryAdapter({ tenants: {} });
+  const originalOpen = fs.openSync;
+  const originalMkdir = fs.mkdirSync;
+  fs.openSync = () => { throw new Error('se intentó abrir un archivo local'); };
+  fs.mkdirSync = () => { throw new Error('se intentó crear run-dir'); };
+  try {
+    await assert.rejects(main([...tenantBase(tenant), '--apply', '--confirm-tenant', tenant,
+      '--max-updates', '1', '--run-dir', `unused-${tenant}`], {
+      adapterFactory() { return adapter; },
+    }), /inexistente/);
+  } finally {
+    fs.openSync = originalOpen;
+    fs.mkdirSync = originalMkdir;
+  }
+  assert.equal(adapter.writes.length, 0);
+});
+
+test('checkpoint y run-dir quedan vinculados a un único tenant', () => {
+  const first = tenantApply('tenant-uno');
+  const second = tenantApply('tenant-dos');
+  const state = initialState(first);
+  assert.equal(state.tenant, 'tenant-uno');
+  assert.throws(() => validateState(state, second), /Checkpoint incompatible/);
+  assert.notEqual(first.runDir, second.runDir);
 });
 
 test('dry-run paginado no accede siquiera a métodos de escritura ni al store', async () => {
@@ -488,10 +835,16 @@ test('adaptador: consulta acotada y update con máscara de un campo + lastUpdate
   }
   query.get = async () => ({ docs: [{ exists: true, id: 'doc-a', data: () => sale(),
     updateTime: snapshotUpdateTime }] });
-  query.doc = id => ({ update: async (...args) => {
-    calls.push(['update', id, ...args]);
-    return nativeWriteResult;
-  } });
+  query.doc = id => ({
+    update: async (...args) => {
+      calls.push(['update', id, ...args]);
+      return nativeWriteResult;
+    },
+    get: async () => {
+      calls.push(['get', id]);
+      return { exists: true, id, data: () => ({ estado: 'activo' }) };
+    },
+  });
   const db = { collection(c) { calls.push(['collection', c]); return query; } };
   const adapter = createAdapter(db, { documentId: () => '__name__' });
   const documents = await adapter.page('ventas', TENANT, 'cursor', 10);
@@ -502,10 +855,13 @@ test('adaptador: consulta acotada y update con máscara de un campo + lastUpdate
   assert.equal(result, nativeWriteResult);
   assert.deepEqual(calls.at(-1), ['update', 'a', { clienteNombreBusqueda: 'ana' },
     { lastUpdateTime: snapshotUpdateTime }]);
+  const tenant = await adapter.readTenant(TENANT);
+  assert.deepEqual(tenant, { id: TENANT, data: { estado: 'activo' } });
+  assert.deepEqual(calls.slice(-2), [['collection', 'clientes-saas'], ['get', TENANT]]);
   await assert.rejects(adapter.update('ventas', 'a', 'updatedAt', 'x', snapshotUpdateTime));
   await assert.rejects(adapter.update('ventas', 'a', 'clienteNombreBusqueda', 'x', null));
   await assert.rejects(adapter.page('pagos', TENANT, null, 10));
-  await assert.rejects(adapter.page('ventas', 'otro', null, 10));
+  await assert.rejects(adapter.page('ventas', 'con/barra', null, 10));
 });
 
 test('adaptador reconcile-only expone exclusivamente lectura documental', async () => {

@@ -8,13 +8,16 @@ de acceso real de este documento quedan preparados para una autorización poster
 ## Alcance y garantías
 
 - Proyecto obligatorio: `conectarsublimados-7881e`.
-- Tenant obligatorio y único admitido: `elgol`.
+- Dry-run, apply y reconcile-only procesan exactamente un `--tenant` por ejecución.
+  El inventario global no admite `--tenant` y nunca escribe.
 - Base única: `(default)`. Colecciones únicas: `ventas` y `pedidos`.
 - Los argumentos se validan antes de cargar Firebase o buscar credenciales.
 - Modo predeterminado: **DRY-RUN**; no llama al camino de escritura ni crea logs,
   checkpoints u otros archivos. Imprime únicamente en la terminal.
-- Apply exige `--apply`, `--confirm-tenant elgol`, `--max-updates N` y un directorio
-  nuevo de ejecución o un checkpoint existente para reanudar.
+- Apply exige `--apply`, una confirmación idéntica mediante `--confirm-tenant`,
+  `--max-updates N` y un directorio individual nuevo o su checkpoint para reanudar.
+- Antes de abrir el run-dir, apply relee el documento canónico del tenant y exige
+  que exista, sea activo, no esté cancelado y no tenga una identidad inconsistente.
 - Solo completa los dos derivados indicados abajo. Nunca usa `set`, `delete`,
   transacciones, Functions, despliegues ni modificación de reglas o índices.
 - Una página en memoria, escrituras secuenciales y reintentos limitados.
@@ -90,13 +93,165 @@ Referencias oficiales: [ADC local](https://cloud.google.com/docs/authentication/
 [Firebase Admin](https://firebase.google.com/docs/admin/setup) y
 [DocumentReference.update](https://cloud.google.com/nodejs/docs/reference/firestore/latest/firestore/documentreference).
 
+## Inventario global de solo lectura — ejecución real pendiente de autorización
+
+`--inventory-global` descubre tenants registrados y audita los campos derivados sin
+crear ni modificar datos. Su fuente canónica es el document ID de `clientes-saas`;
+un campo interno `clienteId` diferente se informa como anomalía de identidad y nunca
+reemplaza ese ID.
+
+Comando preparado para una autorización posterior de lectura real:
+
+```powershell
+node backfill.cjs --project conectarsublimados-7881e --inventory-global --page-size 100
+```
+
+Este modo no admite `--tenant`, `--dry-run`, `--apply`, `--reconcile-only`, cursores
+manuales, límites de escritura, `--run-dir` ni `--resume`. No llama al estado del
+backfill normal, no abre archivos locales y no contiene reservas o pending. Su
+adaptador expone exclusivamente `pageTenants` y `pageCollection`; no expone update,
+set, create, delete, batch ni transacciones.
+
+Recorre secuencialmente y por document ID:
+
+```javascript
+db.collection('clientes-saas')
+  .orderBy(FieldPath.documentId())
+  .select('clienteId', 'nombreVisible', 'nombre', 'nombreCliente', 'estado', 'estadoSuscripcion')
+  .limit(pageSize)
+
+db.collection('ventas')
+  .orderBy(FieldPath.documentId())
+  .select('clienteId', 'clienteNombre', 'clienteNombreBusqueda')
+  .limit(pageSize)
+
+db.collection('pedidos')
+  .orderBy(FieldPath.documentId())
+  .select('clienteId', 'cliente', 'clienteBusqueda')
+  .limit(pageSize)
+// En páginas siguientes: .startAfter(ultimoDocumentId)
+```
+
+Solo conserva mapas de contadores por `clienteId`, no las colecciones completas.
+Los IDs válidos presentes en ventas o pedidos que no estén registrados se agrupan
+como tenants huérfanos. Los documentos con `clienteId` ausente, string vacío o tipo
+inesperado se cuentan por separado y nunca se asignan a un tenant.
+
+Para cada tenant registrado informa ID canónico, nombre existente (en orden
+`nombreVisible`, `nombre`, `nombreCliente`), estado, estado de suscripción,
+elegibilidad informativa, documentos examinados/candidatos, fuentes inválidas,
+derivados de tipo inesperado y errores. La elegibilidad solo es verdadera si
+`estado === "activo"`, `estadoSuscripcion !== "cancelado"` y no hay anomalía de
+identidad. No habilita ninguna escritura.
+
+El resumen global informa tenants por estado/elegibilidad, candidatos y examinados
+por colección, huérfanos, IDs inválidos, anomalías, errores, horas de inicio/final y
+completitud individual de los tres recorridos. Diferencia los candidatos de tenants
+activos elegibles y los de tenants suspendidos/inactivos. Al final imprime
+`TENANTS ACTIVOS CON CANDIDATOS`, ordenados por la suma de candidatos de mayor a
+menor, con columnas de ID, nombre, ventas y pedidos. Los activos cancelados o con
+identidad inconsistente no entran en esa lista operativa. Si falla una página, esa
+colección queda incompleta, los totales se marcan no definitivos y el inventario
+intenta leer las colecciones restantes para aportar diagnóstico.
+
+El resultado siempre advierte que el recorrido paginado no es una snapshot
+transaccional global: escrituras concurrentes pueden cambiar el universo durante la
+lectura. Antes de una futura planificación de apply conviene repetir el inventario.
+`elgol` se procesa como cualquier otro tenant; sus candidatos no se fuerzan a cero.
+Los run-dir existentes bajo `runs/` no se abren ni se modifican.
+
+## Orquestador multi-tenant local
+
+`orchestrator.cjs` automatiza tenants elegibles sin incorporar un apply global. Tiene
+dos fases separadas y procesa siempre un tenant por vez. No usa workers, promesas en
+paralelo ni escrituras simultáneas. Las ejecuciones reales de ambas fases requieren
+autorización operativa aparte.
+
+### PREPARE: inventario y plan congelado
+
+Desde este directorio, un comando futuro de preparación sería:
+
+```powershell
+node orchestrator.cjs `
+  --project conectarsublimados-7881e `
+  --prepare `
+  --run-dir ./runs/multi-tenant-2026-09-01-001 `
+  --page-size 100
+```
+
+PREPARE solo usa el inventario global de lectura. Exige cero errores, los tres
+recorridos completos y totales definitivos. Selecciona documentos registrados de
+`clientes-saas` que estén activos, sean elegibles, no estén cancelados, no tengan
+anomalías de identidad y tengan candidatos. Huérfanos, IDs inválidos, suspendidos,
+inactivos y documentos omitidos por clasificación nunca entran en el plan.
+
+El directorio debe ser nuevo y estar debajo de `tools/backfill-busqueda/runs/`.
+Genera `plan.json`, `manifest.json`, `state.json`, `summary.json`, journal global y
+una carpeta por tenant. `plan.json` contiene proyecto, base, hora, cantidad, total de
+candidatos y la lista ordenada. Su SHA-256 se calcula sobre una serialización estable
+del contenido. EXECUTE no regenera el inventario ni modifica la lista congelada.
+
+### EXECUTE: confirmación y límites
+
+Después de revisar el plan, el comando futuro de ejecución sería:
+
+```powershell
+node orchestrator.cjs `
+  --project conectarsublimados-7881e `
+  --execute `
+  --resume ./runs/multi-tenant-2026-09-01-001 `
+  --confirm-plan HASH_SHA256_DE_PLAN_JSON `
+  --max-updates-per-tenant 250 `
+  --max-updates-total 3000 `
+  --page-size 100
+```
+
+Los límites son obligatorios. Para cada tenant, el límite entregado al motor es
+exactamente la suma de candidatos obtenida por su dry-run individual actual, sin
+margen. Si supera el límite por tenant queda `NEEDS_REVIEW` sin escrituras. Antes de
+autorizar un apply nuevo o reanudado también se comprueba conservadoramente que su
+límite completo cabe en el presupuesto total. Las reservas acumuladas nunca pueden
+superar `--max-updates-total`.
+
+El flujo revalida el documento canónico, ejecuta dry-run completo, crea el run-dir
+individual solo cuando corresponde, llama al motor actual con tenant y confirmación
+idénticos, y ejecuta un dry-run final. `COMPLETED` exige cero candidatos, cero errores
+y recorrido completo. El adaptador, checkpoint, reservas, pending y precondición
+`lastUpdateTime` son los mismos del backfill individual.
+
+Los nombres de las carpetas usan secuencia y un hash del ID; `tenant.json` conserva
+la relación exacta. Cada subdirectorio `apply/` tiene checkpoint y journal propios.
+El estado global nunca se usa como checkpoint de escritura.
+
+### Errores y reanudación
+
+Errores de elegibilidad, concurrencia, pending, checkpoint o lock individual se
+detienen en ese tenant. Pending produce `NEEDS_RECONCILIATION` y no se reconcilia
+automáticamente. Dos errores locales consecutivos de la misma clase detienen toda la
+corrida. Credenciales, permisos, índices, red, disponibilidad, recursos, disco,
+plan/hash, estado global, señal del operador y errores desconocidos son globales.
+
+En resume se saltan `COMPLETED`, `ALREADY_COMPLETE`, `OMITTED`, `FAILED`,
+`NEEDS_REVIEW` y `NEEDS_RECONCILIATION`. Lecturas interrumpidas pueden reiniciarse.
+Un tenant `APPLYING` solo reanuda si su checkpoint corresponde al mismo tenant y
+límite, no tiene pending y no conserva lock individual. Nunca se eliminan locks o
+run-dir automáticamente.
+
+`state.json` y `summary.json` se reemplazan mediante archivo temporal, `fsync` y
+rename. El journal global es append-only. Un `run.lock` en la raíz impide dos EXECUTE
+simultáneos. `summary.json` separa escrituras confirmadas, reservas, resultados
+inciertos y pending, y agrupa completados, ya completos, omitidos y casos de revisión.
+
+Todos esos archivos permanecen bajo `runs/`, ignorado por Git. Contienen IDs y datos
+operativos: no deben copiarse a ubicaciones públicas ni agregarse al repositorio.
+
 ## Futuro dry-run — requiere autorización aparte
 
 Después de configurar y revisar la identidad, este comando recorre ambos conjuntos
-del tenant, en páginas de hasta 100 documentos:
+de un único tenant, en páginas de hasta 100 documentos:
 
 ```powershell
-node backfill.cjs --project conectarsublimados-7881e --tenant elgol --dry-run --page-size 100
+node backfill.cjs --project conectarsublimados-7881e --tenant CLIENTE_ID --dry-run --page-size 100
 ```
 
 Omitir `--dry-run` produce el mismo modo seguro. No añadir `--apply`.
@@ -113,7 +268,7 @@ como completos. Las anomalías de datos son omisiones, no errores de infraestruc
 La consulta de cada página es:
 
 ```javascript
-collection.where('clienteId', '==', 'elgol')
+collection.where('clienteId', '==', 'CLIENTE_ID')
   .orderBy(FieldPath.documentId())
   .select('clienteId', campoFuente, campoDerivado)
   .limit(pageSize)
@@ -121,8 +276,10 @@ collection.where('clienteId', '==', 'elgol')
 ```
 
 No usa offset ni exige que exista el campo derivado para incluir un documento.
-`--page-size` admite 1 a 500 (por defecto 100). Los documentos sin `clienteId`
-correcto quedan fuera; no se adivina a qué tenant pertenecen.
+`--page-size` admite 1 a 500 (por defecto 100). Los documentos sin el `clienteId`
+solicitado quedan fuera; no se adivina a qué tenant pertenecen. Dry-run admite
+cualquier ID documental válido, pero no habilita apply ni demuestra por sí solo que
+el tenant esté activo.
 No se crean índices. Si esta consulta falla por un índice, se detiene y habrá que
 revisar la definición solicitada; los índices de búsqueda por nombre son consultas
 distintas y no sustituyen esta comprobación pendiente en el entorno real.
@@ -143,7 +300,7 @@ de este modo solo expone lectura documental: no contiene operaciones `update`,
 Ejemplo para el primer piloto, sujeto a autorización separada de lectura real:
 
 ```powershell
-node backfill.cjs --project conectarsublimados-7881e --tenant elgol --reconcile-only --resume "C:\Users\MatiNuevo\Desktop\proyectos\conectar-sublima-app\tools\backfill-busqueda\runs\elgol-piloto"
+node backfill.cjs --project conectarsublimados-7881e --tenant CLIENTE_ID --reconcile-only --resume "C:\ruta\al\run-dir-del-tenant"
 ```
 
 No admite `--apply`, `--dry-run`, `--max-updates`, cursores, tamaño/límite de páginas
@@ -172,12 +329,27 @@ posterior con `--resume` requiere autorización de escritura aparte. Si el deriv
 seguía ausente, el recorrido normal podrá encontrarlo nuevamente y cualquier intento
 nuevo consumirá una reserva adicional dentro del límite original.
 
-## Futuro apply — requiere autorización explícita adicional
+## Futuro apply individual — requiere autorización explícita adicional
+
+No existe `--apply-global`. Cada ejecución exige un solo tenant y una confirmación
+idéntica. Antes de crear o abrir el run-dir, el CLI consulta exclusivamente
+`clientes-saas/{CLIENTE_ID}` y valida:
+
+1. El documento existe y su document ID coincide exactamente.
+2. Si contiene un campo interno `clienteId`, coincide con el document ID.
+3. `estado === "activo"`.
+4. `estadoSuscripcion !== "cancelado"`.
+5. `--confirm-tenant` coincide exactamente con `--tenant`.
+
+Un tenant huérfano, suspendido, inactivo, de estado desconocido, cancelado o con
+identidad inconsistente aborta antes de abrir el registro local y antes de cualquier
+escritura. Firebase Admin usa IAM, por lo que esta comprobación de código es una
+barrera adicional obligatoria.
 
 Ejemplo de piloto limitado a **cinco actualizaciones en total**, no cinco por lote:
 
 ```powershell
-node backfill.cjs --project conectarsublimados-7881e --tenant elgol --apply --confirm-tenant elgol --max-updates 5 --page-size 5 --run-dir ./runs/elgol-piloto-001
+node backfill.cjs --project conectarsublimados-7881e --tenant CLIENTE_ID --apply --confirm-tenant CLIENTE_ID --max-updates 5 --page-size 5 --run-dir ./runs/CLIENTE_ID-piloto-001
 ```
 
 El directorio debe ser nuevo. Los caminos relativos se resuelven desde el directorio
@@ -217,10 +389,11 @@ sincronizadas. No hay atomicidad distribuida entre disco local y Firestore.
 Para continuar la misma ejecución después de una interrupción o límite de páginas:
 
 ```powershell
-node backfill.cjs --project conectarsublimados-7881e --tenant elgol --apply --confirm-tenant elgol --max-updates 5 --page-size 5 --resume ./runs/elgol-piloto-001
+node backfill.cjs --project conectarsublimados-7881e --tenant CLIENTE_ID --apply --confirm-tenant CLIENTE_ID --max-updates 5 --page-size 5 --resume ./runs/CLIENTE_ID-piloto-001
 ```
 
-El `max-updates` debe coincidir con el original: no se reinicia al reanudar.
+El `max-updates` y el tenant deben coincidir con el checkpoint original: no se
+reinicia el límite y un run-dir nunca puede reanudarse para otro tenant.
 Al agotarse, esta ejecución no recibe más cupo; otra ejecución con nuevo directorio
 y otro presupuesto requiere revisión/autorización. No editar el checkpoint para
 aumentar el límite. Se permiten otros tamaños de página, manteniendo el ámbito.
