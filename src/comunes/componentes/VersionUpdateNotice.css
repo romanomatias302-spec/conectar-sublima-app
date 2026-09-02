@@ -1,0 +1,105 @@
+.zalfro-version-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.62);
+  box-sizing: border-box;
+}
+
+.zalfro-version-modal {
+  width: min(460px, 100%);
+  padding: 26px;
+  border: 1px solid #dce5ec;
+  border-radius: 14px;
+  background: #ffffff;
+  color: #1f2937;
+  box-shadow: 0 22px 60px rgba(15, 23, 42, 0.28);
+  text-align: center;
+}
+
+.zalfro-version-modal h2 {
+  margin: 0 0 12px;
+  padding: 0;
+  border: 0;
+  color: #111827;
+  font-size: 22px;
+}
+
+.zalfro-version-modal p {
+  margin: 0 0 20px;
+  color: #526171;
+  line-height: 1.55;
+}
+
+.zalfro-version-modal button {
+  min-width: 170px;
+}
+
+.zalfro-version-banner {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 2147482000;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  max-width: min(620px, calc(100vw - 36px));
+  padding: 14px 16px;
+  border: 1px solid #b9dceb;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #1f2937;
+  box-shadow: 0 12px 35px rgba(15, 23, 42, 0.2);
+}
+
+.zalfro-version-banner div {
+  display: grid;
+  gap: 3px;
+}
+
+.zalfro-version-banner strong {
+  color: #111827;
+}
+
+.zalfro-version-banner span {
+  color: #526171;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+body.dark-mode .zalfro-version-modal,
+body.dark-mode .zalfro-version-banner {
+  border-color: #414141;
+  background: #262626;
+  color: #e5e7eb;
+}
+
+body.dark-mode .zalfro-version-modal h2,
+body.dark-mode .zalfro-version-banner strong {
+  color: #f3f4f6;
+}
+
+body.dark-mode .zalfro-version-modal p,
+body.dark-mode .zalfro-version-banner span {
+  color: #b8c2ce;
+}
+
+@media (max-width: 640px) {
+  .zalfro-version-banner {
+    right: 12px;
+    bottom: 12px;
+    left: 12px;
+    max-width: none;
+    align-items: stretch;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .zalfro-version-banner button {
+    width: 100%;
+  }
+}

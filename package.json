@@ -22,8 +22,9 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "react-scripts build",
+    "build": "node scripts/build.cjs",
     "test": "react-scripts test",
+    "test:build-wrapper": "node --test scripts/build.test.cjs",
     "eject": "react-scripts eject"
   },
   "eslintConfig": {
