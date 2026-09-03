@@ -36,7 +36,13 @@ import { Eye, Paperclip, ReceiptText } from "lucide-react";
 
 
 
-export default function VentaDetalle({ perfil, ventaId, onVolver, onVerPedido }) {
+export default function VentaDetalle({
+  perfil,
+  ventaId,
+  onVolver,
+  onVerPedido,
+  soloLectura = false,
+}) {
   const [venta, setVenta] = useState(null);
   const [items, setItems] = useState([]);
   const [pagos, setPagos] = useState([]);
@@ -99,10 +105,10 @@ const puedeVerVentas =
   puedeHacer(perfil, "ventas", "ver");
 
 const puedeEditarVentas =
-  puedeHacer(perfil, "ventas", "editar");
+  !soloLectura && puedeHacer(perfil, "ventas", "editar");
 
 const puedeCrearPedidos =
-  puedeHacer(perfil, "pedidos", "crear");
+  !soloLectura && puedeHacer(perfil, "pedidos", "crear");
 
 const [
   creandoPedidoDesdeVenta,
@@ -120,7 +126,7 @@ const [
 ] = useState("");
 
 const puedeAnularVentas =
-  puedeHacer(perfil, "ventas", "anular");
+  !soloLectura && puedeHacer(perfil, "ventas", "anular");
 
 
 
@@ -822,7 +828,12 @@ const crearPedidoDesdeVenta = async () => {
     return (
       <div className="ventas-page">
         <div className="ventas-card">
-          <p>Cargando detalle de venta...</p>
+          <p>{error || "Cargando detalle de venta..."}</p>
+          {error && onVolver ? (
+            <button type="button" className="ventas-btn ventas-btn-secondary" onClick={onVolver}>
+              Cerrar
+            </button>
+          ) : null}
         </div>
       </div>
     );
@@ -998,7 +1009,7 @@ const crearPedidoDesdeVenta = async () => {
       </button>
 
       <button className="btn btn-secondary" onClick={onVolver}>
-        Volver
+        {soloLectura ? "Cerrar" : "Volver"}
       </button>
     </div>
       </div>

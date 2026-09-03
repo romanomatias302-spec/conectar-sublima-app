@@ -1,15 +1,86 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { obtenerMovimientosPaginados } from "../../firebase/movimientos";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import {
+  movimientoEstaAnulado,
+  movimientoImpactaInforme,
+  crearResumenMovimientosVacio,
+  obtenerMovimientosCompletos,
+  obtenerMovimientosPaginados,
+  obtenerResumenMovimientosCompleto,
+} from "../../firebase/movimientos";
 import { obtenerDetalleMovimientoAuditoria } from "../../firebase/auditoriaMovimientos";
-import { obtenerHistorialProduccionGlobal } from "../../firebase/informesProduccion";
-import { obtenerEstadoActualProduccion } from "../../firebase/informesProduccion";
+import {
+  obtenerEstadoActualProduccion,
+  obtenerHistorialProduccionGlobal,
+  obtenerMetricasHistorialProduccion,
+} from "../../firebase/informesProduccion";
 import {
   obtenerSaldosPendientesClientes,
   obtenerSaldosPendientesProveedores,
 } from "../../firebase/informesFinancieros";
 import * as XLSX from "xlsx";
 import { fechaHoyNegocio } from "../../utils/fechas";
+import VentaDetalle from "../ventas/VentaDetalle";
+import GastoDetalleInforme from "./GastoDetalleInforme";
+import SaldoPendienteModal from "./SaldoPendienteModal";
+import InformeComercial from "./InformeComercial";
+import { obtenerVentaPorId } from "../../firebase/ventas";
+import { obtenerGastoPorId } from "../../firebase/gastos";
 
+export function crearControlSolicitudes() {
+  let ultimaSolicitud = 0;
+
+  return {
+    iniciar() {
+      ultimaSolicitud += 1;
+      return ultimaSolicitud;
+    },
+    esActual(solicitudId) {
+      return solicitudId === ultimaSolicitud;
+    },
+  };
+}
+
+export function tipoDetalleRealMovimiento(movimiento) {
+  const origen = movimiento?.origen || "";
+  const subtipo = movimiento?.subtipo || "";
+  if (!movimiento?.origenRefId) return null;
+
+  if (
+    origen === "venta" ||
+    origen === "venta_pago" ||
+    subtipo === "venta" ||
+    subtipo === "cobro_venta"
+  ) return "venta";
+
+  if (
+    origen === "gasto" ||
+    origen === "gasto_pago" ||
+    subtipo === "gasto" ||
+    subtipo === "gasto_caja"
+  ) return "gasto";
+
+  return null;
+}
+
+export async function resolverDetalleRealMovimiento({
+  movimiento,
+  perfil,
+  cargarVenta = obtenerVentaPorId,
+  cargarGasto = obtenerGastoPorId,
+}) {
+  const tipo = tipoDetalleRealMovimiento(movimiento);
+  if (!tipo) return null;
+
+  const detalle = tipo === "venta"
+    ? await cargarVenta(movimiento.origenRefId)
+    : await cargarGasto({ perfil, gastoId: movimiento.origenRefId });
+  const perteneceAlTenant =
+    perfil?.rol === "superadmin" ||
+    detalle.clienteId === perfil?.clienteId;
+
+  if (!perteneceAlTenant) throw new Error("La relación apunta a otro tenant.");
+  return { tipo, id: movimiento.origenRefId, movimiento };
+}
 
 function formatearMoneda(valor) {
   const numero = Number(valor) || 0;
@@ -106,8 +177,21 @@ const [vistaFinanzas, setVistaFinanzas] = useState("movimientos");
 const [saldosClientes, setSaldosClientes] = useState([]);
 const [saldosProveedores, setSaldosProveedores] = useState([]);
 const [loadingSaldos, setLoadingSaldos] = useState(false);
+const [loadingMetricasFinanzas, setLoadingMetricasFinanzas] = useState(false);
+const [resumen, setResumen] = useState(crearResumenMovimientosVacio);
+const [metricasProduccion, setMetricasProduccion] = useState({
+  totalMovimientos: 0,
+  pedidosFinalizados: 0,
+  promedioGeneralMinutos: 0,
+  productividadKpi: [],
+  etapasKpi: [],
+});
+const solicitudMetricasFinanzasRef = useRef(crearControlSolicitudes());
+const solicitudSaldosRef = useRef(crearControlSolicitudes());
+const solicitudProduccionRef = useRef(crearControlSolicitudes());
 
-const [saldoAbiertoId, setSaldoAbiertoId] = useState(null);
+const [saldoModal, setSaldoModal] = useState(null);
+const [detalleReal, setDetalleReal] = useState(null);
 
 const [exportandoExcel, setExportandoExcel] = useState(false);
 const [mensajeExportacion, setMensajeExportacion] = useState("");
@@ -137,7 +221,7 @@ const historialFiltrado = filtroUsuarioProduccion
     )
   : historialProduccion;
 
-const cargarEstadoActualProduccion = async () => {
+const cargarEstadoActualProduccion = useCallback(async () => {
   try {
     setLoadingEstadoActual(true);
     const res = await obtenerEstadoActualProduccion({ perfil });
@@ -147,9 +231,9 @@ const cargarEstadoActualProduccion = async () => {
   } finally {
     setLoadingEstadoActual(false);
   }
-};
+}, [perfil]);
 
-const cargarMovimientos = async () => {
+const cargarMovimientos = useCallback(async () => {
   try {
     setLoading(true);
 
@@ -171,7 +255,7 @@ const cargarMovimientos = async () => {
 } finally {
     setLoading(false);
   }
-};
+}, [perfil, fechaDesdeFinanzas, fechaHastaFinanzas, tipoMovimientoFiltro]);
 
 const cargarMas = async () => {
   try {
@@ -193,25 +277,68 @@ const cargarMas = async () => {
   }
 };
 
-const cargarSaldosPendientes = async () => {
+const cargarSaldosPendientes = useCallback(async () => {
+  const solicitudId = solicitudSaldosRef.current.iniciar();
   try {
     setLoadingSaldos(true);
+    setSaldosClientes([]);
+    setSaldosProveedores([]);
 
-    const [clientes, proveedores] = await Promise.all([
+    const [clientes, proveedores] = await Promise.allSettled([
       obtenerSaldosPendientesClientes({ perfil }),
       obtenerSaldosPendientesProveedores({ perfil }),
     ]);
 
-    setSaldosClientes(clientes);
-    setSaldosProveedores(proveedores);
-  } catch (error) {
-    console.error("Error cargando saldos pendientes:", error);
+    if (!solicitudSaldosRef.current.esActual(solicitudId)) return;
+
+    if (clientes.status === "fulfilled") {
+      setSaldosClientes(clientes.value);
+    } else {
+      console.error("Error cargando saldos pendientes de clientes:", clientes.reason);
+    }
+
+    if (proveedores.status === "fulfilled") {
+      setSaldosProveedores(proveedores.value);
+    } else {
+      console.error(
+        "Error cargando saldos pendientes de proveedores:",
+        proveedores.reason
+      );
+    }
   } finally {
-    setLoadingSaldos(false);
+    if (solicitudSaldosRef.current.esActual(solicitudId)) {
+      setLoadingSaldos(false);
+    }
   }
-};
+}, [perfil]);
 
 const abrirAuditoriaMovimiento = async (movimiento) => {
+  const origen = movimiento?.origen || "";
+  const origenRefId = movimiento?.origenRefId || "";
+  const tipoReal = tipoDetalleRealMovimiento(movimiento);
+
+  if (tipoReal) {
+    try {
+      setLoadingAuditoria(true);
+      const detalleResuelto = await resolverDetalleRealMovimiento({
+        movimiento,
+        perfil,
+      });
+      setDetalleReal(detalleResuelto);
+      return;
+    } catch (errorRelacion) {
+      console.warn(
+        "No se pudo resolver la relación real del movimiento; se usa fallback:",
+        { movimientoId: movimiento?.firebaseId, origen, origenRefId },
+        errorRelacion
+      );
+      setModalAuditoria({ movimiento, origen, detalle: null });
+      return;
+    } finally {
+      setLoadingAuditoria(false);
+    }
+  }
+
   try {
     setLoadingAuditoria(true);
 
@@ -224,34 +351,6 @@ const abrirAuditoriaMovimiento = async (movimiento) => {
   } finally {
     setLoadingAuditoria(false);
   }
-};
-
-const movimientoEstaAnulado = (m) => {
-  return (
-    m?.estadoMovimiento === "anulado" ||
-    m?.estado === "anulado" ||
-    m?.activo === false ||
-    m?.anulado === true
-  );
-};
-
-const movimientoImpactaInforme = (m) => {
-  const subtipo = m?.subtipo || "";
-
-  const subtiposNoOperativos = [
-    "aporte_capital",
-    "ingreso_capital",
-    "retiro_capital",
-    "egreso_capital",
-    "ajuste_positivo",
-    "ajuste_negativo",
-  ];
-
-  return (
-    !movimientoEstaAnulado(m) &&
-    m?.impactaResultado !== false &&
-    !subtiposNoOperativos.includes(subtipo)
-  );
 };
 
 const aplicarRangoRapidoFinanzas = (rango) => {
@@ -288,17 +387,24 @@ const exportarMovimientosCSV = async () => {
 
     if (exportandoExcel) return;
 
-    if (!movimientos.length) {
-      setMensajeExportacion("No hay movimientos para exportar en el período seleccionado.");
-      return;
-    }
-
     setExportandoExcel(true);
     setMensajeExportacion("Preparando descarga...");
 
-    await new Promise((resolve) => setTimeout(resolve, 300));
+    const movimientosExportables = await obtenerMovimientosCompletos({
+      perfil,
+      fechaDesde: fechaDesdeFinanzas,
+      fechaHasta: fechaHastaFinanzas,
+      tipo: tipoMovimientoFiltro,
+    });
 
-    const datos = movimientos.map((m) => ({
+    if (!movimientosExportables.length) {
+      setMensajeExportacion(
+        "No hay movimientos para exportar en el período seleccionado."
+      );
+      return;
+    }
+
+    const datos = movimientosExportables.map((m) => ({
       Fecha: m.createdAt?.toDate
         ? m.createdAt.toDate().toLocaleDateString("es-AR")
         : m.fecha || "",
@@ -327,27 +433,94 @@ const exportarMovimientosCSV = async () => {
   }
 };
 
-const cargarHistorialProduccion = async () => {
-  try {
-    setLoadingProduccion(true);
+const cargarMetricasFinanzas = useCallback(async () => {
+  const solicitudId = solicitudMetricasFinanzasRef.current.iniciar();
 
-    const historial = await obtenerHistorialProduccionGlobal({
+  try {
+    setLoadingMetricasFinanzas(true);
+    const nuevoResumen = await obtenerResumenMovimientosCompleto({
       perfil,
-      fechaDesde: filtroDesdeProduccion,
-      fechaHasta: filtroHastaProduccion,
+      fechaDesde: fechaDesdeFinanzas,
+      fechaHasta: fechaHastaFinanzas,
+      tipo: tipoMovimientoFiltro,
     });
 
-    setHistorialProduccion(historial);
+    if (solicitudMetricasFinanzasRef.current.esActual(solicitudId)) {
+      setResumen(nuevoResumen);
+    }
   } catch (error) {
-    console.error("Error cargando historial global de producción:", error);
+    console.error("Error cargando métricas financieras completas:", error);
+    if (solicitudMetricasFinanzasRef.current.esActual(solicitudId)) {
+      setResumen(crearResumenMovimientosVacio());
+    }
   } finally {
-    setLoadingProduccion(false);
+    if (solicitudMetricasFinanzasRef.current.esActual(solicitudId)) {
+      setLoadingMetricasFinanzas(false);
+    }
   }
-};
+}, [perfil, fechaDesdeFinanzas, fechaHastaFinanzas, tipoMovimientoFiltro]);
+
+const cargarHistorialProduccion = useCallback(async () => {
+  const solicitudId = solicitudProduccionRef.current.iniciar();
+  try {
+    setLoadingProduccion(true);
+    setMetricasProduccion({
+      totalMovimientos: 0,
+      pedidosFinalizados: 0,
+      promedioGeneralMinutos: 0,
+      productividadKpi: [],
+      etapasKpi: [],
+    });
+
+    const [historial, metricas] = await Promise.allSettled([
+      obtenerHistorialProduccionGlobal({
+        perfil,
+        fechaDesde: filtroDesdeProduccion,
+        fechaHasta: filtroHastaProduccion,
+      }),
+      obtenerMetricasHistorialProduccion({
+        perfil,
+        fechaDesde: filtroDesdeProduccion,
+        fechaHasta: filtroHastaProduccion,
+        usuarioUid: filtroUsuarioProduccion,
+      }),
+    ]);
+
+    if (!solicitudProduccionRef.current.esActual(solicitudId)) return;
+
+    if (historial.status === "fulfilled") {
+      setHistorialProduccion(historial.value);
+    } else {
+      console.error(
+        "Error cargando detalle del historial de producción:",
+        historial.reason
+      );
+    }
+
+    if (metricas.status === "fulfilled") {
+      setMetricasProduccion(metricas.value);
+    } else {
+      console.error(
+        "Error cargando métricas históricas de producción:",
+        metricas.reason
+      );
+    }
+  } finally {
+    if (solicitudProduccionRef.current.esActual(solicitudId)) {
+      setLoadingProduccion(false);
+    }
+  }
+}, [
+  perfil,
+  filtroDesdeProduccion,
+  filtroHastaProduccion,
+  filtroUsuarioProduccion,
+]);
 
 useEffect(() => {
   cargarMovimientos();
-}, [perfil, fechaDesdeFinanzas, fechaHastaFinanzas, tipoMovimientoFiltro]);
+  cargarMetricasFinanzas();
+}, [cargarMovimientos, cargarMetricasFinanzas]);
 
 useEffect(() => {
   if (
@@ -357,33 +530,18 @@ useEffect(() => {
   ) {
     cargarSaldosPendientes();
   }
-}, [vistaActiva, vistaFinanzas, perfil]);
-
-  const resumen = useMemo(() => {
-    const movimientosActivos = movimientos.filter((m) => movimientoImpactaInforme(m));
-
-    const ingresos = movimientosActivos.filter((m) => m.tipo === "ingreso");
-    const egresos = movimientosActivos.filter((m) => m.tipo === "egreso");
-
-    const totalIngresos = ingresos.reduce((acc, m) => acc + (Number(m.monto) || 0), 0);
-    const totalEgresos = egresos.reduce((acc, m) => acc + (Number(m.monto) || 0), 0);
-
-    return {
-      totalIngresos,
-      totalEgresos,
-      resultado: totalIngresos - totalEgresos,
-      cantidadIngresos: ingresos.length,
-      cantidadEgresos: egresos.length,
-      cantidadMovimientos: movimientos.length,
-    };
-  }, [movimientos]);
+}, [vistaActiva, vistaFinanzas, cargarSaldosPendientes]);
 
 useEffect(() => {
   if (vistaActiva === "produccion") {
     cargarHistorialProduccion();
     cargarEstadoActualProduccion();
   }
-}, [vistaActiva, perfil]);
+}, [
+  vistaActiva,
+  cargarHistorialProduccion,
+  cargarEstadoActualProduccion,
+]);
 
   return (
     <div className="clientes-lista informes-page">
@@ -438,11 +596,27 @@ useEffect(() => {
         >
           Producción
         </button>
+
+        <button
+          onClick={() => setVistaActiva("comercial")}
+          style={{
+            padding: "10px 14px",
+            borderRadius: 10,
+            border: "1px solid #d9dee8",
+            background: vistaActiva === "comercial" ? "#eaf2ff" : "#fff",
+            fontWeight: 700,
+            cursor: "pointer",
+          }}
+        >
+          Comercial
+        </button>
       </div>
     
      
 
-{(vistaActiva === "resumen" || vistaActiva === "finanzas") && (
+{(vistaActiva === "resumen" ||
+  vistaActiva === "finanzas" ||
+  vistaActiva === "comercial") && (
   <div
     style={{
       background: "#fff",
@@ -565,7 +739,7 @@ useEffect(() => {
                   setRangoFinanzasActivo("todos");
                   setFechaDesdeFinanzas("");
                   setFechaHastaFinanzas("");
-                  setSaldoAbiertoId(null);
+                  setSaldoModal(null);
                 }
               }}
               style={{
@@ -618,8 +792,13 @@ useEffect(() => {
 )}
 
       {loading && <p>Cargando informes...</p>}
+      {loadingAuditoria && <p>Abriendo detalle...</p>}
+      {loadingMetricasFinanzas &&
+        (vistaActiva === "resumen" || vistaActiva === "finanzas") && (
+          <p>Cargando totales completos...</p>
+        )}
 
-      {!loading && vistaActiva === "resumen" && (
+      {!loading && !loadingMetricasFinanzas && vistaActiva === "resumen" && (
         <div
           style={{
             display: "grid",
@@ -649,17 +828,9 @@ useEffect(() => {
       {!loading && vistaActiva === "finanzas" && (
         <>
         {(() => {
-          const movimientosActivos = movimientos.filter((m) => movimientoImpactaInforme(m));
-
-          const ingresos = movimientosActivos
-            .filter((m) => (m.tipo || "").toLowerCase() === "ingreso")
-            .reduce((acc, m) => acc + (Number(m.monto) || 0), 0);
-
-          const egresos = movimientosActivos
-            .filter((m) => (m.tipo || "").toLowerCase() === "egreso")
-            .reduce((acc, m) => acc + (Number(m.monto) || 0), 0);
-
-          const resultado = ingresos - egresos;
+          const ingresos = resumen.totalIngresosFinanzas;
+          const egresos = resumen.totalEgresosFinanzas;
+          const resultado = resumen.resultadoFinanzas;
 
           const totalClientesPendiente = saldosClientes.reduce(
             (acc, c) => acc + Number(c.totalPendiente || 0),
@@ -763,6 +934,8 @@ useEffect(() => {
             );
           }
 
+          if (loadingMetricasFinanzas) return null;
+
           return (
             <div
               style={{
@@ -773,8 +946,11 @@ useEffect(() => {
               }}
             >
               <div style={cardStyle}>
-                <div style={labelStyle}>Ingresos del período</div>
+                <div style={labelStyle}>Ingresos</div>
                 <div style={valueStyle}>{formatearMoneda(ingresos)}</div>
+                <div style={{ fontSize: 12, color: "#777", marginTop: 4 }}>
+                  Ingresos operativos registrados.
+                </div>
               </div>
 
               <div style={cardStyle}>
@@ -806,68 +982,22 @@ useEffect(() => {
               </thead>
 
               <tbody>
-                {saldosClientes.map((c) => {
-                  const abierto = saldoAbiertoId === (c.clienteId || c.clienteNombre);
-
-                  return (
-                    <React.Fragment key={c.clienteId || c.clienteNombre}>
-                      <tr>
-                        <td>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setSaldoAbiertoId(abierto ? null : c.clienteId || c.clienteNombre)
-                            }
-                          >
-                            {abierto ? "⌃" : "⌄"}
-                          </button>
-                        </td>
-                        <td>{c.clienteNombre}</td>
-                        <td>{c.cantidad}</td>
-                        <td>{formatearMoneda(c.totalPendiente)}</td>
-                        <td>{c.ultimaVenta ? `#${c.ultimaVenta}` : "-"}</td>
-                      </tr>
-
-                      {abierto && (
-                        <tr>
-                          <td colSpan="5">
-                            <div style={{ padding: 12, background: "#f8fafc", borderRadius: 12 }}>
-                              {(c.ventas || []).map((v) => (
-                                <div
-                                  key={v.firebaseId}
-                                  onClick={() =>
-                                    abrirAuditoriaMovimiento({
-                                      origen: "venta",
-                                      origenRefId: v.firebaseId,
-                                      tipo: "ingreso",
-                                      subtipo: "venta",
-                                      fecha: v.fechaVenta,
-                                      descripcion: `Venta #${v.numeroVenta}`,
-                                      monto: v.saldoPendiente,
-                                    })
-                                  }
-                                  style={{
-                                    display: "grid",
-                                    gridTemplateColumns: "1fr 1fr 1fr 1fr",
-                                    gap: 10,
-                                    padding: "10px 0",
-                                    borderBottom: "1px solid #e5e7eb",
-                                    cursor: "pointer",
-                                  }}
-                                >
-                                  <span>Venta #{v.numeroVenta || "-"}</span>
-                                  <span>{v.fechaVenta || "-"}</span>
-                                  <span>Total {formatearMoneda(v.total)}</span>
-                                  <strong>Saldo pendiente {formatearMoneda(v.saldoPendiente)}</strong>
-                                </div>
-                              ))}
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </React.Fragment>
-                  );
-                })}
+                {saldosClientes.map((c) => (
+                  <tr key={c.clienteId || c.clienteNombre}>
+                    <td>
+                      <button
+                        type="button"
+                        onClick={() => setSaldoModal({ tipo: "cliente", resumen: c })}
+                      >
+                        Ver
+                      </button>
+                    </td>
+                    <td>{c.clienteNombre}</td>
+                    <td>{c.cantidad}</td>
+                    <td>{formatearMoneda(c.totalPendiente)}</td>
+                    <td>{c.ultimaVenta ? `#${c.ultimaVenta}` : "-"}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           )}
@@ -891,72 +1021,22 @@ useEffect(() => {
                 </thead>
 
                 <tbody>
-                  {saldosProveedores.map((p) => {
-                    const abierto = saldoAbiertoId === (p.proveedorId || p.proveedorNombre);
-
-                    return (
-                      <React.Fragment key={p.proveedorId || p.proveedorNombre}>
-                        <tr>
-                          <td>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setSaldoAbiertoId(
-                                  abierto ? null : p.proveedorId || p.proveedorNombre
-                                )
-                              }
-                            >
-                              {abierto ? "⌃" : "⌄"}
-                            </button>
-                          </td>
-
-                          <td>{p.proveedorNombre}</td>
-                          <td>{p.cantidad}</td>
-                          <td>{formatearMoneda(p.totalPendiente)}</td>
-                          <td>{p.ultimoGasto ? `#${p.ultimoGasto}` : "-"}</td>
-                        </tr>
-
-                        {abierto && (
-                          <tr>
-                            <td colSpan="5">
-                              <div style={{ padding: 12, background: "#f8fafc", borderRadius: 12 }}>
-                                {(p.gastos || []).map((g) => (
-                                  <div
-                                    key={g.firebaseId}
-                                    onClick={() =>
-                                      abrirAuditoriaMovimiento({
-                                        origen: "gasto",
-                                        origenRefId: g.firebaseId,
-                                        tipo: "egreso",
-                                        subtipo: "gasto",
-                                        fecha: g.fecha,
-                                        descripcion: `Gasto #${g.numeroGasto || "-"}`,
-                                        monto: g.saldo,
-                                        estadoMovimiento: "activo",
-                                      })
-                                    }
-                                    style={{
-                                      display: "grid",
-                                      gridTemplateColumns: "1fr 1fr 1fr 1fr",
-                                      gap: 10,
-                                      padding: "10px 0",
-                                      borderBottom: "1px solid #e5e7eb",
-                                      cursor: "pointer",
-                                    }}
-                                  >
-                                    <span>Gasto #{g.numeroGasto || "-"}</span>
-                                    <span>{g.fecha || "-"}</span>
-                                    <span>Total {formatearMoneda(g.total)}</span>
-                                    <strong>Saldo a pagar {formatearMoneda(g.saldo)}</strong>
-                                  </div>
-                                ))}
-                              </div>
-                            </td>
-                          </tr>
-                        )}
-                      </React.Fragment>
-                    );
-                  })}
+                  {saldosProveedores.map((p) => (
+                    <tr key={p.proveedorId || p.proveedorNombre}>
+                      <td>
+                        <button
+                          type="button"
+                          onClick={() => setSaldoModal({ tipo: "proveedor", resumen: p })}
+                        >
+                          Ver
+                        </button>
+                      </td>
+                      <td>{p.proveedorNombre}</td>
+                      <td>{p.cantidad}</td>
+                      <td>{formatearMoneda(p.totalPendiente)}</td>
+                      <td>{p.ultimoGasto ? `#${p.ultimoGasto}` : "-"}</td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             )}
@@ -1025,6 +1105,14 @@ useEffect(() => {
               </div>
           )}
         </>
+      )}
+
+      {vistaActiva === "comercial" && (
+        <InformeComercial
+          perfil={perfil}
+          fechaDesde={fechaDesdeFinanzas}
+          fechaHasta={fechaHastaFinanzas}
+        />
       )}
 
 {!loading && vistaActiva === "produccion" && (
@@ -1345,98 +1433,13 @@ return (
     {!loadingProduccion && (
       <>
         {(() => {
-          const movimientosValidos = historialFiltrado.filter(
-            (h) => Number(h.duracionEnOrigenMinutos) > 0
-          );
-
-          const totalMovimientos = historialFiltrado.length;
-
-          const pedidosFinalizados = historialFiltrado.filter(
-            (h) => h.pedidoFinalizado === true
-          ).length;
-
-          const promedioGeneralMinutos = movimientosValidos.length
-            ? Math.round(
-                movimientosValidos.reduce(
-                  (acc, h) => acc + (Number(h.duracionEnOrigenMinutos) || 0),
-                  0
-                ) / movimientosValidos.length
-              )
-            : 0;
-
-     const productividadPorUsuarioEtapa = {};
-
-movimientosValidos.forEach((h) => {
-  const usuarioKey =
-    h.usuarioAsignadoUid ||
-    h.usuarioAsignadoNombre ||
-    "sin_asignar";
-
-  const usuarioNombre = h.usuarioAsignadoNombre || "Sin asignar";
-  const etapa = h.columnaOrigenNombre || "Sin etapa";
-  const key = `${usuarioKey}_${etapa}`;
-
-  if (!productividadPorUsuarioEtapa[key]) {
-    productividadPorUsuarioEtapa[key] = {
-      usuario: usuarioNombre,
-      etapa,
-      intervenciones: 0,
-      totalMinutos: 0,
-      peorCasoMinutos: 0,
-    };
-  }
-
-  productividadPorUsuarioEtapa[key].intervenciones += 1;
-  productividadPorUsuarioEtapa[key].totalMinutos +=
-    Number(h.duracionEnOrigenMinutos) || 0;
-
-  productividadPorUsuarioEtapa[key].peorCasoMinutos = Math.max(
-    productividadPorUsuarioEtapa[key].peorCasoMinutos,
-    Number(h.duracionEnOrigenMinutos) || 0
-  );
-});
-
-const productividadKpi = Object.values(productividadPorUsuarioEtapa)
-  .map((item) => ({
-    ...item,
-    promedioMinutos: item.intervenciones
-      ? Math.round(item.totalMinutos / item.intervenciones)
-      : 0,
-  }))
-  .sort((a, b) => b.promedioMinutos - a.promedioMinutos);
-
-    const porEtapa = {};
-
-    movimientosValidos.forEach((h) => {
-      const etapa = h.columnaOrigenNombre || "Sin etapa";
-
-      if (!porEtapa[etapa]) {
-        porEtapa[etapa] = {
-          etapa,
-          totalMinutos: 0,
-          peorCasoMinutos: 0,
-          intervenciones: 0,
-        };
-      }
-
-      porEtapa[etapa].intervenciones += 1;
-      porEtapa[etapa].totalMinutos += Number(h.duracionEnOrigenMinutos) || 0;
-      porEtapa[etapa].peorCasoMinutos = Math.max(
-        porEtapa[etapa].peorCasoMinutos,
-        Number(h.duracionEnOrigenMinutos) || 0
-      );
-    });
-
-    const etapasKpi = Object.values(porEtapa)
-      .map((e) => ({
-        ...e,
-        promedioMinutos: e.intervenciones
-          ? Math.round(e.totalMinutos / e.intervenciones)
-          : 0,
-      }))
-      .sort((a, b) => b.promedioMinutos - a.promedioMinutos);
-
-    const etapaMasLenta = etapasKpi[0];
+          const {
+            pedidosFinalizados,
+            promedioGeneralMinutos,
+            productividadKpi,
+            etapasKpi,
+          } = metricasProduccion;
+          const etapaMasLenta = etapasKpi[0];
 
           return (
             <>
@@ -1647,6 +1650,48 @@ const productividadKpi = Object.values(productividadPorUsuarioEtapa)
     )}
   </div>
 )}
+
+        {saldoModal && (
+          <SaldoPendienteModal
+            perfil={perfil}
+            tipo={saldoModal.tipo}
+            resumen={saldoModal.resumen}
+            onCerrar={() => setSaldoModal(null)}
+            onAbrirVenta={(ventaId) => {
+              setSaldoModal(null);
+              setDetalleReal({ tipo: "venta", id: ventaId });
+            }}
+            onAbrirGasto={(gastoId) => {
+              setSaldoModal(null);
+              setDetalleReal({ tipo: "gasto", id: gastoId });
+            }}
+          />
+        )}
+
+        {detalleReal?.tipo === "venta" && (
+          <div className="modal-overlay" onClick={() => setDetalleReal(null)}>
+            <div
+              className="modal-content"
+              style={{ maxWidth: 1400, maxHeight: "92vh", overflow: "auto" }}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <VentaDetalle
+                perfil={perfil}
+                ventaId={detalleReal.id}
+                soloLectura
+                onVolver={() => setDetalleReal(null)}
+              />
+            </div>
+          </div>
+        )}
+
+        {detalleReal?.tipo === "gasto" && (
+          <GastoDetalleInforme
+            perfil={perfil}
+            gastoId={detalleReal.id}
+            onCerrar={() => setDetalleReal(null)}
+          />
+        )}
 
         {modalAuditoria && (
         <div

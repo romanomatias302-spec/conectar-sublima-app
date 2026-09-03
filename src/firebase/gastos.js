@@ -2,6 +2,7 @@ import {
   addDoc,
   collection,
   doc,
+  getDoc,
   getDocs,
   limit,
   orderBy,
@@ -24,6 +25,24 @@ import { db, storage } from "../firebase";
 import { fechaHoyNegocio } from "../utils/fechas";
 
 const GASTOS_COLLECTION = "gastos";
+
+export async function obtenerGastoPorId({ perfil, gastoId }) {
+  if (!gastoId) throw new Error("Falta gastoId.");
+
+  const snap = await getDoc(doc(db, GASTOS_COLLECTION, gastoId));
+  if (!snap.exists()) throw new Error("El gasto no existe.");
+
+  const gasto = { firebaseId: snap.id, ...snap.data() };
+  if (
+    perfil?.rol !== "superadmin" &&
+    (!perfil?.clienteId || gasto.clienteId !== perfil.clienteId)
+  ) {
+    throw new Error("El gasto no pertenece a la empresa.");
+  }
+
+  return gasto;
+}
+
 async function obtenerSiguienteNumeroGasto(clienteId) {
   const contadorRef = doc(db, "contadores", clienteId);
 
