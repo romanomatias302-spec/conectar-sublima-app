@@ -1,5 +1,5 @@
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
 import { db } from "../../firebase";
 import {
@@ -9,6 +9,7 @@ import {
 } from "../../firebase/ventas";
 import "./VentasPage.css";
 import { formatearMoneda, obtenerConfigMonedaDesdePerfil } from "../../utils/moneda";
+import { fusionarDocumentosPaginados } from "../../utils/paginacionRealtime";
 
 export default function VentasList({ perfil, onVer = () => {}, onEditar = () => {} }) {
   const [ventas, setVentas] = useState([]);
@@ -18,6 +19,8 @@ export default function VentasList({ perfil, onVer = () => {}, onEditar = () => 
   const [busqueda, setBusqueda] = useState("");
   const [ultimoDoc, setUltimoDoc] = useState(null);
   const [hayMas, setHayMas] = useState(true);
+  const listenerInicializadoRef = useRef(false);
+  const versionListadoRef = useRef(0);
   
   
 
@@ -58,6 +61,7 @@ export default function VentasList({ perfil, onVer = () => {}, onEditar = () => 
       if (!ultimoDoc || !hayMas) return;
 
       setLoadingMas(true);
+      const versionListado = versionListadoRef.current;
 
       const res = await obtenerVentasPaginadas({
         perfil,
@@ -65,9 +69,10 @@ export default function VentasList({ perfil, onVer = () => {}, onEditar = () => 
         pageSize: PAGE_SIZE,
       });
 
-      const acumuladas = [...ventas, ...res.ventas];
-
-      setVentas(acumuladas);
+      if (versionListado !== versionListadoRef.current) return;
+      setVentas((actuales) =>
+        fusionarDocumentosPaginados({ actuales, entrantes: res.ventas })
+      );
       setUltimoDoc(res.ultimoDoc);
       setHayMas(res.hayMas);
     } catch (e) {
@@ -84,17 +89,24 @@ export default function VentasList({ perfil, onVer = () => {}, onEditar = () => 
 useEffect(() => {
   if (!perfil) return;
 
+  listenerInicializadoRef.current = false;
+  versionListadoRef.current += 1;
   setLoading(true);
 
   const unsubscribe = escucharVentasRecientes({
     perfil,
     pageSize: PAGE_SIZE,
     onData: (res) => {
-      // Pendiente para otra etapa: este listener aún reemplaza páginas cargadas.
-      // No debe escribir resultados de búsqueda ni utilizar su cursor.
-      setVentas(res.ventas);
-      setUltimoDoc(res.ultimoDoc);
-      setHayMas(res.hayMas);
+      if (!listenerInicializadoRef.current) {
+        setVentas(res.ventas);
+        setUltimoDoc(res.ultimoDoc);
+        setHayMas(res.hayMas);
+        listenerInicializadoRef.current = true;
+      } else {
+        setVentas((actuales) =>
+          fusionarDocumentosPaginados({ actuales, entrantes: res.ventas })
+        );
+      }
       setLoading(false);
     },
     onError: (error) => {

@@ -5,6 +5,12 @@ import {
   runTransaction,
   serverTimestamp,
   writeBatch,
+  getDocs,
+  query,
+  where,
+  orderBy,
+  limit,
+  startAfter,
 } from "firebase/firestore";
 
 import { db } from "../firebase";
@@ -15,6 +21,124 @@ import {
 } from "./produccionColumnas";
 
 import { registrarUsoSaas } from "./saasUso";
+
+export async function buscarPedidosGlobales({ perfil, texto, pageSize = 50 }) {
+  const textoLimpio = String(texto || "").trim();
+  if (!textoLimpio || (!perfil?.clienteId && perfil?.rol !== "superadmin")) {
+    return [];
+  }
+
+  const ref = collection(db, "pedidos");
+  const crearQueryTenant = (...restricciones) =>
+    perfil?.rol === "superadmin"
+      ? query(ref, ...restricciones, limit(pageSize))
+      : query(
+          ref,
+          where("clienteId", "==", perfil.clienteId),
+          ...restricciones,
+          limit(pageSize)
+        );
+  const consultas = [];
+  const numero = Number(textoLimpio);
+  const numeroSeguro =
+    /^(0|[1-9]\d*)$/.test(textoLimpio) &&
+    Number.isSafeInteger(numero) &&
+    String(numero) === textoLimpio;
+
+  ["id", "numeroPedido", "numero"].forEach((campo) => {
+    consultas.push(
+      getDocs(
+        crearQueryTenant(
+          numeroSeguro
+            ? where(campo, "in", [textoLimpio, numero])
+            : where(campo, "==", textoLimpio)
+        )
+      )
+    );
+  });
+  consultas.push(
+    getDocs(crearQueryTenant(where("clienteDNI", "==", textoLimpio)))
+  );
+
+  const nombre = textoLimpio.toLowerCase();
+  consultas.push(
+    getDocs(
+      crearQueryTenant(
+        orderBy("clienteBusqueda"),
+        where("clienteBusqueda", ">=", nombre),
+        where("clienteBusqueda", "<=", nombre + "\uf8ff")
+      )
+    )
+  );
+
+  const resultados = await Promise.allSettled(consultas);
+  const mapa = new Map();
+  let exitosas = 0;
+  resultados.forEach((resultado) => {
+    if (resultado.status !== "fulfilled") {
+      console.warn("Falló una consulta parcial de pedidos:", resultado.reason);
+      return;
+    }
+    exitosas += 1;
+    resultado.value.docs.forEach((documento) => {
+      mapa.set(documento.id, { firebaseId: documento.id, ...documento.data() });
+    });
+  });
+
+  if (!exitosas) throw new Error("No se pudo completar la búsqueda de pedidos.");
+  return Array.from(mapa.values());
+}
+
+export async function obtenerPedidosFiltradosPaginados({
+  perfil,
+  ultimoDoc = null,
+  pageSize = 100,
+  coincide = () => true,
+}) {
+  if (!perfil?.clienteId && perfil?.rol !== "superadmin") {
+    return { pedidos: [], ultimoDoc: null, hayMas: false };
+  }
+
+  const ref = collection(db, "pedidos");
+  const resultados = [];
+  let cursor = ultimoDoc;
+  let recorridoCompleto = false;
+  const scanPageSize = Math.max(pageSize, 100);
+
+  while (resultados.length < pageSize && !recorridoCompleto) {
+    const consulta = query(
+      ref,
+      ...(perfil?.rol === "superadmin"
+        ? []
+        : [where("clienteId", "==", perfil.clienteId)]),
+      orderBy("createdAt", "desc"),
+      ...(cursor ? [startAfter(cursor)] : []),
+      limit(scanPageSize)
+    );
+    const snapshot = await getDocs(consulta);
+    let detenidoPorLimite = false;
+
+    for (const documento of snapshot.docs) {
+      cursor = documento;
+      const pedido = { firebaseId: documento.id, ...documento.data() };
+      if (coincide(pedido)) resultados.push(pedido);
+      if (resultados.length === pageSize) {
+        detenidoPorLimite = true;
+        break;
+      }
+    }
+
+    recorridoCompleto =
+      !detenidoPorLimite &&
+      (snapshot.docs.length === 0 || snapshot.docs.length < scanPageSize);
+  }
+
+  return {
+    pedidos: resultados,
+    ultimoDoc: cursor,
+    hayMas: !recorridoCompleto,
+  };
+}
 
 async function obtenerSiguienteNumeroPedido(perfil) {
   if (!perfil?.clienteId) {

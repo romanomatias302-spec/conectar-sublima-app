@@ -197,45 +197,51 @@ export async function obtenerCotizacionesPaginadas({
   perfil,
   ultimoDoc = null,
   pageSize = 50,
+  fechaDesde = "",
+  fechaHasta = "",
 }) {
   const cotizacionesRef = collection(db, "cotizaciones");
+  const resultados = [];
+  let cursor = ultimoDoc;
+  let recorridoCompleto = false;
+  const scanPageSize = Math.max(pageSize, 100);
 
-  const q =
-    perfil?.rol === "superadmin"
-      ? ultimoDoc
-        ? query(
-            cotizacionesRef,
-            orderBy("createdAt", "desc"),
-            startAfter(ultimoDoc),
-            limit(pageSize)
-          )
-        : query(cotizacionesRef, orderBy("createdAt", "desc"), limit(pageSize))
-      : ultimoDoc
-      ? query(
-          cotizacionesRef,
-          where("clienteId", "==", perfil.clienteId),
-          orderBy("createdAt", "desc"),
-          startAfter(ultimoDoc),
-          limit(pageSize)
-        )
-      : query(
-          cotizacionesRef,
-          where("clienteId", "==", perfil.clienteId),
-          orderBy("createdAt", "desc"),
-          limit(pageSize)
-        );
+  while (resultados.length < pageSize && !recorridoCompleto) {
+    const q = query(
+      cotizacionesRef,
+      ...(perfil?.rol === "superadmin"
+        ? []
+        : [where("clienteId", "==", perfil.clienteId)]),
+      orderBy("createdAt", "desc"),
+      ...(cursor ? [startAfter(cursor)] : []),
+      limit(scanPageSize)
+    );
+    const snapshot = await getDocs(q);
+    let detenidoPorLimite = false;
 
-  const snapshot = await getDocs(q);
+    for (const documento of snapshot.docs) {
+      cursor = documento;
+      const cotizacion = { firebaseId: documento.id, ...documento.data() };
+      const fecha = String(cotizacion.fechaCotizacion || "");
+      const coincideFecha =
+        (!fechaDesde || (fecha && fecha >= fechaDesde)) &&
+        (!fechaHasta || (fecha && fecha <= fechaHasta));
+      if (coincideFecha) resultados.push(cotizacion);
+      if (resultados.length === pageSize) {
+        detenidoPorLimite = true;
+        break;
+      }
+    }
+
+    recorridoCompleto =
+      !detenidoPorLimite &&
+      (snapshot.docs.length === 0 || snapshot.docs.length < scanPageSize);
+  }
 
   return {
-    cotizaciones: snapshot.docs.map((d) => ({
-      firebaseId: d.id,
-      ...d.data(),
-    })),
-    ultimoDoc: snapshot.docs.length
-      ? snapshot.docs[snapshot.docs.length - 1]
-      : null,
-    hayMas: snapshot.docs.length === pageSize,
+    cotizaciones: resultados,
+    ultimoDoc: cursor,
+    hayMas: !recorridoCompleto,
   };
 }
 
@@ -523,49 +529,47 @@ export async function buscarCotizacionesEnFirestore({
   }
 
   const cotizacionesRef = collection(db, "cotizaciones");
+  const textoNormalizado = textoLimpio.toLowerCase();
+  const encontrados = [];
+  let cursor = null;
+  let hayMas = true;
+  const scanPageSize = 100;
 
-  let q;
-
-  if (/^\d+$/.test(textoLimpio)) {
-    q =
-      perfil?.rol === "superadmin"
-        ? query(
-            cotizacionesRef,
-            where("numeroCotizacion", "==", textoLimpio),
-            limit(pageSize)
-          )
-        : query(
-            cotizacionesRef,
-            where("clienteId", "==", perfil.clienteId),
-            where("numeroCotizacion", "==", textoLimpio),
-            limit(pageSize)
-          );
-  } else {
-    q =
-      perfil?.rol === "superadmin"
-        ? query(
-            cotizacionesRef,
-            orderBy("clienteNombre"),
-            where("clienteNombre", ">=", textoLimpio),
-            where("clienteNombre", "<=", textoLimpio + "\uf8ff"),
-            limit(pageSize)
-          )
-        : query(
-            cotizacionesRef,
-            where("clienteId", "==", perfil.clienteId),
-            orderBy("clienteNombre"),
-            where("clienteNombre", ">=", textoLimpio),
-            where("clienteNombre", "<=", textoLimpio + "\uf8ff"),
-            limit(pageSize)
-          );
+  while (hayMas) {
+    const consulta = query(
+      cotizacionesRef,
+      ...(perfil?.rol === "superadmin"
+        ? []
+        : [where("clienteId", "==", perfil.clienteId)]),
+      orderBy("createdAt", "desc"),
+      ...(cursor ? [startAfter(cursor)] : []),
+      limit(scanPageSize)
+    );
+    const snapshot = await getDocs(consulta);
+    snapshot.docs.forEach((documento) => {
+      const cotizacion = { firebaseId: documento.id, ...documento.data() };
+      const coincide = [
+        cotizacion.numeroCotizacion,
+        cotizacion.clienteNombre,
+        cotizacion.clienteDNI,
+      ].some((valor) =>
+        String(valor || "").toLowerCase().includes(textoNormalizado)
+      );
+      if (coincide) encontrados.push(cotizacion);
+    });
+    cursor = snapshot.docs.length
+      ? snapshot.docs[snapshot.docs.length - 1]
+      : null;
+    hayMas = snapshot.docs.length === scanPageSize && Boolean(cursor);
   }
 
-  const snap = await getDocs(q);
-
-  return snap.docs.map((d) => ({
-    firebaseId: d.id,
-    ...d.data(),
-  }));
+  return encontrados
+    .sort((a, b) => {
+      const exactaA = String(a.numeroCotizacion || "") === textoLimpio ? 1 : 0;
+      const exactaB = String(b.numeroCotizacion || "") === textoLimpio ? 1 : 0;
+      return exactaB - exactaA;
+    })
+    .slice(0, pageSize);
 }
 
 export function escucharCotizacionesRecientes({

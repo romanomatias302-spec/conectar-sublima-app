@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   collection,
   getDocs,
@@ -19,6 +19,7 @@ import {
 import { formatearMoneda, obtenerConfigMonedaDesdePerfil } from "../../utils/moneda";
 import { fechaHoyNegocio } from "../../utils/fechas";
 import { puedeHacer } from "../../utils/permisos";
+import { fusionarDocumentosPaginados } from "../../utils/paginacionRealtime";
 import { obtenerUsuariosPorCliente } from "../../firebase/usuariosConfig";
 import "./VentasPage.css";
 import ProductoSelectorModal from "../../components/ProductoSelectorModal/ProductoSelectorModal";
@@ -54,9 +55,13 @@ export default function CotizacionesPage({ perfil, onVerCotizacion }) {
   const [hayMas, setHayMas] = useState(true);
   const [loading, setLoading] = useState(false);
   const [loadingMas, setLoadingMas] = useState(false);
+  const listenerInicializadoRef = useRef(false);
+  const versionListadoRef = useRef(0);
 
   const [busqueda, setBusqueda] = useState("");
   const [buscandoFirestore, setBuscandoFirestore] = useState(false);
+  const [busquedaRemota, setBusquedaRemota] = useState(null);
+  const solicitudBusquedaRef = useRef(0);
   const [fechaDesde, setFechaDesde] = useState("");
   const [fechaHasta, setFechaHasta] = useState("");
 
@@ -108,6 +113,8 @@ const [configNegocio, setConfigNegocio] = useState({
       const res = await obtenerCotizacionesPaginadas({
         perfil,
         pageSize: 50,
+        fechaDesde,
+        fechaHasta,
       });
 
       setCotizaciones(res.cotizaciones);
@@ -126,14 +133,23 @@ const [configNegocio, setConfigNegocio] = useState({
       if (!ultimoDoc || !hayMas) return;
 
       setLoadingMas(true);
+      const versionListado = versionListadoRef.current;
 
       const res = await obtenerCotizacionesPaginadas({
         perfil,
         ultimoDoc,
         pageSize: 50,
+        fechaDesde,
+        fechaHasta,
       });
 
-      setCotizaciones((prev) => [...prev, ...res.cotizaciones]);
+      if (versionListado !== versionListadoRef.current) return;
+      setCotizaciones((actuales) =>
+        fusionarDocumentosPaginados({
+          actuales,
+          entrantes: res.cotizaciones,
+        })
+      );
       setUltimoDoc(res.ultimoDoc);
       setHayMas(res.hayMas);
     } catch (err) {
@@ -206,16 +222,60 @@ useEffect(() => {
   cargarClientes();
   cargarUsuarios();
   cargarConfigNegocio();
+}, [perfil]);
 
+useEffect(() => {
+  if (!perfil) return;
+
+  listenerInicializadoRef.current = false;
+  versionListadoRef.current += 1;
   setLoading(true);
+
+  if (fechaDesde || fechaHasta) {
+    let cancelado = false;
+    obtenerCotizacionesPaginadas({
+      perfil,
+      pageSize: 50,
+      fechaDesde,
+      fechaHasta,
+    })
+      .then((resultado) => {
+        if (cancelado) return;
+        setCotizaciones(resultado.cotizaciones);
+        setUltimoDoc(resultado.ultimoDoc);
+        setHayMas(resultado.hayMas);
+      })
+      .catch((err) => {
+        if (!cancelado) {
+          console.error("Error filtrando cotizaciones:", err);
+          setError("No se pudieron filtrar las cotizaciones.");
+        }
+      })
+      .finally(() => {
+        if (!cancelado) setLoading(false);
+      });
+    return () => {
+      cancelado = true;
+    };
+  }
 
   const unsubscribe = escucharCotizacionesRecientes({
     perfil,
     pageSize: 50,
     onData: (res) => {
-      setCotizaciones(res.cotizaciones);
-      setUltimoDoc(res.ultimoDoc);
-      setHayMas(res.hayMas);
+      if (!listenerInicializadoRef.current) {
+        setCotizaciones(res.cotizaciones);
+        setUltimoDoc(res.ultimoDoc);
+        setHayMas(res.hayMas);
+        listenerInicializadoRef.current = true;
+      } else {
+        setCotizaciones((actuales) =>
+          fusionarDocumentosPaginados({
+            actuales,
+            entrantes: res.cotizaciones,
+          })
+        );
+      }
       setLoading(false);
     },
     onError: (err) => {
@@ -226,12 +286,18 @@ useEffect(() => {
   });
 
   return () => unsubscribe();
-}, [perfil]);
+}, [perfil, fechaDesde, fechaHasta]);
 
 const cotizacionesFiltradas = useMemo(() => {
   const texto = (busqueda || "").trim().toLowerCase();
+  const remotasActuales =
+    busquedaRemota?.texto === texto ? busquedaRemota.cotizaciones : [];
+  const mapa = new Map();
+  [...cotizaciones, ...(remotasActuales || [])].forEach((cotizacion) => {
+    if (cotizacion?.firebaseId) mapa.set(cotizacion.firebaseId, cotizacion);
+  });
 
-  return cotizaciones.filter((c) => {
+  return Array.from(mapa.values()).filter((c) => {
     const coincideTexto =
       !texto ||
       String(c.numeroCotizacion || "").toLowerCase().includes(texto) ||
@@ -245,42 +311,51 @@ const cotizacionesFiltradas = useMemo(() => {
 
     return coincideTexto && coincideDesde && coincideHasta;
   });
-}, [cotizaciones, busqueda, fechaDesde, fechaHasta]);
+}, [cotizaciones, busquedaRemota, busqueda, fechaDesde, fechaHasta]);
 
   useEffect(() => {
   const texto = (busqueda || "").trim();
 
-  if (!texto) return;
+  if (!texto) {
+    setBusquedaRemota(null);
+    setBuscandoFirestore(false);
+    return;
+  }
 
-  if (fechaDesde || fechaHasta) return;
-
-  if (cotizacionesFiltradas.length > 0) return;
+  const solicitudId = ++solicitudBusquedaRef.current;
+  let cancelada = false;
+  setBuscandoFirestore(true);
 
   const timer = setTimeout(async () => {
     try {
-      setBuscandoFirestore(true);
-
       const resultados = await buscarCotizacionesEnFirestore({
         perfil,
         texto,
         pageSize: 50,
       });
 
-      setCotizaciones((prev) => {
-        const existentes = new Set(prev.map((c) => c.firebaseId));
-        const nuevos = resultados.filter((c) => !existentes.has(c.firebaseId));
-        return [...prev, ...nuevos];
+      if (cancelada || solicitudId !== solicitudBusquedaRef.current) return;
+      setBusquedaRemota({
+        texto: texto.toLowerCase(),
+        cotizaciones: resultados,
       });
     } catch (err) {
+      if (cancelada || solicitudId !== solicitudBusquedaRef.current) return;
       console.error("Error buscando cotizaciones:", err);
-      setError("No se pudo buscar la cotización.");
+      setBusquedaRemota({ texto: texto.toLowerCase(), cotizaciones: [] });
+      setError("No se pudo completar la búsqueda de cotizaciones.");
     } finally {
-      setBuscandoFirestore(false);
+      if (!cancelada && solicitudId === solicitudBusquedaRef.current) {
+        setBuscandoFirestore(false);
+      }
     }
   }, 350);
 
-  return () => clearTimeout(timer);
-}, [busqueda, fechaDesde, fechaHasta, cotizacionesFiltradas.length, perfil]);
+  return () => {
+    cancelada = true;
+    clearTimeout(timer);
+  };
+}, [busqueda, perfil]);
 
   const clientesFiltrados = useMemo(() => {
     const texto = (busquedaCliente || "").trim().toLowerCase();

@@ -368,6 +368,8 @@ export async function obtenerGastosPaginados({
   categoria = "",
   fechaDesde = "",
   fechaHasta = "",
+  textoBusqueda = "",
+  filtroSaldo = "",
 }) {
   if (!perfil?.clienteId) {
     return { gastos: [], ultimoDoc: null, hayMas: false };
@@ -377,7 +379,6 @@ export async function obtenerGastosPaginados({
     where("clienteId", "==", perfil.clienteId),
     orderBy("fecha", "desc"),
     orderBy("createdAt", "desc"),
-    limit(pageSize),
   ];
 
   if (categoria) {
@@ -392,25 +393,76 @@ export async function obtenerGastosPaginados({
     filtros.unshift(where("fecha", "<=", fechaHasta));
   }
 
-  const q = ultimoDoc
-    ? query(
-        collection(db, GASTOS_COLLECTION),
-        ...filtros.slice(0, -1),
-        startAfter(ultimoDoc),
-        limit(pageSize)
-      )
-    : query(collection(db, GASTOS_COLLECTION), ...filtros);
+  const resultados = [];
+  let cursor = ultimoDoc;
+  let recorridoCompleto = false;
+  const scanPageSize = Math.max(pageSize, 100);
 
-  const snap = await getDocs(q);
+  while (resultados.length < pageSize && !recorridoCompleto) {
+    const q = query(
+      collection(db, GASTOS_COLLECTION),
+      ...filtros,
+      ...(cursor ? [startAfter(cursor)] : []),
+      limit(scanPageSize)
+    );
+    const snap = await getDocs(q);
+    let detenidoPorLimite = false;
+
+    for (const documento of snap.docs) {
+      cursor = documento;
+      const gasto = { firebaseId: documento.id, ...documento.data() };
+      if (gastoCoincideBusquedaYSaldo(gasto, textoBusqueda, filtroSaldo)) {
+        resultados.push(gasto);
+      }
+      if (resultados.length === pageSize) {
+        detenidoPorLimite = true;
+        break;
+      }
+    }
+
+    recorridoCompleto =
+      !detenidoPorLimite &&
+      (snap.docs.length === 0 || snap.docs.length < scanPageSize);
+  }
 
   return {
-    gastos: snap.docs.map((d) => ({
-      firebaseId: d.id,
-      ...d.data(),
-    })),
-    ultimoDoc: snap.docs.length ? snap.docs[snap.docs.length - 1] : null,
-    hayMas: snap.docs.length === pageSize,
+    gastos: resultados,
+    ultimoDoc: cursor,
+    hayMas: !recorridoCompleto,
   };
+}
+
+export function gastoCoincideBusquedaYSaldo(
+  gasto,
+  textoBusqueda = "",
+  filtroSaldo = ""
+) {
+  const texto = String(textoBusqueda || "").trim().toLowerCase();
+  const coincideTexto =
+    !texto ||
+    [
+      gasto.numeroGasto,
+      gasto.descripcion,
+      gasto.proveedor,
+      gasto.proveedorNombre,
+      gasto.medioPago,
+      gasto.categoria,
+    ].some((valor) => String(valor || "").toLowerCase().includes(texto)) ||
+    (gasto.items || []).some((item) =>
+      String(item.descripcion || "").toLowerCase().includes(texto)
+    );
+
+  const total = Number(gasto.total || gasto.monto || 0);
+  const totalPagado = Number(gasto.totalPagado || 0);
+  const saldo = Number(gasto.saldo || 0);
+  const saldoAFavor = totalPagado > total ? totalPagado - total : 0;
+  const coincideSaldo =
+    !filtroSaldo ||
+    (filtroSaldo === "pendiente" && saldo > 0) ||
+    (filtroSaldo === "a_favor" && saldoAFavor > 0) ||
+    (filtroSaldo === "cero" && saldo === 0 && saldoAFavor === 0);
+
+  return coincideTexto && coincideSaldo;
 }
 
 export function escucharGastosRecientes({

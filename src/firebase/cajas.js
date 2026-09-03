@@ -11,6 +11,7 @@ import {
   serverTimestamp,
   startAt,
   endAt,
+  startAfter,
   onSnapshot,
   writeBatch,
 } from "firebase/firestore";
@@ -145,28 +146,29 @@ export async function obtenerUltimaCajaCerradaAnterior({
 }) {
   if (!perfil?.clienteId) throw new Error("Perfil inválido.");
 
-  const q = query(
-    collection(db, "cajas"),
-    where("clienteId", "==", perfil.clienteId),
-    limit(60)
-  );
+  let cursor = null;
+  let hayMas = true;
 
-  const snap = await getDocs(q);
+  while (hayMas) {
+    const q = query(
+      collection(db, "cajas"),
+      where("clienteId", "==", perfil.clienteId),
+      where("fechaCaja", "<", fechaCaja),
+      orderBy("fechaCaja", "desc"),
+      ...(cursor ? [startAfter(cursor)] : []),
+      limit(60)
+    );
+    const snap = await getDocs(q);
+    const cajaCerrada = snap.docs
+      .map((d) => ({ firebaseId: d.id, ...d.data() }))
+      .find((caja) => caja.estado === "cerrada");
+    if (cajaCerrada) return cajaCerrada;
 
-  const cajas = snap.docs
-    .map((d) => ({
-      firebaseId: d.id,
-      ...d.data(),
-    }))
-    .filter(
-      (caja) =>
-        caja.estado === "cerrada" &&
-        caja.fechaCaja &&
-        caja.fechaCaja < fechaCaja
-    )
-    .sort((a, b) => (a.fechaCaja < b.fechaCaja ? 1 : -1));
+    cursor = snap.docs.length ? snap.docs[snap.docs.length - 1] : null;
+    hayMas = snap.docs.length === 60 && Boolean(cursor);
+  }
 
-  return cajas[0] || null;
+  return null;
 }
 
 export async function obtenerUltimaCajaAnteriorConSaldo({
@@ -178,28 +180,28 @@ export async function obtenerUltimaCajaAnteriorConSaldo({
 
   const { sucursalId } = normalizarSucursal(sucursal);
 
-  const qCajas = query(
-    collection(db, "cajas"),
-    where("clienteId", "==", perfil.clienteId),
-    limit(100)
-  );
+  let cursorCaja = null;
+  let cajaAnterior = null;
+  let hayMasCajas = true;
 
-  const snapCajas = await getDocs(qCajas);
-
-  const cajas = snapCajas.docs
-    .map((d) => ({
-      firebaseId: d.id,
-      ...d.data(),
-    }))
-    .filter(
-      (caja) =>
-        caja.fechaCaja &&
-        caja.fechaCaja < fechaCaja &&
-        cajaPerteneceASucursal(caja, sucursalId)
-    )
-    .sort((a, b) => (a.fechaCaja < b.fechaCaja ? 1 : -1));
-
-  const cajaAnterior = cajas[0] || null;
+  while (!cajaAnterior && hayMasCajas) {
+    const qCajas = query(
+      collection(db, "cajas"),
+      where("clienteId", "==", perfil.clienteId),
+      where("fechaCaja", "<", fechaCaja),
+      orderBy("fechaCaja", "desc"),
+      ...(cursorCaja ? [startAfter(cursorCaja)] : []),
+      limit(100)
+    );
+    const snapCajas = await getDocs(qCajas);
+    cajaAnterior = snapCajas.docs
+      .map((d) => ({ firebaseId: d.id, ...d.data() }))
+      .find((caja) => cajaPerteneceASucursal(caja, sucursalId));
+    cursorCaja = snapCajas.docs.length
+      ? snapCajas.docs[snapCajas.docs.length - 1]
+      : null;
+    hayMasCajas = snapCajas.docs.length === 100 && Boolean(cursorCaja);
+  }
 
   if (!cajaAnterior) {
     return {
@@ -974,27 +976,41 @@ export async function obtenerHistorialCajas({
 
   const sucursalData = normalizarSucursal(sucursal);
 
-  let filtros = [
-    where("clienteId", "==", perfil.clienteId),
-    orderBy("fechaCaja", "desc"),
-  ];
+  const resultados = [];
+  let cursor = null;
+  let recorridoCompleto = false;
+  const pageSize = Math.max(limite, 30);
 
-  if (fechaHasta) filtros.push(startAt(fechaHasta));
-  if (fechaDesde) filtros.push(endAt(fechaDesde));
+  while (resultados.length < limite && !recorridoCompleto) {
+    const filtros = [
+      where("clienteId", "==", perfil.clienteId),
+      orderBy("fechaCaja", "desc"),
+    ];
+    if (cursor) filtros.push(startAfter(cursor));
+    else if (fechaHasta) filtros.push(startAt(fechaHasta));
+    if (fechaDesde) filtros.push(endAt(fechaDesde));
+    filtros.push(limit(pageSize));
 
-  filtros.push(limit(limite));
+    const snap = await getDocs(query(collection(db, "cajas"), ...filtros));
+    let detenidoPorLimite = false;
+    for (const documento of snap.docs) {
+      cursor = documento;
+      const caja = { firebaseId: documento.id, ...documento.data() };
+      if (
+        todasSucursales ||
+        cajaPerteneceASucursal(caja, sucursalData.sucursalId)
+      ) {
+        resultados.push(caja);
+      }
+      if (resultados.length === limite) {
+        detenidoPorLimite = true;
+        break;
+      }
+    }
+    recorridoCompleto =
+      !detenidoPorLimite &&
+      (snap.docs.length === 0 || snap.docs.length < pageSize);
+  }
 
-  const q = query(collection(db, "cajas"), ...filtros);
-  const snap = await getDocs(q);
-
-  return snap.docs
-    .map((d) => ({
-      firebaseId: d.id,
-      ...d.data(),
-    }))
-    .filter((caja) =>
-      todasSucursales
-        ? true
-        : cajaPerteneceASucursal(caja, sucursalData.sucursalId)
-    );
+  return resultados;
 }

@@ -11,6 +11,7 @@ import {
   escucharGastosRecientes,
 } from "../../firebase/gastos";
 import { puedeHacer } from "../../utils/permisos";
+import { fusionarDocumentosPaginados } from "../../utils/paginacionRealtime";
 import { escucharProveedores } from "../../firebase/proveedores";
 import { fechaHoyNegocio } from "../../utils/fechas";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
@@ -92,6 +93,8 @@ const puedeAbrirDetalleGastos =
   const [ultimoDoc, setUltimoDoc] = useState(null);
 const [hayMas, setHayMas] = useState(true);
 const [loading, setLoading] = useState(false);
+const listenerInicializadoRef = useRef(false);
+const versionListadoRef = useRef(0);
 const [guardando, setGuardando] = useState(false);
   const [categorias, setCategorias] = useState(categoriasBase);
   const [proveedores, setProveedores] = useState([]);
@@ -216,6 +219,8 @@ const persistirCategoriasGastos = async (lista) => {
       categoria: filtroCategoria,
       fechaDesde,
       fechaHasta,
+      textoBusqueda: busqueda,
+      filtroSaldo,
     });
 
     setGastos(res.gastos);
@@ -232,6 +237,7 @@ const persistirCategoriasGastos = async (lista) => {
     const cargarMasGastos = async () => {
     try {
         if (!ultimoDoc || !hayMas) return;
+        const versionListado = versionListadoRef.current;
 
         const res = await obtenerGastosPaginados({
         perfil,
@@ -240,9 +246,18 @@ const persistirCategoriasGastos = async (lista) => {
         categoria: filtroCategoria,
         fechaDesde,
         fechaHasta,
+        textoBusqueda: busqueda,
+        filtroSaldo,
         });
 
-        setGastos((prev) => [...prev, ...res.gastos]);
+        if (versionListado !== versionListadoRef.current) return;
+        setGastos((actuales) =>
+          fusionarDocumentosPaginados({
+            actuales,
+            entrantes: res.gastos,
+            camposOrden: ["fecha", "createdAt"],
+          })
+        );
         setUltimoDoc(res.ultimoDoc);
         setHayMas(res.hayMas);
     } catch (error) {
@@ -253,7 +268,42 @@ const persistirCategoriasGastos = async (lista) => {
 useEffect(() => {
   if (!perfil?.clienteId) return;
 
+  listenerInicializadoRef.current = false;
+  versionListadoRef.current += 1;
   setLoading(true);
+
+  if (busqueda.trim() || filtroSaldo) {
+    let cancelado = false;
+    const timer = setTimeout(async () => {
+      try {
+        const res = await obtenerGastosPaginados({
+          perfil,
+          pageSize: 50,
+          categoria: filtroCategoria,
+          fechaDesde,
+          fechaHasta,
+          textoBusqueda: busqueda,
+          filtroSaldo,
+        });
+        if (cancelado) return;
+        setGastos(res.gastos);
+        setUltimoDoc(res.ultimoDoc);
+        setHayMas(res.hayMas);
+      } catch (error) {
+        if (!cancelado) {
+          console.error("Error buscando gastos globalmente:", error);
+          setGastos([]);
+        }
+      } finally {
+        if (!cancelado) setLoading(false);
+      }
+    }, 350);
+
+    return () => {
+      cancelado = true;
+      clearTimeout(timer);
+    };
+  }
 
   const unsubscribe = escucharGastosRecientes({
     perfil,
@@ -262,20 +312,31 @@ useEffect(() => {
     fechaDesde,
     fechaHasta,
     onData: (res) => {
-      setGastos(res.gastos);
-      setUltimoDoc(res.ultimoDoc);
-      setHayMas(res.hayMas);
+      if (!listenerInicializadoRef.current) {
+        setGastos(res.gastos);
+        setUltimoDoc(res.ultimoDoc);
+        setHayMas(res.hayMas);
+        listenerInicializadoRef.current = true;
+      } else {
+        setGastos((actuales) =>
+          fusionarDocumentosPaginados({
+            actuales,
+            entrantes: res.gastos,
+            camposOrden: ["fecha", "createdAt"],
+          })
+        );
+      }
       setLoading(false);
     },
     onError: (error) => {
       console.error("Error escuchando gastos:", error);
-      setGastos([]);
+      if (!listenerInicializadoRef.current) setGastos([]);
       setLoading(false);
     },
   });
 
   return () => unsubscribe();
-}, [perfil?.clienteId, filtroCategoria, fechaDesde, fechaHasta]);
+}, [perfil, perfil?.clienteId, filtroCategoria, fechaDesde, fechaHasta, busqueda, filtroSaldo]);
 
 useEffect(() => {
   if (!perfil?.clienteId) return;
