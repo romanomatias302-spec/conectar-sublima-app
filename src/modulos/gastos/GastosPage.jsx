@@ -13,6 +13,8 @@ import {
 import { puedeHacer } from "../../utils/permisos";
 import { escucharProveedores } from "../../firebase/proveedores";
 import { fechaHoyNegocio } from "../../utils/fechas";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { db } from "../../firebase";
 
 const categoriasBase = [
   "Gasto fijo",
@@ -26,6 +28,31 @@ const categoriasBase = [
   "Transporte",
   "Otros",
 ];
+
+const esCategoriaBase = (categoria) =>
+  categoriasBase.some(
+    (cat) =>
+      cat.toLowerCase() === String(categoria || "").trim().toLowerCase()
+  );
+
+const combinarCategorias = (personalizadas = []) => {
+  const resultado = [];
+
+  [...categoriasBase, ...personalizadas].forEach((categoria) => {
+    const nombre = String(categoria || "").trim();
+    if (!nombre) return;
+
+    const existe = resultado.some(
+      (actual) => actual.toLowerCase() === nombre.toLowerCase()
+    );
+
+    if (!existe) {
+      resultado.push(nombre);
+    }
+  });
+
+  return resultado;
+};
 
 const itemVacio = () => ({
   descripcion: "",
@@ -99,6 +126,65 @@ const [proveedorDropdownAbierto, setProveedorDropdownAbierto] = useState(false);
 
 
   const categoriaDropdownRef = useRef(null);
+
+  useEffect(() => {
+  if (!perfil?.clienteId) return;
+
+  let cancelado = false;
+
+  const cargarCategoriasGastos = async () => {
+    try {
+      const refCliente = doc(db, "clientes-saas", perfil.clienteId);
+      const snap = await getDoc(refCliente);
+
+      if (!snap.exists() || cancelado) return;
+
+      const data = snap.data();
+
+      const personalizadas = Array.isArray(data.categoriasGastos)
+        ? data.categoriasGastos
+        : [];
+
+      setCategorias(combinarCategorias(personalizadas));
+    } catch (error) {
+      console.error("Error cargando categorías de gastos:", error);
+
+      if (!cancelado) {
+        setCategorias(categoriasBase);
+      }
+    }
+  };
+
+  cargarCategoriasGastos();
+
+  return () => {
+    cancelado = true;
+  };
+}, [perfil?.clienteId]);
+
+const persistirCategoriasGastos = async (lista) => {
+  if (!perfil?.clienteId) {
+    throw new Error("No se encontró clienteId.");
+  }
+
+  const personalizadas = lista
+    .map((categoria) => String(categoria || "").trim())
+    .filter(Boolean)
+    .filter((categoria) => !esCategoriaBase(categoria));
+
+  const sinDuplicados = personalizadas.filter(
+    (categoria, index, array) =>
+      array.findIndex(
+        (otra) => otra.toLowerCase() === categoria.toLowerCase()
+      ) === index
+  );
+
+  const refCliente = doc(db, "clientes-saas", perfil.clienteId);
+
+  await updateDoc(refCliente, {
+    categoriasGastos: sinDuplicados,
+  });
+};
 
   useEffect(() => {
     const manejarClickAfuera = (event) => {
@@ -387,36 +473,60 @@ const verComprobante = (comprobante) => {
     setCategoriaDropdownAbierto(false);
   };
 
-  const guardarNuevaCategoriaDropdown = () => {
-    const nombre = nuevaCategoria.trim();
-    if (!nombre) return;
+ const guardarNuevaCategoriaDropdown = async () => {
+  const nombre = nuevaCategoria.trim();
+  if (!nombre) return;
 
-    const existente = categorias.find(
-      (cat) => cat.toLowerCase() === nombre.toLowerCase()
-    );
+  const existente = categorias.find(
+    (cat) => cat.toLowerCase() === nombre.toLowerCase()
+  );
 
-    const categoriaFinal = existente || nombre;
+  if (existente) {
+    seleccionarCategoria(existente);
+    return;
+  }
 
-    if (!existente) {
-      setCategorias((prev) => [categoriaFinal, ...prev]);
-    }
+  const nuevasCategorias = [nombre, ...categorias];
 
-    seleccionarCategoria(categoriaFinal);
-  };
+  try {
+    await persistirCategoriasGastos(nuevasCategorias);
 
-  const guardarEdicionCategoria = (categoriaOriginal) => {
-    const nuevoNombre = nombreCategoriaEditando.trim();
-    if (!nuevoNombre) return;
+    setCategorias(nuevasCategorias);
+    seleccionarCategoria(nombre);
+  } catch (error) {
+    console.error("Error guardando categoría de gasto:", error);
+    alert("No se pudo guardar la categoría.");
+  }
+};
 
-    setCategorias((prev) =>
-      prev.map((cat) => (cat === categoriaOriginal ? nuevoNombre : cat))
-    );
+const guardarEdicionCategoria = async (categoriaOriginal) => {
+  const nuevoNombre = nombreCategoriaEditando.trim();
+  if (!nuevoNombre) return;
 
-    setGastos((prev) =>
-      prev.map((g) =>
-        g.categoria === categoriaOriginal ? { ...g, categoria: nuevoNombre } : g
-      )
-    );
+  if (esCategoriaBase(categoriaOriginal)) {
+    alert("Las categorías predeterminadas no se pueden renombrar.");
+    return;
+  }
+
+  const duplicada = categorias.some(
+    (cat) =>
+      cat !== categoriaOriginal &&
+      cat.toLowerCase() === nuevoNombre.toLowerCase()
+  );
+
+  if (duplicada) {
+    alert("Ya existe una categoría con ese nombre.");
+    return;
+  }
+
+  const nuevasCategorias = categorias.map((cat) =>
+    cat === categoriaOriginal ? nuevoNombre : cat
+  );
+
+  try {
+    await persistirCategoriasGastos(nuevasCategorias);
+
+    setCategorias(nuevasCategorias);
 
     if (form.categoria === categoriaOriginal) {
       actualizarCampo("categoria", nuevoNombre);
@@ -428,13 +538,32 @@ const verComprobante = (comprobante) => {
 
     setEditandoCategoria("");
     setNombreCategoriaEditando("");
-  };
+  } catch (error) {
+    console.error("Error renombrando categoría:", error);
+    alert("No se pudo renombrar la categoría.");
+  }
+};
 
-  const eliminarCategoria = (categoria) => {
-    const confirmar = window.confirm(`¿Eliminar la categoría "${categoria}"?`);
-    if (!confirmar) return;
+const eliminarCategoria = async (categoria) => {
+  if (esCategoriaBase(categoria)) {
+    alert("Las categorías predeterminadas no se pueden eliminar.");
+    return;
+  }
 
-    setCategorias((prev) => prev.filter((cat) => cat !== categoria));
+  const confirmar = window.confirm(
+    `¿Eliminar la categoría "${categoria}"?`
+  );
+
+  if (!confirmar) return;
+
+  const nuevasCategorias = categorias.filter(
+    (cat) => cat !== categoria
+  );
+
+  try {
+    await persistirCategoriasGastos(nuevasCategorias);
+
+    setCategorias(nuevasCategorias);
 
     if (form.categoria === categoria) {
       actualizarCampo("categoria", "");
@@ -443,7 +572,11 @@ const verComprobante = (comprobante) => {
     if (filtroCategoria === categoria) {
       setFiltroCategoria("");
     }
-  };
+  } catch (error) {
+    console.error("Error eliminando categoría:", error);
+    alert("No se pudo eliminar la categoría.");
+  }
+};
 
   const guardarGasto = async () => {
     if (!form.fecha) {
@@ -1289,6 +1422,8 @@ const duplicarGastoLocal = async (gasto) => {
                           <span>{cat}</span>
                         )}
 
+                    {!esCategoriaBase(cat) && (
+                      <>
                         <button
                           type="button"
                           onClick={(e) => {
@@ -1338,6 +1473,8 @@ const duplicarGastoLocal = async (gasto) => {
                         >
                           <FaTrash size={14} />
                         </button>
+                      </>
+                    )}
                       </div>
                     ))}
                   </div>

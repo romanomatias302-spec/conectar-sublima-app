@@ -94,10 +94,16 @@ export default function Configuracion({ modoOscuro, setModoOscuro, perfil, onAct
         const ref = doc(db, "clientes-saas", perfil.clienteId);
         const snap = await getDoc(ref);
 
-        if (snap.exists()) {
-          const data = snap.data();
-          setLogoUrl(data.logoUrl || "");
-          setNombreVisible(data.nombreVisible || data.nombre || "");
+          if (snap.exists()) {
+            const data = snap.data();
+
+            setLogoUrl(data.logoUrl || "");
+            setNombreVisible(data.nombreVisible || data.nombre || "");
+
+            setMoneda(data.moneda || "ARS");
+            setTimezone(
+              data.timezone || "America/Argentina/Buenos_Aires"
+            );
           setCuentaSaas({
             planNombre: data.planNombre || data.plan || "Sin plan",
             estadoSuscripcion: data.estadoSuscripcion || data.estado || "activo",
@@ -167,8 +173,8 @@ export default function Configuracion({ modoOscuro, setModoOscuro, perfil, onAct
       }
     };
 
-    cargarConfigCliente();
-  }, [perfil]);
+cargarConfigCliente();
+}, [perfil?.clienteId, perfil?.rol]);
 
 
 
@@ -264,10 +270,10 @@ const guardarConfigCliente = async () => {
         });
       }
 
-      setMensajeMoneda("Configuración de moneda guardada correctamente.");
+      setMensajeMoneda("Configuración regional guardada correctamente.");
     } catch (error) {
       console.error("Error guardando moneda:", error);
-      setMensajeMoneda("No se pudo guardar la configuración de moneda.");
+      setMensajeMoneda("No se pudo guardar la configuración regional.");
     } finally {
       setGuardandoMoneda(false);
     }
@@ -401,11 +407,18 @@ const pagarPeriodoMercadoPago = async (periodo) => {
             </div>
 
             <div className="container-secundaria" style={{ marginTop: "20px" }}>
-              <h3>Moneda del sistema</h3>
+              <h3>Configuración regional</h3>
 
-              <div style={{ display: "grid", gap: "14px", maxWidth: "420px" }}>
+              <div
+                style={{
+                  display: "grid",
+                  gap: "14px",
+                  maxWidth: "420px",
+                }}
+              >
                 <div>
                   <label>Moneda</label>
+
                   <select
                     value={moneda}
                     onChange={(e) => setMoneda(e.target.value)}
@@ -418,37 +431,38 @@ const pagarPeriodoMercadoPago = async (periodo) => {
                   </select>
                 </div>
 
+                <div>
+                  <label>Zona horaria del negocio</label>
+
+                  <select
+                    value={timezone}
+                    onChange={(e) => setTimezone(e.target.value)}
+                  >
+                    {Object.entries(TIMEZONES_CONFIG).map(([value, label]) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 <button
                   className="btn btn-primary"
                   onClick={guardarConfiguracionMoneda}
                   disabled={guardandoMoneda}
                   style={{ width: "fit-content" }}
                 >
-                  {guardandoMoneda ? "Guardando..." : "Guardar moneda"}
+                  {guardandoMoneda
+                    ? "Guardando..."
+                    : "Guardar configuración"}
                 </button>
 
-
                 {mensajeMoneda && (
-                  <p style={{ margin: 0, color: "#666" }}>{mensajeMoneda}</p>
+                  <p style={{ margin: 0, color: "#666" }}>
+                    {mensajeMoneda}
+                  </p>
                 )}
               </div>
-
-              
-            </div>
-
-            <div className="config-item">
-              <span>Zona horaria del negocio</span>
-
-              <select
-                value={timezone}
-                onChange={(e) => setTimezone(e.target.value)}
-              >
-                {Object.entries(TIMEZONES_CONFIG).map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </select>
             </div>
 
 
