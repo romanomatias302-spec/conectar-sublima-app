@@ -290,6 +290,9 @@ async function runDiagnostic(config, adapter) {
     },
     summary: {
       activeCandidates: candidates.length,
+      candidatesSinceRequestedDate: candidates.filter(
+        row => validCreation(row) && timeValue(row) >= config.since.getTime()
+      ).length,
       candidatesSinceAugust31: candidates.filter(
         row => validCreation(row) && timeValue(row) >= augustCutoff.getTime()
       ).length,
@@ -322,6 +325,7 @@ function printReport(result, log = console.log) {
   log('');
   log('RESUMEN');
   log(`Total candidatas activas observadas: ${summary.activeCandidates}`);
+  log(`Candidatas creadas desde ${result.since}: ${summary.candidatesSinceRequestedDate}`);
   log(`Candidatas creadas desde 2026-08-31: ${summary.candidatesSinceAugust31}`);
   log(`Candidatas creadas desde 2026-09-01: ${summary.candidatesSinceSeptember1}`);
   log(`Candidatas sin createdAt válido: ${summary.candidatesWithoutValidCreatedAt}`);
