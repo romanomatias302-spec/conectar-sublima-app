@@ -1,14 +1,18 @@
+import { calcularProgresoPorColumna } from "./produccionUtils";
+
 export default function ProduccionEstadoCell({
   pedido,
   columnasProduccion = [],
   onIrProduccion = () => {},
 }) {
-  const progreso = pedido?.progresoProduccion || 0;
-
   const columnaActual =
     pedido?.estado === "Cancelado"
       ? null
       : columnasProduccion.find((c) => c.id === pedido.columnaProduccionId);
+
+  const progreso = columnaActual
+    ? calcularProgresoPorColumna(columnasProduccion, columnaActual.id)
+    : Number(pedido?.progresoProduccion || 0);
 
   const etiqueta = pedido?.estado === "Cancelado"
     ? "Cancelado"

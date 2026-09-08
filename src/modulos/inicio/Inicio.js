@@ -1,82 +1,80 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import "./Inicio.css";
 import {
-  FaUsers,
-  FaClipboardList,
-  FaCog,
-  FaDollarSign,
-  FaExclamationTriangle,
-  FaIndustry,
-  FaChartBar,
+  FaChartBar, FaClipboardList, FaCog, FaDollarSign,
+  FaExclamationTriangle, FaIndustry, FaReceipt, FaShoppingCart, FaUsers,
 } from "react-icons/fa";
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  getCountFromServer,
-  query,
-  where,
-  
-} from "firebase/firestore";
+import { doc, getDoc } from "firebase/firestore";
 import { db } from "../../firebase";
 import { puedeHacer } from "../../utils/permisos";
+import {
+  desplazarFechaISO, fechaHoyNegocio, formatearFechaNegocio,
+  obtenerRangoRapidoNegocio,
+} from "../../utils/fechas";
 import { obtenerEstadoActualProduccion } from "../../firebase/informesProduccion";
+import {
+  obtenerCantidadClientesNuevosPeriodo, obtenerCantidadFinalizadosPeriodo,
+  obtenerCantidadPedidosPeriodo, obtenerCantidadSinIniciar,
+  obtenerPedidosAtrasadosActuales, obtenerResumenVentasCobros,
+  obtenerSeriePedidos,
+} from "../../firebase/inicioDashboard";
 
+const STATS_INICIALES = {
+  pedidos: 0, ventas: 0, cobrado: 0, pedidosPendientes: 0,
+  terminados: 0, clientesNuevos: 0, pedidosAtrasados: 0,
+  pedidoMasAtrasado: null, cuelloBotellaNombre: "-", cuelloBotellaCantidad: 0,
+};
+
+const OPCIONES_PERIODO = [
+  ["hoy", "Hoy"], ["ayer", "Ayer"], ["7dias", "Últimos 7 días"],
+  ["30dias", "Últimos 30 días"], ["personalizado", "Personalizado"],
+];
+
+function crearDiasGrafico(hoy) {
+  return Array.from({ length: 7 }, (_, index) => {
+    const fecha = desplazarFechaISO(hoy, index - 6);
+    const [year, month, day] = fecha.split("-").map(Number);
+    return {
+      fecha,
+      label: new Intl.DateTimeFormat("es-AR", {
+        weekday: "short", timeZone: "UTC",
+      }).format(new Date(Date.UTC(year, month - 1, day, 12))),
+      cantidad: 0,
+    };
+  });
+}
 
 export default function Inicio({ onNavigate, perfil }) {
-const [stats, setStats] = useState({
-  pedidosHoy: 0,
-  clientesTotales: 0,
-  pedidosPendientes: 0,
-  pedidosTotales: 0,
-
-  ingresosHoy: 0,
-  produccionEnProceso: 0,
-  pedidoMasAtrasado: null,
-  terminadosHoy: 0,
-  clientesNuevosHoy: 0,
-  pedidosAtrasados30: 0,
-  cuelloBotellaNombre: "-",
-  cuelloBotellaCantidad: 0,
-});
-
+  const hoy = fechaHoyNegocio(perfil);
+  const [stats, setStats] = useState(STATS_INICIALES);
   const [nombreEmpresa, setNombreEmpresa] = useState("Mi Empresa");
   const [logoUrl, setLogoUrl] = useState("");
-  const [pedidosSemana, setPedidosSemana] = useState([]);
-  const [hoverPoint, setHoverPoint] = useState(null);
+  const [periodo, setPeriodo] = useState("hoy");
+  const [personalizadoDesde, setPersonalizadoDesde] = useState(hoy);
+  const [personalizadoHasta, setPersonalizadoHasta] = useState(hoy);
+  const [pedidosSemana, setPedidosSemana] = useState(() => crearDiasGrafico(hoy));
+  const [cargando, setCargando] = useState(false);
+  const [errorDashboard, setErrorDashboard] = useState("");
+  const solicitudPeriodoRef = useRef(0);
+  const solicitudEstadoRef = useRef(0);
 
-  const hoy = useMemo(() => {
-    const fecha = new Date();
-    const yyyy = fecha.getFullYear();
-    const mm = String(fecha.getMonth() + 1).padStart(2, "0");
-    const dd = String(fecha.getDate()).padStart(2, "0");
-    return `${yyyy}-${mm}-${dd}`;
-  }, []);
-
-  const ultimos7Dias = useMemo(() => {
-  const dias = [];
-
-  for (let i = 6; i >= 0; i--) {
-    const fecha = new Date();
-    fecha.setDate(fecha.getDate() - i);
-
-    const yyyy = fecha.getFullYear();
-    const mm = String(fecha.getMonth() + 1).padStart(2, "0");
-    const dd = String(fecha.getDate()).padStart(2, "0");
-
-    dias.push({
-      fecha: `${yyyy}-${mm}-${dd}`,
-      label: fecha.toLocaleDateString("es-AR", { weekday: "short" }),
-      cantidad: 0,
-    });
-  }
-
-  return dias;
-}, []);
+  const rango = useMemo(
+    () => obtenerRangoRapidoNegocio({
+      periodo, perfil, personalizadoDesde, personalizadoHasta,
+    }),
+    [periodo, perfil, personalizadoDesde, personalizadoHasta]
+  );
+  const diasGrafico = useMemo(() => crearDiasGrafico(hoy), [hoy]);
+  const rangoValido =
+    /^\d{4}-\d{2}-\d{2}$/.test(rango.desde) &&
+    /^\d{4}-\d{2}-\d{2}$/.test(rango.hasta) &&
+    rango.desde <= rango.hasta;
 
   const puedeVerClientes = puedeHacer(perfil, "clientes", "ver");
   const puedeVerPedidos = puedeHacer(perfil, "pedidos", "ver");
+  const puedeVerVentas = puedeHacer(perfil, "ventas", "ver");
+  const puedeVerProduccion = puedeHacer(perfil, "produccion", "ver");
+  const puedeVerGastos = puedeHacer(perfil, "gastos", "ver");
   const puedeVerConfiguracion = puedeHacer(perfil, "configuracion", "ver");
   const puedeVerInicioPedidos = puedeHacer(perfil, "inicio", "verPedidos");
   const puedeVerInicioClientes = puedeHacer(perfil, "inicio", "verClientes");
@@ -84,256 +82,166 @@ const [stats, setStats] = useState({
   const puedeVerInicioProduccion = puedeHacer(perfil, "inicio", "verProduccion");
   const puedeVerInicioAtrasados = puedeHacer(perfil, "inicio", "verAtrasados");
   const puedeVerInicioGrafico = puedeHacer(perfil, "inicio", "verGrafico");
-  const puedeVerInicioCuelloBotella = puedeHacer(perfil, "inicio", "verCuelloBotella");
-
-  useEffect(() => {
-    const cargarDashboard = async () => {
-      try {
-        if (!perfil) return;
-
-        if (perfil.rol === "superadmin") {
-          setNombreEmpresa("Panel Dueño SaaS");
-          setLogoUrl("");
-          return;
-        }
-
-        const clienteId = perfil.clienteId;
-        console.log("DASHBOARD clienteId usado:", clienteId);
-        if (!clienteId) return;
-
-        const clienteSaasRef = doc(db, "clientes-saas", clienteId);
-        const clienteSaasSnap = await getDoc(clienteSaasRef);
-
-        if (clienteSaasSnap.exists()) {
-          const data = clienteSaasSnap.data();
-          setNombreEmpresa(data.nombreVisible || data.nombre || "Mi Empresa");
-          setLogoUrl(data.logoUrl || "");
-        }
-
-        const pedidosRef = collection(db, "pedidos");
-        const clientesRef = collection(db, "clientes");
-        const ventasRef = collection(db, "ventas");
-
-        const inicioHoy = new Date();
-        inicioHoy.setHours(0, 0, 0, 0);
-
-        const finHoy = new Date();
-        finHoy.setHours(23, 59, 59, 999);
-
-        const hace30Dias = new Date();
-        hace30Dias.setDate(hace30Dias.getDate() - 30);
-        const hace30DiasStr = hace30Dias.toISOString().slice(0, 10);
-
-        const inicioSemanaStr = ultimos7Dias[0]?.fecha;
-
-        const pedidosSemanaQ = query(
-          pedidosRef,
-          where("clienteId", "==", clienteId),
-          where("fechaPedido", ">=", inicioSemanaStr),
-          where("fechaPedido", "<=", hoy)
-        );
-
-        const pedidosHoyQ = query(
-          pedidosRef,
-          where("clienteId", "==", clienteId),
-          where("fechaPedido", "==", hoy)
-        );
-
-        const pedidosSinIniciarQ = query(
-          pedidosRef,
-          where("clienteId", "==", clienteId),
-          where("estadoProduccion", "==", "pendiente")
-        );
-
-        const terminadosHoyQ = query(
-          pedidosRef,
-          where("clienteId", "==", clienteId),
-          where("estadoProduccion", "==", "finalizado"),
-          where("produccionActualizadoAt", ">=", inicioHoy),
-          where("produccionActualizadoAt", "<=", finHoy)
-        );
-
-        const clientesNuevosHoyQ = query(
-          clientesRef,
-          where("clienteId", "==", clienteId),
-          where("createdAt", ">=", inicioHoy),
-          where("createdAt", "<=", finHoy)
-        );
-
-        const ingresosHoyQ = query(
-          ventasRef,
-          where("clienteId", "==", clienteId),
-          where("fechaVenta", "==", hoy)
-        );
-
-        const pedidosAtrasados30Q = query(
-          pedidosRef,
-          where("clienteId", "==", clienteId),
-          where("fechaEntrega", ">=", hace30DiasStr),
-          where("fechaEntrega", "<", hoy)
-        );
-
-      const pedidosHoySnap = puedeVerInicioPedidos
-        ? await getCountFromServer(pedidosHoyQ)
-        : null;
-
-      const pedidosSinIniciarSnap = puedeVerInicioProduccion
-        ? await getCountFromServer(pedidosSinIniciarQ)
-        : null;
-
-      const terminadosHoySnap = puedeVerInicioProduccion
-        ? await getCountFromServer(terminadosHoyQ)
-        : null;
-
-      const clientesNuevosHoySnap = puedeVerInicioClientes
-        ? await getCountFromServer(clientesNuevosHoyQ)
-        : null;
-
-      const ingresosHoySnap = puedeVerInicioIngresos
-        ? await getDocs(ingresosHoyQ)
-        : null;
-
-      const pedidosAtrasados30Snap = puedeVerInicioAtrasados
-        ? await getDocs(pedidosAtrasados30Q)
-        : null;
-
-      const estadoActualProduccion = puedeVerInicioCuelloBotella
-        ? await obtenerEstadoActualProduccion({ perfil })
-        : [];
-
-      const pedidosSemanaSnap = puedeVerInicioGrafico
-        ? await getDocs(pedidosSemanaQ)
-        : null;
-        
-
-      const ventasHoy = ingresosHoySnap
-        ? ingresosHoySnap.docs
-            .map((d) => ({
-              firebaseId: d.id,
-              ...d.data(),
-            }))
-            .filter((venta) => venta.estadoVenta !== "anulada")
-        : [];
-
-        const ingresosHoy = ventasHoy.reduce((acc, venta) => {
-          return acc + Number(venta.totalPagado || 0);
-        }, 0);
-
-        const pedidosAtrasados30 = pedidosAtrasados30Snap
-          ? pedidosAtrasados30Snap.docs
-              .map((d) => ({
-                firebaseId: d.id,
-                ...d.data(),
-              }))
-              .filter((p) => p.estadoProduccion !== "finalizado")
-          : [];
-
-        const porEtapaActual = {};
-
-        estadoActualProduccion.forEach((p) => {
-          const etapa = p.columnaActualNombre || "Sin etapa";
-
-          if (!porEtapaActual[etapa]) {
-            porEtapaActual[etapa] = {
-              etapa,
-              cantidad: 0,
-              totalMin: 0,
-            };
-          }
-
-          porEtapaActual[etapa].cantidad += 1;
-          porEtapaActual[etapa].totalMin += Number(p.minutosSinMover || 0);
-        });
-
-        const etapasActuales = Object.values(porEtapaActual)
-          .map((e) => ({
-            ...e,
-            promedioMin: e.cantidad ? Math.round(e.totalMin / e.cantidad) : 0,
-          }))
-          .sort((a, b) => b.cantidad - a.cantidad);
-
-        const cuelloBotella = etapasActuales[0] || null;
-
-        const pedidoMasAtrasado =
-          pedidosAtrasados30.sort((a, b) =>
-            String(a.fechaEntrega || "").localeCompare(String(b.fechaEntrega || ""))
-          )[0] || null;
-
-          const pedidosSemanaMap = {};
-
-          ultimos7Dias.forEach((d) => {
-            pedidosSemanaMap[d.fecha] = { ...d };
-          });
-
-          if (pedidosSemanaSnap) {
-            pedidosSemanaSnap.docs.forEach((docu) => {
-              const pedido = docu.data();
-              const fecha = pedido.fechaPedido;
-
-              if (pedidosSemanaMap[fecha]) {
-                pedidosSemanaMap[fecha].cantidad += 1;
-              }
-            });
-          }
-
-          setPedidosSemana(Object.values(pedidosSemanaMap));
-
-      setStats({
-        pedidosHoy: pedidosHoySnap?.data().count || 0,
-        clientesTotales: 0,
-        pedidosPendientes: pedidosSinIniciarSnap?.data().count || 0,
-        pedidosTotales: 0,
-
-        ingresosHoy,
-        produccionEnProceso: 0,
-        pedidoMasAtrasado,
-
-        terminadosHoy: terminadosHoySnap?.data().count || 0,
-        clientesNuevosHoy: clientesNuevosHoySnap?.data().count || 0,
-        pedidosAtrasados30: pedidosAtrasados30.length,
-        cuelloBotellaNombre: cuelloBotella?.etapa || "-",
-        cuelloBotellaCantidad: cuelloBotella?.cantidad || 0,
-      });
-      } catch (error) {
-        console.error("Error al cargar dashboard:", error);
-      }
-    };
-
-    cargarDashboard();
-  }, [perfil, hoy]);
-
-  const maxPedidosSemana = Math.max(
-    ...pedidosSemana.map((d) => d.cantidad),
-    1
+  const puedeVerInicioCuelloBotella = puedeHacer(
+    perfil, "inicio", "verCuelloBotella"
   );
 
-  const puntosGrafico = pedidosSemana.map((d, index) => {
-    const x = (700 / 6) * index;
-    const y = 190 - (d.cantidad / maxPedidosSemana) * 130;
+  const formatearMoneda = (valor) =>
+    new Intl.NumberFormat(perfil?.localeMoneda || "es-AR", {
+      style: "currency", currency: perfil?.moneda || "ARS",
+      maximumFractionDigits: 2,
+    }).format(Number(valor) || 0);
 
-    return {
-      ...d,
-      x,
-      y,
+  useEffect(() => {
+    let cancelado = false;
+    async function cargarEmpresa() {
+      if (!perfil?.clienteId || perfil.rol === "superadmin") return;
+      try {
+        const snapshot = await getDoc(doc(db, "clientes-saas", perfil.clienteId));
+        if (cancelado || !snapshot.exists()) return;
+        const data = snapshot.data();
+        setNombreEmpresa(data.nombreVisible || data.nombre || "Mi Empresa");
+        setLogoUrl(data.logoUrl || "");
+      } catch (error) {
+        console.error("Error al cargar la empresa de Inicio:", error);
+      }
+    }
+    cargarEmpresa();
+    return () => { cancelado = true; };
+  }, [perfil?.clienteId, perfil?.rol]);
+
+  useEffect(() => {
+    if (!perfil?.clienteId || perfil.rol === "superadmin" || !rangoValido) {
+      solicitudPeriodoRef.current += 1;
+      setCargando(false);
+      return;
+    }
+    const solicitudId = ++solicitudPeriodoRef.current;
+    setCargando(true);
+    setErrorDashboard("");
+
+    async function cargarMetricasPeriodo() {
+      try {
+        const argsPeriodo = {
+          perfil, fechaDesde: rango.desde, fechaHasta: rango.hasta,
+        };
+        const [pedidos, comercial, terminados, clientesNuevos] = await Promise.all([
+          puedeVerInicioPedidos
+            ? obtenerCantidadPedidosPeriodo(argsPeriodo) : Promise.resolve(0),
+          puedeVerInicioIngresos
+            ? obtenerResumenVentasCobros(argsPeriodo)
+            : Promise.resolve({ ventas: 0, cobrado: 0 }),
+          puedeVerInicioProduccion
+            ? obtenerCantidadFinalizadosPeriodo(argsPeriodo) : Promise.resolve(0),
+          puedeVerInicioClientes
+            ? obtenerCantidadClientesNuevosPeriodo(argsPeriodo) : Promise.resolve(0),
+        ]);
+
+        if (solicitudId !== solicitudPeriodoRef.current) return;
+        setStats((actuales) => ({
+          ...actuales,
+          pedidos, ventas: comercial.ventas, cobrado: comercial.cobrado,
+          terminados, clientesNuevos,
+        }));
+      } catch (error) {
+        if (solicitudId !== solicitudPeriodoRef.current) return;
+        console.error("Error al cargar dashboard:", error);
+        setErrorDashboard("No pudimos actualizar el resumen. Intentá nuevamente.");
+      } finally {
+        if (solicitudId === solicitudPeriodoRef.current) setCargando(false);
+      }
+    }
+
+    cargarMetricasPeriodo();
+    return () => {
+      if (solicitudId === solicitudPeriodoRef.current) {
+        solicitudPeriodoRef.current += 1;
+      }
     };
-  });
+  }, [
+    perfil, rango.desde, rango.hasta, rangoValido,
+    puedeVerInicioPedidos, puedeVerInicioIngresos, puedeVerInicioProduccion,
+    puedeVerInicioClientes,
+  ]);
 
+  useEffect(() => {
+    if (!perfil?.clienteId || perfil.rol === "superadmin") return;
+    const solicitudId = ++solicitudEstadoRef.current;
+
+    async function cargarEstadoActual() {
+      try {
+        const [pedidosPendientes, atrasados, estadoActualProduccion, serie] =
+          await Promise.all([
+            puedeVerInicioProduccion
+              ? obtenerCantidadSinIniciar({ perfil }) : Promise.resolve(0),
+            puedeVerInicioAtrasados
+              ? obtenerPedidosAtrasadosActuales({ perfil, hoyNegocio: hoy })
+              : Promise.resolve({ cantidad: 0, pedidoMasAtrasado: null }),
+            puedeVerInicioCuelloBotella
+              ? obtenerEstadoActualProduccion({ perfil }) : Promise.resolve([]),
+            puedeVerInicioGrafico
+              ? obtenerSeriePedidos({ perfil, dias: diasGrafico })
+              : Promise.resolve(diasGrafico),
+          ]);
+        if (solicitudId !== solicitudEstadoRef.current) return;
+
+        const porEtapa = estadoActualProduccion.reduce((acumulado, pedido) => {
+          const etapa = pedido.columnaActualNombre || "Sin etapa";
+          acumulado[etapa] = (acumulado[etapa] || 0) + 1;
+          return acumulado;
+        }, {});
+        const cuelloBotella = Object.entries(porEtapa).sort(
+          (a, b) => b[1] - a[1]
+        )[0];
+        setStats((actuales) => ({
+          ...actuales,
+          pedidosPendientes,
+          pedidosAtrasados: atrasados.cantidad,
+          pedidoMasAtrasado: atrasados.pedidoMasAtrasado,
+          cuelloBotellaNombre: cuelloBotella?.[0] || "-",
+          cuelloBotellaCantidad: cuelloBotella?.[1] || 0,
+        }));
+        setPedidosSemana(serie);
+      } catch (error) {
+        if (solicitudId !== solicitudEstadoRef.current) return;
+        console.error("Error al cargar el estado actual de Inicio:", error);
+        setErrorDashboard("No pudimos actualizar el resumen. Intentá nuevamente.");
+      }
+    }
+
+    cargarEstadoActual();
+    return () => {
+      if (solicitudId === solicitudEstadoRef.current) {
+        solicitudEstadoRef.current += 1;
+      }
+    };
+  }, [
+    perfil, hoy, diasGrafico, puedeVerInicioProduccion, puedeVerInicioAtrasados,
+    puedeVerInicioCuelloBotella, puedeVerInicioGrafico,
+  ]);
+
+  const maxPedidosSemana = Math.max(...pedidosSemana.map((d) => d.cantidad), 1);
+  const puntosGrafico = pedidosSemana.map((dia, index) => ({
+    ...dia, x: (700 / 6) * index,
+    y: 190 - (dia.cantidad / maxPedidosSemana) * 130,
+  }));
   const lineaGrafico = puntosGrafico
-    .map((p, index) => `${index === 0 ? "M" : "L"} ${p.x} ${p.y}`)
+    .map((punto, index) => `${index === 0 ? "M" : "L"} ${punto.x} ${punto.y}`)
     .join(" ");
-
   const areaGrafico = `${lineaGrafico} L 700 220 L 0 220 Z`;
-
   const pedidoAtrasadoTexto = stats.pedidoMasAtrasado
-  ? `#${stats.pedidoMasAtrasado.id || stats.pedidoMasAtrasado.numeroPedido || stats.pedidoMasAtrasado.firebaseId}`
-  : "Sin atrasos";
-
-const clientePedidoAtrasado =
-  stats.pedidoMasAtrasado?.cliente ||
-  stats.pedidoMasAtrasado?.clienteNombre ||
-  "Todo al día";
-
-
+    ? `#${stats.pedidoMasAtrasado.id || stats.pedidoMasAtrasado.numeroPedido ||
+        stats.pedidoMasAtrasado.firebaseId}`
+    : "Sin atrasos";
+  const clientePedidoAtrasado =
+    stats.pedidoMasAtrasado?.cliente ||
+    stats.pedidoMasAtrasado?.clienteNombre || "Todo al día";
+  const ventasFormateadas = formatearMoneda(stats.ventas);
+  const cobradoFormateado = formatearMoneda(stats.cobrado);
+  const claseValorMonetario = (texto) =>
+    `inicio-kpi-valor-monetario ${
+      texto.length >= 14 ? "muy-largo" : texto.length >= 11 ? "largo" : ""
+    }`;
 
   return (
     <div className="inicio-container">
@@ -348,234 +256,90 @@ const clientePedidoAtrasado =
               </div>
             )}
           </div>
-
-          <div>
-            <h1>{nombreEmpresa}</h1>
-          </div>
+          <h1>{nombreEmpresa}</h1>
         </div>
       </header>
 
       <section className="inicio-dashboard-grid">
         <div className="inicio-hero-card">
-          <div>
-            <span className="inicio-eyebrow">Dashboard</span>
-            <h2>Resumen operativo</h2>
-
-          </div>
-
-          <div className="inicio-hero-glow">
-            <FaChartBar />
-          </div>
+          <div><span className="inicio-eyebrow">Dashboard</span><h2>Resumen operativo</h2></div>
+          <div className="inicio-hero-glow"><FaChartBar /></div>
         </div>
 
-        <div className="inicio-kpis">
-          {puedeVerInicioPedidos && (
-            <div className="inicio-kpi-card">
-              <FaClipboardList className="inicio-kpi-icon" />
-              <span>Pedidos hoy</span>
-              <strong>{stats.pedidosHoy}</strong>
+        <div className="inicio-periodo" aria-label="Período del resumen">
+          <div className="inicio-periodo-chips">
+            {OPCIONES_PERIODO.map(([valor, etiqueta]) => (
+              <button key={valor} type="button"
+                className={periodo === valor ? "activo" : ""}
+                onClick={() => setPeriodo(valor)}>{etiqueta}</button>
+            ))}
+          </div>
+          {periodo === "personalizado" && (
+            <div className="inicio-periodo-personalizado">
+              <label>Desde<input aria-label="Desde" type="date" value={personalizadoDesde} onChange={(e) => setPersonalizadoDesde(e.target.value)} /></label>
+              <label>Hasta<input aria-label="Hasta" type="date" value={personalizadoHasta} onChange={(e) => setPersonalizadoHasta(e.target.value)} /></label>
             </div>
           )}
-
-
-          {puedeVerInicioProduccion && (    
-            <div className="inicio-kpi-card">
-              <FaClipboardList className="inicio-kpi-icon" />
-              <span>Sin iniciar</span>
-              <strong>{stats.pedidosPendientes}</strong>
-            </div>
-           )}
-
-
-          {puedeVerInicioProduccion && (  
-            <div className="inicio-kpi-card">
-              <FaIndustry className="inicio-kpi-icon" />
-            <span>Terminados hoy</span>
-            <strong>{stats.terminadosHoy}</strong>
-            </div>
-          )}
-
-          {puedeVerInicioClientes && (  
-            <div className="inicio-kpi-card">
-              <FaUsers className="inicio-kpi-icon" />
-            <span>Clientes nuevos hoy</span>
-            <strong>{stats.clientesNuevosHoy}</strong>
-            </div>
-          )}
-
-          {puedeVerInicioIngresos && (
-            <div className="inicio-kpi-card">
-              <FaDollarSign className="inicio-kpi-icon" />
-              <span>Ingresos hoy</span>
-              <strong>${stats.ingresosHoy.toLocaleString("es-AR")}</strong>
-            </div>
-          )}  
-
-          {puedeVerInicioAtrasados && (  
-            <div className="inicio-kpi-card inicio-kpi-alerta">
-              <FaExclamationTriangle className="inicio-kpi-icon" />
-              <span>Atrasados 30 días</span>
-              <strong>{stats.pedidosAtrasados30}</strong>
-            </div>
-          )}   
+          <span className="inicio-periodo-rango">
+            {rangoValido
+              ? `${formatearFechaNegocio(rango.desde)} al ${formatearFechaNegocio(rango.hasta)}`
+              : "Revisá el rango seleccionado"}
+          </span>
         </div>
 
-        <div className="inicio-panel inicio-panel-chart">
+        {errorDashboard && <div className="inicio-error">{errorDashboard}</div>}
+        <div data-testid="inicio-kpis" aria-busy={cargando} className={`inicio-kpis ${cargando ? "cargando" : ""}`}>
+          {puedeVerInicioPedidos && <div data-testid="kpi-pedidos" className="inicio-kpi-card"><FaClipboardList className="inicio-kpi-icon" /><span>Pedidos</span><strong>{stats.pedidos}</strong><small>En el período</small></div>}
+          {puedeVerInicioIngresos && <div className="inicio-kpi-card"><FaShoppingCart className="inicio-kpi-icon" /><span>Ventas</span><strong className={claseValorMonetario(ventasFormateadas)} title={ventasFormateadas}>{ventasFormateadas}</strong><small>Total vendido</small></div>}
+          {puedeVerInicioIngresos && <div className="inicio-kpi-card"><FaDollarSign className="inicio-kpi-icon" /><span>Cobrado</span><strong className={claseValorMonetario(cobradoFormateado)} title={cobradoFormateado}>{cobradoFormateado}</strong><small>Pagos recibidos</small></div>}
+          {puedeVerInicioProduccion && <div className="inicio-kpi-card"><FaClipboardList className="inicio-kpi-icon" /><span>Sin iniciar</span><strong>{stats.pedidosPendientes}</strong><small>Estado actual</small></div>}
+          {puedeVerInicioProduccion && <div className="inicio-kpi-card"><FaIndustry className="inicio-kpi-icon" /><span>Finalizados</span><strong>{stats.terminados}</strong><small>En el período</small></div>}
+          {puedeVerInicioClientes && <div className="inicio-kpi-card"><FaUsers className="inicio-kpi-icon" /><span>Clientes nuevos</span><strong>{stats.clientesNuevos}</strong><small>En el período</small></div>}
+          {puedeVerInicioAtrasados && <div className="inicio-kpi-card inicio-kpi-alerta"><FaExclamationTriangle className="inicio-kpi-icon" /><span>Pedidos atrasados</span><strong>{stats.pedidosAtrasados}</strong><small>Pendientes de entrega</small></div>}
+        </div>
 
         {puedeVerInicioGrafico && (
-          <div className="inicio-panel-header">
-            <div>
-              <h3>Evolución semanal</h3>
-              <p>Pedidos de los últimos días</p>
+          <div className="inicio-panel inicio-panel-chart">
+            <div className="inicio-panel-header"><div><h3>Evolución semanal</h3><p>Pedidos de los últimos 7 días</p></div></div>
+            <div className="inicio-line-chart">
+              <svg viewBox="0 0 700 220" preserveAspectRatio="none">
+                <defs><linearGradient id="inicioChartFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#00aeef" stopOpacity="0.32" /><stop offset="100%" stopColor="#00aeef" stopOpacity="0.02" /></linearGradient><linearGradient id="inicioChartLine" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stopColor="#0096d1" /><stop offset="100%" stopColor="#36d6ff" /></linearGradient></defs>
+                <path className="inicio-chart-grid-line" d="M 0 40 H 700 M 0 90 H 700 M 0 140 H 700 M 0 190 H 700" />
+                {lineaGrafico && <><path className="inicio-chart-area" d={areaGrafico} /><path className="inicio-chart-line" d={lineaGrafico} /></>}
+                {puntosGrafico.map((p) => <g key={p.fecha}><circle cx={p.x} cy={p.y} r="6" className="inicio-chart-point" /><title>{`${p.label}: ${p.cantidad} pedidos`}</title></g>)}
+              </svg>
             </div>
-          </div>
-        )}  
-
-<div className="inicio-line-chart">
-  <svg viewBox="0 0 700 220" preserveAspectRatio="none">
-    <defs>
-      <linearGradient id="inicioChartFill" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stopColor="#00aeef" stopOpacity="0.32" />
-        <stop offset="100%" stopColor="#00aeef" stopOpacity="0.02" />
-      </linearGradient>
-
-      <linearGradient id="inicioChartLine" x1="0" y1="0" x2="1" y2="0">
-        <stop offset="0%" stopColor="#0096d1" />
-        <stop offset="100%" stopColor="#36d6ff" />
-      </linearGradient>
-    </defs>
-
-    <path
-      className="inicio-chart-grid-line"
-      d="M 0 40 H 700 M 0 90 H 700 M 0 140 H 700 M 0 190 H 700"
-    />
-
-      {lineaGrafico && (
-        <>
-          <path className="inicio-chart-area" d={areaGrafico} />
-          <path className="inicio-chart-line" d={lineaGrafico} />
-        </>
-      )}
-
-    {puntosGrafico.map((p) => (
-      <g key={p.fecha}>
-        <circle
-          cx={p.x}
-          cy={p.y}
-          r="6"
-          className="inicio-chart-point"
-        />
-        <title>{`${p.label}: ${p.cantidad} pedidos`}</title>
-      </g>
-    ))}
-  </svg>
-</div>
-
-        <div className="inicio-chart-labels">
-          {pedidosSemana.map((d, index) => (
-            <span key={d.fecha}>
-              {index === pedidosSemana.length - 1 ? "Hoy" : d.label}
-            </span>
-          ))}
-        </div>
-        </div>
-
-
-        {puedeVerInicioCuelloBotella && (    
-          <div className="inicio-panel">
-            <div className="inicio-panel-header">
-              <div>
-                <h3>Cuello de botella</h3>
-                <p>Últimos 30 días</p>
-              </div>
-            </div>
-
-            <div className="inicio-production-list">
-              <div className="inicio-production-row">
-                <span>Etapa crítica</span>
-                <strong>{stats.cuelloBotellaNombre}</strong>
-              </div>
-
-              <div className="inicio-progress">
-                <div style={{ width: `${Math.min(stats.cuelloBotellaCantidad * 10, 100)}%` }} />
-              </div>
-
-              <div className="inicio-production-row">
-                <span>Pedidos acumulados</span>
-                <strong>{stats.cuelloBotellaCantidad}</strong>
-              </div>
-            </div>
+            <div className="inicio-chart-labels">{pedidosSemana.map((d, index) => <span key={d.fecha}>{index === pedidosSemana.length - 1 ? "Hoy" : d.label}</span>)}</div>
           </div>
         )}
 
+        {puedeVerInicioCuelloBotella && (
+          <div className="inicio-panel">
+            <div className="inicio-panel-header"><div><h3>Cuello de botella</h3><p>Estado actual</p></div></div>
+            <div className="inicio-production-list"><div className="inicio-production-row"><span>Etapa crítica</span><strong>{stats.cuelloBotellaNombre}</strong></div><div className="inicio-progress"><div style={{ width: `${Math.min(stats.cuelloBotellaCantidad * 10, 100)}%` }} /></div><div className="inicio-production-row"><span>Pedidos acumulados</span><strong>{stats.cuelloBotellaCantidad}</strong></div></div>
+          </div>
+        )}
 
         {puedeVerInicioAtrasados && (
           <div className="inicio-panel inicio-panel-danger">
-            <div className="inicio-panel-header">
-              <div>
-                <h3>Pedidos atrasados</h3>
-                <p>Últimos 30 días</p>
-              </div>
-            </div>
-
-            <div className="inicio-overdue-number">
-              {stats.pedidosAtrasados30}
-            </div>
-
-            <span className="inicio-overdue-date">
-              {stats.pedidosAtrasados30 > 0 ? "Revisar producción" : "Sin atrasos recientes"}
-            </span>
-          </div>
-        )}  
-
-        <div className="inicio-panel">
-          <div className="inicio-panel-header">
-            <div>
-              <h3>Accesos rápidos</h3>
-              <p>Módulos principales</p>
-            </div>
-          </div>
-
-      
-
-      <section className="accesos-rapidos">
-        {puedeVerPedidos && (
-          <div onClick={() => onNavigate("pedidos")} className="modulo">
-            <FaClipboardList className="icon" />
-            <span>Pedidos</span>
+            <div className="inicio-panel-header"><div><h3>Pedido más atrasado</h3><p>Situación actual</p></div></div>
+            <div className="inicio-overdue-number">{pedidoAtrasadoTexto}</div>
+            <span className="inicio-overdue-date">{clientePedidoAtrasado}</span>
           </div>
         )}
 
-        {puedeVerClientes && (
-          <div onClick={() => onNavigate("listado")} className="modulo">
-            <FaUsers className="icon" />
-            <span>Clientes</span>
-          </div>
-        )}
-
-        {puedeVerConfiguracion && (
-          <div onClick={() => onNavigate("configuracion")} className="modulo">
-            <FaCog className="icon" />
-            <span>Configuración</span>
-          </div>
-        )}
-
-        {/* Dejamos ocultos por ahora hasta tener módulo/permisos reales */}
-        {/* <div className="modulo">
-          <FaBox className="icon" />
-          <span>Productos</span>
+        <div className="inicio-panel inicio-panel-accesos">
+          <div className="inicio-panel-header"><div><h3>Accesos rápidos</h3><p>Módulos principales</p></div></div>
+          <section className="accesos-rapidos">
+            {puedeVerPedidos && <button type="button" onClick={() => onNavigate("pedidos")} className="modulo"><FaClipboardList className="icon" /><span>Pedidos</span></button>}
+            {puedeVerVentas && <button type="button" onClick={() => onNavigate("ventas")} className="modulo"><FaReceipt className="icon" /><span>Ventas</span></button>}
+            {puedeVerProduccion && <button type="button" onClick={() => onNavigate("produccion")} className="modulo"><FaIndustry className="icon" /><span>Producción</span></button>}
+            {puedeVerClientes && <button type="button" onClick={() => onNavigate("clientes")} className="modulo"><FaUsers className="icon" /><span>Clientes</span></button>}
+            {puedeVerGastos && <button type="button" onClick={() => onNavigate("gastos")} className="modulo"><FaDollarSign className="icon" /><span>Gastos</span></button>}
+            {puedeVerConfiguracion && <button type="button" onClick={() => onNavigate("configuracion")} className="modulo"><FaCog className="icon" /><span>Configuración</span></button>}
+          </section>
         </div>
-
-        <div className="modulo">
-          <FaChartBar className="icon" />
-          <span>Estadísticas</span>
-        </div> */}
       </section>
-
-      </div> 
-
-      </section> 
-
-    </div> 
+    </div>
   );
 }

@@ -37,6 +37,7 @@ import GastosPage from "./modulos/gastos/GastosPage";
 import { puedeHacer as puedeHacerPerfil } from "./utils/permisos";
 import ProveedoresPage from "./modulos/proveedores/ProveedoresPage";
 import ListasPreciosPage from "./modulos/listasPrecios/ListasPreciosPage";
+import { resolverVistaInicio } from "./modulos/inicio/inicioNavegacion";
 
 
 
@@ -510,45 +511,9 @@ irAVista("venta-detalle", {
 
   // 🔹 Navegación desde la pantalla de inicio
   const manejarNavegacionDesdeInicio = (modulo) => {
-  switch (modulo) {
-    case "inicio":
-      irAVista("inicio");
-      break;
-
-    case "listado":
-      irAVista("listado");
-      break;
-
-    case "formulario":
-      irAVista("formulario");
-      break;
-
-    case "pedidos":
-      irAVista("pedidos");
-      break;
-      
-
-    case "produccion":
-      irAVista("produccion");
-      break;
-
-    case "detallePedido":
-    case "nuevoPedido":
-      irAVista("detallePedido", { pedido: null });
-      break;
-
-    case "ventas":
-      irAVista("ventas");
-      break;
-
-    case "movimientos":
-      irAVista("movimientos");
-      break;
-
-    default:
-      break;
-  }
-};
+    const vistaDestino = resolverVistaInicio(modulo);
+    if (vistaDestino) irAVista(vistaDestino);
+  };
 
     const iniciarPagoCuentaBloqueada = async () => {
       try {

@@ -1824,6 +1824,13 @@ match /produccion_sectores/{sectorId} {
         allow delete: if false;
       }
     }
+
+    // =========================
+    // pagos - collectionGroup Inicio
+    // =========================
+    match /{path=**}/pagos/{pagoId} {
+      allow read: if canReadVentas(resource.data.clienteId);
+    }
     
     // =========================
     // historial_produccion - collectionGroup informes

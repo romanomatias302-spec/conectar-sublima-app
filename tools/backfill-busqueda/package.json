@@ -5,8 +5,8 @@
   "description": "Backfill local y acotado de campos derivados de búsqueda",
   "engines": { "node": ">=22" },
   "scripts": {
-    "test": "node --test backfill.test.cjs orchestrator.test.cjs",
-    "check": "node --check backfill.cjs && node --check orchestrator.cjs && node --check backfill.test.cjs && node --check orchestrator.test.cjs"
+    "test": "node --test backfill.test.cjs orchestrator.test.cjs auditoria-pagos.test.cjs normalizar-pagos-minimo.test.cjs comparar-cobrado.test.cjs",
+    "check": "node --check backfill.cjs && node --check orchestrator.cjs && node --check diagnostico-ventas-recientes.cjs && node --check auditoria-pagos.cjs && node --check normalizar-pagos-minimo.cjs && node --check comparar-cobrado.cjs && node --check backfill.test.cjs && node --check orchestrator.test.cjs && node --check auditoria-pagos.test.cjs && node --check normalizar-pagos-minimo.test.cjs && node --check comparar-cobrado.test.cjs"
   },
   "dependencies": { "firebase-admin": "13.10.0" }
 }

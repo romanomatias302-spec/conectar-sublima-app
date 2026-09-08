@@ -93,6 +93,46 @@ Referencias oficiales: [ADC local](https://cloud.google.com/docs/authentication/
 [Firebase Admin](https://firebase.google.com/docs/admin/setup) y
 [DocumentReference.update](https://cloud.google.com/nodejs/docs/reference/firestore/latest/firestore/documentreference).
 
+## Normalización cerrada de tres pagos históricos
+
+`normalizar-pagos-minimo.cjs` está limitado en código al proyecto
+`conectarsublimados-7881e`, a la venta `39iO7tiIMJa9k2X3K8Vw` de `elgol` y a los
+tres pagos expresamente auditados. Su dry-run predeterminado relee la venta y los
+pagos, muestra estado, cambio propuesto y precondiciones, y no escribe:
+
+```powershell
+node normalizar-pagos-minimo.cjs --project conectarsublimados-7881e
+```
+
+El modo de escritura queda preparado, pero requiere autorización posterior y la
+confirmación literal `elgol:3-pagos-anulados`. Solo puede completar `ventaId` y
+`estadoPagoRegistro`; antes de cada operación relee la venta y el pago en una
+transacción y usa el `snapshot.updateTime` real como `lastUpdateTime`.
+
+El pago `elgol3/ugBXc7nUUqkHlvkY7dl4/zrCmHAg2jRv3Ov1wQk8K` no está en el
+allowlist y no debe normalizarse: tiene monto y venta total cero, sin evidencia
+suficiente. Queda fuera del total futuro porque su `estadoPagoRegistro` no es
+`activo`; no se le inventa monto, estado ni relación.
+
+## Comparador read-only de Cobrado
+
+`comparar-cobrado.cjs` compara, para un único tenant y período, el método histórico
+de recorrido de ventas y pagos con la consulta preparada a `collectionGroup("pagos")`.
+Ambos resultados informan cantidad de pagos activos y suma de `monto`; una diferencia
+produce código de salida 2. El script pagina todas las lecturas, no posee opción de
+escritura y no genera archivos locales.
+
+```powershell
+node comparar-cobrado.cjs --project conectarsublimados-7881e --tenant CLIENTE_ID --from 2026-09-03 --to 2026-09-03 --page-size 100
+node comparar-cobrado.cjs --project conectarsublimados-7881e --tenant CLIENTE_ID --from 2026-08-28 --to 2026-09-03 --page-size 100
+node comparar-cobrado.cjs --project conectarsublimados-7881e --tenant CLIENTE_ID --from 2026-08-05 --to 2026-09-03 --page-size 100
+node comparar-cobrado.cjs --project conectarsublimados-7881e --tenant CLIENTE_ID --from FECHA_HISTORICA_DESDE --to FECHA_HISTORICA_HASTA --page-size 100
+```
+
+Son comandos preparados para ejecución manual posterior. El comparador nuevo exige
+el índice de collection group y reglas compatibles; no activa el datasource del
+dashboard.
+
 ## Inventario global de solo lectura — ejecución real pendiente de autorización
 
 `--inventory-global` descubre tenants registrados y audita los campos derivados sin
@@ -244,6 +284,46 @@ inciertos y pending, y agrupa completados, ya completos, omitidos y casos de rev
 
 Todos esos archivos permanecen bajo `runs/`, ignorado por Git. Contienen IDs y datos
 operativos: no deben copiarse a ubicaciones públicas ni agregarse al repositorio.
+
+## Auditoría read-only de pagos de ventas
+
+`auditoria-pagos.cjs` releva pagos embebidos, subcolecciones y movimientos
+`cobro_venta`. No comparte ningún camino con apply, no crea archivos y su adaptador
+solo expone lecturas paginadas. Los siguientes comandos requieren una autorización
+operativa aparte para usar ADC y consultar el proyecto real:
+
+```powershell
+# Un tenant registrado
+node auditoria-pagos.cjs --project conectarsublimados-7881e --tenant CLIENTE_ID --page-size 100
+
+# Inventario global, incluidos tenants sin actividad y datos huérfanos
+node auditoria-pagos.cjs --project conectarsublimados-7881e --inventory-global --page-size 100
+
+# Los cuatro pagos problemáticos conocidos, sin escribir ni crear archivos
+node auditoria-pagos.cjs --project conectarsublimados-7881e --inspect-known-payments --page-size 100
+```
+
+`--limit-details N` limita solo los casos anómalos impresos; nunca limita las
+lecturas ni los totales. Cada colección y cada subcolección se pagina por document
+ID. Si algún recorrido falla, se marca incompleto y los totales no se presentan
+como definitivos.
+
+Una relación pago/movimiento se considera segura solamente cuando `pagoRefId`
+coincide con el ID del subdocumento, `origenRefId` coincide con la venta padre y el
+tenant coincide. Monto, fecha y medio sirven únicamente para señalar posibles
+correspondencias `AMBIGUO`. De igual manera, un pago embebido solo se considera
+duplicado seguro si contiene un ID estable que coincide con la subcolección y sus
+datos básicos son equivalentes.
+
+Las clasificaciones describen casos auditados: `LISTO_PARA_COLLECTION_GROUP`,
+`LEGACY_NORMALIZABLE`, `AMBIGUO`, `INCONSISTENTE` e `INVALIDO`. Un caso legacy solo
+indica que los datos observados permiten proponer una normalización; esta herramienta
+no implementa ni autoriza esa migración.
+
+El modo `--inspect-known-payments` contiene una lista cerrada de cuatro paths. Lee
+el pago completo, una vista acotada de su venta padre y los movimientos del mismo
+tenant cuyo `origenRefId` coincide con la venta. Esto último no demuestra identidad:
+solo `pagoRefId` igual al ID real del pago se considera una relación estable.
 
 ## Futuro dry-run — requiere autorización aparte
 

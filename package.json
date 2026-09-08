@@ -25,6 +25,7 @@
     "build": "node scripts/build.cjs",
     "test": "react-scripts test",
     "test:build-wrapper": "node --test scripts/build.test.cjs",
+    "test:firestore-rules": "firebase emulators:exec --only firestore --project demo-zalfro-rules \"node --test tests/firestore.rules.test.cjs\"",
     "eject": "react-scripts eject"
   },
   "eslintConfig": {
@@ -44,5 +45,9 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.2",
+    "firebase-tools": "^14.27.0"
   }
 }

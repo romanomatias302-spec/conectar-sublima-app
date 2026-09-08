@@ -22,6 +22,12 @@ import {
   uploadBytes,
 } from "firebase/storage";
 import { registrarUsoSaas } from "./saasUso";
+import {
+  calcularVentaTrasAnularPago,
+  confirmarPagoYMovimientoAtomico,
+  crearCambiosAnulacionPago,
+  vincularPagoYMovimiento,
+} from "./ventasPagosAtomicos";
 
 export async function obtenerSiguienteNumeroVenta(clienteId) {
   if (!clienteId) {
@@ -335,6 +341,7 @@ for (const item of itemsNormalizados) {
       sucursalId,
       sucursalNombre,
       ventaRefId: ventaRef.id,
+      ventaId: ventaRef.id,
       numeroVenta,
       fechaPago: pago.fechaPago || fechaVenta,
       fechaComprobanteReal: pago.fechaComprobanteReal || "",
@@ -351,10 +358,39 @@ for (const item of itemsNormalizados) {
       updatedAt: serverTimestamp(),
     };
 
-      const pagoRef = await addDoc(
-        collection(db, "ventas", ventaRef.id, "pagos"),
-        pagoData
-      );
+      const pagoRef = doc(collection(db, "ventas", ventaRef.id, "pagos"));
+      const movimientoCobroRef = doc(collection(db, "movimientos"));
+      const pagoMovimientoBatch = writeBatch(db);
+      const vinculados = vincularPagoYMovimiento({
+        pagoBase: pagoData,
+        movimientoBase: {
+          clienteId: perfil.clienteId,
+          sucursalId,
+          sucursalNombre,
+          tipo: "ingreso",
+          subtipo: "cobro_venta",
+          origen: "venta_pago",
+          descripcion: `Cobro venta #${numeroVenta} - ${cliente.nombre || ""}`,
+          monto: Number(pago.monto || 0),
+          medioPago: pago.medioPago || "efectivo",
+          fecha: pago.fechaPago || fechaVenta,
+          impactaCaja: (pago.medioPago || "efectivo") === "efectivo",
+          impactaResultado: false,
+          estadoMovimiento: "activo",
+          activo: true,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        },
+        ventaId: ventaRef.id,
+        pagoId: pagoRef.id,
+        movimientoId: movimientoCobroRef.id,
+      });
+      await confirmarPagoYMovimientoAtomico({
+        batch: pagoMovimientoBatch,
+        pagoRef,
+        movimientoRef: movimientoCobroRef,
+        ...vinculados,
+      });
 
       try {
         await obtenerOAsignarNumeroRecibo({
@@ -369,28 +405,6 @@ for (const item of itemsNormalizados) {
         );
       }
 
-      await addDoc(collection(db, "movimientos"), {
-        clienteId: perfil.clienteId,
-        sucursalId,
-        sucursalNombre,
-        tipo: "ingreso",
-        subtipo: "cobro_venta",
-        origen: "venta_pago",
-        origenRefId: ventaRef.id,
-        pagoRefId: "",
-        descripcion: `Cobro venta #${numeroVenta} - ${cliente.nombre || ""}`,
-        monto: Number(pago.monto || 0),
-        medioPago: pago.medioPago || "efectivo",
-        fecha: pago.fechaPago || fechaVenta,
-
-        impactaCaja: (pago.medioPago || "efectivo") === "efectivo",
-        impactaResultado: false,
-        estadoMovimiento: "activo",
-        activo: true,
-
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
     }
   }
 
@@ -460,13 +474,16 @@ export async function agregarPagoAVenta({
     })
   : null;  
 
-  const pagoRef = await addDoc(
-    collection(db, "ventas", venta.firebaseId, "pagos"),
-    {
+  const pagoRef = doc(collection(db, "ventas", venta.firebaseId, "pagos"));
+  const movimientoCobroRef = doc(collection(db, "movimientos"));
+  const pagoMovimientoBatch = writeBatch(db);
+  const vinculados = vincularPagoYMovimiento({
+    pagoBase: {
     clienteId: perfil.clienteId,
     sucursalId,
     sucursalNombre,
     ventaRefId: venta.firebaseId,
+    ventaId: venta.firebaseId,
     numeroVenta: venta.numeroVenta,
     fechaPago,
     fechaComprobanteReal: fechaComprobanteReal || "",
@@ -476,12 +493,39 @@ export async function agregarPagoAVenta({
     observacion,
 
     comprobante,
-
     estadoPagoRegistro: "activo",
     motivoAnulacion: "",
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
     
+    },
+    movimientoBase: {
+      clienteId: perfil.clienteId,
+      sucursalId,
+      sucursalNombre,
+      tipo: "ingreso",
+      subtipo: "cobro_venta",
+      origen: "venta_pago",
+      descripcion: `Cobro venta #${venta.numeroVenta} - ${venta.clienteNombre || ""}`,
+      monto: montoNum,
+      medioPago: medioPago || "efectivo",
+      fecha: fechaPago,
+      impactaCaja: (medioPago || "efectivo") === "efectivo",
+      impactaResultado: false,
+      estadoMovimiento: "activo",
+      activo: true,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    },
+    ventaId: venta.firebaseId,
+    pagoId: pagoRef.id,
+    movimientoId: movimientoCobroRef.id,
+  });
+  await confirmarPagoYMovimientoAtomico({
+    batch: pagoMovimientoBatch,
+    pagoRef,
+    movimientoRef: movimientoCobroRef,
+    ...vinculados,
   });
 
   try {
@@ -496,28 +540,6 @@ export async function agregarPagoAVenta({
     errorRecibo
   );
 }
-
-await addDoc(collection(db, "movimientos"), {
-  clienteId: perfil.clienteId,
-  sucursalId,
-  sucursalNombre,
-  tipo: "ingreso",
-  subtipo: "cobro_venta",
-  origen: "venta_pago",
-  origenRefId: venta.firebaseId,
-  descripcion: `Cobro venta #${venta.numeroVenta} - ${venta.clienteNombre || ""}`,
-  monto: montoNum,
-  medioPago: medioPago || "efectivo",
-  fecha: fechaPago,
-
-  impactaCaja: (medioPago || "efectivo") === "efectivo",
-  impactaResultado: false,
-  estadoMovimiento: "activo",
-  activo: true,
-
-  createdAt: serverTimestamp(),
-  updatedAt: serverTimestamp(),
-});
 
     await recalcularTotalesVenta(venta.firebaseId);
 }
@@ -1134,16 +1156,81 @@ export async function anularPagoDeVenta({
   if (!ventaId || !pagoId) throw new Error("Faltan datos para anular el pago.");
 
   const pagoRef = doc(db, "ventas", ventaId, "pagos", pagoId);
+  const ventaRef = doc(db, "ventas", ventaId);
+  const pagoPrevioSnap = await getDoc(pagoRef);
+  if (!pagoPrevioSnap.exists()) throw new Error("El pago no existe.");
+  const pagoPrevio = pagoPrevioSnap.data();
+  if (pagoPrevio.clienteId && pagoPrevio.clienteId !== perfil.clienteId) {
+    throw new Error("El pago no pertenece a la empresa.");
+  }
+  if ((pagoPrevio.estadoPagoRegistro || "activo") === "anulado") return;
 
-  await updateDoc(pagoRef, {
-    estadoPagoRegistro: "anulado",
-    motivoAnulacion,
-    anuladoAt: serverTimestamp(),
-    anuladoPor: perfil?.email || "",
-    updatedAt: serverTimestamp(),
+  if (!pagoPrevio.movimientoRefId) {
+    await updateDoc(pagoRef, {
+      estadoPagoRegistro: "anulado",
+      motivoAnulacion,
+      anuladoAt: serverTimestamp(),
+      anuladoPor: perfil?.email || "",
+      updatedAt: serverTimestamp(),
+    });
+    await recalcularTotalesVenta(ventaId);
+    console.warn(
+      `Pago ${pagoId} anulado sin movimiento identificable por referencia estable; no se aplicaron heurísticas legacy.`
+    );
+    return;
+  }
+
+  const resultado = await runTransaction(db, async (transaction) => {
+    const [pagoSnap, ventaSnap] = await Promise.all([
+      transaction.get(pagoRef),
+      transaction.get(ventaRef),
+    ]);
+    if (!pagoSnap.exists()) throw new Error("El pago no existe.");
+    if (!ventaSnap.exists()) throw new Error("La venta no existe.");
+    const pagoData = pagoSnap.data();
+    const ventaData = ventaSnap.data();
+    if (ventaData.clienteId !== perfil.clienteId) {
+      throw new Error("La venta no pertenece a la empresa.");
+    }
+    if (pagoData.clienteId && pagoData.clienteId !== perfil.clienteId) {
+      throw new Error("El pago no pertenece a la empresa.");
+    }
+    if ((pagoData.estadoPagoRegistro || "activo") === "anulado") {
+      return { yaAnulado: true, movimientoLegacy: !pagoData.movimientoRefId };
+    }
+
+    const movimientoRef = doc(db, "movimientos", pagoData.movimientoRefId);
+    const movimientoSnap = await transaction.get(movimientoRef);
+    if (!movimientoSnap.exists()) {
+      throw new Error("El movimiento relacionado con el pago no existe.");
+    }
+    const movimientoData = movimientoSnap.data();
+    if (
+      movimientoData.clienteId !== perfil.clienteId ||
+      movimientoData.origenRefId !== ventaId ||
+      movimientoData.pagoRefId !== pagoId
+    ) {
+      throw new Error("La relación entre el pago y su movimiento es inconsistente.");
+    }
+
+    const totales = calcularVentaTrasAnularPago({ venta: ventaData, pago: pagoData });
+    const cambios = crearCambiosAnulacionPago({
+      totales,
+      motivoAnulacion,
+      actor: perfil?.email || "",
+      marcaTiempo: serverTimestamp(),
+    });
+
+    transaction.update(pagoRef, cambios.pago);
+    transaction.update(movimientoRef, cambios.movimiento);
+    transaction.update(ventaRef, cambios.venta);
+    return {
+      yaAnulado: false,
+      movimientoLegacy: false,
+    };
   });
 
-  await recalcularTotalesVenta(ventaId);
+  return resultado;
 }
 
 export async function anularVenta({
