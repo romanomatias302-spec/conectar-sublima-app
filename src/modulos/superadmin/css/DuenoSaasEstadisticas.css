@@ -623,3 +623,57 @@
 .saas-usage-head {
   min-width: 960px;
 }
+
+.saas-currency-groups {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.saas-currency-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.saas-currency-group h4 {
+  margin: 0 0 4px;
+  color: #cbd5e1;
+  font-size: 13px;
+}
+
+.saas-currency-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 12px;
+  border-radius: 12px;
+  background: rgba(30, 41, 59, 0.72);
+}
+
+.saas-currency-row span,
+.saas-data-note,
+.saas-empty-inline {
+  color: #94a3b8;
+}
+
+.saas-currency-row strong {
+  color: #fff;
+  white-space: nowrap;
+}
+
+.saas-data-note {
+  font-size: 12px;
+  margin: 12px 0 0;
+}
+
+.saas-usage-head,
+.saas-usage-dark-row {
+  grid-template-columns: 220px 110px 100px 90px 120px;
+}
+
+@media (max-width: 900px) {
+  .saas-currency-groups {
+    grid-template-columns: 1fr;
+  }
+}

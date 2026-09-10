@@ -14,6 +14,7 @@ const {
   collectionGroup,
   deleteDoc,
   doc,
+  getDoc,
   getDocs,
   orderBy,
   query,
@@ -87,6 +88,12 @@ test.beforeEach(async () => {
         rol: 'superadmin',
         permisos: {},
       }),
+      setDoc(doc(db, 'usuarios', 'admin-a'), {
+        activo: true,
+        clienteId: TENANT_A,
+        rol: 'admin',
+        permisos: {},
+      }),
       setDoc(doc(db, 'ventas', 'sale-a'), { clienteId: TENANT_A }),
       setDoc(doc(db, 'ventas', 'sale-b'), { clienteId: TENANT_B }),
       setDoc(doc(db, 'ventas', 'sale-a', 'pagos', 'payment-a'), {
@@ -102,6 +109,11 @@ test.beforeEach(async () => {
         estadoPagoRegistro: 'activo',
         fechaPago: '2026-08-16',
         monto: 200,
+      }),
+      setDoc(doc(db, 'saas_notifications_outbox', 'notification-a'), {
+        clienteId: TENANT_A,
+        eventType: 'PAYMENT_RECEIVED',
+        status: 'pending',
       }),
     ]);
   });
@@ -159,4 +171,39 @@ test('la regla collectionGroup no amplía permisos de escritura', async () => {
     fechaPago: '2026-08-20',
     monto: 50,
   }));
+});
+
+test('admin tenant no puede alterar plan, precio ni estado comercial SaaS', async () => {
+  const ref = doc(authenticatedDb('admin-a'), 'clientes-saas', TENANT_A);
+  await assertFails(updateDoc(ref, {planId: 'empresa', price: 1}));
+  await assertFails(updateDoc(ref, {subscriptionStatus: 'active'}));
+});
+
+test('superadmin conserva administración de contrato SaaS', async () => {
+  const ref = doc(authenticatedDb('superadmin'), 'clientes-saas', TENANT_A);
+  await assertSucceeds(updateDoc(ref, {planId: 'start', price: 19000}));
+});
+
+test('outbox SaaS sólo puede leerse desde frontend por superadmin', async () => {
+  const path = ['saas_notifications_outbox', 'notification-a'];
+  await assertFails(getDoc(doc(authenticatedDb('admin-a'), ...path)));
+  await assertFails(getDoc(doc(authenticatedDb('reader-a'), ...path)));
+  await assertSucceeds(getDoc(doc(authenticatedDb('superadmin'), ...path)));
+});
+
+test('ningún frontend puede crear ni cambiar estados de la outbox SaaS', async () => {
+  const newData = {
+    clienteId: TENANT_A,
+    eventType: 'CLIENT_CREATED',
+    status: 'sent',
+  };
+  for (const uid of ['admin-a', 'reader-a', 'superadmin']) {
+    const db = authenticatedDb(uid);
+    await assertFails(setDoc(doc(db, 'saas_notifications_outbox', `new-${uid}`),
+      newData));
+    await assertFails(updateDoc(doc(db, 'saas_notifications_outbox',
+      'notification-a'), {status: 'sent'}));
+    await assertFails(deleteDoc(doc(db, 'saas_notifications_outbox',
+      'notification-a')));
+  }
 });

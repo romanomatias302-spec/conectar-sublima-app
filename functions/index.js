@@ -1,7 +1,15 @@
-const { onRequest } = require("firebase-functions/v2/https");
+const {onCall, onRequest, HttpsError} = require("firebase-functions/v2/https");
+const {authorizeSaasOwner} = require("./saasBillingCore");
+const {
+  buildReactivationPatch,
+  createRecurringChargeTransaction,
+  deterministicChargeId,
+  evaluateBillingCandidate,
+  isTrial,
+} = require("./saasBillingEngine");
 
-const { onSchedule } = require("firebase-functions/v2/scheduler");
-const { defineSecret } = require("firebase-functions/params");
+const {onSchedule} = require("firebase-functions/v2/scheduler");
+const {defineSecret} = require("firebase-functions/params");
 
 const sharp = require("sharp");
 
@@ -11,6 +19,9 @@ const {
   WebhookSignatureValidator,
   InvalidWebhookSignatureError,
 } = require("mercadopago");
+const {createHotmartFirestoreRepository} = require("./hotmartFirestoreRepository");
+const {createHotmartWebhookHandler} = require("./hotmartWebhookHandler");
+const {createSaasNotificationHooks} = require("./saasNotificationHooks");
 
 admin.initializeApp();
 
@@ -19,6 +30,7 @@ const MP_ACCESS_TOKEN_TEST = defineSecret("MP_ACCESS_TOKEN_TEST");
 
 const MP_ACCESS_TOKEN_PROD = defineSecret("MP_ACCESS_TOKEN_PROD");
 const MP_WEBHOOK_SECRET_PROD = defineSecret("MP_WEBHOOK_SECRET_PROD");
+const HOTMART_WEBHOOK_HOTTOK = defineSecret("HOTMART_WEBHOOK_HOTTOK");
 
 function fechaISO(date) {
   return date.toISOString().slice(0, 10);
@@ -43,12 +55,6 @@ function normalizarFecha(valor) {
   return null;
 }
 
-function sumarMeses(fecha, meses) {
-  const nueva = new Date(fecha);
-  nueva.setMonth(nueva.getMonth() + meses);
-  return nueva;
-}
-
 function sumarDias(fecha, dias) {
   const nueva = new Date(fecha);
   nueva.setDate(nueva.getDate() + dias);
@@ -66,76 +72,11 @@ function inicioDia(fecha) {
   return new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate());
 }
 
-function obtenerCicloActual(cliente, hoy) {
-  const fechaAlta = normalizarFecha(cliente.fechaAlta);
-
-  if (!fechaAlta) {
-    return null;
-  }
-
-  const hoyInicio = inicioDia(hoy);
-  const frecuenciaCobro = cliente.frecuenciaCobro || "mensual";
-  const diasCiclo = Number(
-    cliente.diasCiclo || (frecuenciaCobro === "anual" ? 365 : 30)
-  );
-
-  // Prueba gratis: no genera cargo automático
-  if (frecuenciaCobro === "prueba") {
-    return null;
-  }
-
-  // Mensual: mantenemos lógica vieja para no romper clientes actuales
-  if (frecuenciaCobro === "mensual") {
-    let meses = 1;
-    let fechaCobro = sumarMeses(fechaAlta, meses);
-
-    while (sumarDias(fechaCobro, 7) < hoyInicio) {
-      meses += 1;
-      fechaCobro = sumarMeses(fechaAlta, meses);
-    }
-
-    const periodoFacturado = `${fechaCobro.getFullYear()}-${String(
-      fechaCobro.getMonth() + 1
-    ).padStart(2, "0")}`;
-
-    return {
-      fechaCobro,
-      periodoFacturado,
-      frecuenciaCobro,
-    };
-  }
-
-  // Anual: nuevo comportamiento, cada 365 días
-  if (frecuenciaCobro === "anual") {
-    let ciclos = 1;
-    let fechaCobro = sumarDias(fechaAlta, diasCiclo);
-
-    while (sumarDias(fechaCobro, 7) < hoyInicio) {
-      ciclos += 1;
-      fechaCobro = sumarDias(fechaAlta, diasCiclo * ciclos);
-    }
-
-    const periodoFacturado = `${fechaCobro.getFullYear()}-ANUAL-${ciclos}`;
-
-    return {
-      fechaCobro,
-      periodoFacturado,
-      frecuenciaCobro,
-    };
-  }
-
-  return null;
-}
-
 async function procesarPruebaGratisVencida({ cliente, docu, hoy, modoPrueba }) {
   const frecuenciaCobro = cliente.frecuenciaCobro || "";
   const estadoSuscripcion = cliente.estadoSuscripcion || "";
 
-  const esPrueba =
-    frecuenciaCobro === "prueba" ||
-    estadoSuscripcion === "prueba" ||
-    cliente.planNombre === "Prueba gratis 7 días" ||
-    cliente.plan === "Prueba gratis 7 días";
+  const esPrueba = isTrial(cliente) || frecuenciaCobro === "prueba" || estadoSuscripcion === "prueba";
 
   if (!esPrueba) {
     return {
@@ -269,25 +210,14 @@ async function registrarPagoSaas({
   const clienteActualizadoSnap = await clienteRef.get();
   const clienteActualizado = clienteActualizadoSnap.data() || {};
 
-  if (
-    Number(clienteActualizado.saldoCuentaCorriente || 0) <= 0 &&
-    clienteActualizado.suspendidoManual !== true
-  ) {
-    await clienteRef.update({
-      estado: "activo",
-      estadoSuscripcion: "activa",
-      suspendidoPorSistema: false,
-      motivoSuspension: "",
-      fechaReactivacion: fechaISO(new Date()),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
-  }
-
   return {
     ok: true,
     clienteSaasId,
     periodoFacturado,
     monto: Number(monto || 0),
+    reactivado: cliente.suspendidoPorSistema === true &&
+      clienteActualizado.suspendidoPorSistema !== true &&
+      Number(clienteActualizado.saldoCuentaCorriente || 0) <= 0,
   };
 }
 
@@ -340,13 +270,14 @@ async function recalcularEstadoCuentaCliente(clienteSaasId) {
   const cliente = clienteSnap.data();
 
   let estadoCuenta = "al_dia";
-  let estadoSuscripcion = "activa";
+  let estadoSuscripcion = isTrial(cliente) ? "prueba" : "activa";
   let suspendidoPorSistema = false;
+  const now = new Date();
 
 if (saldo > 0) {
   estadoCuenta = "mora";
 
-  const hoy = new Date();
+  const hoy = now;
 
   const tienePeriodoVencidoPendiente = Object.values(periodos).some((p) => {
     const saldoPeriodo = p.cargos - p.pagos;
@@ -369,10 +300,11 @@ if (saldo > 0) {
     estadoCuenta = "saldo_favor";
   }
 
-  await clienteRef.update({
+  const estadoPatch = {
     saldoCuentaCorriente: saldo,
     estadoCuenta,
     estadoSuscripcion,
+    subscriptionStatus: ({activa: "active", gracia: "past_due", suspendida: "suspended", prueba: "trial"})[estadoSuscripcion],
     suspendidoPorSistema,
     estado:
       cliente.suspendidoManual === true
@@ -381,7 +313,13 @@ if (saldo > 0) {
         ? "suspendido"
         : "activo",
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-  });
+  };
+  if (suspendidoPorSistema && cliente.suspendidoPorSistema !== true) {
+    estadoPatch.fechaSuspension = fechaISO(now);
+    estadoPatch.motivoSuspension = "deuda_vencida";
+  }
+  const reactivationPatch = buildReactivationPatch(cliente, saldo, now);
+  await clienteRef.update({...estadoPatch, ...(reactivationPatch || {})});
 }
 
 async function procesarCargosSaas({ modoPrueba = false } = {}) {
@@ -392,9 +330,10 @@ let cargosEmitidos = 0;
 let pruebasSuspendidas = 0;
 const simulados = [];
 const omitidos = [];
+const errores = [];
 
   for (const docu of clientesSnap.docs) {
-    const cliente = {
+    let cliente = {
       id: docu.id,
       ...docu.data(),
     };
@@ -426,92 +365,37 @@ const omitidos = [];
       continue;
     }
 
-if (!cliente.fechaAlta) {
-  if (modoPrueba) {
-    omitidos.push({
-      clienteNombre: cliente.nombre || "",
-      motivo: "Sin fechaAlta",
-    });
-  }
-
-  await recalcularEstadoCuentaCliente(cliente.id);
-  continue;
-}
-
-if (cliente.suspendidoManual === true) {
-  if (modoPrueba) {
-    omitidos.push({
-      clienteNombre: cliente.nombre || "",
-      motivo: "Suspendido manualmente",
-    });
-  }
-  continue;
-}
-
-if ((cliente.estado || "") === "inactivo") {
-  if (modoPrueba) {
-    omitidos.push({
-      clienteNombre: cliente.nombre || "",
-      motivo: "Cliente inactivo",
-    });
-  }
-  continue;
-}
-
-if ((cliente.estadoSuscripcion || "") === "cancelado") {
-  if (modoPrueba) {
-    omitidos.push({
-      clienteNombre: cliente.nombre || "",
-      motivo: "Suscripción cancelada",
-    });
-  }
-  continue;
-}
-
-    const diasAnticipacionCargo = Number(cliente.diasAnticipacionCargo || 10);
-    const diasGracia = Number(cliente.diasGracia || 7);
-
-    const ciclo = obtenerCicloActual(cliente, hoy);
-
-    if (!ciclo) {
-      if (modoPrueba) {
-        omitidos.push({
-          clienteNombre: cliente.nombre || "",
-          motivo:
-            (cliente.frecuenciaCobro || "") === "prueba"
-              ? "Cliente en prueba, no genera cargo automático"
-              : "No se pudo calcular ciclo",
-          fechaAlta: cliente.fechaAlta,
-          frecuenciaCobro: cliente.frecuenciaCobro || "mensual",
-        });
-      }
-
+    const estadoBilling = String(
+      cliente.subscriptionStatus || cliente.estadoSuscripcion || ""
+    ).toLowerCase();
+    if (
+      !modoPrueba &&
+      (Number(cliente.saldoCuentaCorriente || 0) > 0 ||
+        ["gracia", "past_due"].includes(estadoBilling))
+    ) {
       await recalcularEstadoCuentaCliente(cliente.id);
+      const clienteActualizado = await docu.ref.get();
+      if (clienteActualizado.exists) {
+        cliente = {id: docu.id, ...clienteActualizado.data()};
+      }
+    }
+
+    const evaluacion = evaluateBillingCandidate(cliente, hoy);
+    if (evaluacion.action !== "CHARGE") {
+      const detalle = {clienteId: cliente.id, code: evaluacion.code};
+      if (evaluacion.fields) detalle.fields = evaluacion.fields;
+      if (evaluacion.action === "ERROR") {
+        errores.push(detalle);
+        console.error("Billing SaaS omitido por configuración inválida", detalle);
+      } else {
+        omitidos.push(detalle);
+      }
       continue;
     }
 
-    const { fechaCobro, periodoFacturado, frecuenciaCobro } = ciclo;
-
-    const fechaEmision = sumarDias(fechaCobro, -diasAnticipacionCargo);
-    const fechaVencimiento = sumarDias(fechaCobro, diasGracia);
-
-    if (hoy < inicioDia(fechaEmision)) {
-      if (modoPrueba) {
-        omitidos.push({
-          clienteNombre: cliente.nombre || "",
-          motivo: "Todavía no llegó la fecha de emisión",
-          fechaAlta: cliente.fechaAlta,
-          fechaCobro: fechaISO(fechaCobro),
-          fechaEmision: fechaISO(fechaEmision),
-          hoy: fechaISO(hoy),
-          periodoFacturado,
-          frecuenciaCobro,
-        });
-      }
-
-      await recalcularEstadoCuentaCliente(cliente.id);
-      continue;
-    }
+    const {period} = evaluacion;
+    const periodoFacturado = period.periodKey;
+    const frecuenciaCobro = period.cycle === "annual" ? "anual" : "mensual";
 
 const cargoExistenteSnap = await db
   .collection("saas_pagos")
@@ -521,45 +405,41 @@ const cargoExistenteSnap = await db
   .limit(10)
   .get();
 
-const yaExisteCargoActivo = cargoExistenteSnap.docs.some((docCargo) => {
+let yaExisteCargoActivo = cargoExistenteSnap.docs.some((docCargo) => {
   const cargo = docCargo.data();
   return cargo.anulado !== true;
 });
 
-if (yaExisteCargoActivo) {
-  if (modoPrueba) {
-    omitidos.push({
-      clienteNombre: cliente.nombre || "",
-      motivo: "Ya existe cargo activo para el período",
-      periodoFacturado,
-    });
-  }
+if (!yaExisteCargoActivo && period.cycle === "annual") {
+  const movimientosHistoricos = await db
+    .collection("saas_pagos")
+    .where("clienteSaasId", "==", cliente.id)
+    .get();
+  yaExisteCargoActivo = movimientosHistoricos.docs.some((docCargo) => {
+    const cargo = docCargo.data();
+    return cargo.tipoMovimiento === "cargo" && cargo.anulado !== true &&
+      (cargo.fechaCobro === period.billingDate || cargo.periodStart === period.periodStart);
+  });
+}
 
-  await recalcularEstadoCuentaCliente(cliente.id);
+if (yaExisteCargoActivo) {
+  omitidos.push({clienteId: cliente.id, code: "ALREADY_BILLED_PERIOD", periodoFacturado});
   continue;
 }
 
-    const monto = Number(cliente.planPrecio || cliente.mantenimientoMensual || 0);
-    if (monto <= 0) {
-    if (modoPrueba) {
-      omitidos.push({
-        clienteNombre: cliente.nombre || "",
-        motivo: "Monto cero o inválido",
-        monto,
-      });
-    }
-
-    continue;
-  }
+    const monto = evaluacion.amount;
+    const cargoId = deterministicChargeId(cliente.id, periodoFacturado);
 
     const movimiento = {
       clienteSaasId: cliente.id,
       clienteNombre: cliente.nombre || "",
       tipoMovimiento: "cargo",
       monto,
-      fechaPago: fechaISO(fechaEmision),
-      fechaCobro: fechaISO(fechaCobro),
-      fechaVencimiento: fechaISO(fechaVencimiento),
+      moneda: evaluacion.currency,
+      currency: evaluacion.currency,
+      fechaPago: period.issueDate,
+      fechaCobro: period.billingDate,
+      fechaVencimiento: period.dueDate,
       medioPago: "",
       concepto: frecuenciaCobro === "anual" ? "anualidad" : "mensualidad",
       observacion:
@@ -567,6 +447,10 @@ if (yaExisteCargoActivo) {
           ? `Cargo automático anual - período ${periodoFacturado}`
           : `Cargo automático mensual - período ${periodoFacturado}`,
       periodoFacturado,
+      periodKey: periodoFacturado,
+      periodStart: period.periodStart,
+      periodEnd: period.periodEnd,
+      idempotencyKey: cargoId,
       origen: "automatico",
       anulado: false,
       estado: "activo",
@@ -579,14 +463,21 @@ if (yaExisteCargoActivo) {
       continue;
     }
 
-    await db.collection("saas_pagos").add(movimiento);
-
-    await docu.ref.update({
-      fechaProximoCargo: fechaISO(fechaCobro),
-      fechaVencimiento: fechaISO(fechaVencimiento),
-      ultimoPeriodoFacturado: periodoFacturado,
+    const cargoRef = db.collection("saas_pagos").doc(cargoId);
+    const resultadoCreacion = await createRecurringChargeTransaction({
+      db,
+      clientRef: docu.ref,
+      chargeRef: cargoRef,
+      expectedPeriodKey: periodoFacturado,
+      now: hoy,
+      movement: movimiento,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
+
+    if (!resultadoCreacion.created) {
+      omitidos.push({clienteId: cliente.id, code: resultadoCreacion.code, periodoFacturado});
+      continue;
+    }
 
     await recalcularEstadoCuentaCliente(cliente.id);
 
@@ -599,6 +490,7 @@ return {
   pruebasSuspendidas,
   simulados,
   omitidos,
+  errores,
 };
 }
 
@@ -664,47 +556,16 @@ exports.probarCargoClienteSaas = onRequest(async (req, res) => {
       return;
     }
 
-    const diasAnticipacionCargo = Number(cliente.diasAnticipacionCargo || 10);
-    const diasGracia = Number(cliente.diasGracia || 7);
-
-    const ciclo = obtenerCicloActual(cliente, hoy);
-
-    if (!ciclo) {
-      res.json({
-        clienteId,
-        clienteNombre: cliente.nombre || "",
-        resultado: "omitido",
-        motivo: "No se pudo calcular ciclo",
-        frecuenciaCobro: cliente.frecuenciaCobro || "mensual",
-        fechaAlta: cliente.fechaAlta || null,
-      });
-      return;
-    }
-
-    const { fechaCobro, periodoFacturado, frecuenciaCobro } = ciclo;
-
-    const fechaEmision = sumarDias(fechaCobro, -diasAnticipacionCargo);
-    const fechaVencimiento = sumarDias(fechaCobro, diasGracia);
-
-    const monto = Number(cliente.planPrecio || cliente.mantenimientoMensual || 0);
+    const evaluacion = evaluateBillingCandidate(cliente, hoy);
 
     res.json({
       clienteId,
-      clienteNombre: cliente.nombre || "",
-      frecuenciaCobro,
-      monto,
-      fechaAlta: cliente.fechaAlta || null,
-      fechaCobro: fechaISO(fechaCobro),
-      fechaEmision: fechaISO(fechaEmision),
-      fechaVencimiento: fechaISO(fechaVencimiento),
-      periodoFacturado,
-      generaCargoHoy: hoy >= inicioDia(fechaEmision) && monto > 0,
-      motivo:
-        hoy < inicioDia(fechaEmision)
-          ? "Todavía no llegó la fecha de emisión"
-          : monto <= 0
-          ? "Monto cero o inválido"
-          : "Generaría cargo",
+      action: evaluacion.action,
+      code: evaluacion.code,
+      fields: evaluacion.fields || [],
+      monto: evaluacion.amount || 0,
+      moneda: evaluacion.currency || null,
+      periodo: evaluacion.period || null,
     });
   } catch (error) {
     console.error(error);
@@ -733,6 +594,23 @@ exports.ejecutarCargosSaasAhora = onRequest(async (req, res) => {
       error: error.message || "Error ejecutando cargos reales",
     });
   }
+});
+
+exports.ejecutarCargosSaasAhoraSeguro = onCall(async (request) => {
+  const profileSnap = request.auth?.uid
+    ? await db.collection("usuarios").doc(request.auth.uid).get()
+    : null;
+  const authorization = authorizeSaasOwner(
+    request.auth,
+    profileSnap?.exists ? profileSnap.data() : null
+  );
+  if (!authorization.authorized) {
+    throw new HttpsError(
+      authorization.code === "UNAUTHENTICATED" ? "unauthenticated" : "permission-denied",
+      "Se requieren privilegios de propietario SaaS."
+    );
+  }
+  return procesarCargosSaas({modoPrueba: false});
 });
 
 exports.crearPreferenciaMercadoPago = onRequest(
@@ -1065,6 +943,21 @@ exports.webhookMercadoPagoSaas = onRequest(
   }
 );
 
+exports.webhookHotmartSaas = onRequest(
+  {
+    secrets: [HOTMART_WEBHOOK_HOTTOK],
+  },
+  createHotmartWebhookHandler({
+    expectedHottok: () => HOTMART_WEBHOOK_HOTTOK.value(),
+    repository: createHotmartFirestoreRepository({
+      db,
+      FieldValue: admin.firestore.FieldValue,
+      recalculate: recalcularEstadoCuentaCliente,
+    }),
+    notifications: createSaasNotificationHooks({db}),
+  }),
+);
+
 
 /*aca se agrega funcion nueva para solucionar lo de las imagenes, de manera temporal */
 
@@ -1155,6 +1048,28 @@ async function migrarMiniaturasProduccion({ clienteId, soloUna = true }) {
     soloUna,
   };
 }
+
+exports.migrarMiniaturasProduccionSeguro = onCall(async (request) => {
+  const profileSnap = request.auth?.uid
+    ? await db.collection("usuarios").doc(request.auth.uid).get()
+    : null;
+  const authorization = authorizeSaasOwner(
+    request.auth,
+    profileSnap?.exists ? profileSnap.data() : null
+  );
+  if (!authorization.authorized) {
+    throw new HttpsError(
+      authorization.code === "UNAUTHENTICATED" ? "unauthenticated" : "permission-denied",
+      "Se requieren privilegios de propietario SaaS."
+    );
+  }
+  const clienteId = String(request.data?.clienteId || "").trim();
+  if (!clienteId) throw new HttpsError("invalid-argument", "Falta clienteId.");
+  return migrarMiniaturasProduccion({
+    clienteId,
+    soloUna: request.data?.modo !== "todos",
+  });
+});
 
 exports.migrarMiniaturasProduccion = onRequest(async (req, res) => {
   try {

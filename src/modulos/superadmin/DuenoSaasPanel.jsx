@@ -1,10 +1,9 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   collection,
   getDocs,
   doc,
   updateDoc,
-  serverTimestamp,
   onSnapshot,
 } from "firebase/firestore";
 import { signOut } from "firebase/auth";
@@ -19,8 +18,24 @@ import {
   registrarMovimientoSaas,
   obtenerPagosSaas,
   anularMovimientoSaas,
+  cambiarSuspensionManualSaas,
 } from "../../firebase/saasPagos";
 import DuenoSaasEstadisticas from "./DuenoSaasEstadisticas";
+import {
+  activateSaasClientRow,
+  buildSaasPanelMetrics,
+  buildSaasTabUrl,
+  classifySaasClient,
+  filterSaasClients,
+  formatSaasMoney,
+  getSaasTabFromSearch,
+  isInteractiveSaasTarget,
+  refreshAfterSaasMutation,
+  resolveSaasCurrency,
+  resolveSaasPlanLabel,
+  resolveSaasPrice,
+  syncSaasTabFromLocation,
+} from "../../domain/saasPanel";
 import "./css/DuenoSaasLayout.css";
 import "./css/DuenoSaasSidebar.css";
 import "./css/DuenoSaasClientes.css";
@@ -55,12 +70,16 @@ export default function DuenoSaasPanel() {
 const [filtroEstado, setFiltroEstado] = useState("todos");
 const [busquedaCliente, setBusquedaCliente] = useState("");
 const [filtroPlan, setFiltroPlan] = useState("todos");
+const [filtroPais, setFiltroPais] = useState("todos");
+const [filtroMoneda, setFiltroMoneda] = useState("todos");
 const [ordenClientes, setOrdenClientes] = useState("recientes");
 const [pagosCliente, setPagosCliente] = useState([]);
 const [mostrarPago, setMostrarPago] = useState(false);
 const [mostrarCargoMasivo, setMostrarCargoMasivo] = useState(false);
 const [menuClienteAbierto, setMenuClienteAbierto] = useState(null);
-const [seccionActiva, setSeccionActiva] = useState("clientes");
+const [seccionActiva, setSeccionActiva] = useState(() =>
+  typeof window === "undefined" ? "clientes" : getSaasTabFromSearch(window.location.search)
+);
 
 const [posicionMenuCliente, setPosicionMenuCliente] = useState(null);
 const [clienteMobileAbierto, setClienteMobileAbierto] = useState(null);
@@ -156,6 +175,7 @@ const obtenerTimestampCliente = (c) => {
         ...docu.data(),
       }));
       setClientes(lista);
+      return lista;
     } catch (error) {
       console.error("Error al cargar clientes SaaS:", error);
     } finally {
@@ -173,6 +193,7 @@ const obtenerTimestampCliente = (c) => {
     }));
 
     setMovimientosSaas(lista);
+    return lista;
   } catch (error) {
     console.error("Error cargando movimientos SaaS:", error);
   }
@@ -243,15 +264,12 @@ const mapearUsoClientes = (snapshot) => {
     }
   };
 
-const cargarTodo = async () => {
-  await cargarClientes();
-  await cargarUsuarios();
-  await cargarMovimientosSaas();
-  
-};
-
 useEffect(() => {
-  cargarClientes();
+  cargarClientes().then((clientesIniciales) => {
+    if (Array.isArray(clientesIniciales) && clientesIniciales.length > 0) {
+      cargarInvitaciones(clientesIniciales);
+    }
+  });
   cargarUsuarios();
   cargarMovimientosSaas();
 
@@ -270,28 +288,35 @@ useEffect(() => {
   };
 }, []);
 
-  useEffect(() => {
-    if (clientes.length > 0) {
-      cargarInvitaciones(clientes);
-    }
-  }, [clientes]);
-
-  useEffect(() => {
-  const cerrarMenu = () => {
-    setMenuClienteAbierto(null);
-    setPosicionMenuCliente(null);
-  };
-
-  window.addEventListener("scroll", cerrarMenu, true);
-  window.addEventListener("resize", cerrarMenu);
-
-  return () => {
-    window.removeEventListener("scroll", cerrarMenu, true);
-    window.removeEventListener("resize", cerrarMenu);
-  };
+useEffect(() => {
+  const syncTab = () => syncSaasTabFromLocation(window.location, setSeccionActiva);
+  window.addEventListener("popstate", syncTab);
+  const current = getSaasTabFromSearch(window.location.search);
+  const raw = new URLSearchParams(window.location.search).get("tab");
+  if (raw && raw !== current) {
+    window.history.replaceState(null, "", buildSaasTabUrl(window.location, current));
+  }
+  return () => window.removeEventListener("popstate", syncTab);
 }, []);
 
-useEffect(() => {
+const cambiarSeccion = (tab) => {
+  const nextUrl = buildSaasTabUrl(window.location, tab);
+  window.history.pushState(null, "", nextUrl);
+  setSeccionActiva(getSaasTabFromSearch(new URL(nextUrl, window.location.origin).search));
+};
+
+const refrescarDatosSaas = async (kind) => {
+  let refreshedClients = null;
+  await refreshAfterSaasMutation(kind, {
+    clients: async () => {
+      refreshedClients = await cargarClientes();
+    },
+    movements: cargarMovimientosSaas,
+  });
+  return refreshedClients;
+};
+
+  useEffect(() => {
   const cerrarMenu = () => {
     setMenuClienteAbierto(null);
     setPosicionMenuCliente(null);
@@ -407,15 +432,17 @@ useEffect(() => {
     }
   };
 
-  const movimientosSaasActivos = movimientosSaas.filter(
-  (m) => m.anulado !== true
+const movimientosSaasActivos = useMemo(
+  () => movimientosSaas.filter((m) => m.anulado !== true),
+  [movimientosSaas]
 );
 
-const pagosSaasActivos = movimientosSaasActivos.filter(
-  (m) => m.tipoMovimiento === "pago"
+const pagosSaasActivos = useMemo(
+  () => movimientosSaasActivos.filter((m) => m.tipoMovimiento === "pago"),
+  [movimientosSaasActivos]
 );
 
-const pagosPorCliente = pagosSaasActivos.reduce((acc, pago) => {
+const pagosPorCliente = useMemo(() => pagosSaasActivos.reduce((acc, pago) => {
   const clienteId = pago.clienteSaasId;
   if (!clienteId) return acc;
 
@@ -435,60 +462,37 @@ const pagosPorCliente = pagosSaasActivos.reduce((acc, pago) => {
   }
 
   return acc;
-}, {});
+}, {}), [pagosSaasActivos]);
 
 
+const metricasPanel = useMemo(
+  () => buildSaasPanelMetrics(clientes, movimientosSaas),
+  [clientes, movimientosSaas]
+);
 const resumenDashboard = {
   totalClientes: clientes.length,
-  activos: clientes.filter((c) => (c.estado || "activo") === "activo").length,
-  suspendidos: clientes.filter((c) => (c.estado || "") === "suspendido").length,
-  enPrueba: clientes.filter((c) => c.estadoSuscripcion === "prueba").length,
+  activos: metricasPanel.counts.active,
+  gracia: metricasPanel.counts.grace,
+  suspendidos: metricasPanel.churn.risk + metricasPanel.churn.recovery,
+  noRecuperados: metricasPanel.counts.churn,
+  enPrueba: metricasPanel.counts.trial,
   conDeuda: clientes.filter((c) => Number(c.saldoCuentaCorriente || 0) > 0).length,
-  saldoPendiente: clientes.reduce((acc, c) => {
-    const saldo = Number(c.saldoCuentaCorriente || 0);
-    return saldo > 0 ? acc + saldo : acc;
-  }, 0),
+  monedasConDeuda: Object.keys(metricasPanel.debt).length,
   pagosRegistrados: pagosSaasActivos.length,
 };
 
-const clientesFiltrados = clientes
-  .filter((c) => {
-    const texto = busquedaCliente.trim().toLowerCase();
+const planesFiltro = [...new Set(clientes.map(resolveSaasPlanLabel))].sort();
+const paisesFiltro = [...new Set(clientes.map((c) => c.pais).filter(Boolean))].sort();
+const monedasFiltro = [...new Set(clientes.map(resolveSaasCurrency).filter(Boolean))].sort();
 
-    const coincideBusqueda =
-      !texto || (c.nombre || "").toLowerCase().includes(texto);
-
-    const saldo = Number(c.saldoCuentaCorriente || 0);
-
-    let coincideEstado = true;
-
-    if (filtroEstado === "activo") {
-      coincideEstado = (c.estado || "activo") === "activo";
-    }
-
-    if (filtroEstado === "suspendido") {
-      coincideEstado = (c.estado || "") === "suspendido";
-    }
-
-    if (filtroEstado === "inactivo") {
-      coincideEstado = (c.estado || "") === "inactivo";
-    }
-
-    if (filtroEstado === "mora") {
-      coincideEstado = saldo > 0;
-    }
-
-    if (filtroEstado === "saldo_favor") {
-      coincideEstado = saldo < 0;
-    }
-
-    const planCliente = c.planNombre || c.plan || "";
-    const coincidePlan =
-      filtroPlan === "todos" || planCliente === filtroPlan;
-
-    return coincideBusqueda && coincideEstado && coincidePlan;
+const clientesFiltrados = useMemo(() => filterSaasClients(clientes, {
+    search: busquedaCliente,
+    state: filtroEstado,
+    plan: filtroPlan,
+    country: filtroPais,
+    currency: filtroMoneda,
   })
-.sort((a, b) => {
+  .sort((a, b) => {
   if (ordenClientes === "recientes") {
     return obtenerTimestampCliente(b) - obtenerTimestampCliente(a);
   }
@@ -510,8 +514,8 @@ const clientesFiltrados = clientes
     return aActivo ? -1 : 1;
   }
 
-  return 0;
-});
+    return 0;
+  }), [clientes, busquedaCliente, filtroEstado, filtroPlan, filtroPais, filtroMoneda, ordenClientes]);
 
 const periodoActual = new Date().toISOString().slice(0, 7);
 
@@ -598,6 +602,9 @@ const clientesParaCargoMasivo = clientes.filter((c) => {
   if (planCliente !== formCargoMasivo.planNombre) return false;
 
   if (c.suspendidoManual === true) return false;
+  if (c.suspendidoPorSistema === true) return false;
+  if (["suspendida", "suspended", "gracia", "past_due"].includes(String(c.subscriptionStatus || c.estadoSuscripcion || "").toLowerCase())) return false;
+  if (Number(c.saldoCuentaCorriente || 0) > 0) return false;
   if ((c.estado || "") === "inactivo") return false;
   if ((c.estadoSuscripcion || "") === "cancelado") return false;
 
@@ -638,7 +645,7 @@ const emitirCargoMasivo = async () => {
       });
     }
 
-    await cargarClientes();
+    await refrescarDatosSaas("recurringCharge");
     setMostrarCargoMasivo(false);
 
     setFormCargoMasivo({
@@ -660,7 +667,7 @@ return (
   <div className="dueno-saas-layout">
     <DuenoSaasSidebar
       seccionActiva={seccionActiva}
-      setSeccionActiva={setSeccionActiva}
+      setSeccionActiva={cambiarSeccion}
       onCerrarSesion={cerrarSesion}
     />
 
@@ -697,7 +704,6 @@ return (
             movimientosSaas={movimientosSaas}
             usoClientes={usoClientes}
             pagosPorCliente={pagosPorCliente}
-            formatearMoneda={formatearMoneda}
             formatearFecha={formatearFecha}
           />
         )}
@@ -716,8 +722,18 @@ return (
         </div>
 
         <div style={dashboardCard}>
-          <strong>Suspendidos</strong>
+          <strong>En gracia</strong>
+          <span>{resumenDashboard.gracia}</span>
+        </div>
+
+        <div style={dashboardCard}>
+          <strong>Suspendidos recuperables</strong>
           <span>{resumenDashboard.suspendidos}</span>
+        </div>
+
+        <div style={dashboardCard}>
+          <strong>No recuperados</strong>
+          <span>{resumenDashboard.noRecuperados}</span>
         </div>
 
         <div style={dashboardCard}>
@@ -731,8 +747,8 @@ return (
         </div>
 
         <div style={dashboardCard}>
-          <strong>Saldo pendiente</strong>
-          <span>{formatearMoneda(resumenDashboard.saldoPendiente)}</span>
+          <strong>Monedas con deuda</strong>
+          <span>{resumenDashboard.monedasConDeuda}</span>
         </div>
 
         <div style={dashboardCard}>
@@ -749,7 +765,7 @@ return (
             <input
               value={busquedaCliente}
               onChange={(e) => setBusquedaCliente(e.target.value)}
-              placeholder="Buscar cliente..."
+              placeholder="Buscar nombre, email, ID, país o plan..."
               style={inputFiltro}
             />
 
@@ -759,11 +775,14 @@ return (
               style={selectFiltro}
             >
               <option value="todos">Todos</option>
-              <option value="activo">Activos</option>
+              <option value="active">Activos</option>
+              <option value="grace">En gracia</option>
+              <option value="suspended">Suspendidos recuperables</option>
+              <option value="churn">No recuperados</option>
+              <option value="trial">Pruebas</option>
               <option value="mora">Con saldo a abonar</option>
               <option value="saldo_favor">Con saldo a favor</option>
-              <option value="suspendido">Suspendidos</option>
-              <option value="inactivo">Inactivos</option>
+              <option value="cancelled">Inactivos / cancelados</option>
             </select>
             <select
               value={ordenClientes}
@@ -781,11 +800,19 @@ return (
               style={selectFiltro}
             >
               <option value="todos">Todos los planes</option>
-              {planesDisponibles.map((plan) => (
+              {planesFiltro.map((plan) => (
                 <option key={plan} value={plan}>
                   {plan}
                 </option>
               ))}
+            </select>
+            <select value={filtroPais} onChange={(e) => setFiltroPais(e.target.value)} style={selectFiltro}>
+              <option value="todos">Todos los países</option>
+              {paisesFiltro.map((pais) => <option key={pais} value={pais}>{pais}</option>)}
+            </select>
+            <select value={filtroMoneda} onChange={(e) => setFiltroMoneda(e.target.value)} style={selectFiltro}>
+              <option value="todos">Todas las monedas</option>
+              {monedasFiltro.map((moneda) => <option key={moneda} value={moneda}>{moneda}</option>)}
             </select>
 </div>
 
@@ -803,8 +830,8 @@ return (
                       }
                     >
                       <div>
-                        <strong>{c.nombre || "-"}</strong>
-                        <span>{c.planNombre || c.plan || "-"}</span>
+                        <strong>{c.nombre || c.nombreCliente || c.empresa || c.id || "—"}</strong>
+                        <span>{resolveSaasPlanLabel(c)}</span>
                       </div>
 
                       <b>{abierto ? "▲" : "▼"}</b>
@@ -812,13 +839,11 @@ return (
 
                     {abierto && (
                       <div className="saas-cliente-card-body">
-                        <p><span>Estado</span><strong>{c.estado || "activo"}</strong></p>
-                        <p><span>Mantenimiento</span><strong>{formatearMoneda(c.planPrecio || c.mantenimientoMensual || 0)}</strong></p>
-                        <p><span>Saldo</span><strong>{formatearMoneda(c.saldoCuentaCorriente || 0)}</strong></p>
-                        <p><span>Pagos</span><strong>{pagosPorCliente[c.id]?.cantidadPagos || 0}</strong></p>
-                        <p><span>Pedidos 30 días</span><strong>{usoClientes[c.id]?.pedidosUltimos30 || 0}</strong></p>
-                        <p><span>Último uso</span><strong>{formatearFecha(usoClientes[c.id]?.ultimoUso)}</strong></p>
-                        <p><span>Vencimiento</span><strong>{formatearFecha(c.fechaVencimiento || c.fechaProximoCargo)}</strong></p>
+                        <p><span>Email</span><strong>{c.email || "—"}</strong></p>
+                        <p><span>Estado</span><strong>{classifySaasClient(c).label}</strong></p>
+                        <p><span>Precio</span><strong>{formatSaasMoney(resolveSaasPrice(c), resolveSaasCurrency(c))}</strong></p>
+                        <p><span>País</span><strong>{c.pais || "—"}</strong></p>
+                        <p><span>Próximo cobro</span><strong>{formatearFecha(c.nextBillingDate || c.fechaProximoCargo)}</strong></p>
 
                         <div className="saas-cliente-card-actions">
                           <button type="button" onClick={() => abrirEditarCliente(c)}>
@@ -853,19 +878,18 @@ return (
 
             
           
+          <div className="saas-clientes-table-scroll">
           <table className="saas-clientes-table-desktop" style={table}>
             <thead>
               <tr>
                 <th style={th}>Empresa</th>
-                <th style={th}>Estado</th>
+                <th style={th}>Email</th>
                 <th style={th}>Plan</th>
-                <th style={th}>Mantenimiento</th>
-                <th style={th}>Saldo</th>
-                <th style={th}>Pagos</th>
-                <th style={th}>Pedidos 30 días</th>
-                <th style={th}>Último uso</th>
-                <th style={th}>Último pago</th>
-                <th style={th}>Vencimiento</th>
+                <th style={th}>Moneda</th>
+                <th style={th}>Precio</th>
+                <th style={th}>Estado</th>
+                <th style={th}>País</th>
+                <th style={th}>Próximo cobro</th>
                 <th style={th}>Acciones</th>
               </tr>
             </thead>
@@ -876,61 +900,29 @@ return (
                   key={c.id}
                   style={
                     (c.estado || "activo") === "suspendido"
-                      ? filaSuspendida
-                      : undefined
+                      ? {...filaSuspendida, cursor: "pointer"}
+                      : {cursor: "pointer"}
                   }
+                  role="button"
+                  tabIndex={0}
+                  onClick={(event) => {
+                    activateSaasClientRow(event, c, abrirEditarCliente);
+                  }}
+                  onKeyDown={(event) => {
+                    if ((event.key === "Enter" || event.key === " ") && !isInteractiveSaasTarget(event.target, event.currentTarget)) {
+                      event.preventDefault();
+                      abrirEditarCliente(c);
+                    }
+                  }}
                 >
-                  <td style={td}>{c.nombre || "-"}</td>
-                  <td style={td}>
-                    {c.suspendidoManual
-                      ? "Suspendido manual"
-                      : c.suspendidoPorSistema
-                      ? "Suspendido por deuda"
-                      : c.estado === "suspendido"
-                      ? "Suspendido"
-                      : "Activo"}
-                  </td>
-                    <td style={td}>{c.planNombre || c.plan || "-"}</td>
-
-                    <td style={td}>
-                      {formatearMoneda(c.planPrecio || c.mantenimientoMensual || 0)}
-                    </td>
-
-                    <td style={td}>
-                      <span
-                        style={{
-                          fontWeight: 700,
-                          color:
-                            Number(c.saldoCuentaCorriente || 0) > 0
-                              ? "#dc2626"
-                              : Number(c.saldoCuentaCorriente || 0) < 0
-                              ? "#16a34a"
-                              : "#111827",
-                        }}
-                      >
-                        {Number(c.saldoCuentaCorriente || 0) > 0
-                          ? `Debe ${formatearMoneda(c.saldoCuentaCorriente)}`
-                          : Number(c.saldoCuentaCorriente || 0) < 0
-                          ? `A favor ${formatearMoneda(
-                              Math.abs(Number(c.saldoCuentaCorriente || 0))
-                            )}`
-                          : formatearMoneda(0)}
-                      </span>
-                    </td>
-
-                    <td style={td}>{pagosPorCliente[c.id]?.cantidadPagos || 0}</td>
-
-                    <td style={td}>{usoClientes[c.id]?.pedidosUltimos30 || 0}</td>
-
-                    <td style={td}>{formatearFecha(usoClientes[c.id]?.ultimoUso)}</td>
-
-                    <td style={td}>
-                      {formatearFecha(pagosPorCliente[c.id]?.ultimoPago || c.ultimoPago)}
-                    </td>
-
-                    <td style={td}>
-                      {formatearFecha(c.fechaVencimiento || c.fechaProximoCargo)}
-                    </td>
+                  <td style={td}>{c.nombre || c.nombreCliente || c.empresa || c.id || "—"}</td>
+                  <td style={td}>{c.email || "—"}</td>
+                  <td style={td}>{resolveSaasPlanLabel(c)}</td>
+                  <td style={td}>{resolveSaasCurrency(c) || "Sin moneda"}</td>
+                  <td style={td}>{formatSaasMoney(resolveSaasPrice(c), resolveSaasCurrency(c))}</td>
+                  <td style={td}>{classifySaasClient(c).label}</td>
+                  <td style={td}>{c.pais || "—"}</td>
+                  <td style={td}>{formatearFecha(c.nextBillingDate || c.fechaProximoCargo)}</td>
 
                     <td style={td}>
                       <button
@@ -969,13 +961,14 @@ return (
 
               {clientesFiltrados.length === 0 && (
                 <tr>
-                  <td style={td} colSpan="7">
+                  <td style={td} colSpan="9">
                     No hay clientes cargados.
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 
@@ -1058,17 +1051,15 @@ return (
                           ? "suspendido"
                           : "activo";
 
-                      await updateDoc(doc(db, "clientes-saas", c.id), {
-                        estado: nuevoEstado,
-                        suspendidoManual: nuevoEstado === "suspendido",
-                        suspendidoPorSistema: false,
-                        motivoSuspension:
-                          nuevoEstado === "suspendido" ? "manual" : "",
-                        updatedAt: serverTimestamp(),
-                      });
+                      try {
+                        await cambiarSuspensionManualSaas(c.id, nuevoEstado);
+                      } catch (error) {
+                        console.error("No se pudo cambiar la suspensión SaaS:", error);
+                        alert(error.message || "No se pudo actualizar el estado del cliente.");
+                        return;
+                      }
 
-                      await cargarClientes();
-                      await cargarMovimientosSaas();
+                      await refrescarDatosSaas("suspension");
                       
 
                       setMenuClienteAbierto(null);
@@ -1143,74 +1134,6 @@ return (
                 .map((u) => {
                   const usuarioActivo = u.activo !== false;
 
-                  const planesDisponibles = [
-                    ...new Set(
-                      clientes
-                        .map((c) => c.planNombre || c.plan)
-                        .filter(Boolean)
-                    ),
-                  ];
-
-                  const clientesParaCargoMasivo = clientes.filter((c) => {
-                    const planCliente = c.planNombre || c.plan;
-
-                    if (planCliente !== formCargoMasivo.planNombre) return false;
-
-                    // No cobrar clientes suspendidos manualmente por nosotros
-                    if (c.suspendidoManual === true) return false;
-
-                    // No cobrar clientes inactivos/cancelados
-                    if ((c.estado || "") === "inactivo") return false;
-                    if ((c.estadoSuscripcion || "") === "cancelado") return false;
-
-                    return true;
-                  });
-
-                  const emitirCargoMasivo = async () => {
-                    if (!formCargoMasivo.planNombre) {
-                      alert("Seleccioná un plan.");
-                      return;
-                    }
-
-                    if (!formCargoMasivo.monto || Number(formCargoMasivo.monto) <= 0) {
-                      alert("Ingresá un monto válido.");
-                      return;
-                    }
-
-                    const ok = window.confirm(
-                      `Se emitirá un cargo de ${formatearMoneda(formCargoMasivo.monto)} a ${clientesParaCargoMasivo.length} clientes del plan ${formCargoMasivo.planNombre}. ¿Continuar?`
-                    );
-
-                    if (!ok) return;
-
-                    try {
-                      for (const cliente of clientesParaCargoMasivo) {
-                        await registrarMovimientoSaas({
-                          clienteSaas: cliente,
-                          tipoMovimiento: "cargo",
-                          monto: Number(formCargoMasivo.monto),
-                          fechaPago: formCargoMasivo.fechaPago,
-                          medioPago: "",
-                          concepto: formCargoMasivo.concepto,
-                          observacion: formCargoMasivo.observacion,
-                        });
-                      }
-
-                      await cargarClientes();
-                      setMostrarCargoMasivo(false);
-
-                      setFormCargoMasivo({
-                        planNombre: "",
-                        monto: "",
-                        fechaPago: new Date().toISOString().slice(0, 10),
-                        concepto: "mensualidad",
-                        observacion: "Cargo mensual masivo",
-                      });
-                    } catch (error) {
-                      console.error(error);
-                      alert("No se pudo emitir el cargo masivo.");
-                    }
-                  };
 
                   return (
                     <tr
@@ -1495,12 +1418,7 @@ return (
                               const pagos = await obtenerPagosSaas(clienteCuentaCorriente.id);
                               setPagosCliente(pagos);
 
-                              await cargarClientes();
-                              const clientesSnap = await getDocs(collection(db, "clientes-saas"));
-                              const clientesActualizados = clientesSnap.docs.map((docu) => ({
-                                id: docu.id,
-                                ...docu.data(),
-                              }));
+                              const clientesActualizados = await refrescarDatosSaas("voidMovement") || [];
 
                               const clienteActualizado = clientesActualizados.find(
                                 (c) => c.id === clienteCuentaCorriente.id
@@ -1543,7 +1461,7 @@ return (
             setClienteEditando(null);
           }}
           onGuardado={async () => {
-            await cargarClientes();
+            await refrescarDatosSaas(clienteEditando?.id ? "plan" : "client");
             setMostrarForm(false);
             setClienteEditando(null);
           }}
@@ -1799,12 +1717,7 @@ return (
                 const pagos = await obtenerPagosSaas(clienteCuentaCorriente.id);
                 setPagosCliente(pagos);
 
-                await cargarClientes();
-                const clientesSnap = await getDocs(collection(db, "clientes-saas"));
-                const clientesActualizados = clientesSnap.docs.map((docu) => ({
-                  id: docu.id,
-                  ...docu.data(),
-                }));
+                const clientesActualizados = await refrescarDatosSaas("payment") || [];
 
                 const clienteActualizado = clientesActualizados.find(
                   (c) => c.id === clienteCuentaCorriente.id

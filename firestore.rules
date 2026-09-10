@@ -880,12 +880,19 @@ function canReadMovimientos(clienteId) {
 
       allow update: if isSuperAdmin()
 
-      // Administrador del tenant:
-      // conserva exactamente el comportamiento actual.
+      // El administrador del tenant conserva la configuración operativa,
+      // pero no puede alterar contrato, precio ni estado comercial.
       || (
         isAdmin()
         && isActiveUser()
         && clienteId == profile().clienteId
+        && !changedKeys().hasAny([
+          "plan", "planNombre", "planId",
+          "frecuenciaCobro", "billingCycle",
+          "planPrecio", "mantenimientoMensual", "price",
+          "estado", "estadoSuscripcion", "subscriptionStatus",
+          "suspendidoManual", "suspendidoPorSistema"
+        ])
       )
 
       // Usuario común:
@@ -2008,6 +2015,14 @@ match /produccion_sectores/{sectorId} {
       allow update: if isSuperAdmin();
 
       allow delete: if false;
+    }
+
+    // =========================
+    // SaaS notifications outbox
+    // =========================
+    match /saas_notifications_outbox/{notificationId} {
+      allow read: if isSuperAdmin();
+      allow create, update, delete: if false;
     }
     
 

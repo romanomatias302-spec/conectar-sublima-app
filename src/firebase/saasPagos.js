@@ -4,20 +4,19 @@ import {
   getDocs,
   query,
   where,
-  orderBy,
   serverTimestamp,
   doc,
   updateDoc,
   getDoc,
+  runTransaction,
 } from "firebase/firestore";
 import { db } from "../firebase";
-
-function sumarUnMes(fechaStr) {
-  if (!fechaStr) return "";
-  const fecha = new Date(fechaStr);
-  fecha.setMonth(fecha.getMonth() + 1);
-  return fecha.toISOString().slice(0, 10);
-}
+import {
+  buildRecurringChargeAdvancePatch,
+  buildSaasReactivationPatch,
+  deterministicSaasChargeId,
+  recurringSaasPeriodKey,
+} from "../domain/saasBillingState";
 
 export async function registrarMovimientoSaas({
   clienteSaas,
@@ -32,22 +31,66 @@ export async function registrarMovimientoSaas({
 }) {
   if (!clienteSaas?.id) throw new Error("Cliente SaaS inválido.");
   if (Number(monto || 0) <= 0) throw new Error("El monto debe ser mayor a 0.");
+  const status = String(clienteSaas.subscriptionStatus || clienteSaas.estadoSuscripcion || "").toLowerCase();
+  if (tipoMovimiento === "cargo" && (
+    clienteSaas.suspendidoManual === true || clienteSaas.suspendidoPorSistema === true ||
+    ["suspendida", "suspended", "gracia", "past_due"].includes(status) ||
+    Number(clienteSaas.saldoCuentaCorriente || 0) > 0
+  )) throw new Error("No se puede generar un cargo recurrente mientras la cuenta está suspendida o tiene deuda.");
+  const esCargoRecurrente = tipoMovimiento === "cargo" && ["mensualidad", "anualidad"].includes(concepto);
+  const periodoRecurrente = esCargoRecurrente
+    ? periodoFacturado || recurringSaasPeriodKey(clienteSaas, fechaPago)
+    : periodoFacturado;
+  if (esCargoRecurrente && !periodoRecurrente) throw new Error("El cargo recurrente requiere un período de facturación válido.");
+  const currency = String(clienteSaas.currency || clienteSaas.moneda || "").trim().toUpperCase();
+  if (tipoMovimiento === "cargo" && !currency) throw new Error("El cargo recurrente requiere una moneda.");
 
-await addDoc(collection(db, "saas_pagos"), {
+const movimiento = {
   clienteSaasId: clienteSaas.id,
   clienteNombre: clienteSaas.nombre || "",
   tipoMovimiento,
   monto: Number(monto || 0),
+  moneda: currency,
+  currency,
   fechaPago,
   medioPago,
   concepto,
-  periodoFacturado,
+  periodoFacturado: periodoRecurrente,
   observacion,
   anulado: false,
   estado: "activo",
   createdAt: serverTimestamp(),
   updatedAt: serverTimestamp(),
-});
+};
+
+if (esCargoRecurrente) {
+  const cargoRef = doc(db, "saas_pagos", deterministicSaasChargeId(clienteSaas.id, periodoRecurrente));
+  const clienteRef = doc(db, "clientes-saas", clienteSaas.id);
+  await runTransaction(db, async (transaction) => {
+    const [existing, currentClientSnapshot] = await Promise.all([
+      transaction.get(cargoRef),
+      transaction.get(clienteRef),
+    ]);
+    if (existing.exists()) throw new Error("Ya existe un cargo para este cliente y período.");
+    if (!currentClientSnapshot.exists()) throw new Error("El cliente SaaS ya no existe.");
+    const currentClient = {id: currentClientSnapshot.id, ...currentClientSnapshot.data()};
+    const currentStatus = String(currentClient.subscriptionStatus || currentClient.estadoSuscripcion || "").toLowerCase();
+    if (
+      currentClient.suspendidoManual === true || currentClient.suspendidoPorSistema === true ||
+      ["suspendida", "suspended", "gracia", "past_due"].includes(currentStatus) ||
+      Number(currentClient.saldoCuentaCorriente || 0) > 0
+    ) throw new Error("La cuenta cambió de estado y ya no admite un cargo recurrente.");
+    if (recurringSaasPeriodKey(currentClient, fechaPago) !== periodoRecurrente) {
+      throw new Error("El período de facturación cambió. Volvé a intentar.");
+    }
+    const advancePatch = buildRecurringChargeAdvancePatch(currentClient, periodoRecurrente, fechaPago);
+    if (!advancePatch) throw new Error("No se pudo determinar el siguiente ciclo de facturación.");
+    transaction.set(cargoRef, {...movimiento, idempotencyKey: cargoRef.id, periodKey: periodoRecurrente});
+    transaction.update(clienteRef, {...advancePatch, updatedAt: serverTimestamp()});
+  });
+} else {
+  await addDoc(collection(db, "saas_pagos"), movimiento);
+}
 
 await recalcularEstadoCuentaCliente(clienteSaas.id);
 
@@ -111,14 +154,8 @@ export async function recalcularEstadoCuentaCliente(clienteSaasId) {
 
   const clienteRef = doc(db, "clientes-saas", clienteSaasId);
 
-  const snap = await getDocs(
-    query(
-      collection(db, "clientes-saas"),
-      where("__name__", "==", clienteSaasId)
-    )
-  );
-
-  const cliente = snap.docs[0]?.data();
+  const clienteSnap = await getDoc(clienteRef);
+  const cliente = clienteSnap.exists() ? clienteSnap.data() : null;
 
   if (!cliente) return;
 
@@ -146,10 +183,12 @@ export async function recalcularEstadoCuentaCliente(clienteSaasId) {
     estadoCuenta = "saldo_favor";
   }
 
+  const reactivationPatch = buildSaasReactivationPatch(cliente, saldo, new Date());
   await updateDoc(clienteRef, {
     saldoCuentaCorriente: saldo,
     estadoCuenta,
     estadoSuscripcion,
+    subscriptionStatus: ({activa: "active", gracia: "past_due", suspendida: "suspended"})[estadoSuscripcion],
 
     suspendidoPorSistema,
 
@@ -160,7 +199,44 @@ export async function recalcularEstadoCuentaCliente(clienteSaasId) {
         ? "suspendido"
         : "activo",
 
+    ...(suspendidoPorSistema && cliente.suspendidoPorSistema !== true
+      ? {fechaSuspension: new Date().toISOString().slice(0, 10), motivoSuspension: "deuda_vencida"}
+      : {}),
+    ...(reactivationPatch || {}),
+
     updatedAt: serverTimestamp(),
+  });
+}
+
+export async function cambiarSuspensionManualSaas(clienteSaasId, nuevoEstado) {
+  if (!clienteSaasId) throw new Error("Cliente SaaS inválido.");
+  if (!["activo", "suspendido"].includes(nuevoEstado)) throw new Error("Estado SaaS inválido.");
+  const clienteRef = doc(db, "clientes-saas", clienteSaasId);
+  await runTransaction(db, async (transaction) => {
+    const snapshot = await transaction.get(clienteRef);
+    if (!snapshot.exists()) throw new Error("El cliente SaaS ya no existe.");
+    const cliente = {id: snapshot.id, ...snapshot.data()};
+    if (nuevoEstado === "activo" && Number(cliente.saldoCuentaCorriente || 0) > 0) {
+      throw new Error("No se puede reactivar la cuenta mientras exista deuda pendiente.");
+    }
+
+    const estadoNormalizado = String(cliente.subscriptionStatus || cliente.estadoSuscripcion || "").toLowerCase();
+    const esTrial = cliente.planId === "trial" || ["trial", "prueba"].includes(estadoNormalizado);
+    const reactivationPatch = nuevoEstado === "activo" && !esTrial
+      ? buildSaasReactivationPatch({...cliente, suspendidoManual: false, suspendidoPorSistema: true}, 0, new Date())
+      : null;
+    if (nuevoEstado === "activo" && !esTrial && !reactivationPatch) {
+      throw new Error("La suscripción no tiene un ciclo válido para reactivarse.");
+    }
+
+    transaction.update(clienteRef, {
+      estado: nuevoEstado,
+      suspendidoManual: nuevoEstado === "suspendido",
+      suspendidoPorSistema: false,
+      motivoSuspension: nuevoEstado === "suspendido" ? "manual" : "",
+      ...(reactivationPatch || {}),
+      updatedAt: serverTimestamp(),
+    });
   });
 }
 

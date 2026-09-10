@@ -24,6 +24,7 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import ConfiguracionUsuarios from "./ConfiguracionUsuarios";
 import ConfiguracionSucursales from "./ConfiguracionSucursales";
 import ConfiguracionProduccion from "./ConfiguracionProduccion";
+import { accountPaymentAction } from "../../domain/saasPaymentProvider";
 
 export default function Configuracion({ modoOscuro, setModoOscuro, perfil, onActualizarPerfil, }) {
   const [pestañaActiva, setPestañaActiva] = useState(
@@ -114,6 +115,8 @@ export default function Configuracion({ modoOscuro, setModoOscuro, perfil, onAct
             ultimoPago: data.ultimoPago || "",
             pais: data.pais || "-",
             metodoCobro: data.metodoCobro || "manual",
+            billingProvider: data.billingProvider || "",
+            hotmartSubscriptionId: data.hotmartSubscriptionId || "",
             suspendidoPorSistema: data.suspendidoPorSistema || false,
             suspendidoManual: data.suspendidoManual || false,
           });
@@ -690,6 +693,12 @@ const pagarPeriodoMercadoPago = async (periodo) => {
                               return;
                             }
 
+                            const action = accountPaymentAction(cuentaSaas);
+                            if (action.provider === "hotmart") {
+                              window.location.assign(action.url);
+                              return;
+                            }
+
                             alert(
                               "Para informar el pago, comunicate con el administrador indicando el período " +
                                 p.periodo +
@@ -700,9 +709,7 @@ const pagarPeriodoMercadoPago = async (periodo) => {
                         >
                           {periodoPagando === p.periodo
                             ? "Procesando..."
-                            : cuentaSaas.metodoCobro === "mercadopago"
-                            ? "Pagar con Mercado Pago"
-                            : "Informar pago"}
+                            : accountPaymentAction(cuentaSaas).label}
                         </button>
                           ) : (
                             "-"

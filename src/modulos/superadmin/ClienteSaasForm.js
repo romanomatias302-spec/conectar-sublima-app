@@ -1,6 +1,17 @@
 import React, { useEffect, useState } from "react";
 import { addDoc, collection, doc, updateDoc } from "firebase/firestore";
 import { db } from "../../firebase";
+import {nextSaasBillingDate} from "../../domain/saasBillingState";
+import {
+  getSelectablePlans,
+  priceAfterCurrencyChange,
+  priceForPlan,
+  rehydrateSaasClient,
+  resolveCurrencyAfterCountryChange,
+  resolveSaasEntitlements,
+  SUPPORTED_CURRENCIES,
+  validateSaasSubscription,
+} from "../../domain/saasPlans";
 
 export default function ClienteSaasForm({
   clienteEditando,
@@ -20,6 +31,12 @@ plan: "Prueba gratis 7 días",
 planNombre: "Prueba gratis 7 días",
 planPrecio: 0,
 moneda: "ARS",
+planId: "trial",
+billingCycle: "monthly",
+currency: "ARS",
+price: 0,
+subscriptionStatus: "trial",
+currencyExplicit: false,
 frecuenciaCobro: "prueba",
 diasCiclo: 7,
 
@@ -47,9 +64,12 @@ diasCiclo: 7,
 });
 
   const [loading, setLoading] = useState(false);
+  const [commercialFieldsDirty, setCommercialFieldsDirty] = useState(false);
 
   useEffect(() => {
     if (clienteEditando) {
+      setCommercialFieldsDirty(false);
+      const nuevoModelo = rehydrateSaasClient(clienteEditando);
       setFormData({
         nombre: clienteEditando.nombre || "",
         nombreCliente: clienteEditando.nombreCliente || "",
@@ -63,6 +83,8 @@ diasCiclo: 7,
         planNombre: clienteEditando.planNombre || clienteEditando.plan || "",
         planPrecio: clienteEditando.planPrecio || clienteEditando.mantenimientoMensual || "",
         moneda: clienteEditando.moneda || "",
+        ...nuevoModelo,
+        currencyExplicit: true,
         frecuenciaCobro: clienteEditando.frecuenciaCobro || "mensual",
         diasCiclo: clienteEditando.diasCiclo || 30,
 
@@ -88,28 +110,6 @@ diasCiclo: 7,
       });
     }
   }, [clienteEditando]);
-
-    const sumarUnMes = (fechaStr) => {
-        if (!fechaStr) return "";
-
-        const partes = fechaStr.split("-");
-        if (partes.length !== 3) return "";
-
-        const anio = Number(partes[0]);
-        const mes = Number(partes[1]) - 1;
-        const dia = Number(partes[2]);
-
-        const fecha = new Date(anio, mes, dia);
-        fecha.setMonth(fecha.getMonth() + 1);
-
-        const yyyy = fecha.getFullYear();
-        const mm = String(fecha.getMonth() + 1).padStart(2, "0");
-        const dd = String(fecha.getDate()).padStart(2, "0");
-
-        return `${yyyy}-${mm}-${dd}`;
-    };
-
-
 
     const sumarDias = (fechaStr, dias) => {
       if (!fechaStr) return "";
@@ -176,7 +176,8 @@ diasCiclo: 7,
         };
       }
 
-      const proximoCargo = sumarDias(fechaAlta, config.diasCiclo);
+      const cycle = config.frecuenciaCobro === "anual" ? "annual" : "monthly";
+      const proximoCargo = nextSaasBillingDate(fechaAlta, cycle);
       const vencimiento = sumarDias(proximoCargo, 7);
 
       return {
@@ -187,6 +188,9 @@ diasCiclo: 7,
 
     const handleChange = (e) => {
         const { name, value } = e.target;
+        if (["planId", "billingCycle", "currency", "price", "subscriptionStatus"].includes(name)) {
+          setCommercialFieldsDirty(true);
+        }
 
         setFormData((prev) => {
         const nuevoValor =
@@ -202,6 +206,58 @@ diasCiclo: 7,
             ...prev,
             [name]: nuevoValor,
         };
+
+    if (name === "planId") {
+      if (value === "trial") {
+        nuevoForm.planNombre = "Prueba gratis 7 días";
+        nuevoForm.subscriptionStatus = "trial";
+        nuevoForm.price = 0;
+        nuevoForm.planPrecio = 0;
+      } else {
+        const plan = getSelectablePlans().find((item) => item.id === value);
+        nuevoForm.planNombre = plan?.name || "";
+        if (nuevoForm.subscriptionStatus === "trial") nuevoForm.subscriptionStatus = "active";
+        const catalogPrice = priceForPlan(value, nuevoForm.currency, nuevoForm.billingCycle);
+        nuevoForm.price = catalogPrice ?? "";
+        nuevoForm.planPrecio = catalogPrice ?? "";
+      }
+    }
+
+    if (name === "currency") {
+      nuevoForm.currencyExplicit = true;
+      nuevoForm.moneda = value;
+      const nextPrice = priceAfterCurrencyChange({planId: nuevoForm.planId, currency: value, billingCycle: nuevoForm.billingCycle, currentPrice: prev.price});
+      nuevoForm.price = nextPrice;
+      nuevoForm.planPrecio = nextPrice;
+    }
+
+    if (name === "pais") {
+      const suggested = resolveCurrencyAfterCountryChange({
+        country: value,
+        currentCurrency: prev.currency,
+        currencyExplicit: prev.currencyExplicit,
+        isNew: !clienteEditando,
+      });
+      nuevoForm.currency = suggested;
+      nuevoForm.moneda = suggested;
+      if (suggested !== prev.currency) {
+        const nextPrice = priceAfterCurrencyChange({planId: nuevoForm.planId, currency: suggested, billingCycle: nuevoForm.billingCycle, currentPrice: prev.price});
+        nuevoForm.price = nextPrice;
+        nuevoForm.planPrecio = nextPrice;
+      }
+    }
+
+    if (name === "price") {
+      nuevoForm.planPrecio = nuevoValor;
+    }
+
+    if (name === "billingCycle") {
+      nuevoForm.frecuenciaCobro = value === "annual" ? "anual" : "mensual";
+      nuevoForm.diasCiclo = value === "annual" ? 365 : 30;
+      const catalogPrice = priceForPlan(nuevoForm.planId, nuevoForm.currency, value);
+      nuevoForm.price = catalogPrice ?? "";
+      nuevoForm.planPrecio = catalogPrice ?? "";
+    }
 
     if (name === "planNombre") {
       const configPlan = obtenerConfigPlan(value);
@@ -251,6 +307,19 @@ diasCiclo: 7,
     return;
   }
 
+  const resolved = resolveSaasEntitlements(formData);
+  const validation = validateSaasSubscription({
+    planId: formData.planId,
+    billingCycle: formData.billingCycle,
+    currency: formData.currency,
+    price: formData.price,
+    subscriptionStatus: formData.subscriptionStatus,
+  });
+  if ((!resolved.isLegacy || commercialFieldsDirty) && !validation.valid) {
+    alert(validation.errors[0]);
+    return;
+  }
+
   if (!formData.fechaAlta) {
     alert("Ingresá la fecha de alta.");
     return;
@@ -259,21 +328,51 @@ diasCiclo: 7,
     try {
       setLoading(true);
 
-    const configPlan = obtenerConfigPlan(formData.planNombre);
+    const configPlan = formData.planId === "trial"
+      ? obtenerConfigPlan("Prueba gratis 7 días")
+      : obtenerConfigPlan(formData.billingCycle === "annual" ? "Anual" : "Mensual");
 
-    const fechas = calcularFechasPorPlan({
-      fechaAlta: formData.fechaAlta,
-      planNombre: formData.planNombre,
+    const esPruebaGratis = formData.planId === "trial";
+    const modeloAnterior = resolveSaasEntitlements(clienteEditando || {});
+    const convierteTrialAPago = Boolean(clienteEditando?.id && modeloAnterior.isTrial && !esPruebaGratis);
+    const fechaHoy = new Date().toISOString().slice(0, 10);
+    const billingAnchorDate = convierteTrialAPago
+      ? fechaHoy
+      : clienteEditando?.billingAnchorDate || formData.fechaAlta;
+    const fechasCalculadas = calcularFechasPorPlan({
+      fechaAlta: billingAnchorDate,
+      planNombre: formData.planId === "trial"
+        ? "Prueba gratis 7 días"
+        : formData.billingCycle === "annual" ? "Anual" : "Mensual",
     });
-
-    const esPruebaGratis = configPlan.frecuenciaCobro === "prueba";
+    const preservaCicloExistente = Boolean(clienteEditando?.id && !convierteTrialAPago && !modeloAnterior.isTrial);
+    const fechas = preservaCicloExistente
+      ? {
+          fechaProximoCargo: clienteEditando.nextBillingDate || clienteEditando.fechaProximoCargo || fechasCalculadas.fechaProximoCargo,
+          fechaVencimiento: clienteEditando.fechaVencimiento || fechasCalculadas.fechaVencimiento,
+        }
+      : fechasCalculadas;
 
     const precioFinal = esPruebaGratis
       ? 0
-      : Number(formData.planPrecio || 0);
+      : Number(formData.price);
 
+    const formDataPersistible = { ...formData };
+    delete formDataPersistible.currencyExplicit;
+    const estadoSuscripcionLegacy = ({
+      trial: "prueba", active: "activa", past_due: "gracia",
+      suspended: "suspendida", cancelled: "cancelado",
+    })[formData.subscriptionStatus] || configPlan.estadoSuscripcion;
     const dataAGuardar = {
-      ...formData,
+      ...formDataPersistible,
+
+    planId: resolved.isLegacy ? "legacy" : formData.planId,
+    billingCycle: formData.billingCycle,
+    currency: formData.currency,
+    price: precioFinal,
+    subscriptionStatus: formData.subscriptionStatus,
+    billingAnchorDate,
+    nextBillingDate: esPruebaGratis ? "" : fechas.fechaProximoCargo,
 
     plan: formData.planNombre,
     planNombre: formData.planNombre,
@@ -282,12 +381,13 @@ diasCiclo: 7,
 
       mantenimientoMensual: precioFinal,
       planPrecio: precioFinal,
+      moneda: formData.currency,
 
       fechaProximoCargo: fechas.fechaProximoCargo,
       fechaVencimiento: fechas.fechaVencimiento,
 
       estado: formData.estado === "suspendido" ? "suspendido" : "activo",
-      estadoSuscripcion: configPlan.estadoSuscripcion,
+      estadoSuscripcion: estadoSuscripcionLegacy,
     };
 
       if (clienteEditando?.id) {
@@ -372,32 +472,45 @@ diasCiclo: 7,
       <div style={campo}>
         <label style={label}>Plan</label>
         <select
-          name="planNombre"
-          value={formData.planNombre}
+          name="planId"
+          value={formData.planId}
           onChange={handleChange}
           style={input}
+          disabled={formData.planId === "legacy"}
         >
-        
-          <option value="Prueba gratis 7 días">Prueba gratis 7 días</option>
-          <option value="Mensual">Mensual</option>
-          <option value="Anual">Anual</option>
-          <option value="Personalizado">Personalizado</option>
+          {formData.planId === "legacy" && <option value="legacy">Legacy — conserva límites ilimitados</option>}
+          <option value="trial">Prueba gratis 7 días</option>
+          {getSelectablePlans().map((plan) => (
+            <option key={plan.id} value={plan.id}>{plan.name}</option>
+          ))}
+        </select>
+        {formData.planId === "legacy" && (
+          <small style={{ color: "#64748b" }}>
+            Cliente histórico: conserva usuarios y sucursales ilimitados.
+          </small>
+        )}
+      </div>
+
+      <div style={campo}>
+        <label style={label}>Ciclo de facturación</label>
+        <select name="billingCycle" value={formData.billingCycle} onChange={handleChange} style={input} disabled={formData.planId === "trial"}>
+          <option value="monthly">Mensual</option>
+          <option value="annual">Anual (precio manual)</option>
         </select>
       </div>
 
       <div style={campo}>
         <label style={label}>Moneda</label>
         <select
-          name="moneda"
-          value={formData.moneda}
+          name="currency"
+          value={formData.currency}
           onChange={handleChange}
           style={input}
         >
-          <option value="ARS">ARS</option>
-          <option value="USD">USD</option>
-          <option value="PEN">PEN</option>
-          <option value="CLP">CLP</option>
-          <option value="MXN">MXN</option>
+          <option value="">Sin moneda</option>
+          {SUPPORTED_CURRENCIES.map((currency) => (
+            <option key={currency} value={currency}>{currency}</option>
+          ))}
         </select>
       </div>
 
@@ -430,28 +543,32 @@ diasCiclo: 7,
         >
           <option value="manual">Manual</option>
           <option value="mercadopago">Mercado Pago</option>
+          <option value="hotmart">Hotmart</option>
           <option value="stripe">Stripe</option>
           <option value="paypal">PayPal</option>
         </select>
       </div>
 
       <div style={campo}>
-        <label style={label}>Precio mensual</label>
+        <label style={label}>{formData.billingCycle === "annual" ? "Precio anual" : "Precio mensual"}</label>
         <input
-          name="planPrecio"
+          name="price"
           type="number"
           placeholder="0"
-          value={formData.planPrecio}
+          value={formData.price}
           onChange={handleChange}
           style={input}
         />
         <small style={{ color: "#64748b" }}>
           {new Intl.NumberFormat("es-AR", {
             style: "currency",
-            currency: formData.moneda || "ARS",
+            currency: formData.currency || "ARS",
             minimumFractionDigits: 0,
-          }).format(Number(formData.planPrecio || 0))}
+          }).format(Number(formData.price || 0))}
         </small>
+        {formData.planId !== "legacy" && formData.planId !== "trial" && priceForPlan(formData.planId, formData.currency, formData.billingCycle) === null && (
+          <small style={{ color: "#64748b" }}>Ingresá el precio manualmente para esta moneda y ciclo.</small>
+        )}
       </div>
 
       <div style={campo}>

@@ -1,0 +1,6 @@
+"use strict";
+
+const SUPPORTED_CURRENCIES = Object.freeze(["ARS", "USD", "MXN", "COP", "PEN", "CLP"]);
+const SUPPORTED_CURRENCY_SET = new Set(SUPPORTED_CURRENCIES);
+
+module.exports = {SUPPORTED_CURRENCIES, SUPPORTED_CURRENCY_SET};

@@ -2,8 +2,31 @@
   display: none;
 }
 
+.saas-clientes-table-scroll {
+  max-height: calc(100vh - 320px);
+  overflow: auto;
+  border-radius: 12px;
+}
+
+.saas-clientes-table-desktop thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #ffffff;
+  box-shadow: 0 1px 0 #e5e7eb;
+}
+
+.saas-clientes-table-desktop tbody tr[role="button"]:focus-visible {
+  outline: 3px solid rgba(109, 40, 217, 0.35);
+  outline-offset: -3px;
+}
+
 @media (max-width: 800px) {
   .saas-clientes-table-desktop {
+    display: none;
+  }
+
+  .saas-clientes-table-scroll {
     display: none;
   }
 

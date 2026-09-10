@@ -1,352 +1,111 @@
-import React, { useMemo, useState } from "react";
+import React, {useMemo, useState} from "react";
+import {
+  buildSaasPanelMetrics,
+  classifySaasClient,
+  formatSaasMoney,
+  getActiveSaasClients,
+  groupActiveClientsByCountry,
+  groupActiveSubscriptionsByBillingCycle,
+  resolveSaasPlanLabel,
+} from "../../domain/saasPanel";
+
+function toDate(value) {
+  if (!value) return null;
+  const date = value?.seconds ? new Date(value.seconds * 1000) : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function isInRange(value, range, from, to, now = new Date()) {
+  if (range === "general") return true;
+  const date = toDate(value);
+  if (!date) return false;
+  const start = new Date(now);
+  const end = new Date(now);
+  if (range === "7") start.setDate(now.getDate() - 7);
+  if (range === "30") start.setDate(now.getDate() - 30);
+  if (range === "mes") {
+    start.setDate(1);
+    end.setMonth(now.getMonth() + 1, 0);
+  }
+  if (range === "anio") {
+    start.setMonth(0, 1);
+    end.setMonth(11, 31);
+  }
+  if (range === "custom") {
+    const customStart = from ? new Date(`${from}T00:00:00`) : null;
+    const customEnd = to ? new Date(`${to}T23:59:59`) : null;
+    return (!customStart || date >= customStart) && (!customEnd || date <= customEnd);
+  }
+  return date >= start && date <= end;
+}
+
+function currencyRows(values = {}) {
+  return Object.entries(values)
+    .filter(([, amount]) => Number(amount) !== 0)
+    .sort(([a], [b]) => a.localeCompare(b));
+}
 
 export default function DuenoSaasEstadisticas({
   clientes = [],
   movimientosSaas = [],
   usoClientes = {},
   pagosPorCliente = {},
-  formatearMoneda,
   formatearFecha,
 }) {
   const [rango, setRango] = useState("general");
   const [desde, setDesde] = useState("");
   const [hasta, setHasta] = useState("");
 
-  const estaEnRango = (valor) => {
-    if (rango === "general") return true;
-    if (!valor) return false;
-
-    const fecha = valor?.seconds
-      ? new Date(valor.seconds * 1000)
-      : new Date(valor);
-
-    if (isNaN(fecha.getTime())) return false;
-
-    const hoy = new Date();
-    const inicio = new Date();
-    const fin = new Date();
-
-    if (rango === "7") inicio.setDate(hoy.getDate() - 7);
-    if (rango === "30") inicio.setDate(hoy.getDate() - 30);
-
-    if (rango === "mes") {
-      inicio.setDate(1);
-      fin.setMonth(hoy.getMonth() + 1);
-      fin.setDate(0);
-    }
-
-    if (rango === "anio") {
-      inicio.setMonth(0, 1);
-      fin.setMonth(11, 31);
-    }
-
-    if (rango === "custom") {
-      const d = desde ? new Date(desde) : null;
-      const h = hasta ? new Date(hasta) : null;
-
-      if (d && fecha < d) return false;
-      if (h && fecha > h) return false;
-
-      return true;
-    }
-
-    return fecha >= inicio && fecha <= fin;
-  };
-
   const data = useMemo(() => {
-    const movimientosActivos = movimientosSaas.filter((m) => m.anulado !== true);
-
-    const pagosFiltrados = movimientosActivos.filter(
-      (m) => m.tipoMovimiento === "pago" && estaEnRango(m.fechaPago)
+    const filteredClients = rango === "general"
+      ? clientes
+      : clientes.filter((client) => isInRange(client.fechaAlta || client.createdAt, rango, desde, hasta));
+    const filteredMovements = movimientosSaas.filter((movement) =>
+      isInRange(movement.fechaPago || movement.createdAt, rango, desde, hasta)
     );
-
-    const clientesFiltrados =
-      rango === "general"
-        ? clientes
-        : clientes.filter((c) => estaEnRango(c.fechaAlta || c.createdAt));
-
-    const esActivo = (c) =>
-      (c.estado || "activo") === "activo" &&
-      (c.estadoSuscripcion || "activo") !== "cancelado" &&
-      (c.estadoSuscripcion || "activo") !== "prueba";
-
-    const esSuspendido = (c) => (c.estado || "") === "suspendido";
-
-    const esPrueba = (c) =>
-      (c.estadoSuscripcion || "") === "prueba" ||
-      (c.planNombre || "") === "Prueba gratis 7 días";
-
-    const esCancelado = (c) =>
-      (c.estadoSuscripcion || "") === "cancelado" ||
-      (c.estado || "") === "inactivo";
-
-    const activos = clientesFiltrados.filter(esActivo);
-    const suspendidos = clientesFiltrados.filter(esSuspendido);
-    const pruebas = clientesFiltrados.filter(esPrueba);
-    const cancelados = clientesFiltrados.filter(esCancelado);
-
-    const mrr = activos.reduce((acc, c) => {
-      const plan = (c.planNombre || c.plan || "").toLowerCase();
-      const esMensual =
-        plan.includes("mensual") ||
-        plan.includes("pro") ||
-        plan.includes("basic") ||
-        plan.includes("básico");
-
-      if (!esMensual) return acc;
-
-      return acc + Number(c.planPrecio || c.mantenimientoMensual || 0);
-    }, 0);
-
-    const totalCobrado = pagosFiltrados.reduce(
-      (acc, p) => acc + Number(p.monto || 0),
-      0
-    );
-
-const deudaPorMoneda = [...activos, ...suspendidos, ...cancelados].reduce(
-  (acc, c) => {
-    const saldo = Number(c.saldoCuentaCorriente || 0);
-    if (saldo <= 0) return acc;
-
-    const monedaOriginal = (c.moneda || "ARS").toUpperCase();
-
-    const moneda =
-    monedaOriginal === "USD" || monedaOriginal === "DOLAR" || monedaOriginal === "DÓLAR"
-        ? "USD"
-        : "ARS";
-    const grupo = esActivo(c) ? "activos" : "inactivos";
-
-    if (!acc[moneda]) {
-      acc[moneda] = {
-        moneda,
-        activos: 0,
-        inactivos: 0,
-        total: 0,
-      };
-    }
-
-    acc[moneda][grupo] += saldo;
-    acc[moneda].total += saldo;
-
-    return acc;
-  },
-  {}
-);
-
-const deudaActivos = Object.values(deudaPorMoneda).reduce(
-  (acc, m) => acc + m.activos,
-  0
-);
-
-const deudaInactivos = Object.values(deudaPorMoneda).reduce(
-  (acc, m) => acc + m.inactivos,
-  0
-);
-
-const clientesActivosConDeuda = activos.filter(
-  (c) => Number(c.saldoCuentaCorriente || 0) > 0
-).length;
-
-const clientesInactivosConDeuda = [...suspendidos, ...cancelados].filter(
-  (c) => Number(c.saldoCuentaCorriente || 0) > 0
-).length;
-
-const ultimosPagos = pagosFiltrados
-  .slice()
-  .sort((a, b) => {
-    const fechaA = a.fechaPago?.seconds
-      ? a.fechaPago.seconds * 1000
-      : new Date(a.fechaPago || 0).getTime();
-
-    const fechaB = b.fechaPago?.seconds
-      ? b.fechaPago.seconds * 1000
-      : new Date(b.fechaPago || 0).getTime();
-
-    return fechaB - fechaA;
-  })
-  .slice(0, 8);
-
-    const mayorPago = pagosFiltrados.reduce(
-      (max, p) => Math.max(max, Number(p.monto || 0)),
-      0
-    );
-
-    const porPlan = Object.values(
-      clientesFiltrados.reduce((acc, c) => {
-        const plan = c.planNombre || c.plan || "Sin plan";
-
-        if (!acc[plan]) {
-          acc[plan] = {
-            nombre: plan,
-            total: 0,
-            activos: 0,
-            suspendidos: 0,
-            pruebas: 0,
-            cancelados: 0,
-            mrr: 0,
-          };
-        }
-
-        acc[plan].total += 1;
-        if (esActivo(c)) {
-          acc[plan].activos += 1;
-          acc[plan].mrr += Number(c.planPrecio || c.mantenimientoMensual || 0);
-        }
-        if (esSuspendido(c)) acc[plan].suspendidos += 1;
-        if (esPrueba(c)) acc[plan].pruebas += 1;
-        if (esCancelado(c)) acc[plan].cancelados += 1;
-
-        return acc;
-      }, {})
-    ).sort((a, b) => b.total - a.total);
-
-    const planes = ["Mensual", "Anual", "Personalizado"].filter((plan) =>
-    porPlan.some((p) => p.nombre === plan)
-    );
-
-    const porPais = Object.values(
-      clientesFiltrados.reduce((acc, c) => {
-        const pais = c.pais || "Sin país";
-        const plan = c.planNombre || c.plan || "Sin plan";
-
-        if (!acc[pais]) {
-          acc[pais] = {
-            pais,
-            total: 0,
-            activos: 0,
-            suspendidos: 0,
-            pruebas: 0,
-            mrr: 0,
-            planes: {},
-          };
-        }
-
-        acc[pais].total += 1;
-
-        if (!acc[pais].planes[plan]) {
-          acc[pais].planes[plan] = 0;
-        }
-
-        if (esActivo(c)) {
-          acc[pais].activos += 1;
-          acc[pais].planes[plan] += 1;
-          acc[pais].mrr += Number(c.planPrecio || c.mantenimientoMensual || 0);
-        }
-
-        if (esSuspendido(c)) acc[pais].suspendidos += 1;
-        if (esPrueba(c)) acc[pais].pruebas += 1;
-
-        return acc;
-      }, {})
-    ).sort((a, b) => b.total - a.total);
-
-    const uso = clientes
-      .filter((c) => (c.estado || "activo") === "activo")
-      .map((c) => ({
-        id: c.id,
-        nombre: c.nombre || "-",
-        plan: c.planNombre || c.plan || "-",
-        pais: c.pais || "-",
-        pedidos30: usoClientes[c.id]?.pedidosUltimos30 || 0,
-        ventas30: usoClientes[c.id]?.ventasUltimos30 || 0,
-
-        storage30:
-        usoClientes[c.id]?.storageUltimos30MB ||
-        c.storageUltimos30MB ||
-        0,
-
-        imagenesPedido30:
-        usoClientes[c.id]?.imagenesPedidoUltimos30 ||
-        c.imagenesPedidoUltimos30 ||
-        0,
-
-        lecturas30:
-        usoClientes[c.id]?.lecturasUltimos30 ||
-        c.lecturasUltimos30 ||
-        0,
-
-        escrituras30:
-        usoClientes[c.id]?.escriturasUltimos30 ||
-        c.escriturasUltimos30 ||
-        0,
-
-        pedidos: usoClientes[c.id]?.pedidos || 0,
-        ventas: usoClientes[c.id]?.ventas || 0,
-        ultimoUso: usoClientes[c.id]?.ultimoUso || "",
-        pagos: pagosPorCliente[c.id]?.cantidadPagos || 0,
-        totalPagado: pagosPorCliente[c.id]?.totalPagado || 0,
+    const metrics = buildSaasPanelMetrics(filteredClients, filteredMovements);
+    const activeClients = getActiveSaasClients(filteredClients);
+    const activeClientSet = new Set(activeClients);
+    const activeSubscriptions = groupActiveSubscriptionsByBillingCycle(filteredClients);
+    const activeClientsByCountry = groupActiveClientsByCountry(filteredClients);
+    const planCounts = Object.values(filteredClients.reduce((result, client) => {
+      const plan = resolveSaasPlanLabel(client);
+      if (!result[plan]) result[plan] = {plan, total: 0, active: 0, grace: 0, suspended: 0, trial: 0};
+      const group = classifySaasClient(client).group;
+      result[plan].total += 1;
+      if (group === "active" && activeClientSet.has(client)) result[plan].active += 1;
+      else if (group !== "active" && Object.prototype.hasOwnProperty.call(result[plan], group)) result[plan][group] += 1;
+      return result;
+    }, {})).sort((a, b) => b.total - a.total);
+    const latestPayments = filteredMovements
+      .filter((movement) => movement.anulado !== true && movement.estado !== "anulado" && movement.tipoMovimiento === "pago")
+      .sort((a, b) => (toDate(b.fechaPago)?.getTime() || 0) - (toDate(a.fechaPago)?.getTime() || 0))
+      .slice(0, 8);
+    const usage = filteredClients
+      .filter((client) => activeClientSet.has(client) || classifySaasClient(client).group === "grace")
+      .map((client) => ({
+        id: client.id,
+        name: client.nombre || client.nombreCliente || client.id,
+        plan: resolveSaasPlanLabel(client),
+        country: client.pais || "Sin país",
+        orders: usoClientes[client.id]?.pedidosUltimos30 || 0,
+        sales: usoClientes[client.id]?.ventasUltimos30 || 0,
+        lastUse: usoClientes[client.id]?.ultimoUso || "",
+        payments: pagosPorCliente[client.id]?.cantidadPagos || 0,
       }))
-      .sort((a, b) => {
-        if (!a.ultimoUso && !b.ultimoUso) return 0;
-        if (!a.ultimoUso) return 1;
-        if (!b.ultimoUso) return -1;
-        return b.ultimoUso.localeCompare(a.ultimoUso);
-      });
-
-      const deudaPorMonedaNormalizada = {
-        ARS: deudaPorMoneda.ARS || {
-            moneda: "ARS",
-            activos: 0,
-            inactivos: 0,
-            total: 0,
-        },
-        USD: deudaPorMoneda.USD || {
-            moneda: "USD",
-            activos: 0,
-            inactivos: 0,
-            total: 0,
-        },
-        };
-
-    return {
-      activos,
-      suspendidos,
-      pruebas,
-      cancelados,
-      mrr,
-      arr: mrr * 12,
-      pagosFiltrados,
-      totalCobrado,
-      mayorPago,
-      deudaActivos,
-    deudaInactivos,
-    clientesActivosConDeuda,
-    clientesInactivosConDeuda,
-    ultimosPagos,
-    deudaPorMoneda: deudaPorMonedaNormalizada,
-      porPlan,
-      porPais,
-      planes,
-      uso,
-    };
+      .sort((a, b) => String(b.lastUse).localeCompare(String(a.lastUse)));
+    return {...metrics, activeClients, activeSubscriptions, activeClientsByCountry, planCounts, latestPayments, usage};
   }, [clientes, movimientosSaas, usoClientes, pagosPorCliente, rango, desde, hasta]);
-
-  const totalEstado =
-    data.activos.length +
-    data.suspendidos.length +
-    data.pruebas.length +
-    data.cancelados.length;
-
-    const formatearMonedaPorCodigo = (valor, moneda = "ARS") => {
-    const codigo = moneda === "USD" ? "USD" : "ARS";
-
-    return new Intl.NumberFormat("es-AR", {
-        style: "currency",
-        currency: codigo,
-        minimumFractionDigits: codigo === "ARS" ? 0 : 2,
-    }).format(Number(valor || 0));
-    };
 
   return (
     <section className="saas-dark-dashboard">
       <header className="saas-dark-header">
         <div>
           <h2>Estadísticas SaaS</h2>
-          <p>Visión completa del negocio, clientes, pagos y uso real.</p>
+          <p>Métricas comerciales separadas por estado y moneda.</p>
         </div>
-
         <div className="saas-date-filter">
-          <select value={rango} onChange={(e) => setRango(e.target.value)}>
+          <select value={rango} onChange={(event) => setRango(event.target.value)}>
             <option value="general">General</option>
             <option value="7">Últimos 7 días</option>
             <option value="30">Últimos 30 días</option>
@@ -354,260 +113,93 @@ const ultimosPagos = pagosFiltrados
             <option value="anio">Este año</option>
             <option value="custom">Personalizado</option>
           </select>
-
-          {rango === "custom" && (
-            <>
-              <input type="date" value={desde} onChange={(e) => setDesde(e.target.value)} />
-              <input type="date" value={hasta} onChange={(e) => setHasta(e.target.value)} />
-            </>
-          )}
+          {rango === "custom" && <>
+            <input type="date" value={desde} onChange={(event) => setDesde(event.target.value)} />
+            <input type="date" value={hasta} onChange={(event) => setHasta(event.target.value)} />
+          </>}
         </div>
       </header>
 
       <div className="saas-neon-kpis">
-        <Kpi color="blue" label="Activos" value={data.activos.length} />
-        <Kpi color="red" label="Suspendidos" value={data.suspendidos.length} />
-        <Kpi color="yellow" label="Plan prueba 7 días" value={data.pruebas.length} />
-        <Kpi color="green" label="MRR activos mensuales" value={formatearMoneda(data.mrr)} />
-        <Kpi color="purple" label="ARR" value={formatearMoneda(data.arr)} />
-        <Kpi color="cyan" label="Pagos recibidos" value={data.pagosFiltrados.length} />
+        <Kpi color="blue" label="Clientes activos" value={data.activeClients.length} />
+        <Kpi color="green" label="Suscripciones mensuales" value={data.activeSubscriptions.monthly} />
+        <Kpi color="green" label="Suscripciones anuales" value={data.activeSubscriptions.annual} />
+        <Kpi color="cyan" label="En gracia" value={data.counts.grace} />
+        <Kpi color="red" label="Suspendidos recuperables" value={data.churn.risk + data.churn.recovery} />
+        <Kpi color="purple" label="No recuperados" value={data.counts.churn} />
+        <Kpi color="yellow" label="Pruebas" value={data.counts.trial} />
       </div>
 
       <div className="saas-dark-grid">
-        <Panel wide title="Clientes por plan">
-          <table className="saas-dark-table">
-            <thead>
-              <tr>
-                <th>Plan</th>
-                <th>Total</th>
-                <th>Activos</th>
-                <th>Suspendidos</th>
-                <th>Prueba</th>
-                <th>MRR</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.porPlan.map((p) => (
-                <tr key={p.nombre}>
-                  <td>{p.nombre}</td>
-                  <td>{p.total}</td>
-                  <td className="ok">{p.activos}</td>
-                  <td className="bad">{p.suspendidos}</td>
-                  <td className="warn">{p.pruebas}</td>
-                  <td>{formatearMoneda(p.mrr)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Panel>
-
-        <Panel title="Deuda de clientes">
-            <div className="saas-debt-chart">
-                <div
-                className="saas-debt-ring"
-                style={{
-                    background: `conic-gradient(
-                    #22c55e 0 ${
-                        data.deudaActivos + data.deudaInactivos > 0
-                        ? (data.deudaActivos /
-                            (data.deudaActivos + data.deudaInactivos)) *
-                            100
-                        : 50
-                    }%,
-                    #ef4444 0 100%
-                    )`,
-                }}
-                >
-                <div>
-                    <span>Total deuda</span>
-                    <strong>
-                    {Object.values(data.deudaPorMoneda).length} monedas
-                    </strong>
-                </div>
-                </div>
-
-          <div className="saas-debt-legend">
-            <div>
-                <span className="dot green"></span>
-                <p>Activos con deuda</p>
-                <strong>{data.clientesActivosConDeuda} clientes</strong>
-
-                <div className="saas-debt-currency-list">
-                {Object.values(data.deudaPorMoneda)
-                    .filter((m) => m.activos > 0)
-                    .map((m) => (
-                    <small key={`activos-${m.moneda}`}>
-                        {m.moneda}: {formatearMonedaPorCodigo(m.activos, m.moneda)}
-                    </small>
-                    ))}
-                </div>
-            </div>
-
-            <div>
-                <span className="dot red"></span>
-                <p>Inactivos / suspendidos con deuda</p>
-                <strong>{data.clientesInactivosConDeuda} clientes</strong>
-
-                <div className="saas-debt-currency-list">
-                {Object.values(data.deudaPorMoneda)
-                    .filter((m) => m.inactivos > 0)
-                    .map((m) => (
-                    <small key={`inactivos-${m.moneda}`}>
-                        {m.moneda}: {formatearMonedaPorCodigo(m.inactivos, m.moneda)}
-                    </small>
-                    ))}
-                </div>
-            </div>
-            </div>
-            </div>
-            </Panel>
-
-        <Panel title="Estado de clientes">
-          <div className="saas-ring-wrap">
-            <div
-              className="saas-ring"
-              style={{
-                background: `conic-gradient(
-                  #22c55e 0 ${(data.activos.length / Math.max(totalEstado, 1)) * 100}%,
-                  #ef4444 0 ${((data.activos.length + data.suspendidos.length) / Math.max(totalEstado, 1)) * 100}%,
-                  #facc15 0 ${((data.activos.length + data.suspendidos.length + data.pruebas.length) / Math.max(totalEstado, 1)) * 100}%,
-                  #64748b 0 100%
-                )`,
-              }}
-            >
-              <div>
-                <strong>{totalEstado}</strong>
-                <span>Total</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="saas-state-list">
-            <State label="Activos" value={data.activos.length} />
-            <State label="Suspendidos" value={data.suspendidos.length} />
-            <State label="Prueba" value={data.pruebas.length} />
-            <State label="Cancelados" value={data.cancelados.length} />
-          </div>
-        </Panel>
-
-        <Panel wide title="Clientes por país y plan activo">
+        <Panel title="Clientes activos por país">
           <div className="saas-country-grid">
             <table className="saas-dark-table">
-              <thead>
-                <tr>
-                  <th>País</th>
-                  <th>Total</th>
-                  <th>Activos</th>
-                  {data.planes.slice(0, 4).map((plan) => (
-                    <th key={plan}>{plan}</th>
-                  ))}
-                  <th>MRR</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.porPais.map((p) => (
-                  <tr key={p.pais}>
-                    <td>{p.pais}</td>
-                    <td>{p.total}</td>
-                    <td className="ok">{p.activos}</td>
-                    {data.planes.slice(0, 4).map((plan) => (
-                      <td key={plan}>{p.planes[plan] || 0}</td>
-                    ))}
-                    <td>{formatearMoneda(p.mrr)}</td>
-                  </tr>
-                ))}
-              </tbody>
+              <thead><tr><th>País</th><th>Clientes activos</th></tr></thead>
+              <tbody>{data.activeClientsByCountry.map((row) => (
+                <tr key={row.country}><td>{row.country}</td><td className="ok">{row.total}</td></tr>
+              ))}</tbody>
+            </table>
+            {data.activeClientsByCountry.length === 0 && <div className="saas-empty-state">No hay clientes activos.</div>}
+          </div>
+        </Panel>
+        <Panel wide title="MRR por moneda">
+          <div className="saas-currency-groups">
+            <CurrencyGroup title="MRR activo" values={data.mrr.active} />
+            <CurrencyGroup title="MRR en gracia" values={data.mrr.grace} />
+            <CurrencyGroup title="MRR suspendido recuperable" values={data.mrr.recoverable} />
+          </div>
+        </Panel>
+        {data.activeSubscriptions.withoutCycle > 0 && (
+          <Panel title="Suscripciones sin ciclo">
+            <State label="Activas sin ciclo confiable" value={data.activeSubscriptions.withoutCycle} />
+          </Panel>
+        )}
+        <Panel title="Cobrado por moneda">
+          <CurrencyGroup values={data.collected} empty="No hay cobros con moneda en el período." />
+          {data.paymentsWithoutCurrency > 0 && (
+            <p className="saas-data-note">{data.paymentsWithoutCurrency} pagos históricos sin moneda no se sumaron.</p>
+          )}
+        </Panel>
+        <Panel title="Suspensión y recuperación">
+          <State label="Riesgo · 0–30 días" value={data.churn.risk} />
+          <State label="Recuperación · 31–60 días" value={data.churn.recovery} />
+          <State label="No recuperado · más de 60 días" value={data.churn.not_recovered} />
+          <State label="Sin fecha confiable" value={data.churn.unclassified} />
+        </Panel>
+        <Panel title="Deuda por moneda">
+          <CurrencyGroup values={data.debt} empty="No hay deuda registrada." />
+        </Panel>
+        <Panel wide title="Clientes por plan">
+          <div className="saas-country-grid">
+            <table className="saas-dark-table">
+              <thead><tr><th>Plan</th><th>Total</th><th>Activos</th><th>Gracia</th><th>Suspendidos</th><th>Prueba</th></tr></thead>
+              <tbody>{data.planCounts.map((row) => (
+                <tr key={row.plan}><td>{row.plan}</td><td>{row.total}</td><td className="ok">{row.active}</td><td className="warn">{row.grace}</td><td className="bad">{row.suspended}</td><td>{row.trial}</td></tr>
+              ))}</tbody>
             </table>
           </div>
         </Panel>
-
-        <Panel title="Pagos registrados">
-          <div className="saas-payment-neon">
-            <strong>{formatearMoneda(data.totalCobrado)}</strong>
-            <span>Total cobrado</span>
-          </div>
-
-          <div className="saas-payment-stats">
-            <div>
-              <span>Pagos</span>
-              <strong>{data.pagosFiltrados.length}</strong>
-            </div>
-            <div>
-              <span>Promedio</span>
-              <strong>
-                {formatearMoneda(
-                  data.pagosFiltrados.length
-                    ? data.totalCobrado / data.pagosFiltrados.length
-                    : 0
-                )}
-              </strong>
-            </div>
-            <div>
-              <span>Mayor pago</span>
-              <strong>{formatearMoneda(data.mayorPago)}</strong>
-            </div>
+        <Panel title="Últimos pagos recibidos">
+          <div className="saas-last-payments">
+            {data.latestPayments.length === 0 && <div className="saas-empty-state">No hay pagos en este período.</div>}
+            {data.latestPayments.map((payment) => {
+              const currency = String(payment.currency || payment.moneda || "").toUpperCase();
+              return <div className="saas-last-payment-row" key={payment.id}>
+                <div><strong>{payment.clienteNombre || "Cliente SaaS"}</strong><span>{formatearFecha(payment.fechaPago)} · {payment.medioPago || "Sin medio"}</span></div>
+                <b>{currency ? formatSaasMoney(payment.monto, currency) : "Sin moneda"}</b>
+              </div>;
+            })}
           </div>
         </Panel>
-
-        <Panel title="Últimos pagos recibidos">
-            <div className="saas-last-payments">
-                {data.ultimosPagos.length === 0 && (
-                <div className="saas-empty-state">No hay pagos en este período.</div>
-                )}
-
-                {data.ultimosPagos.map((p) => (
-                <div className="saas-last-payment-row" key={p.id}>
-                    <div>
-                    <strong>
-                        {p.clienteSaasNombre ||
-                        p.clienteNombre ||
-                        p.nombreCliente ||
-                        p.clienteSaas?.nombre ||
-                        "Cliente SaaS"}
-                    </strong>
-                    <span>
-                        {formatearFecha(p.fechaPago)} · {p.medioPago || "Sin medio"}
-                    </span>
-                    </div>
-
-                    <b>{formatearMoneda(p.monto)}</b>
-                </div>
-                ))}
-            </div>
-            </Panel>
-
-            <Panel wide title="Últimos usos de la aplicación">
-                <div className="saas-usage-table-scroll">
-                <div className="saas-usage-head">
-                <span>Cliente</span>
-                <span>Pedidos 30d</span>
-                <span>Ventas 30d</span>
-                
-                <span>Imágenes 30d</span>
-                <span>Lecturas</span>
-                <span>Escrituras</span>
-                <span>Último uso</span>
-                </div>
-                
-
-            <div className="saas-usage-scroll">
-                {data.uso.map((u) => (
-                <div className="saas-usage-dark-row" key={u.id}>
-                <div>
-                    <strong>{u.nombre}</strong>
-                    <span>{u.plan} · {u.pais}</span>
-                </div>
-
-                <b>{u.pedidos30}</b>
-                <b>{u.ventas30}</b>
-                <b>{u.imagenesPedido30}</b>
-                <b>{u.lecturas30}</b>
-                <b>{u.escrituras30}</b>
-
-                <span>{formatearFecha(u.ultimoUso)}</span>
-                </div>
-            ))}
-          </div>
+        <Panel wide title="Uso reciente">
+          <div className="saas-usage-table-scroll">
+            <div className="saas-usage-head saas-usage-head-compact"><span>Cliente</span><span>Pedidos 30d</span><span>Ventas 30d</span><span>Pagos</span><span>Último uso</span></div>
+            <div className="saas-usage-scroll">{data.usage.map((client) => (
+              <div className="saas-usage-dark-row saas-usage-row-compact" key={client.id}>
+                <div className="saas-usage-client"><strong>{client.name}</strong><span>{client.plan} · {client.country}</span></div>
+                <b>{client.orders}</b><b>{client.sales}</b><b>{client.payments}</b><span className="saas-usage-date">{formatearFecha(client.lastUse)}</span>
+              </div>
+            ))}</div>
           </div>
         </Panel>
       </div>
@@ -615,29 +207,24 @@ const ultimosPagos = pagosFiltrados
   );
 }
 
-function Kpi({ label, value, color }) {
-  return (
-    <div className={`saas-neon-kpi ${color}`}>
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
-  );
+function CurrencyGroup({title, values, empty = "Sin valores relevantes."}) {
+  const rows = currencyRows(values);
+  return <div className="saas-currency-group">
+    {title && <h4>{title}</h4>}
+    {rows.length === 0 ? <span className="saas-empty-inline">{empty}</span> : rows.map(([currency, amount]) => (
+      <div className="saas-currency-row" key={currency}><span>{currency}</span><strong>{formatSaasMoney(amount, currency)}</strong></div>
+    ))}
+  </div>;
 }
 
-function Panel({ title, children, wide }) {
-  return (
-    <article className={wide ? "saas-dark-panel wide" : "saas-dark-panel"}>
-      <h3>{title}</h3>
-      {children}
-    </article>
-  );
+function Kpi({label, value, color}) {
+  return <div className={`saas-neon-kpi ${color}`}><span>{label}</span><strong>{value}</strong></div>;
 }
 
-function State({ label, value }) {
-  return (
-    <div className="saas-state-row">
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
-  );
+function Panel({title, children, wide}) {
+  return <article className={wide ? "saas-dark-panel wide" : "saas-dark-panel"}><h3>{title}</h3>{children}</article>;
+}
+
+function State({label, value}) {
+  return <div className="saas-state-row"><span>{label}</span><strong>{value}</strong></div>;
 }

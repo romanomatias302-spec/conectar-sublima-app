@@ -38,6 +38,7 @@ import { puedeHacer as puedeHacerPerfil } from "./utils/permisos";
 import ProveedoresPage from "./modulos/proveedores/ProveedoresPage";
 import ListasPreciosPage from "./modulos/listasPrecios/ListasPreciosPage";
 import { resolverVistaInicio } from "./modulos/inicio/inicioNavegacion";
+import { accountPaymentAction } from "./domain/saasPaymentProvider";
 
 
 
@@ -298,8 +299,11 @@ useEffect(() => {
            setClienteBloqueado({
               id: dataPerfil.clienteId,
               nombre: clienteSaasData.nombre || "",
-              pais: clienteSaasData.pais || "",
-              moneda: clienteSaasData.moneda || "",
+               pais: clienteSaasData.pais || "",
+               moneda: clienteSaasData.moneda || "",
+               billingProvider: clienteSaasData.billingProvider || "",
+               metodoCobro: clienteSaasData.metodoCobro || "manual",
+               hotmartSubscriptionId: clienteSaasData.hotmartSubscriptionId || "",
             });
 
               setPerfil(null);
@@ -634,7 +638,9 @@ irAVista("venta-detalle", {
 
     const puedePagarCuentaBloqueadaConMercadoPago =
       paisCuentaBloqueada === "argentina" &&
-      monedaCuentaBloqueada === "ARS";
+      monedaCuentaBloqueada === "ARS" &&
+      accountPaymentAction(clienteBloqueado).provider === "mercadopago";
+    const accionCuentaBloqueada = accountPaymentAction(clienteBloqueado || {});
 
     if (esRutaActivacion) {
       return <ActivarCuenta />;
@@ -677,7 +683,21 @@ if (mensajeBloqueo) {
       <div className="saas-bloqueo-card">
         <h2>Cuenta suspendida</h2>
 
-        {puedePagarCuentaBloqueadaConMercadoPago ? (
+        {accionCuentaBloqueada.provider === "hotmart" ? (
+          <>
+            <p>
+              Administrá el medio de pago de tu suscripción existente en Hotmart.
+              El acceso se reactivará cuando Hotmart confirme el pago.
+            </p>
+            <button
+              type="button"
+              className="saas-bloqueo-pagar"
+              onClick={() => window.location.assign(accionCuentaBloqueada.url)}
+            >
+              Administrar en Hotmart
+            </button>
+          </>
+        ) : puedePagarCuentaBloqueadaConMercadoPago ? (
           <>
             <p>
               Tu cuenta se encuentra suspendida. Podés regularizar el acceso
