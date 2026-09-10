@@ -61,10 +61,12 @@ diasCiclo: 7,
 
         plan: clienteEditando.plan || "instalacion",
         planNombre: clienteEditando.planNombre || clienteEditando.plan || "",
-        planPrecio: clienteEditando.planPrecio || clienteEditando.mantenimientoMensual || "",
+        planPrecio:
+          clienteEditando.planPrecio ??
+          clienteEditando.mantenimientoMensual ??
+          0,
         billingCurrency:
           clienteEditando.billingCurrency ||
-          clienteEditando.moneda ||
           "USD",
         frecuenciaCobro: clienteEditando.frecuenciaCobro || "mensual",
         diasCiclo: clienteEditando.diasCiclo || 30,
@@ -254,12 +256,29 @@ diasCiclo: 7,
     return;
   }
 
-  if (!formData.fechaAlta) {
-    alert("Ingresá la fecha de alta.");
+if (!formData.fechaAlta) {
+  alert("Ingresá la fecha de alta.");
+  return;
+}
+
+const configPlanActual = obtenerConfigPlan(formData.planNombre);
+const esPruebaGratisActual =
+  configPlanActual.frecuenciaCobro === "prueba";
+
+if (
+  !esPruebaGratisActual &&
+  Number(formData.planPrecio) === 0
+) {
+  const confirmarPrecioCero = window.confirm(
+    "El precio de facturación Zalfro quedará guardado en 0. ¿Querés continuar?"
+  );
+
+  if (!confirmarPrecioCero) {
     return;
   }
+}
 
-    try {
+try {
       setLoading(true);
 
     const configPlan = obtenerConfigPlan(formData.planNombre);

@@ -820,7 +820,7 @@ return (
                           <strong>
                             {formatearMoneda(
                               c.planPrecio || c.mantenimientoMensual || 0,
-                              c.billingCurrency || c.moneda || "ARS"
+                              c.billingCurrency || "USD"
                             )}
                           </strong>
                         </p>
@@ -829,7 +829,7 @@ return (
                           <strong>
                             {formatearMoneda(
                               c.saldoCuentaCorriente || 0,
-                              c.billingCurrency || c.moneda || "ARS"
+                              c.billingCurrency || "USD"
                             )}
                           </strong>
                         </p>
@@ -1390,12 +1390,22 @@ return (
             <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
               <div style={miniCard}>
                 <strong>Total cargos</strong>
-                <span>${resumenCuenta.cargos}</span>
+                <span>
+                  {formatearMoneda(
+                    resumenCuenta.cargos,
+                    clienteCuentaCorriente.billingCurrency || "USD"
+                  )}
+                </span>
               </div>
 
               <div style={miniCard}>
                 <strong>Total pagos</strong>
-                <span>${resumenCuenta.pagos}</span>
+                <span>
+                  {formatearMoneda(
+                    resumenCuenta.pagos,
+                    clienteCuentaCorriente.billingCurrency || "USD"
+                  )}
+                </span>
               </div>
 
               <div style={miniCard}>
@@ -1411,11 +1421,20 @@ return (
                     fontWeight: 800,
                   }}
                 >
-                  {resumenCuenta.saldo > 0
-                    ? `Debe $${resumenCuenta.saldo}`
-                    : resumenCuenta.saldo < 0
-                    ? `A favor $${Math.abs(resumenCuenta.saldo)}`
-                    : "$0"}
+                {resumenCuenta.saldo > 0
+                  ? `Debe ${formatearMoneda(
+                      resumenCuenta.saldo,
+                      clienteCuentaCorriente.billingCurrency || "USD"
+                    )}`
+                  : resumenCuenta.saldo < 0
+                  ? `A favor ${formatearMoneda(
+                      Math.abs(resumenCuenta.saldo),
+                      clienteCuentaCorriente.billingCurrency || "USD"
+                    )}`
+                  : formatearMoneda(
+                      0,
+                      clienteCuentaCorriente.billingCurrency || "USD"
+                    )}
                 </span>
               </div>
             </div>
@@ -1439,9 +1458,24 @@ return (
                     {resumenPorPeriodo.map((p) => (
                       <tr key={p.periodo}>
                         <td style={td}>{p.periodo}</td>
-                        <td style={td}>{formatearMoneda(p.cargos)}</td>
-                        <td style={td}>{formatearMoneda(p.pagos)}</td>
-                        <td style={td}>{formatearMoneda(p.saldo)}</td>
+                        <td style={td}>
+                          {formatearMoneda(
+                            p.cargos,
+                            clienteCuentaCorriente.billingCurrency || "USD"
+                          )}
+                        </td>
+                        <td style={td}>
+                          {formatearMoneda(
+                            p.pagos,
+                            clienteCuentaCorriente.billingCurrency || "USD"
+                          )}
+                        </td>
+                        <td style={td}>
+                          {formatearMoneda(
+                            p.saldo,
+                            clienteCuentaCorriente.billingCurrency || "USD"
+                          )}
+                        </td>
                         <td style={td}>
                           <strong
                             style={{
@@ -1486,7 +1520,14 @@ return (
                     <td style={td}>{p.tipoMovimiento || "pago"}</td>
                     <td style={td}>{p.concepto || "-"}</td>
                     <td style={td}>{p.medioPago || "-"}</td>
-                    <td style={td}>{formatearMoneda(p.monto)}</td>
+                    <td style={td}>
+                      {formatearMoneda(
+                        p.monto,
+                        p.billingCurrency ||
+                          clienteCuentaCorriente.billingCurrency ||
+                          "USD"
+                      )}
+                    </td>
                     <td style={td}>
                       {p.anulado
                         ? `ANULADO: ${p.motivoAnulacion || "-"}`
