@@ -11,7 +11,7 @@ function clientVariables(client = {}, overrides = {}) {
     empresa: client.nombre || client.empresa || "",
     plan: client.planNombre || client.plan || "",
     billingCycle: client.billingCycle || client.frecuenciaCobro || "",
-    currency: client.currency || client.moneda || "",
+    currency: client.billingCurrency || client.currency || "USD",
     price: client.price ?? client.planPrecio ?? client.mantenimientoMensual,
     ...overrides,
   };

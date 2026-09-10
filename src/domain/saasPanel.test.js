@@ -12,9 +12,20 @@ import {
   isInteractiveSaasTarget,
   matchesSaasClientSearch,
   refreshAfterSaasMutation,
+  resolveSaasCurrency,
+  resolveSaasMovementCurrency,
   resolveSaasPlanLabel,
   syncSaasTabFromLocation,
 } from "./saasPanel";
+
+test("moneda comercial del cliente nunca cae en moneda operativa", () => {
+  expect(resolveSaasCurrency({
+    billingCurrency: "USD", currency: "ARS", moneda: "MXN",
+  }, "USD")).toBe("USD");
+  expect(resolveSaasCurrency({currency: "ARS", moneda: "MXN"}, "USD")).toBe("ARS");
+  expect(resolveSaasCurrency({moneda: "MXN"}, "USD")).toBe("USD");
+  expect(resolveSaasMovementCurrency({moneda: "PEN"})).toBe("PEN");
+});
 
 test("MRR y cobrado nunca mezclan monedas y preservan monedas minoritarias", () => {
   const clients = [
@@ -115,7 +126,7 @@ test("alias históricos de estado y cargos únicos no distorsionan el MRR", () =
   ];
   const data = buildSaasPanelMetrics(clients, []);
   expect(data.counts.grace).toBe(1);
-  expect(data.mrr.grace).toEqual({ARS: 120});
+  expect(data.mrr.grace).toEqual({USD: 120});
   expect(data.mrr.active).toEqual({});
 });
 

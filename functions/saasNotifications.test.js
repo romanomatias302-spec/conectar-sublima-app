@@ -7,7 +7,7 @@ const {
   buildSaasOutboxRecord,
   calculateNotificationRetry,
 } = require("./saasNotificationCore");
-const {createSaasNotificationHooks} = require("./saasNotificationHooks");
+const {clientVariables, createSaasNotificationHooks} = require("./saasNotificationHooks");
 const {
   enqueueSaasNotification,
   SAAS_NOTIFICATION_OUTBOX,
@@ -44,6 +44,14 @@ const activeClient = {
   currency: "ARS",
   price: 39000,
 };
+
+test("notificaciones resuelven billing sin usar moneda operativa", () => {
+  assert.equal(clientVariables({
+    billingCurrency: "USD", currency: "ARS", moneda: "MXN",
+  }).currency, "USD");
+  assert.equal(clientVariables({currency: "ARS", moneda: "MXN"}).currency, "ARS");
+  assert.equal(clientVariables({moneda: "MXN"}).currency, "USD");
+});
 
 test("el mismo evento crea una sola notificación", async () => {
   const db = fakeFirestore();

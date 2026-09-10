@@ -7,7 +7,6 @@ import {
   priceAfterCurrencyChange,
   priceForPlan,
   rehydrateSaasClient,
-  resolveCurrencyAfterCountryChange,
   resolveSaasEntitlements,
   SUPPORTED_CURRENCIES,
   validateSaasSubscription,
@@ -30,10 +29,9 @@ telefono: "",
 plan: "Prueba gratis 7 días",
 planNombre: "Prueba gratis 7 días",
 planPrecio: 0,
-moneda: "ARS",
 planId: "trial",
 billingCycle: "monthly",
-currency: "ARS",
+currency: "USD",
 price: 0,
 subscriptionStatus: "trial",
 currencyExplicit: false,
@@ -81,9 +79,15 @@ diasCiclo: 7,
 
         plan: clienteEditando.plan || "instalacion",
         planNombre: clienteEditando.planNombre || clienteEditando.plan || "",
-        planPrecio: clienteEditando.planPrecio || clienteEditando.mantenimientoMensual || "",
-        moneda: clienteEditando.moneda || "",
+        planPrecio:
+          clienteEditando.planPrecio ??
+          clienteEditando.mantenimientoMensual ??
+          0,
         ...nuevoModelo,
+        currency:
+          clienteEditando.billingCurrency ||
+          clienteEditando.currency ||
+          "USD",
         currencyExplicit: true,
         frecuenciaCobro: clienteEditando.frecuenciaCobro || "mensual",
         diasCiclo: clienteEditando.diasCiclo || 30,
@@ -223,28 +227,21 @@ diasCiclo: 7,
       }
     }
 
-    if (name === "currency") {
-      nuevoForm.currencyExplicit = true;
-      nuevoForm.moneda = value;
-      const nextPrice = priceAfterCurrencyChange({planId: nuevoForm.planId, currency: value, billingCycle: nuevoForm.billingCycle, currentPrice: prev.price});
-      nuevoForm.price = nextPrice;
-      nuevoForm.planPrecio = nextPrice;
-    }
-
-    if (name === "pais") {
-      const suggested = resolveCurrencyAfterCountryChange({
-        country: value,
-        currentCurrency: prev.currency,
-        currencyExplicit: prev.currencyExplicit,
-        isNew: !clienteEditando,
-      });
-      nuevoForm.currency = suggested;
-      nuevoForm.moneda = suggested;
-      if (suggested !== prev.currency) {
-        const nextPrice = priceAfterCurrencyChange({planId: nuevoForm.planId, currency: suggested, billingCycle: nuevoForm.billingCycle, currentPrice: prev.price});
+      if (name === "currency") {
+        nuevoForm.currencyExplicit = true;
+        const nextPrice = priceAfterCurrencyChange({
+          planId: nuevoForm.planId,
+          currency: value,
+          billingCycle: nuevoForm.billingCycle,
+          currentPrice: prev.price,
+        });
         nuevoForm.price = nextPrice;
         nuevoForm.planPrecio = nextPrice;
       }
+
+    if (name === "pais") {
+      // El país pertenece a los datos del cliente.
+      // No modifica la moneda de facturación Zalfro.
     }
 
     if (name === "price") {
@@ -325,6 +322,19 @@ diasCiclo: 7,
     return;
   }
 
+  if (
+    formData.planId !== "trial" &&
+    Number(formData.price) === 0
+  ) {
+    const confirmarPrecioCero = window.confirm(
+      "El precio de facturación Zalfro quedará guardado en 0. ¿Querés continuar?"
+    );
+
+    if (!confirmarPrecioCero) {
+      return;
+    }
+  }
+
     try {
       setLoading(true);
 
@@ -359,6 +369,7 @@ diasCiclo: 7,
 
     const formDataPersistible = { ...formData };
     delete formDataPersistible.currencyExplicit;
+    delete formDataPersistible.moneda;
     const estadoSuscripcionLegacy = ({
       trial: "prueba", active: "activa", past_due: "gracia",
       suspended: "suspendida", cancelled: "cancelado",
@@ -369,6 +380,7 @@ diasCiclo: 7,
     planId: resolved.isLegacy ? "legacy" : formData.planId,
     billingCycle: formData.billingCycle,
     currency: formData.currency,
+    billingCurrency: formData.currency,
     price: precioFinal,
     subscriptionStatus: formData.subscriptionStatus,
     billingAnchorDate,
@@ -379,9 +391,8 @@ diasCiclo: 7,
     frecuenciaCobro: configPlan.frecuenciaCobro,
     diasCiclo: configPlan.diasCiclo,
 
-      mantenimientoMensual: precioFinal,
-      planPrecio: precioFinal,
-      moneda: formData.currency,
+    mantenimientoMensual: precioFinal,
+    planPrecio: precioFinal,
 
       fechaProximoCargo: fechas.fechaProximoCargo,
       fechaVencimiento: fechas.fechaVencimiento,
@@ -500,7 +511,7 @@ diasCiclo: 7,
       </div>
 
       <div style={campo}>
-        <label style={label}>Moneda</label>
+        <label style={label}>Moneda de facturación Zalfro</label>
         <select
           name="currency"
           value={formData.currency}

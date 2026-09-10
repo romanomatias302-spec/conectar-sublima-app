@@ -176,6 +176,8 @@ test('la regla collectionGroup no amplía permisos de escritura', async () => {
 test('admin tenant no puede alterar plan, precio ni estado comercial SaaS', async () => {
   const ref = doc(authenticatedDb('admin-a'), 'clientes-saas', TENANT_A);
   await assertFails(updateDoc(ref, {planId: 'empresa', price: 1}));
+  await assertFails(updateDoc(ref, {billingCurrency: 'ARS'}));
+  await assertFails(updateDoc(ref, {currency: 'ARS'}));
   await assertFails(updateDoc(ref, {subscriptionStatus: 'active'}));
 });
 

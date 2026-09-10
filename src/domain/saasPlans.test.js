@@ -23,29 +23,32 @@ test.each([["Mensual", "monthly"], ["Anual", "annual"]])("histórico %s resuelve
   expect(resolveSaasEntitlements({ plan, planPrecio: 100 })).toMatchObject({ planId: "legacy", billingCycle: cycle, isLegacy: true, unlimitedUsers: true, unlimitedBranches: true });
 });
 
-test.each([
-  ["México", "USD"], ["México", "MXN"], ["Colombia", "USD"], ["Colombia", "COP"],
-  ["Perú", "PEN"], ["Chile", "CLP"], ["Argentina", "USD"], ["Argentina", "ARS"],
-])("rehidratación preserva %s + %s", (pais, currency) => {
-  expect(rehydrateSaasClient({ pais, moneda: currency, plan: "Mensual" }).currency).toBe(currency);
+test("rehidratación separa moneda operativa de facturación", () => {
+  expect(rehydrateSaasClient({
+    plan: "Mensual", billingCurrency: "USD", currency: "ARS", moneda: "MXN",
+  })).toMatchObject({planId: "legacy", currency: "USD"});
+  expect(rehydrateSaasClient({
+    plan: "Mensual", currency: "ARS", moneda: "MXN",
+  }).currency).toBe("ARS");
+  expect(rehydrateSaasClient({
+    plan: "Mensual", moneda: "MXN",
+  }).currency).toBe("USD");
 });
 
-test.each(["MXN", "COP"])("legacy %s abre correctamente", (currency) => {
-  expect(rehydrateSaasClient({pais: "Otro", plan: "Mensual", moneda: currency})).toMatchObject({planId: "legacy", currency});
-});
-
-test("legacy sin moneda permanece sin moneda", () => {
-  expect(rehydrateSaasClient({pais: "Colombia", plan: "Anual"}).currency).toBe("");
-});
-
-test("cambiar país no pisa una moneda explícita y solo sugiere en altas", () => {
+test("cambiar país nunca modifica la moneda de billing", () => {
   expect(resolveCurrencyAfterCountryChange({country: "Colombia", currentCurrency: "USD", currencyExplicit: true, isNew: true})).toBe("USD");
   expect(resolveCurrencyAfterCountryChange({country: "Colombia", currentCurrency: "", currencyExplicit: false, isNew: false})).toBe("");
-  expect(resolveCurrencyAfterCountryChange({country: "Colombia", currentCurrency: "", currencyExplicit: false, isNew: true})).toBe("COP");
+  expect(resolveCurrencyAfterCountryChange({country: "Colombia", currentCurrency: "", currencyExplicit: false, isNew: true})).toBe("USD");
 });
 
-test.each([undefined, null, "", 0, -1, Number.NaN])("plan pago rechaza precio %p", (price) => {
+test.each([undefined, null, "", -1, Number.NaN])("plan pago rechaza precio %p", (price) => {
   expect(validateSaasSubscription({ planId: "start", billingCycle: "monthly", currency: "ARS", price }).valid).toBe(false);
+});
+
+test("plan pago permite precio cero", () => {
+  expect(validateSaasSubscription({
+    planId: "start", billingCycle: "monthly", currency: "USD", price: 0,
+  }).valid).toBe(true);
 });
 
 test("trial permite precio cero y los precios mensuales están versionados", () => {

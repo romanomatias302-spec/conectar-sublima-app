@@ -182,6 +182,7 @@ function createHotmartFirestoreRepository({
             clienteNombre: tenant.nombre || "",
             tipoMovimiento: "cargo",
             monto: event.amount,
+            billingCurrency: event.currency,
             moneda: event.currency,
             currency: event.currency,
             fechaPago: formatDate(toUtcDate(event.occurredAt)),
@@ -206,6 +207,7 @@ function createHotmartFirestoreRepository({
           clienteNombre: tenant.nombre || "",
           tipoMovimiento: "pago",
           monto: event.amount,
+          billingCurrency: event.currency,
           moneda: event.currency,
           currency: event.currency,
           fechaPago: formatDate(toUtcDate(event.occurredAt)),
@@ -241,8 +243,8 @@ function createHotmartFirestoreRepository({
           planNombre: event.planName,
           billingCycle: event.billingCycle,
           frecuenciaCobro: event.billingCycle === "annual" ? "anual" : "mensual",
+          billingCurrency: event.currency,
           currency: event.currency,
-          moneda: event.currency,
           price: event.amount,
           planPrecio: event.amount,
           ultimoPago: payment.fechaPago,
@@ -294,7 +296,7 @@ function createHotmartFirestoreRepository({
           id: event.transactionId,
           periodKey: providerPeriodKey(event),
           amount: balance,
-          currency: client?.currency || client?.moneda,
+          currency: client?.billingCurrency || client?.currency || "USD",
           dueDate: client?.fechaVencimiento,
         },
         pastDue: balance > 0,
@@ -323,14 +325,17 @@ function createHotmartFirestoreRepository({
           return {duplicate: true, reversalId: reversalRef.id};
         }
         const payment = paymentSnapshot.data();
+        const paymentCurrency = payment.billingCurrency ||
+          payment.currency || payment.moneda;
         const timestamp = FieldValue.serverTimestamp();
         transaction.create(reversalRef, {
           clienteSaasId: tenant.id,
           clienteNombre: tenant.nombre || "",
           tipoMovimiento: "ajuste",
           monto: Number(payment.monto || 0),
-          moneda: payment.currency || payment.moneda,
-          currency: payment.currency || payment.moneda,
+          billingCurrency: paymentCurrency,
+          moneda: paymentCurrency,
+          currency: paymentCurrency,
           fechaPago: formatDate(toUtcDate(event.occurredAt || new Date())),
           concepto: event.action === "PAYMENT_CHARGEBACK" ? "chargeback" : "reembolso",
           periodoFacturado: payment.periodoFacturado,

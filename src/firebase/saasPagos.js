@@ -42,26 +42,33 @@ export async function registrarMovimientoSaas({
     ? periodoFacturado || recurringSaasPeriodKey(clienteSaas, fechaPago)
     : periodoFacturado;
   if (esCargoRecurrente && !periodoRecurrente) throw new Error("El cargo recurrente requiere un período de facturación válido.");
-  const currency = String(clienteSaas.currency || clienteSaas.moneda || "").trim().toUpperCase();
-  if (tipoMovimiento === "cargo" && !currency) throw new Error("El cargo recurrente requiere una moneda.");
+  const billingCurrency = String(
+    clienteSaas.billingCurrency ||
+    clienteSaas.currency ||
+    "USD"
+  ).trim().toUpperCase();
+  if (tipoMovimiento === "cargo" && !billingCurrency) {
+    throw new Error("El cargo recurrente requiere una moneda.");
+  }
 
-const movimiento = {
-  clienteSaasId: clienteSaas.id,
-  clienteNombre: clienteSaas.nombre || "",
-  tipoMovimiento,
-  monto: Number(monto || 0),
-  moneda: currency,
-  currency,
-  fechaPago,
-  medioPago,
-  concepto,
-  periodoFacturado: periodoRecurrente,
-  observacion,
-  anulado: false,
-  estado: "activo",
-  createdAt: serverTimestamp(),
-  updatedAt: serverTimestamp(),
-};
+  const movimiento = {
+    clienteSaasId: clienteSaas.id,
+    clienteNombre: clienteSaas.nombre || "",
+    tipoMovimiento,
+    monto: Number(monto || 0),
+    billingCurrency,
+    currency: billingCurrency,
+    moneda: billingCurrency,
+    fechaPago,
+    medioPago,
+    concepto,
+    periodoFacturado: periodoRecurrente,
+    observacion,
+    anulado: false,
+    estado: "activo",
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  };
 
 if (esCargoRecurrente) {
   const cargoRef = doc(db, "saas_pagos", deterministicSaasChargeId(clienteSaas.id, periodoRecurrente));

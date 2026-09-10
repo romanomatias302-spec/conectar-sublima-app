@@ -41,7 +41,7 @@ test("separa adopción de campos nuevos y monedas llamativas", () => {
   ]);
   assert.deepEqual([result.I_ADOPCION_CAMPOS_NUEVOS.completos, result.I_ADOPCION_CAMPOS_NUEVOS.parciales, result.I_ADOPCION_CAMPOS_NUEVOS.soloHistoricos], [1, 1, 1]);
   assert.equal(result.H_COMBINACIONES_MONEDA.find((row) => row.clienteId === "parcial").clasificacion, "POSIBLE_ELECCION_EXPLICITA");
-  assert.equal(result.H_COMBINACIONES_MONEDA.find((row) => row.clienteId === "historico").clasificacion, "REQUIERE_REVISION");
+  assert.equal(result.H_COMBINACIONES_MONEDA.some((row) => row.clienteId === "historico"), false);
 });
 
 test("distribuye suspendidos por antigüedad usando fecha confiable", () => {

@@ -6,6 +6,7 @@ import {
   getActiveSaasClients,
   groupActiveClientsByCountry,
   groupActiveSubscriptionsByBillingCycle,
+  resolveSaasMovementCurrency,
   resolveSaasPlanLabel,
 } from "../../domain/saasPanel";
 
@@ -183,7 +184,7 @@ export default function DuenoSaasEstadisticas({
           <div className="saas-last-payments">
             {data.latestPayments.length === 0 && <div className="saas-empty-state">No hay pagos en este período.</div>}
             {data.latestPayments.map((payment) => {
-              const currency = String(payment.currency || payment.moneda || "").toUpperCase();
+              const currency = resolveSaasMovementCurrency(payment);
               return <div className="saas-last-payment-row" key={payment.id}>
                 <div><strong>{payment.clienteNombre || "Cliente SaaS"}</strong><span>{formatearFecha(payment.fechaPago)} · {payment.medioPago || "Sin medio"}</span></div>
                 <b>{currency ? formatSaasMoney(payment.monto, currency) : "Sin moneda"}</b>

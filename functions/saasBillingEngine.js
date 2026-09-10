@@ -106,6 +106,7 @@ function evaluateBillingCandidate(client = {}, now = new Date()) {
   if (status === "past_due" || Number(client.saldoCuentaCorriente || 0) > 0) return {action: "SKIP", code: "OUTSTANDING_DEBT_SKIP"};
   const validation = validateBillableClient(client);
   if (!validation.valid) return {action: "ERROR", code: "INVALID_PAID_SUBSCRIPTION", fields: validation.errors};
+  if (validation.price === 0) return {action: "SKIP", code: "ZERO_PRICE_SKIP"};
   const period = calculateBillingPeriod(client, now);
   if (!period.valid) return {action: "ERROR", code: period.code};
   if (!period.dueForEmission) return {action: "SKIP", code: "NOT_DUE", period};
@@ -148,6 +149,7 @@ async function createRecurringChargeTransaction({db, clientRef, chargeRef, expec
     transaction.create(chargeRef, {
       ...movement,
       monto: evaluation.amount,
+      billingCurrency: evaluation.currency,
       moneda: evaluation.currency,
       currency: evaluation.currency,
     });

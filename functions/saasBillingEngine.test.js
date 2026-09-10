@@ -47,9 +47,9 @@ test("legacy Mensual y Anual históricos siguen facturando", () => {
   assert.equal(evaluateBillingCandidate({...base, plan: "Anual", frecuenciaCobro: "anual", fechaProximoCargo: "2027-08-01"}, new Date("2027-07-22T00:00:00Z")).period.cycle, "annual");
 });
 
-test("precio o moneda inválidos no generan cargo", () => {
-  assert.equal(evaluateBillingCandidate({...activeMonthly, price: 0}, new Date("2026-08-22T00:00:00Z")).code, "INVALID_PAID_SUBSCRIPTION");
-  assert.equal(evaluateBillingCandidate({...activeMonthly, currency: ""}, new Date("2026-08-22T00:00:00Z")).code, "INVALID_PAID_SUBSCRIPTION");
+test("precio cero se omite sin crear cargo y precio inválido genera error", () => {
+  assert.equal(evaluateBillingCandidate({...activeMonthly, price: 0}, new Date("2026-08-22T00:00:00Z")).code, "ZERO_PRICE_SKIP");
+  assert.equal(evaluateBillingCandidate({...activeMonthly, price: -1}, new Date("2026-08-22T00:00:00Z")).code, "INVALID_PAID_SUBSCRIPTION");
 });
 
 test("deuda saldada reactiva y deuda parcial no", () => {

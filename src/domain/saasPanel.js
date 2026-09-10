@@ -18,9 +18,20 @@ function asDate(value) {
   return raw instanceof Date && !Number.isNaN(raw.getTime()) ? raw : null;
 }
 
-export function resolveSaasCurrency(record = {}) {
-  const currency = String(record.currency || record.moneda || "").trim().toUpperCase();
+export function resolveSaasCurrency(record = {}, fallback = "") {
+  const currency = String(
+    record.billingCurrency ||
+    record.currency ||
+    fallback ||
+    ""
+  ).trim().toUpperCase();
+
   return currency || "";
+}
+
+export function resolveSaasMovementCurrency(record = {}) {
+  return resolveSaasCurrency(record) ||
+    String(record.moneda || "").trim().toUpperCase();
 }
 
 export function resolveSaasPrice(client = {}) {
@@ -175,7 +186,7 @@ export function buildSaasPanelMetrics(clients = [], movements = [], now = new Da
     const classification = classifySaasClient(client, now);
     counts[classification.group] = (counts[classification.group] || 0) + 1;
     if (classification.churn) churn[classification.churn] += 1;
-    const currency = resolveSaasCurrency(client);
+    const currency = resolveSaasCurrency(client, "USD");
     const monthly = recurringMonthlyValue(client);
     if (classification.group === "active") addCurrency(mrr.active, currency, monthly);
     if (classification.group === "grace") addCurrency(mrr.grace, currency, monthly);
@@ -192,7 +203,7 @@ export function buildSaasPanelMetrics(clients = [], movements = [], now = new Da
   for (const movement of movements) {
     if (movement.anulado === true || movement.estado === "anulado" || movement.tipoMovimiento !== "pago") continue;
     activePayments += 1;
-    const currency = resolveSaasCurrency(movement);
+    const currency = resolveSaasMovementCurrency(movement);
     if (!currency) {
       paymentsWithoutCurrency += 1;
       continue;
@@ -228,7 +239,13 @@ export function filterSaasClients(clients = [], filters = {}, now = new Date()) 
     }
     if (filters.plan && filters.plan !== "todos" && resolveSaasPlanLabel(client) !== filters.plan) return false;
     if (filters.country && filters.country !== "todos" && String(client.pais || "") !== filters.country) return false;
-    if (filters.currency && filters.currency !== "todos" && resolveSaasCurrency(client) !== filters.currency) return false;
+    if (
+      filters.currency &&
+      filters.currency !== "todos" &&
+      resolveSaasCurrency(client, "USD") !== filters.currency
+    ) {
+      return false;
+    }
     return true;
   });
 }

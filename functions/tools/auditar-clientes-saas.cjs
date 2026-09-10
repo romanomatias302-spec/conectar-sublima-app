@@ -60,6 +60,7 @@ function classifySpecial(row) {
 }
 
 function classifyCurrency(row) {
+  if (row.currencySource === "default") return null;
   const expected = {argentina: "ARS", mexico: "MXN", colombia: "COP", peru: "PEN", chile: "CLP", "estados unidos": "USD"}[normalizeKey(row.country)];
   if (!expected || row.currency === "(SIN MONEDA)" || row.currency === expected) return null;
   return row.currency === "USD" ? "POSIBLE_ELECCION_EXPLICITA" : "REQUIERE_REVISION";
@@ -69,7 +70,11 @@ function classifyClient(id, data = {}) {
   const historicalPlan = text(data.planNombre || data.plan, "");
   const plan = text(data.planId || historicalPlan, "(sin plan)");
   const cycle = text(data.billingCycle || data.frecuenciaCobro, "(sin ciclo)");
-  const currency = text(data.currency || data.moneda, "(sin moneda)").toUpperCase();
+  const explicitCurrency = data.billingCurrency || data.currency;
+  const currency = text(
+      explicitCurrency || "USD",
+      "USD",
+  ).toUpperCase();
   const rawPrice = data.price ?? data.planPrecio ?? data.mantenimientoMensual;
   const priceClass = classifyPrice(rawPrice);
   const price = ["cero", "positivo", "negativo"].includes(priceClass) ? Number(rawPrice) : null;
@@ -78,6 +83,7 @@ function classifyClient(id, data = {}) {
   const newFields = NEW_FIELDS.filter((field) => hasValue(data, field));
   const row = {
     id, name: text(data.nombre || data.nombreCliente, "(sin nombre)"), plan, historicalPlan, cycle, currency,
+    currencySource: explicitCurrency ? "explicit" : "default",
     rawPrice, price, priceClass, status, country: text(data.pais, "(sin país)"),
     legacy: ["mensual", "anual"].includes(legacyPlan) && !hasValue(data, "planId"), newFields,
     newModel: newFields.length === NEW_FIELDS.length ? "COMPLETO" : newFields.length ? "PARCIAL" : "SOLO_HISTORICO",

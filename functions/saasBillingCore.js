@@ -27,13 +27,23 @@ function isPaidSubscription(client = {}) {
 function validateBillableClient(client = {}) {
   if (!isPaidSubscription(client)) return {valid: true, trial: isTrialClient(client), errors: []};
   const errors = [];
-  const price = Number(client.price ?? client.planPrecio ?? client.mantenimientoMensual);
-  const currency = String(client.currency || client.moneda || "").trim().toUpperCase();
+  const rawPrice = client.price ??
+    client.planPrecio ??
+    client.mantenimientoMensual;
+  const price = Number(rawPrice);
+
+  const currency = String(
+    client.billingCurrency ||
+    client.currency ||
+    "USD"
+  ).trim().toUpperCase();
   const cycle = String(client.billingCycle || client.frecuenciaCobro || "").toLowerCase();
   const legacyPlan = String(client.planNombre || client.plan || "").trim().toLowerCase();
   if (client.planId && !PAID_PLAN_IDS.has(String(client.planId).toLowerCase())) errors.push("INVALID_PLAN");
   if (!client.planId && !legacyPlan) errors.push("MISSING_PLAN");
-  if (!Number.isFinite(price) || price <= 0) errors.push("INVALID_PRICE");
+  if (rawPrice === "" || !Number.isFinite(price) || price < 0) {
+    errors.push("INVALID_PRICE");
+  }
   if (!currency) errors.push("MISSING_CURRENCY");
   else if (!SUPPORTED_CURRENCY_SET.has(currency)) errors.push("INVALID_CURRENCY");
   if (!cycle) errors.push("MISSING_BILLING_CYCLE");

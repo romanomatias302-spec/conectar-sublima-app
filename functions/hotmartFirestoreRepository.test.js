@@ -119,6 +119,7 @@ test("pago aprobado crea cargo y pago determinísticos una sola vez", async () =
     planId: "start",
     billingCycle: "monthly",
     currency: "ARS",
+    moneda: "MXN",
   };
   const {docs, repository} = createRepository({
     "clientes-saas/tenant-1": {...tenant},
@@ -135,6 +136,11 @@ test("pago aprobado crea cargo y pago determinísticos una sola vez", async () =
   assert.equal(payment.providerEventId, "event-1");
   assert.equal(payment.monto, 100);
   assert.equal(payment.currency, "ARS");
+  assert.equal(payment.billingCurrency, "ARS");
+  const updatedTenant = docs.get("clientes-saas/tenant-1");
+  assert.equal(updatedTenant.billingCurrency, "ARS");
+  assert.equal(updatedTenant.currency, "ARS");
+  assert.equal(updatedTenant.moneda, "MXN");
   assert.equal([...docs.keys()].filter((key) => key.startsWith("saas_pagos/")).length, 2);
 });
 

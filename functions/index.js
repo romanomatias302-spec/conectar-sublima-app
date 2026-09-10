@@ -435,6 +435,7 @@ if (yaExisteCargoActivo) {
       clienteNombre: cliente.nombre || "",
       tipoMovimiento: "cargo",
       monto,
+      billingCurrency: evaluacion.currency,
       moneda: evaluacion.currency,
       currency: evaluacion.currency,
       fechaPago: period.issueDate,

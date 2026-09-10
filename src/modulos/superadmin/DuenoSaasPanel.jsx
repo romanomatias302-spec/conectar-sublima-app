@@ -32,6 +32,7 @@ import {
   isInteractiveSaasTarget,
   refreshAfterSaasMutation,
   resolveSaasCurrency,
+  resolveSaasMovementCurrency,
   resolveSaasPlanLabel,
   resolveSaasPrice,
   syncSaasTabFromLocation,
@@ -158,11 +159,14 @@ const obtenerTimestampCliente = (c) => {
   return isNaN(fecha.getTime()) ? 0 : fecha.getTime();
 };
 
-  const formatearMoneda = (valor) => {
+const formatearMoneda = (valor, moneda = "USD") => {
+  const codigo = String(moneda || "USD").toUpperCase();
+
   return new Intl.NumberFormat("es-AR", {
     style: "currency",
-    currency: "ARS",
-    minimumFractionDigits: 2,
+    currency: codigo,
+    minimumFractionDigits: codigo === "ARS" ? 0 : 2,
+    maximumFractionDigits: 2,
   }).format(Number(valor || 0));
 };
 
@@ -483,7 +487,13 @@ const resumenDashboard = {
 
 const planesFiltro = [...new Set(clientes.map(resolveSaasPlanLabel))].sort();
 const paisesFiltro = [...new Set(clientes.map((c) => c.pais).filter(Boolean))].sort();
-const monedasFiltro = [...new Set(clientes.map(resolveSaasCurrency).filter(Boolean))].sort();
+const monedasFiltro = [
+  ...new Set(
+    clientes
+      .map((c) => resolveSaasCurrency(c, "USD"))
+      .filter(Boolean)
+  ),
+].sort();
 
 const clientesFiltrados = useMemo(() => filterSaasClients(clientes, {
     search: busquedaCliente,
@@ -611,6 +621,17 @@ const clientesParaCargoMasivo = clientes.filter((c) => {
   return true;
 });
 
+const monedasCargoMasivo = [
+  ...new Set(
+    clientesParaCargoMasivo.map((cliente) =>
+      resolveSaasCurrency(cliente, "USD")
+    )
+  ),
+];
+const monedaCargoMasivo = monedasCargoMasivo.length === 1
+  ? monedasCargoMasivo[0]
+  : "";
+
 const emitirCargoMasivo = async () => {
   if (!formCargoMasivo.planNombre) {
     alert("Seleccioná un plan.");
@@ -622,9 +643,18 @@ const emitirCargoMasivo = async () => {
     return;
   }
 
+  if (monedasCargoMasivo.length > 1) {
+    alert(
+      "El plan seleccionado incluye clientes con distintas monedas de facturación. " +
+      "Filtrá o emití los cargos por moneda para evitar importes incorrectos."
+    );
+    return;
+  }
+
   const ok = window.confirm(
     `Se emitirá un cargo de ${formatearMoneda(
-      formCargoMasivo.monto
+      formCargoMasivo.monto,
+      monedaCargoMasivo || "USD"
     )} a ${clientesParaCargoMasivo.length} clientes del plan ${
       formCargoMasivo.planNombre
     }. ¿Continuar?`
@@ -841,7 +871,15 @@ return (
                       <div className="saas-cliente-card-body">
                         <p><span>Email</span><strong>{c.email || "—"}</strong></p>
                         <p><span>Estado</span><strong>{classifySaasClient(c).label}</strong></p>
-                        <p><span>Precio</span><strong>{formatSaasMoney(resolveSaasPrice(c), resolveSaasCurrency(c))}</strong></p>
+                        <p>
+                          <span>Precio</span>
+                          <strong>
+                            {formatSaasMoney(
+                              resolveSaasPrice(c),
+                              resolveSaasCurrency(c, "USD")
+                            )}
+                          </strong>
+                        </p>
                         <p><span>País</span><strong>{c.pais || "—"}</strong></p>
                         <p><span>Próximo cobro</span><strong>{formatearFecha(c.nextBillingDate || c.fechaProximoCargo)}</strong></p>
 
@@ -918,8 +956,16 @@ return (
                   <td style={td}>{c.nombre || c.nombreCliente || c.empresa || c.id || "—"}</td>
                   <td style={td}>{c.email || "—"}</td>
                   <td style={td}>{resolveSaasPlanLabel(c)}</td>
-                  <td style={td}>{resolveSaasCurrency(c) || "Sin moneda"}</td>
-                  <td style={td}>{formatSaasMoney(resolveSaasPrice(c), resolveSaasCurrency(c))}</td>
+                  <td style={td}>
+                    {resolveSaasCurrency(c, "USD")}
+                  </td>
+
+                  <td style={td}>
+                    {formatSaasMoney(
+                      resolveSaasPrice(c),
+                      resolveSaasCurrency(c, "USD")
+                    )}
+                  </td>
                   <td style={td}>{classifySaasClient(c).label}</td>
                   <td style={td}>{c.pais || "—"}</td>
                   <td style={td}>{formatearFecha(c.nextBillingDate || c.fechaProximoCargo)}</td>
@@ -1285,12 +1331,22 @@ return (
             <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
               <div style={miniCard}>
                 <strong>Total cargos</strong>
-                <span>${resumenCuenta.cargos}</span>
+                <span>
+                  {formatearMoneda(
+                    resumenCuenta.cargos,
+                    resolveSaasCurrency(clienteCuentaCorriente, "USD")
+                  )}
+                </span>
               </div>
 
               <div style={miniCard}>
                 <strong>Total pagos</strong>
-                <span>${resumenCuenta.pagos}</span>
+                <span>
+                  {formatearMoneda(
+                    resumenCuenta.pagos,
+                    resolveSaasCurrency(clienteCuentaCorriente, "USD")
+                  )}
+                </span>
               </div>
 
               <div style={miniCard}>
@@ -1307,10 +1363,19 @@ return (
                   }}
                 >
                   {resumenCuenta.saldo > 0
-                    ? `Debe $${resumenCuenta.saldo}`
+                    ? `Debe ${formatearMoneda(
+                        resumenCuenta.saldo,
+                        resolveSaasCurrency(clienteCuentaCorriente, "USD")
+                      )}`
                     : resumenCuenta.saldo < 0
-                    ? `A favor $${Math.abs(resumenCuenta.saldo)}`
-                    : "$0"}
+                    ? `A favor ${formatearMoneda(
+                        Math.abs(resumenCuenta.saldo),
+                        resolveSaasCurrency(clienteCuentaCorriente, "USD")
+                      )}`
+                    : formatearMoneda(
+                        0,
+                        resolveSaasCurrency(clienteCuentaCorriente, "USD")
+                      )}
                 </span>
               </div>
             </div>
@@ -1334,9 +1399,26 @@ return (
                     {resumenPorPeriodo.map((p) => (
                       <tr key={p.periodo}>
                         <td style={td}>{p.periodo}</td>
-                        <td style={td}>{formatearMoneda(p.cargos)}</td>
-                        <td style={td}>{formatearMoneda(p.pagos)}</td>
-                        <td style={td}>{formatearMoneda(p.saldo)}</td>
+                        <td style={td}>
+                          {formatearMoneda(
+                            p.cargos,
+                            resolveSaasCurrency(clienteCuentaCorriente, "USD")
+                          )}
+                        </td>
+
+                        <td style={td}>
+                          {formatearMoneda(
+                            p.pagos,
+                            resolveSaasCurrency(clienteCuentaCorriente, "USD")
+                          )}
+                        </td>
+
+                        <td style={td}>
+                          {formatearMoneda(
+                            p.saldo,
+                            resolveSaasCurrency(clienteCuentaCorriente, "USD")
+                          )}
+                        </td>
                         <td style={td}>
                           <strong
                             style={{
@@ -1381,7 +1463,13 @@ return (
                     <td style={td}>{p.tipoMovimiento || "pago"}</td>
                     <td style={td}>{p.concepto || "-"}</td>
                     <td style={td}>{p.medioPago || "-"}</td>
-                    <td style={td}>{formatearMoneda(p.monto)}</td>
+                    <td style={td}>
+                      {formatearMoneda(
+                        p.monto,
+                        resolveSaasMovementCurrency(p) ||
+                          resolveSaasCurrency(clienteCuentaCorriente, "USD")
+                      )}
+                    </td>
                     <td style={td}>
                       {p.anulado
                         ? `ANULADO: ${p.motivoAnulacion || "-"}`
@@ -1516,7 +1604,10 @@ return (
               />
 
               <strong>
-                {formatearMoneda(formCargoMasivo.monto)}
+                {formatearMoneda(
+                  formCargoMasivo.monto,
+                  monedaCargoMasivo || "USD"
+                )}
               </strong>
 
               <label>Fecha del cargo</label>

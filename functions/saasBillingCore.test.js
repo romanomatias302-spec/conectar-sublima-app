@@ -10,6 +10,53 @@ test("suscripción paga sin precio se rechaza con error estructurado", () => {
   assert.deepEqual(result.errors, ["INVALID_PRICE"]);
 });
 
+test("suscripción paga permite precio cero", () => {
+  const result = validateBillableClient({
+    planId: "start",
+    billingCycle: "monthly",
+    billingCurrency: "USD",
+    price: 0,
+  });
+
+  assert.equal(result.valid, true);
+  assert.equal(result.price, 0);
+  assert.equal(result.currency, "USD");
+  assert.deepEqual(result.errors, []);
+});
+
+test("billing SaaS no usa la moneda operativa del cliente", () => {
+  const result = validateBillableClient({
+    planId: "start",
+    billingCycle: "monthly",
+    moneda: "MXN",
+    price: 19,
+  });
+
+  assert.equal(result.valid, true);
+  assert.equal(result.currency, "USD");
+});
+
+test("billingCurrency tiene prioridad y currency conserva compatibilidad", () => {
+  assert.equal(validateBillableClient({
+    planId: "start", billingCycle: "monthly", price: 19,
+    billingCurrency: "USD", currency: "ARS", moneda: "MXN",
+  }).currency, "USD");
+  assert.equal(validateBillableClient({
+    planId: "start", billingCycle: "monthly", price: 19,
+    currency: "ARS", moneda: "MXN",
+  }).currency, "ARS");
+});
+
+test("precio negativo, ausente, vacío o NaN es inválido", () => {
+  for (const price of [-1, undefined, "", Number.NaN]) {
+    const result = validateBillableClient({
+      planId: "start", billingCycle: "monthly", currency: "USD", price,
+    });
+    assert.equal(result.valid, false);
+    assert.ok(result.errors.includes("INVALID_PRICE"));
+  }
+});
+
 test("trial con precio cero es válido y no facturable", () => {
   assert.deepEqual(validateBillableClient({subscriptionStatus: "trial", price: 0}), {valid: true, trial: true, errors: []});
 });

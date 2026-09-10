@@ -54,7 +54,11 @@ export function resolveSaasEntitlements(client = {}) {
     planId: trial ? "trial" : planId || "unknown",
     planName: trial ? "Prueba gratis 7 días" : plan?.name || rawPlan || "Sin plan",
     billingCycle,
-    currency: String(client.currency || client.moneda || "").trim().toUpperCase(),
+    currency: String(
+      client.billingCurrency ||
+      client.currency ||
+      "USD"
+    ).trim().toUpperCase(),
     price: client.price ?? client.planPrecio ?? client.mantenimientoMensual ?? null,
     subscriptionStatus,
     maxUsers: plan?.maxUsers ?? null,
@@ -77,14 +81,18 @@ export function canAddBranch(client, currentBranches) {
   return entitlements.unlimitedBranches || (Number.isInteger(entitlements.maxBranches) && Number(currentBranches || 0) < entitlements.maxBranches);
 }
 
-export function suggestCurrencyForCountry(country) {
-  const key = String(country || "").trim().toLowerCase();
-  return ({ argentina: "ARS", "méxico": "MXN", mexico: "MXN", colombia: "COP", perú: "PEN", peru: "PEN", chile: "CLP", "estados unidos": "USD" })[key] || "USD";
+export function suggestCurrencyForCountry() {
+  return "USD";
 }
 
-export function resolveCurrencyAfterCountryChange({country, currentCurrency, currencyExplicit, isNew}) {
+export function resolveCurrencyAfterCountryChange({
+  currentCurrency,
+  currencyExplicit,
+  isNew,
+}) {
   if (!isNew || currencyExplicit) return currentCurrency;
-  return suggestCurrencyForCountry(country);
+
+  return "USD";
 }
 
 export function rehydrateSaasClient(client = {}) {
@@ -107,7 +115,15 @@ export function validateSaasSubscription(input = {}) {
   if (!isTrial && !BILLING_CYCLES.includes(input.billingCycle)) errors.push("Seleccioná un ciclo de facturación válido.");
   if (!SUPPORTED_CURRENCIES.includes(String(input.currency || "").toUpperCase())) errors.push("Seleccioná una moneda válida.");
   const numericPrice = Number(input.price);
-  if (!isTrial && (!Number.isFinite(numericPrice) || numericPrice <= 0)) errors.push("El precio debe ser mayor a 0 para una suscripción paga.");
+  if (!isTrial && (
+    input.price === "" ||
+    input.price === null ||
+    input.price === undefined ||
+    !Number.isFinite(numericPrice) ||
+    numericPrice < 0
+  )) {
+    errors.push("El precio no puede ser negativo.");
+  }
   return { valid: errors.length === 0, errors, isTrial, price: isTrial ? 0 : numericPrice };
 }
 

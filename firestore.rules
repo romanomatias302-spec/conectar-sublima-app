@@ -889,6 +889,7 @@ function canReadMovimientos(clienteId) {
         && !changedKeys().hasAny([
           "plan", "planNombre", "planId",
           "frecuenciaCobro", "billingCycle",
+          "billingCurrency", "currency",
           "planPrecio", "mantenimientoMensual", "price",
           "estado", "estadoSuscripcion", "subscriptionStatus",
           "suspendidoManual", "suspendidoPorSistema"
