@@ -30,14 +30,21 @@ export async function registrarMovimientoSaas({
   observacion = "",
   
 }) {
-  if (!clienteSaas?.id) throw new Error("Cliente SaaS inválido.");
-  if (Number(monto || 0) <= 0) throw new Error("El monto debe ser mayor a 0.");
+if (!clienteSaas?.id) throw new Error("Cliente SaaS inválido.");
+if (Number(monto || 0) <= 0) throw new Error("El monto debe ser mayor a 0.");
+
+const billingCurrency = String(
+  clienteSaas.billingCurrency ||
+  clienteSaas.moneda ||
+  "ARS"
+).toUpperCase();
 
 await addDoc(collection(db, "saas_pagos"), {
   clienteSaasId: clienteSaas.id,
   clienteNombre: clienteSaas.nombre || "",
   tipoMovimiento,
   monto: Number(monto || 0),
+  billingCurrency,
   fechaPago,
   medioPago,
   concepto,

@@ -108,12 +108,11 @@ const deudaPorMoneda = [...activos, ...suspendidos, ...cancelados].reduce(
     const saldo = Number(c.saldoCuentaCorriente || 0);
     if (saldo <= 0) return acc;
 
-    const monedaOriginal = (c.moneda || "ARS").toUpperCase();
-
-    const moneda =
-    monedaOriginal === "USD" || monedaOriginal === "DOLAR" || monedaOriginal === "DÓLAR"
-        ? "USD"
-        : "ARS";
+const moneda = String(
+  c.billingCurrency ||
+  c.moneda ||
+  "ARS"
+).toUpperCase();
     const grupo = esActivo(c) ? "activos" : "inactivos";
 
     if (!acc[moneda]) {
@@ -283,20 +282,7 @@ const ultimosPagos = pagosFiltrados
         return b.ultimoUso.localeCompare(a.ultimoUso);
       });
 
-      const deudaPorMonedaNormalizada = {
-        ARS: deudaPorMoneda.ARS || {
-            moneda: "ARS",
-            activos: 0,
-            inactivos: 0,
-            total: 0,
-        },
-        USD: deudaPorMoneda.USD || {
-            moneda: "USD",
-            activos: 0,
-            inactivos: 0,
-            total: 0,
-        },
-        };
+const deudaPorMonedaNormalizada = deudaPorMoneda;
 
     return {
       activos,
@@ -327,15 +313,15 @@ const ultimosPagos = pagosFiltrados
     data.pruebas.length +
     data.cancelados.length;
 
-    const formatearMonedaPorCodigo = (valor, moneda = "ARS") => {
-    const codigo = moneda === "USD" ? "USD" : "ARS";
+const formatearMonedaPorCodigo = (valor, moneda = "USD") => {
+  const codigo = String(moneda || "USD").toUpperCase();
 
-    return new Intl.NumberFormat("es-AR", {
-        style: "currency",
-        currency: codigo,
-        minimumFractionDigits: codigo === "ARS" ? 0 : 2,
-    }).format(Number(valor || 0));
-    };
+  return new Intl.NumberFormat("es-AR", {
+    style: "currency",
+    currency: codigo,
+    minimumFractionDigits: codigo === "ARS" ? 0 : 2,
+  }).format(Number(valor || 0));
+};
 
   return (
     <section className="saas-dark-dashboard">

@@ -19,7 +19,7 @@ telefono: "",
 plan: "Prueba gratis 7 días",
 planNombre: "Prueba gratis 7 días",
 planPrecio: 0,
-moneda: "ARS",
+billingCurrency: "USD",
 frecuenciaCobro: "prueba",
 diasCiclo: 7,
 
@@ -62,7 +62,10 @@ diasCiclo: 7,
         plan: clienteEditando.plan || "instalacion",
         planNombre: clienteEditando.planNombre || clienteEditando.plan || "",
         planPrecio: clienteEditando.planPrecio || clienteEditando.mantenimientoMensual || "",
-        moneda: clienteEditando.moneda || "",
+        billingCurrency:
+          clienteEditando.billingCurrency ||
+          clienteEditando.moneda ||
+          "USD",
         frecuenciaCobro: clienteEditando.frecuenciaCobro || "mensual",
         diasCiclo: clienteEditando.diasCiclo || 30,
 
@@ -386,15 +389,16 @@ diasCiclo: 7,
       </div>
 
       <div style={campo}>
-        <label style={label}>Moneda</label>
+        <label style={label}>Moneda de facturación Zalfro</label>
         <select
-          name="moneda"
-          value={formData.moneda}
+          name="billingCurrency"
+          value={formData.billingCurrency}
           onChange={handleChange}
           style={input}
         >
           <option value="ARS">ARS</option>
           <option value="USD">USD</option>
+          <option value="COP">COP</option>
           <option value="PEN">PEN</option>
           <option value="CLP">CLP</option>
           <option value="MXN">MXN</option>
@@ -448,7 +452,7 @@ diasCiclo: 7,
         <small style={{ color: "#64748b" }}>
           {new Intl.NumberFormat("es-AR", {
             style: "currency",
-            currency: formData.moneda || "ARS",
+            currency: formData.billingCurrency || "USD",
             minimumFractionDigits: 0,
           }).format(Number(formData.planPrecio || 0))}
         </small>

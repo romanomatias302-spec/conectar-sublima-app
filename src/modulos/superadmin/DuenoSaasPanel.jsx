@@ -139,11 +139,13 @@ const obtenerTimestampCliente = (c) => {
   return isNaN(fecha.getTime()) ? 0 : fecha.getTime();
 };
 
-  const formatearMoneda = (valor) => {
+const formatearMoneda = (valor, moneda = "ARS") => {
+  const codigo = String(moneda || "ARS").toUpperCase();
+
   return new Intl.NumberFormat("es-AR", {
     style: "currency",
-    currency: "ARS",
-    minimumFractionDigits: 2,
+    currency: codigo,
+    minimumFractionDigits: codigo === "ARS" ? 0 : 2,
   }).format(Number(valor || 0));
 };
 
@@ -813,8 +815,24 @@ return (
                     {abierto && (
                       <div className="saas-cliente-card-body">
                         <p><span>Estado</span><strong>{c.estado || "activo"}</strong></p>
-                        <p><span>Mantenimiento</span><strong>{formatearMoneda(c.planPrecio || c.mantenimientoMensual || 0)}</strong></p>
-                        <p><span>Saldo</span><strong>{formatearMoneda(c.saldoCuentaCorriente || 0)}</strong></p>
+                        <p>
+                          <span>Mantenimiento</span>
+                          <strong>
+                            {formatearMoneda(
+                              c.planPrecio || c.mantenimientoMensual || 0,
+                              c.billingCurrency || c.moneda || "ARS"
+                            )}
+                          </strong>
+                        </p>
+                        <p>
+                          <span>Saldo</span>
+                          <strong>
+                            {formatearMoneda(
+                              c.saldoCuentaCorriente || 0,
+                              c.billingCurrency || c.moneda || "ARS"
+                            )}
+                          </strong>
+                        </p>
                         <p><span>Pagos</span><strong>{pagosPorCliente[c.id]?.cantidadPagos || 0}</strong></p>
                         <p><span>Pedidos 30 días</span><strong>{usoClientes[c.id]?.pedidosUltimos30 || 0}</strong></p>
                         <p><span>Último uso</span><strong>{formatearFecha(usoClientes[c.id]?.ultimoUso)}</strong></p>
@@ -893,7 +911,10 @@ return (
                     <td style={td}>{c.planNombre || c.plan || "-"}</td>
 
                     <td style={td}>
-                      {formatearMoneda(c.planPrecio || c.mantenimientoMensual || 0)}
+                      {formatearMoneda(
+                        c.planPrecio || c.mantenimientoMensual || 0,
+                        c.billingCurrency || c.moneda || "ARS"
+                      )}
                     </td>
 
                     <td style={td}>
@@ -909,12 +930,19 @@ return (
                         }}
                       >
                         {Number(c.saldoCuentaCorriente || 0) > 0
-                          ? `Debe ${formatearMoneda(c.saldoCuentaCorriente)}`
-                          : Number(c.saldoCuentaCorriente || 0) < 0
-                          ? `A favor ${formatearMoneda(
-                              Math.abs(Number(c.saldoCuentaCorriente || 0))
+                          ? `Debe ${formatearMoneda(
+                              c.saldoCuentaCorriente,
+                              c.billingCurrency || c.moneda || "ARS"
                             )}`
-                          : formatearMoneda(0)}
+                          : Number(c.saldoCuentaCorriente || 0) < 0
+                            ? `A favor ${formatearMoneda(
+                                Math.abs(Number(c.saldoCuentaCorriente || 0)),
+                                c.billingCurrency || c.moneda || "ARS"
+                              )}`
+                          : formatearMoneda(
+                              0,
+                              c.billingCurrency || c.moneda || "ARS"
+                            )}
                       </span>
                     </td>
 
