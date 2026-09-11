@@ -318,3 +318,56 @@ body.dark-mode .tab-btn.activo {
 /* =========================================
    CONFIGURACIÓN - PRODUCCIÓN fin
    ========================================= */
+
+/* =========================================
+   CUENTA Y PLANES SAAS
+   ========================================= */
+.account-plan-section { display: grid; gap: 20px; margin-bottom: 24px; }
+.account-plan-summary { padding: 22px; border: 1px solid #dce6ec; border-radius: 14px; background: linear-gradient(135deg, #fff 0%, #f4fbff 100%); box-shadow: 0 2px 12px rgba(0,0,0,.05); }
+.account-plan-heading, .account-plans-header, .account-plan-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; }
+.account-plan-heading h3, .account-plans-header h3 { border: 0; padding: 0; margin: 4px 0; font-size: 22px; color: #172b3a; }
+.account-plan-eyebrow { color: #1689bd; font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.account-plan-legacy, .account-plan-status, .account-plan-card-head span { display: inline-flex; align-items: center; gap: 5px; padding: 5px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+.account-plan-legacy { color: #586573; background: #eef2f5; }
+.account-plan-status { color: #137642; background: #dcf7e8; }
+.account-plan-status-suspended, .account-plan-status-cancelled, .account-plan-status-past_due { color: #a64218; background: #fff0e8; }
+.account-plan-details { display: grid; grid-template-columns: repeat(5, minmax(120px,1fr)); gap: 14px; padding-top: 20px; }
+.account-plan-details div { display: grid; gap: 4px; }
+.account-plan-details span, .account-usage-card span { color: #6b7780; font-size: 12px; }
+.account-plan-details strong, .account-usage-card strong { color: #23333e; font-size: 14px; }
+.account-usage-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; margin-top: 18px; }
+.account-usage-card { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid #dce6ec; border-radius: 10px; background: rgba(255,255,255,.75); color: #0096d1; }
+.account-usage-card div { display: grid; gap: 2px; }
+.account-usage-card.is-over { color: #c14f20; border-color: #f2b99f; background: #fff8f4; }
+.account-plan-warning { display: flex; align-items: flex-start; gap: 10px; margin-top: 14px; padding: 11px 13px; color: #92451f; background: #fff4eb; border-radius: 9px; font-size: 13px; line-height: 1.45; }
+.account-plans-header p { margin: 2px 0 0; color: #6b7780; font-size: 13px; }
+.account-plans-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 12px; }
+.account-plan-card { display: flex; flex-direction: column; min-width: 0; padding: 16px; border: 1px solid #dce3e8; border-radius: 12px; background: #fff; box-shadow: 0 2px 10px rgba(0,0,0,.04); }
+.account-plan-card.is-current { border-color: #0096d1; box-shadow: 0 0 0 1px rgba(0,150,209,.15); }
+.account-plan-card h4 { margin: 0; color: #263640; font-size: 15px; }
+.account-plan-card-head span { color: #087aa7; background: #e7f7fd; padding: 4px 7px; }
+.account-plan-price { min-height: 52px; margin: 14px 0 10px; color: #172b3a; font-size: 20px; font-weight: 800; }
+.account-plan-price small { display: block; margin-top: 2px; color: #77838b; font-size: 11px; font-weight: 500; }
+.account-plan-card ul { display: grid; gap: 9px; padding: 0; margin: 0 0 16px; list-style: none; color: #52616a; font-size: 12px; line-height: 1.35; }
+.account-plan-card li { display: flex; align-items: flex-start; gap: 7px; }
+.account-plan-card li svg { flex: 0 0 auto; margin-top: 2px; color: #0096d1; }
+.account-plan-button { width: 100%; margin-top: auto; padding: 9px 12px; border-radius: 8px; background: #0096d1; color: #fff; font-weight: 700; cursor: pointer; }
+.account-plan-button:hover { background: #007faf; }
+.account-plan-button.is-current, .account-plan-button:disabled { color: #71808a; background: #edf2f5; cursor: default; }
+.account-plan-button.secondary { color: #31444f; background: #edf2f5; }
+.account-balance-card { margin-bottom: 20px; padding: 16px 20px; }
+.account-balance-card:hover, .account-plan-card:hover, .account-plan-summary:hover { transform: none; }
+.account-plan-modal-backdrop { position: fixed; inset: 0; z-index: 1200; display: grid; place-items: center; padding: 20px; background: rgba(16,31,40,.55); }
+.account-plan-modal { width: min(480px,100%); padding: 24px; border-radius: 14px; background: #fff; box-shadow: 0 20px 60px rgba(0,0,0,.25); }
+.account-plan-modal h3 { margin: 6px 0 12px; border: 0; padding: 0; font-size: 21px; }
+.account-plan-modal p { color: #52616a; line-height: 1.5; }
+.account-plan-modal-note { display: grid; gap: 4px; padding: 13px; border-radius: 9px; background: #eff9fd; color: #2d4654; font-size: 13px; }
+.account-plan-flow-note { font-size: 12px; }
+.account-plan-modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+.account-plan-modal-actions .account-plan-button { width: auto; margin: 0; }
+body.dark-mode .account-plan-summary, body.dark-mode .account-plan-card, body.dark-mode .account-plan-modal { color: #e7edf1; background: #252a2d; border-color: #3b454b; }
+body.dark-mode .account-plan-heading h3, body.dark-mode .account-plans-header h3, body.dark-mode .account-plan-card h4, body.dark-mode .account-plan-price, body.dark-mode .account-plan-details strong, body.dark-mode .account-usage-card strong { color: #eef4f6; }
+body.dark-mode .account-usage-card { background: #20272b; border-color: #3b454b; }
+
+@media (max-width: 1050px) { .account-plans-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } .account-plan-details { grid-template-columns: repeat(3,minmax(120px,1fr)); } }
+@media (max-width: 600px) { .account-plan-summary { padding: 16px; } .account-plan-heading { align-items: flex-start; } .account-plan-details, .account-usage-grid, .account-plans-grid { grid-template-columns: 1fr; } .account-plan-card { padding: 14px; } }

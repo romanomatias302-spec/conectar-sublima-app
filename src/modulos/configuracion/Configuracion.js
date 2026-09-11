@@ -25,6 +25,10 @@ import ConfiguracionUsuarios from "./ConfiguracionUsuarios";
 import ConfiguracionSucursales from "./ConfiguracionSucursales";
 import ConfiguracionProduccion from "./ConfiguracionProduccion";
 import { accountPaymentAction } from "../../domain/saasPaymentProvider";
+import { calculateSaasResourceUsage } from "../../domain/saasEntitlementUsage";
+import { obtenerUsuariosPorCliente } from "../../firebase/usuariosConfig";
+import { escucharInvitacionesPorCliente } from "../../firebase/invitacionesUsuarios";
+import ConfiguracionCuentaPlan from "./ConfiguracionCuentaPlan";
 
 export default function Configuracion({ modoOscuro, setModoOscuro, perfil, onActualizarPerfil, }) {
   const [pestañaActiva, setPestañaActiva] = useState(
@@ -35,6 +39,7 @@ export default function Configuracion({ modoOscuro, setModoOscuro, perfil, onAct
   const [logoFile, setLogoFile] = useState(null);
   const [nombreVisible, setNombreVisible] = useState("");
   const [cuentaSaas, setCuentaSaas] = useState(null);
+  const [usoCuenta, setUsoCuenta] = useState(null);
   const [guardandoConfig, setGuardandoConfig] = useState(false);
   const [mensajeConfig, setMensajeConfig] = useState("");
   const [moneda, setMoneda] = useState(perfil?.moneda || "ARS");
@@ -105,13 +110,15 @@ export default function Configuracion({ modoOscuro, setModoOscuro, perfil, onAct
             setTimezone(
               data.timezone || "America/Argentina/Buenos_Aires"
             );
-          setCuentaSaas({
+          const cuentaActual = {
+            id: snap.id,
+            ...data,
             planNombre: data.planNombre || data.plan || "Sin plan",
             estadoSuscripcion: data.estadoSuscripcion || data.estado || "activo",
             fechaVencimiento: data.fechaVencimiento || data.fechaProximoCargo || "",
             planPrecio: data.planPrecio || data.mantenimientoMensual || 0,
             saldoCuentaCorriente: data.saldoCuentaCorriente || 0,
-            moneda: data.moneda || "ARS",
+            moneda: data.billingCurrency || data.currency || "USD",
             ultimoPago: data.ultimoPago || "",
             pais: data.pais || "-",
             metodoCobro: data.metodoCobro || "manual",
@@ -119,7 +126,20 @@ export default function Configuracion({ modoOscuro, setModoOscuro, perfil, onAct
             hotmartSubscriptionId: data.hotmartSubscriptionId || "",
             suspendidoPorSistema: data.suspendidoPorSistema || false,
             suspendidoManual: data.suspendidoManual || false,
-          });
+          };
+          setCuentaSaas(cuentaActual);
+
+          const [usuarios, invitaciones, sucursalesSnap] = await Promise.all([
+            obtenerUsuariosPorCliente(perfil.clienteId),
+            escucharInvitacionesPorCliente(perfil.clienteId),
+            getDocs(query(collection(db, "sucursales"), where("clienteId", "==", perfil.clienteId))),
+          ]);
+          setUsoCuenta(calculateSaasResourceUsage({
+            client: cuentaActual,
+            users: usuarios,
+            invitations: invitaciones,
+            branches: sucursalesSnap.docs.map((documento) => ({id: documento.id, ...documento.data()})),
+          }));
 
           const pagosRef = collection(db, "saas_pagos");
           const pagosQuery = query(
@@ -583,33 +603,13 @@ const pagarPeriodoMercadoPago = async (periodo) => {
             <p>Cargando información de cuenta...</p>
           ) : (
             <>
-              <div
-                className="container-secundaria"
-                style={{
-                  marginBottom: 20,
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-                  gap: 12,
-                }}
-              >
-                <div>
-                  <strong>Plan actual</strong>
-                  <p>{cuentaSaas.planNombre}</p>
-                </div>
+              {usoCuenta ? (
+                <ConfiguracionCuentaPlan account={cuentaSaas} usage={usoCuenta} />
+              ) : (
+                <p>Cargando uso y límites del plan...</p>
+              )}
 
-                <div>
-                  <strong>Estado</strong>
-                  <p>
-                    {cuentaSaas.suspendidoManual || cuentaSaas.suspendidoPorSistema
-                      ? "Suspendido"
-                      : "Activo"}
-                  </p>
-                </div>
-
-
-
-
-
+              <div className="container-secundaria account-balance-card">
                 <div>
                   <strong>Saldo total</strong>
                   <p
