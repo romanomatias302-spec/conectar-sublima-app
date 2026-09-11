@@ -7,6 +7,7 @@ import {
   priceAfterCurrencyChange,
   priceForPlan,
   rehydrateSaasClient,
+  resolveManualSaasPlanId,
   resolveSaasEntitlements,
   SUPPORTED_CURRENCIES,
   validateSaasSubscription,
@@ -63,6 +64,9 @@ diasCiclo: 7,
 
   const [loading, setLoading] = useState(false);
   const [commercialFieldsDirty, setCommercialFieldsDirty] = useState(false);
+  const clienteOriginalLegacy = resolveSaasEntitlements(
+    clienteEditando || {}
+  ).isLegacy;
 
   useEffect(() => {
     if (clienteEditando) {
@@ -377,7 +381,7 @@ diasCiclo: 7,
     const dataAGuardar = {
       ...formDataPersistible,
 
-    planId: resolved.isLegacy ? "legacy" : formData.planId,
+    planId: resolveManualSaasPlanId(clienteEditando || formData, formData.planId),
     billingCycle: formData.billingCycle,
     currency: formData.currency,
     billingCurrency: formData.currency,
@@ -487,9 +491,10 @@ diasCiclo: 7,
           value={formData.planId}
           onChange={handleChange}
           style={input}
-          disabled={formData.planId === "legacy"}
         >
-          {formData.planId === "legacy" && <option value="legacy">Legacy — conserva límites ilimitados</option>}
+          {clienteOriginalLegacy && (
+            <option value="legacy">Legacy — conserva límites ilimitados</option>
+          )}
           <option value="trial">Prueba gratis 7 días</option>
           {getSelectablePlans().map((plan) => (
             <option key={plan.id} value={plan.id}>{plan.name}</option>

@@ -94,6 +94,27 @@ test.beforeEach(async () => {
         rol: 'admin',
         permisos: {},
       }),
+      setDoc(doc(db, 'usuarios', 'inactive-a'), {
+        activo: false,
+        clienteId: TENANT_A,
+        rol: 'usuario',
+        email: 'inactive@example.test',
+      }),
+      setDoc(doc(db, 'sucursales', 'inactive-branch-a'), {
+        activa: false,
+        clienteId: TENANT_A,
+        nombre: 'Inactiva',
+      }),
+      setDoc(doc(db, 'invitaciones_usuarios', 'pending-a'), {
+        clienteId: TENANT_A,
+        nombre: 'Pendiente',
+        email: 'pending@example.test',
+        rol: 'usuario',
+        estado: 'pendiente',
+        token: 'pending-a',
+        createdAt: new Date('2026-09-10T00:00:00Z'),
+        expiraAt: new Date('2099-09-17T00:00:00Z'),
+      }),
       setDoc(doc(db, 'ventas', 'sale-a'), { clienteId: TENANT_A }),
       setDoc(doc(db, 'ventas', 'sale-b'), { clienteId: TENANT_B }),
       setDoc(doc(db, 'ventas', 'sale-a', 'pagos', 'payment-a'), {
@@ -179,6 +200,35 @@ test('admin tenant no puede alterar plan, precio ni estado comercial SaaS', asyn
   await assertFails(updateDoc(ref, {billingCurrency: 'ARS'}));
   await assertFails(updateDoc(ref, {currency: 'ARS'}));
   await assertFails(updateDoc(ref, {subscriptionStatus: 'active'}));
+  await assertFails(updateDoc(ref, {maxUsers: 999, maxBranches: 999}));
+  await assertFails(updateDoc(ref, {entitlements: {unlimitedUsers: true}}));
+});
+
+test('altas y reactivaciones con cupo sólo pueden pasar por Functions', async () => {
+  for (const uid of ['admin-a', 'superadmin']) {
+    const db = authenticatedDb(uid);
+    await assertFails(setDoc(doc(db, 'usuarios', `direct-${uid}`), {
+      activo: true, clienteId: TENANT_A, rol: 'usuario', email: `${uid}@example.test`,
+    }));
+    await assertFails(updateDoc(doc(db, 'usuarios', 'inactive-a'), {activo: true}));
+    await assertFails(setDoc(doc(db, 'sucursales', `direct-${uid}`), {
+      activa: true, clienteId: TENANT_A, nombre: 'Directa',
+    }));
+    await assertFails(updateDoc(doc(db, 'sucursales', 'inactive-branch-a'), {activa: true}));
+    await assertFails(setDoc(doc(db, 'invitaciones_usuarios', `direct-${uid}`), {
+      clienteId: TENANT_A, nombre: 'Directa', email: `${uid}@example.test`,
+      rol: 'usuario', estado: 'pendiente', token: `direct-${uid}`,
+    }));
+    await assertFails(updateDoc(doc(db, 'invitaciones_usuarios', 'pending-a'), {
+      estado: 'cancelada',
+    }));
+  }
+});
+
+test('ediciones operativas sin consumo de cupo permanecen disponibles', async () => {
+  const db = authenticatedDb('admin-a');
+  await assertSucceeds(updateDoc(doc(db, 'usuarios', 'inactive-a'), {nombre: 'Nuevo nombre'}));
+  await assertSucceeds(updateDoc(doc(db, 'sucursales', 'inactive-branch-a'), {nombre: 'Renombrada'}));
 });
 
 test('superadmin conserva administración de contrato SaaS', async () => {

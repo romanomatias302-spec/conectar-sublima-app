@@ -1,29 +1,19 @@
 import {
-  collection,
   doc,
   getDoc,
   getDocs,
   query,
-  serverTimestamp,
-  setDoc,
-  updateDoc,
+  collection,
   where,
 } from "firebase/firestore";
 import { db } from "../firebase";
+import {
+  aceptarInvitacionSaas,
+  cancelarInvitacionSaas,
+  crearInvitacionSaas,
+} from "./saasEntitlements";
 
 const INVITACIONES_COLLECTION = "invitaciones_usuarios";
-
-function generarTokenSeguro() {
-  return `${Date.now()}_${Math.random().toString(36).slice(2)}_${Math.random()
-    .toString(36)
-    .slice(2)}`;
-}
-
-function sumarDias(fecha, dias) {
-  const nueva = new Date(fecha);
-  nueva.setDate(nueva.getDate() + dias);
-  return nueva;
-}
 
 export async function crearInvitacionUsuario({
   clienteId,
@@ -39,44 +29,13 @@ export async function crearInvitacionUsuario({
   if (!nombreLimpio) throw new Error("Completá el nombre");
   if (!emailLimpio) throw new Error("Completá el email");
 
-  const existentePendiente = query(
-    collection(db, INVITACIONES_COLLECTION),
-    where("clienteId", "==", clienteId),
-    where("email", "==", emailLimpio),
-    where("estado", "==", "pendiente")
-  );
-
-  const existenteSnap = await getDocs(existentePendiente);
-
-  if (!existenteSnap.empty) {
-    throw new Error("Ya existe una invitación pendiente para ese email");
-  }
-
-  const token = generarTokenSeguro();
-  const expiraAt = sumarDias(new Date(), 7);
-
-  const ref = doc(db, INVITACIONES_COLLECTION, token);
-
-  await setDoc(ref, {
+  return crearInvitacionSaas({
     clienteId,
     nombre: nombreLimpio,
     email: emailLimpio,
     rol,
-    token,
-    estado: "pendiente", // pendiente | usada | vencida | cancelada
-    createdAt: serverTimestamp(),
-    expiraAt,
     creadoPorUid: creadoPor?.uid || null,
-    creadoPorNombre: creadoPor?.nombre || creadoPor?.email || null,
-    usadoAt: null,
-    usuarioCreadoUid: null,
   });
-
-  return {
-    id: token,
-    token,
-    expiraAt,
-  };
 }
 
 export async function obtenerInvitacionPorToken(token) {
@@ -107,15 +66,13 @@ export function invitacionEstaVencida(invitacion) {
 export async function marcarInvitacionComoUsada({
   invitacionId,
   usuarioCreadoUid,
+  nombre,
   dbInstance = db,
 }) {
   if (!invitacionId) throw new Error("Falta invitacionId");
 
-  await updateDoc(doc(dbInstance, INVITACIONES_COLLECTION, invitacionId), {
-    estado: "usada",
-    usadoAt: serverTimestamp(),
-    usuarioCreadoUid: usuarioCreadoUid || null,
-  });
+  if (dbInstance !== db) throw new Error("dbInstance alternativo no soportado por enforcement SaaS");
+  await aceptarInvitacionSaas({invitacionId, usuarioCreadoUid, nombre});
 }
 
 export async function escucharInvitacionesPorCliente(clienteId) {
@@ -139,14 +96,5 @@ export async function escucharInvitacionesPorCliente(clienteId) {
 }
 
 export async function cancelarInvitacion(invitacionId) {
-  const ref = doc(db, INVITACIONES_COLLECTION, invitacionId);
-  const snap = await getDoc(ref);
-
-  if (!snap.exists()) {
-    throw new Error("La invitación no existe");
-  }
-
-  await updateDoc(ref, {
-    estado: "cancelada",
-  });
+  return cancelarInvitacionSaas(invitacionId);
 }

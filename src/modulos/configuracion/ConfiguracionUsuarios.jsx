@@ -1,11 +1,20 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   collection,
+  doc,
+  getDoc,
   onSnapshot,
   query,
   where,
 } from "firebase/firestore";
 import { db } from "../../firebase";
+import { cambiarEstadoUsuarioSaas } from "../../firebase/saasEntitlements";
+import {
+  calculateSaasResourceUsage,
+  formatPlanUsage,
+  invitationReservesUserSeat,
+  planLimitMessage,
+} from "../../domain/saasEntitlementUsage";
 import {
   cancelarInvitacion,
   crearInvitacionUsuario,
@@ -319,6 +328,7 @@ const MODULOS_PERMISOS = [
 export default function ConfiguracionUsuarios({ perfil }) {
   const [usuarios, setUsuarios] = useState([]);
   const [invitaciones, setInvitaciones] = useState([]);
+  const [clienteSaas, setClienteSaas] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
@@ -354,13 +364,17 @@ const [sucursalesPermitidasEditando, setSucursalesPermitidasEditando] = useState
 
       setLoading(true);
 
-      const [usuariosData, invitacionesData] = await Promise.all([
+      const [usuariosData, invitacionesData, clienteSnapshot] = await Promise.all([
         obtenerUsuariosPorCliente(perfil.clienteId),
         escucharInvitacionesPorCliente(perfil.clienteId),
+        getDoc(doc(db, "clientes-saas", perfil.clienteId)),
       ]);
 
       setUsuarios(usuariosData);
       setInvitaciones(invitacionesData);
+      setClienteSaas(clienteSnapshot.exists() ? {
+        id: clienteSnapshot.id, ...clienteSnapshot.data(),
+      } : null);
     } catch (error) {
       console.error("Error cargando usuarios/configuración:", error);
       setMensaje("No se pudieron cargar los usuarios.");
@@ -545,9 +559,14 @@ useEffect(() => {
 }, [perfil?.clienteId]);
 
 const invitacionesPendientes = useMemo(
-    () => invitaciones.filter((i) => i.estado === "pendiente"),
+    () => invitaciones.filter((i) => invitationReservesUserSeat(i)),
     [invitaciones]
   );
+
+const resourceUsage = useMemo(() => calculateSaasResourceUsage({
+  client: clienteSaas || {}, users: usuarios, invitations: invitaciones,
+  branches: sucursales,
+}), [clienteSaas, usuarios, invitaciones, sucursales]);
 
  const sectoresProduccionOrdenados =
   useMemo(() => {
@@ -851,7 +870,9 @@ async function cambiarEstadoUsuario(usuario, activo) {
 
     setMensaje("");
 
-    await actualizarDatosUsuario(usuario.uid, {
+    await cambiarEstadoUsuarioSaas({
+      clienteId: perfil.clienteId,
+      uid: usuario.uid,
       activo,
     });
 
@@ -859,7 +880,7 @@ async function cambiarEstadoUsuario(usuario, activo) {
     await cargarTodo();
   } catch (error) {
     console.error("Error cambiando estado de usuario:", error);
-    setMensaje("No se pudo cambiar el estado del usuario.");
+    setMensaje(error.message || "No se pudo cambiar el estado del usuario.");
   }
 }
 
@@ -995,7 +1016,7 @@ setPermisosEditando((prev) => ({
               <button
                 className="btn btn-primary"
                 onClick={manejarCrearInvitacion}
-                disabled={guardando}
+                disabled={guardando || !resourceUsage.canAddUser}
               >
                 {guardando ? "Creando..." : "Crear invitación"}
               </button>
@@ -1031,11 +1052,28 @@ setPermisosEditando((prev) => ({
             <p style={{ margin: "6px 0 0", color: "#666" }}>
               Invitá nuevos usuarios para que activen su cuenta.
             </p>
+            <p style={{ margin: "6px 0 0", color: "#475569", fontWeight: 600 }}>
+              Usuarios: {formatPlanUsage(
+                resourceUsage.usedUsers,
+                resourceUsage.entitlements.maxUsers,
+                resourceUsage.entitlements.unlimitedUsers
+              )}
+            </p>
+            {!resourceUsage.canAddUser && (
+              <p className="alert-error" style={{ marginTop: 10 }}>
+                {planLimitMessage(
+                  resourceUsage.entitlements,
+                  "users",
+                  resourceUsage.usersOverLimit
+                )}
+              </p>
+            )}
 
           {puedeInvitar && (
             <button
               className="btn btn-primary"
               onClick={() => setMostrarFormulario((prev) => !prev)}
+              disabled={!resourceUsage.canAddUser}
             >
               {mostrarFormulario ? "Cerrar" : "Invitar usuario"}
             </button>

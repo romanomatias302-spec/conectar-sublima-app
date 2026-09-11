@@ -4,8 +4,7 @@ import {
   signOut,
   updateProfile,
 } from "firebase/auth";
-import { doc, serverTimestamp, setDoc } from "firebase/firestore";
-import { auth, db } from "../../firebase";
+import { auth } from "../../firebase";
 import {
   invitacionEstaVencida,
   marcarInvitacionComoUsada,
@@ -161,50 +160,15 @@ export default function ActivarCuenta() {
         displayName: nombre.trim(),
       });
 
-      console.log("Paso 3: guardando usuario en Firestore...");
-
-      await setDoc(doc(db, "usuarios", nuevoUsuario.uid), {
-        nombre: nombre.trim(),
-        email: invitacion.email,
-        rol: invitacion.rol || "usuario",
-        activo: true,
-        clienteId: invitacion.clienteId,
-        createdAt: serverTimestamp(),
-        invitacionId: invitacion.id,
-        permisos: {
-          inicio: {
-            ver: true,
-            verPedidos: true,
-            verClientes: false,
-            verIngresos: false,
-            verProduccion: true,
-            verAtrasados: true,
-            verGrafico: true,
-            verCuelloBotella: true,
-          },
-          clientes: { ver: false, crear: false, editar: false, eliminar: false },
-          pedidos: { ver: true, crear: false, editar: false, eliminar: false },
-          produccion: {
-            ver: true,
-            mover: true,
-            editarDetalle: true,
-            asignarUsuario: false,
-          },
-          ventas: { ver: false, crear: false, editar: false, eliminar: false },
-          movimientos: { ver: false },
-          configuracion: { ver: false },
-        },
-      });
-
-      console.log("Paso 4: marcando invitación como usada...");
+      console.log("Paso 3: activando invitación y perfil en forma segura...");
 
       await marcarInvitacionComoUsada({
         invitacionId: invitacion.id,
         usuarioCreadoUid: nuevoUsuario.uid,
-        dbInstance: db,
+        nombre: nombre.trim(),
       });
 
-      console.log("Paso 5: cerrando sesión secundaria...");
+      console.log("Paso 4: cerrando sesión...");
 
       await signOut(auth);
 

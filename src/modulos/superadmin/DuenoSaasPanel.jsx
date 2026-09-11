@@ -2,12 +2,16 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   collection,
   getDocs,
-  doc,
-  updateDoc,
   onSnapshot,
 } from "firebase/firestore";
 import { signOut } from "firebase/auth";
 import { auth, db } from "../../firebase";
+import { cambiarEstadoUsuarioSaas } from "../../firebase/saasEntitlements";
+import {
+  calculateSaasResourceUsage,
+  formatPlanUsage,
+  planLimitMessage,
+} from "../../domain/saasEntitlementUsage";
 import ClienteSaasForm from "./ClienteSaasForm";
 import {
   crearInvitacionUsuario,
@@ -292,6 +296,12 @@ useEffect(() => {
   };
 }, []);
 
+const clienteUsuariosUsage = useMemo(() => calculateSaasResourceUsage({
+  client: clienteUsuarios || {},
+  users: usuarios.filter((user) => user.clienteId === clienteUsuarios?.id),
+  invitations: invitaciones.filter((item) => item.clienteId === clienteUsuarios?.id),
+}), [clienteUsuarios, usuarios, invitaciones]);
+
 useEffect(() => {
   const syncTab = () => syncSaasTabFromLocation(window.location, setSeccionActiva);
   window.addEventListener("popstate", syncTab);
@@ -406,7 +416,9 @@ const refrescarDatosSaas = async (kind) => {
     if (!ok) return;
 
     try {
-      await updateDoc(doc(db, "usuarios", usuario.firebaseId), {
+      await cambiarEstadoUsuarioSaas({
+        clienteId: usuario.clienteId,
+        uid: usuario.firebaseId,
         activo: false,
       });
       await cargarUsuarios();
@@ -418,7 +430,9 @@ const refrescarDatosSaas = async (kind) => {
 
   const activarUsuario = async (usuario) => {
     try {
-      await updateDoc(doc(db, "usuarios", usuario.firebaseId), {
+      await cambiarEstadoUsuarioSaas({
+        clienteId: usuario.clienteId,
+        uid: usuario.firebaseId,
         activo: true,
       });
       await cargarUsuarios();
@@ -1132,12 +1146,29 @@ return (
           <h2 style={{ margin: 0 }}>
             Usuarios - {clienteUsuarios.nombre}
           </h2>
+          <p style={{margin: "6px 0 0", color: "#475569", fontWeight: 600}}>
+            {formatPlanUsage(
+              clienteUsuariosUsage.usedUsers,
+              clienteUsuariosUsage.entitlements.maxUsers,
+              clienteUsuariosUsage.entitlements.unlimitedUsers
+            )}
+          </p>
+          {!clienteUsuariosUsage.canAddUser && (
+            <p style={{color: "#b91c1c", margin: "6px 0 0"}}>
+              {planLimitMessage(
+                clienteUsuariosUsage.entitlements,
+                "users",
+                clienteUsuariosUsage.usersOverLimit
+              )}
+            </p>
+          )}
         </div>
 
         <div style={{ display: "flex", gap: 10 }}>
           <button
             onClick={() => abrirInvitacionParaCliente(clienteUsuarios)}
             style={btnNuevo}
+            disabled={!clienteUsuariosUsage.canAddUser}
           >
             + Invitar usuario
           </button>
@@ -1209,6 +1240,7 @@ return (
                         <button
                           style={btnEditar}
                           onClick={() => activarUsuario(u)}
+                          disabled={!clienteUsuariosUsage.canAddUser}
                         >
                           Activar
                         </button>
@@ -1927,7 +1959,12 @@ return (
                   Cerrar
                 </button>
 
-                <button type="button" onClick={crearInvitacion} style={btnPri}>
+                <button
+                  type="button"
+                  onClick={crearInvitacion}
+                  style={btnPri}
+                  disabled={!clienteUsuariosUsage.canAddUser}
+                >
                   Crear invitación
                 </button>
               </div>

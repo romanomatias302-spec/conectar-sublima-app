@@ -1,6 +1,7 @@
 import {
   canAddBranch, canAddUser, getPlanDefinition, priceAfterCurrencyChange, priceForPlan,
-  rehydrateSaasClient, resolveCurrencyAfterCountryChange, resolveSaasEntitlements,
+  rehydrateSaasClient, resolveCurrencyAfterCountryChange, resolveManualSaasPlanId,
+  resolveSaasEntitlements,
   SUPPORTED_CURRENCIES, validateSaasSubscription,
 } from "./saasPlans";
 
@@ -33,6 +34,33 @@ test("rehidratación separa moneda operativa de facturación", () => {
   expect(rehydrateSaasClient({
     plan: "Mensual", moneda: "MXN",
   }).currency).toBe("USD");
+});
+
+test("legacy permanece legacy mientras no se elige otro plan", () => {
+  const legacy = {plan: "Mensual", moneda: "MXN"};
+  expect(resolveManualSaasPlanId(legacy, rehydrateSaasClient(legacy).planId)).toBe("legacy");
+});
+
+test.each(["start", "profesional", "profesional_plus", "empresa"])(
+  "legacy puede cambiarse explícitamente a %s",
+  (planId) => {
+    const legacy = {plan: "Mensual", moneda: "MXN", usuarios: 8, sucursales: 4};
+    const persisted = {...legacy, planId: resolveManualSaasPlanId(legacy, planId)};
+    expect(persisted.planId).toBe(planId);
+    expect(persisted.moneda).toBe("MXN");
+    expect(persisted.usuarios).toBe(8);
+    expect(persisted.sucursales).toBe(4);
+  }
+);
+
+test("resolver un cambio manual no crea cargos ni altera fechas históricas", () => {
+  const legacy = {
+    plan: "Anual", fechaProximoCargo: "2027-04-10",
+    saldoCuentaCorriente: 250, movimientos: ["cargo-historico"],
+  };
+  const snapshot = JSON.parse(JSON.stringify(legacy));
+  expect(resolveManualSaasPlanId(legacy, "start")).toBe("start");
+  expect(legacy).toEqual(snapshot);
 });
 
 test("cambiar país nunca modifica la moneda de billing", () => {

@@ -22,6 +22,11 @@ const {
 const {createHotmartFirestoreRepository} = require("./hotmartFirestoreRepository");
 const {createHotmartWebhookHandler} = require("./hotmartWebhookHandler");
 const {createSaasNotificationHooks} = require("./saasNotificationHooks");
+const {
+  createSaasEntitlementService,
+  USER_LIMIT_CODE,
+  BRANCH_LIMIT_CODE,
+} = require("./saasEntitlementEnforcement");
 
 admin.initializeApp();
 
@@ -31,6 +36,36 @@ const MP_ACCESS_TOKEN_TEST = defineSecret("MP_ACCESS_TOKEN_TEST");
 const MP_ACCESS_TOKEN_PROD = defineSecret("MP_ACCESS_TOKEN_PROD");
 const MP_WEBHOOK_SECRET_PROD = defineSecret("MP_WEBHOOK_SECRET_PROD");
 const HOTMART_WEBHOOK_HOTTOK = defineSecret("HOTMART_WEBHOOK_HOTTOK");
+const entitlementService = createSaasEntitlementService({
+  db,
+  FieldValue: admin.firestore.FieldValue,
+  Timestamp: admin.firestore.Timestamp,
+});
+
+function entitlementHttpsError(error) {
+  const resourceLimit = [USER_LIMIT_CODE, BRANCH_LIMIT_CODE].includes(error?.code);
+  return new HttpsError(
+    resourceLimit ? "resource-exhausted" : "failed-precondition",
+    error?.code || "SAAS_ENTITLEMENT_OPERATION_FAILED",
+    {code: error?.code || "SAAS_ENTITLEMENT_OPERATION_FAILED", ...(error?.details || {})}
+  );
+}
+
+async function authorizeEntitlementActor(request, tenantId) {
+  if (!request.auth?.uid) throw new HttpsError("unauthenticated", "UNAUTHENTICATED");
+  const snapshot = await db.collection("usuarios").doc(request.auth.uid).get();
+  const profile = snapshot.exists ? snapshot.data() : null;
+  const superadmin = profile?.rol === "superadmin" || request.auth.token?.superadmin === true;
+  const tenantAdmin = profile?.rol === "admin" && profile?.activo === true && profile?.clienteId === tenantId;
+  if (!superadmin && !tenantAdmin) throw new HttpsError("permission-denied", "FORBIDDEN");
+  return {profile, superadmin};
+}
+
+function requireText(value, code) {
+  const normalized = String(value || "").trim();
+  if (!normalized) throw new HttpsError("invalid-argument", code);
+  return normalized;
+}
 
 function fechaISO(date) {
   return date.toISOString().slice(0, 10);
@@ -958,6 +993,101 @@ exports.webhookHotmartSaas = onRequest(
     notifications: createSaasNotificationHooks({db}),
   }),
 );
+
+exports.crearInvitacionUsuarioSaas = onCall(async (request) => {
+  const tenantId = requireText(request.data?.clienteId, "MISSING_TENANT_ID");
+  const name = requireText(request.data?.nombre, "MISSING_NAME");
+  const email = requireText(request.data?.email, "MISSING_EMAIL").toLowerCase();
+  await authorizeEntitlementActor(request, tenantId);
+  try {
+    return await entitlementService.createInvitation({
+      tenantId, name, email, role: request.data?.rol,
+      createdBy: request.auth.uid,
+    });
+  } catch (error) {
+    throw entitlementHttpsError(error);
+  }
+});
+
+exports.cancelarInvitacionUsuarioSaas = onCall(async (request) => {
+  const invitationId = requireText(request.data?.invitacionId, "MISSING_INVITATION_ID");
+  const snapshot = await db.collection("invitaciones_usuarios").doc(invitationId).get();
+  if (!snapshot.exists) throw new HttpsError("not-found", "INVITATION_NOT_FOUND");
+  await authorizeEntitlementActor(request, snapshot.data().clienteId);
+  try {
+    return await entitlementService.cancelInvitation({invitationId});
+  } catch (error) {
+    throw entitlementHttpsError(error);
+  }
+});
+
+exports.aceptarInvitacionUsuarioSaas = onCall(async (request) => {
+  if (!request.auth?.uid) throw new HttpsError("unauthenticated", "UNAUTHENTICATED");
+  const invitationId = requireText(request.data?.invitacionId, "MISSING_INVITATION_ID");
+  try {
+    return await entitlementService.acceptInvitation({
+      invitationId,
+      uid: request.auth.uid,
+      authEmail: request.auth.token?.email || "",
+      displayName: request.data?.nombre,
+    });
+  } catch (error) {
+    throw entitlementHttpsError(error);
+  }
+});
+
+exports.cambiarEstadoUsuarioSaas = onCall(async (request) => {
+  const tenantId = requireText(request.data?.clienteId, "MISSING_TENANT_ID");
+  const uid = requireText(request.data?.uid, "MISSING_USER_ID");
+  if (typeof request.data?.activo !== "boolean") {
+    throw new HttpsError("invalid-argument", "MISSING_ACTIVE_STATE");
+  }
+  await authorizeEntitlementActor(request, tenantId);
+  try {
+    return await entitlementService.setUserActive({tenantId, uid, active: request.data.activo});
+  } catch (error) {
+    throw entitlementHttpsError(error);
+  }
+});
+
+exports.asegurarSucursalPrincipalSaas = onCall(async (request) => {
+  const tenantId = requireText(request.data?.clienteId, "MISSING_TENANT_ID");
+  await authorizeEntitlementActor(request, tenantId);
+  try {
+    return await entitlementService.ensurePrincipalBranch({tenantId});
+  } catch (error) {
+    throw entitlementHttpsError(error);
+  }
+});
+
+exports.crearSucursalSaas = onCall(async (request) => {
+  const tenantId = requireText(request.data?.clienteId, "MISSING_TENANT_ID");
+  const name = requireText(request.data?.nombre, "MISSING_NAME");
+  await authorizeEntitlementActor(request, tenantId);
+  try {
+    return await entitlementService.createBranch({
+      tenantId, name, address: request.data?.direccion,
+    });
+  } catch (error) {
+    throw entitlementHttpsError(error);
+  }
+});
+
+exports.cambiarEstadoSucursalSaas = onCall(async (request) => {
+  const tenantId = requireText(request.data?.clienteId, "MISSING_TENANT_ID");
+  const branchId = requireText(request.data?.sucursalId, "MISSING_BRANCH_ID");
+  if (typeof request.data?.activa !== "boolean") {
+    throw new HttpsError("invalid-argument", "MISSING_ACTIVE_STATE");
+  }
+  await authorizeEntitlementActor(request, tenantId);
+  try {
+    return await entitlementService.setBranchActive({
+      tenantId, branchId, active: request.data.activa,
+    });
+  } catch (error) {
+    throw entitlementHttpsError(error);
+  }
+});
 
 
 /*aca se agrega funcion nueva para solucionar lo de las imagenes, de manera temporal */

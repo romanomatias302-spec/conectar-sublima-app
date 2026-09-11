@@ -835,30 +835,20 @@ function canReadMovimientos(clienteId) {
         )
       );
 
-      allow create: if isSuperAdmin()
-        || (
-          signedIn()
-          && request.auth.uid == uid
-          && request.resource.data.activo == true
-          && request.resource.data.clienteId is string
-          && request.resource.data.clienteId != ""
-          && (
-            request.resource.data.rol == "admin"
-            || (
-              request.resource.data.rol == "usuario"
-              && request.resource.data.invitacionId is string
-              && request.resource.data.invitacionId != ""
-              && invitacionValidaParaActivacion()
-            )
-          )
-        );
+      // Altas y activaciones pasan por Functions para aplicar cupos en
+      // transacción. Admin SDK no queda sujeto a estas reglas.
+      allow create: if false;
 
-      allow update: if isSuperAdmin()
+      allow update: if (
+          isSuperAdmin()
+          && !changedKeys().hasAny(["activo", "clienteId", "rol"])
+        )
         || (
           signedIn()
           && request.auth.uid == uid
           && resource.data.rol == request.resource.data.rol
           && resource.data.clienteId == request.resource.data.clienteId
+          && resource.data.activo == request.resource.data.activo
         )
         || (
           isAdmin()
@@ -867,6 +857,7 @@ function canReadMovimientos(clienteId) {
           && request.resource.data.clienteId == resource.data.clienteId
           && request.resource.data.rol == resource.data.rol
           && request.resource.data.email == resource.data.email
+          && request.resource.data.activo == resource.data.activo
         );
 
       allow delete: if isSuperAdmin();
@@ -892,7 +883,8 @@ function canReadMovimientos(clienteId) {
           "billingCurrency", "currency",
           "planPrecio", "mantenimientoMensual", "price",
           "estado", "estadoSuscripcion", "subscriptionStatus",
-          "suspendidoManual", "suspendidoPorSistema"
+          "suspendidoManual", "suspendidoPorSistema",
+          "maxUsers", "maxBranches", "entitlements"
         ])
       )
 
@@ -1045,6 +1037,7 @@ function canReadMovimientos(clienteId) {
       allow get: if (
           resource.data.token == invitacionId
           && resource.data.estado == "pendiente"
+          && resource.data.expiraAt > request.time
         )
         || isSuperAdmin()
         || (
@@ -1061,34 +1054,9 @@ function canReadMovimientos(clienteId) {
           && resource.data.clienteId == profile().clienteId
         );
 
-      allow create: if puedeCrearInvitacion()
-        && request.resource.data.clienteId is string
-        && request.resource.data.clienteId != ""
-        && request.resource.data.email is string
-        && request.resource.data.email != ""
-        && request.resource.data.nombre is string
-        && request.resource.data.nombre != ""
-        && request.resource.data.rol in ["admin", "usuario"]
-        && request.resource.data.estado == "pendiente"
-        && request.resource.data.token == invitacionId;
-
-      allow update: if (
-          puedeActualizarInvitacion(resource.data.clienteId)
-          && request.resource.data.clienteId == resource.data.clienteId
-          && request.resource.data.email == resource.data.email
-          && request.resource.data.token == resource.data.token
-          && request.resource.data.createdAt == resource.data.createdAt
-        )
-        || (
-          request.auth != null
-          && resource.data.estado == "pendiente"
-          && request.resource.data.estado == "usada"
-          && request.resource.data.email == resource.data.email
-          && request.resource.data.clienteId == resource.data.clienteId
-          && request.resource.data.token == resource.data.token
-          && request.resource.data.createdAt == resource.data.createdAt
-          && request.resource.data.usuarioCreadoUid == request.auth.uid
-        );
+      // Crear, cancelar y consumir invitaciones requiere la transacción
+      // central de cupos ejecutada por Functions.
+      allow create, update: if false;
 
       allow delete: if false;
     }
@@ -1114,19 +1082,18 @@ function canReadMovimientos(clienteId) {
           )
         );
 
-      allow create: if isSuperAdmin()
-        || (
-          request.resource.data.clienteId is string
-          && tenantUserBase(request.resource.data.clienteId)
-          && isAdmin()
-        );
+      allow create: if false;
 
-      allow update: if isSuperAdmin()
+      allow update: if (
+          isSuperAdmin()
+          && !changedKeys().hasAny(["clienteId", "activa", "esPrincipal", "codigo"])
+        )
         || (
           resource.data.clienteId is string
           && tenantUserBase(resource.data.clienteId)
           && isAdmin()
           && request.resource.data.clienteId == resource.data.clienteId
+          && !changedKeys().hasAny(["clienteId", "activa", "esPrincipal", "codigo"])
         );
 
       allow delete: if false;
@@ -2016,6 +1983,11 @@ match /produccion_sectores/{sectorId} {
       allow update: if isSuperAdmin();
 
       allow delete: if false;
+    }
+
+    // Lock interno de concurrencia para cupos SaaS. Sólo Admin SDK.
+    match /saas_entitlement_locks/{clienteId} {
+      allow read, write: if false;
     }
 
     // =========================

@@ -1,9 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  addDoc,
   collection,
   doc,
-  setDoc,
   onSnapshot,
   query,
   serverTimestamp,
@@ -12,6 +10,16 @@ import {
 } from "firebase/firestore";
 import { db } from "../../firebase";
 import ActionMenu from "../../comunes/componentes/ActionMenu";
+import {
+  asegurarSucursalPrincipalSaas,
+  cambiarEstadoSucursalSaas,
+  crearSucursalSaas,
+} from "../../firebase/saasEntitlements";
+import {
+  calculateSaasResourceUsage,
+  formatPlanUsage,
+  planLimitMessage,
+} from "../../domain/saasEntitlementUsage";
 
 const SUCURSAL_PRINCIPAL_ID = "principal";
 
@@ -24,6 +32,7 @@ export default function ConfiguracionSucursales({ perfil }) {
   const [direccion, setDireccion] = useState("");
   const [guardando, setGuardando] = useState(false);
   const [mensaje, setMensaje] = useState("");
+  const [clienteSaas, setClienteSaas] = useState(null);
 
   useEffect(() => {
     if (!perfil?.clienteId) return;
@@ -31,7 +40,7 @@ export default function ConfiguracionSucursales({ perfil }) {
     const ref = collection(db, "sucursales");
     const q = query(ref, where("clienteId", "==", perfil.clienteId));
 
-    const unsubscribe = onSnapshot(q, async (snap) => {
+    const unsubscribe = onSnapshot(q, (snap) => {
       const lista = snap.docs.map((d) => ({
         firebaseId: d.id,
         ...d.data(),
@@ -41,18 +50,11 @@ const tienePrincipal = lista.some(
   (s) => s.esPrincipal === true || s.codigo === SUCURSAL_PRINCIPAL_ID
 );
 
-if (!tienePrincipal) {
-  await setDoc(doc(db, "sucursales", `${perfil.clienteId}_principal`), {
-    clienteId: perfil.clienteId,
-    codigo: SUCURSAL_PRINCIPAL_ID,
-    nombre: "Sucursal principal",
-    direccion: "",
-    activa: true,
-    esPrincipal: true,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
+if (!tienePrincipal && lista.length === 0) {
+  asegurarSucursalPrincipalSaas(perfil.clienteId).catch((error) => {
+    console.error("No se pudo asegurar la sucursal principal:", error);
+    setMensaje(error.message || "No se pudo preparar la sucursal principal.");
   });
-  return;
 }
 
       setSucursales(
@@ -66,6 +68,17 @@ if (!tienePrincipal) {
 
     return () => unsubscribe();
   }, [perfil?.clienteId]);
+
+  useEffect(() => {
+    if (!perfil?.clienteId) return undefined;
+    return onSnapshot(doc(db, "clientes-saas", perfil.clienteId), (snapshot) => {
+      setClienteSaas(snapshot.exists() ? {id: snapshot.id, ...snapshot.data()} : null);
+    });
+  }, [perfil?.clienteId]);
+
+  const resourceUsage = useMemo(() => calculateSaasResourceUsage({
+    client: clienteSaas || {}, branches: sucursales,
+  }), [clienteSaas, sucursales]);
 
   const sucursalesFiltradas = useMemo(() => {
     const texto = busqueda.trim().toLowerCase();
@@ -109,21 +122,16 @@ const cerrarModalCrear = () => {
       setGuardando(true);
       setMensaje("");
 
-      await addDoc(collection(db, "sucursales"), {
+      await crearSucursalSaas({
         clienteId: perfil.clienteId,
-        codigo: "",
         nombre: nombreLimpio,
         direccion: direccion.trim(),
-        activa: true,
-        esPrincipal: false,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
       });
 
       cerrarModalCrear();
     } catch (error) {
       console.error("Error creando sucursal:", error);
-      setMensaje("No se pudo crear la sucursal.");
+      setMensaje(error.message || "No se pudo crear la sucursal.");
     } finally {
       setGuardando(false);
     }
@@ -180,10 +188,16 @@ const actualizarSucursal = async () => {
       return;
     }
 
-    await updateDoc(doc(db, "sucursales", sucursal.firebaseId), {
-      activa: sucursal.activa === false,
-      updatedAt: serverTimestamp(),
-    });
+    try {
+      await cambiarEstadoSucursalSaas({
+        clienteId: perfil.clienteId,
+        sucursalId: sucursal.firebaseId,
+        activa: sucursal.activa === false,
+      });
+    } catch (error) {
+      console.error("Error cambiando estado de sucursal:", error);
+      setMensaje(error.message || "No se pudo cambiar el estado de la sucursal.");
+    }
   };
 
   return (
@@ -192,6 +206,22 @@ const actualizarSucursal = async () => {
 <div className="sucursales-head">
           <div>
             <h3 style={{ margin: 0 }}>Sucursales</h3>
+            <p style={{margin: "6px 0 0", color: "#475569", fontWeight: 600}}>
+              {formatPlanUsage(
+                resourceUsage.activeBranches,
+                resourceUsage.entitlements.maxBranches,
+                resourceUsage.entitlements.unlimitedBranches
+              )}
+            </p>
+            {!resourceUsage.canAddBranch && (
+              <p className="alert-error" style={{marginTop: 10}}>
+                {planLimitMessage(
+                  resourceUsage.entitlements,
+                  "branches",
+                  resourceUsage.branchesOverLimit
+                )}
+              </p>
+            )}
           </div>
 
           <button
@@ -202,6 +232,7 @@ const actualizarSucursal = async () => {
             setDireccion("");
             setModalCrear(true);
             }}
+            disabled={!resourceUsage.canAddBranch}
           >
             + Crear sucursal
           </button>
@@ -264,6 +295,7 @@ const actualizarSucursal = async () => {
                         type="button"
                         className="btn btn-secundario"
                         onClick={() => cambiarEstadoSucursal(sucursal)}
+                        disabled={!resourceUsage.canAddBranch}
                         style={{
                         padding: "6px 10px",
                         fontSize: 12,

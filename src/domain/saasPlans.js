@@ -61,10 +61,10 @@ export function resolveSaasEntitlements(client = {}) {
     ).trim().toUpperCase(),
     price: client.price ?? client.planPrecio ?? client.mantenimientoMensual ?? null,
     subscriptionStatus,
-    maxUsers: plan?.maxUsers ?? null,
-    maxBranches: plan?.maxBranches ?? null,
-    unlimitedUsers: plan?.unlimitedUsers === true,
-    unlimitedBranches: plan?.unlimitedBranches === true,
+    maxUsers: trial ? null : plan?.maxUsers ?? null,
+    maxBranches: trial ? null : plan?.maxBranches ?? null,
+    unlimitedUsers: trial || plan?.unlimitedUsers === true,
+    unlimitedBranches: trial || plan?.unlimitedBranches === true,
     isLegacy: planId === "legacy",
     isTrial: trial,
     isKnownPlan: Boolean(plan) || trial,
@@ -105,6 +105,14 @@ export function rehydrateSaasClient(client = {}) {
     subscriptionStatus: entitlements.subscriptionStatus,
     isLegacy: entitlements.isLegacy,
   };
+}
+
+export function resolveManualSaasPlanId(currentClient = {}, selectedPlanId = "") {
+  const selected = String(selectedPlanId || "").trim().toLowerCase();
+  if (selected === "trial") return "trial";
+  const selectedPlan = getPlanDefinition(selected);
+  if (selectedPlan) return selectedPlan.id;
+  return resolveSaasEntitlements(currentClient).planId;
 }
 
 export function validateSaasSubscription(input = {}) {
