@@ -105,7 +105,9 @@ function associationIssues(event, tenant, resolutionSource = "") {
       currentSubscription !== event.subscriptionId && active) {
     reasons.push("SECOND_ACTIVE_SUBSCRIPTION");
   }
-  const tenantCurrency = String(tenant.currency || tenant.moneda || "")
+  const tenantCurrency = String(
+      tenant.billingCurrency || tenant.currency || "USD",
+  )
       .trim().toUpperCase();
   if (event.action === "PAYMENT_APPROVED" && tenantCurrency &&
       event.currency && tenantCurrency !== event.currency) {

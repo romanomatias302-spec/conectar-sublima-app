@@ -206,6 +206,20 @@ test("plan, ciclo o moneda inválidos quedan pendientes", async () => {
   }
 });
 
+test("la asociación compara moneda SaaS y nunca la moneda operativa", async () => {
+  const repository = fakeRepository({
+    billingCurrency: "USD",
+    currency: "ARS",
+    moneda: "MXN",
+  });
+  const result = await processHotmartEvent({
+    event: event({currency: "USD"}),
+    repository,
+  });
+  assert.equal(result.status, "PROCESSED");
+  assert.equal(repository.state.approvedCalls, 1);
+});
+
 test("email ambiguo y tenant inexistente nunca se asocian arbitrariamente", async () => {
   const ambiguous = fakeRepository({hotmartSubscriptionId: ""});
   ambiguous.findTenantsByNormalizedEmail = async () => [
