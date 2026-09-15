@@ -1089,6 +1089,16 @@ exports.cambiarEstadoSucursalSaas = onCall(async (request) => {
   }
 });
 
+exports.completarDowngradeSaas = onCall(async (request) => {
+  const tenantId = requireText(request.data?.clienteId, "MISSING_TENANT_ID");
+  await authorizeEntitlementActor(request, tenantId);
+  try {
+    return await entitlementService.completePendingDowngrade({tenantId});
+  } catch (error) {
+    throw entitlementHttpsError(error);
+  }
+});
+
 
 /*aca se agrega funcion nueva para solucionar lo de las imagenes, de manera temporal */
 

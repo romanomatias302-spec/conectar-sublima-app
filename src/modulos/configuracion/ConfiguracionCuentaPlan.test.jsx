@@ -36,3 +36,16 @@ test("el cambio abre un paso informativo y no confirma cargos ni persistencia", 
   expect(screen.getByRole("dialog")).toHaveTextContent("Este paso no modifica tu plan ni genera cargos");
   expect(screen.getByText(/checkout se habilitarán cuando el circuito comercial/)).toBeInTheDocument();
 });
+
+test("muestra el plan efectivo separado del downgrade pendiente y permite administrar recursos", () => {
+  const manage = jest.fn();
+  render(<ConfiguracionCuentaPlan
+    account={{planId: "profesional_plus", pendingPlanId: "profesional", billingCurrency: "USD"}}
+    usage={{...usage, usedUsers: 10, activeBranches: 5}}
+    onManageResources={manage}
+  />);
+  expect(screen.getByText("Profesional Plus → Profesional")).toBeInTheDocument();
+  expect(screen.getByText(/plan y precio actuales siguen vigentes/)).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", {name: "Administrar recursos"}));
+  expect(manage).toHaveBeenCalledTimes(1);
+});

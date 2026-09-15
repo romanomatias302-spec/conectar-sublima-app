@@ -12,6 +12,7 @@ import {
   formatPlanUsage,
   planLimitMessage,
 } from "../../domain/saasEntitlementUsage";
+import {pendingPlanEntitlements} from "../../domain/saasPlanChange";
 import ClienteSaasForm from "./ClienteSaasForm";
 import {
   crearInvitacionUsuario,
@@ -51,6 +52,7 @@ export default function DuenoSaasPanel() {
   const [clientes, setClientes] = useState([]);
   const [usuarios, setUsuarios] = useState([]);
   const [invitaciones, setInvitaciones] = useState([]);
+  const [sucursales, setSucursales] = useState([]);
   const [movimientosSaas, setMovimientosSaas] = useState([]);
   const [usoClientes, setUsoClientes] = useState({});
   const [loading, setLoading] = useState(true);
@@ -254,6 +256,15 @@ const mapearUsoClientes = (snapshot) => {
     }
   };
 
+  const cargarSucursales = async () => {
+    try {
+      const snapshot = await getDocs(collection(db, "sucursales"));
+      setSucursales(snapshot.docs.map((item) => ({firebaseId: item.id, ...item.data()})));
+    } catch (error) {
+      console.error("Error cargando sucursales SaaS:", error);
+    }
+  };
+
   const cargarInvitaciones = async (clientesActuales = clientes) => {
     try {
       const todas = [];
@@ -279,6 +290,7 @@ useEffect(() => {
     }
   });
   cargarUsuarios();
+  cargarSucursales();
   cargarMovimientosSaas();
 
   const unsubUso = onSnapshot(
@@ -301,6 +313,13 @@ const clienteUsuariosUsage = useMemo(() => calculateSaasResourceUsage({
   users: usuarios.filter((user) => user.clienteId === clienteUsuarios?.id),
   invitations: invitaciones.filter((item) => item.clienteId === clienteUsuarios?.id),
 }), [clienteUsuarios, usuarios, invitaciones]);
+
+const usoEntitlementsCliente = (cliente) => calculateSaasResourceUsage({
+  client: cliente,
+  users: usuarios.filter((user) => user.clienteId === cliente.id),
+  invitations: invitaciones.filter((item) => item.clienteId === cliente.id),
+  branches: sucursales.filter((branch) => branch.clienteId === cliente.id),
+});
 
 useEffect(() => {
   const syncTab = () => syncSaasTabFromLocation(window.location, setSeccionActiva);
@@ -875,7 +894,7 @@ return (
                     >
                       <div>
                         <strong>{c.nombre || c.nombreCliente || c.empresa || c.id || "—"}</strong>
-                        <span>{resolveSaasPlanLabel(c)}</span>
+                        <span>{resolveSaasPlanLabel(c)}{c.pendingPlanId ? ` · pendiente a ${pendingPlanEntitlements(c)?.planName}` : ""}</span>
                       </div>
 
                       <b>{abierto ? "▲" : "▼"}</b>
@@ -969,7 +988,18 @@ return (
                 >
                   <td style={td}>{c.nombre || c.nombreCliente || c.empresa || c.id || "—"}</td>
                   <td style={td}>{c.email || "—"}</td>
-                  <td style={td}>{resolveSaasPlanLabel(c)}</td>
+                  <td style={td}>
+                    <div>{resolveSaasPlanLabel(c)}</div>
+                    {c.pendingPlanId && (() => {
+                      const pending = pendingPlanEntitlements(c);
+                      const usage = usoEntitlementsCliente(c);
+                      return pending ? (
+                        <small style={{display: "block", marginTop: 4, color: "#b45309", fontWeight: 700}}>
+                          Downgrade pendiente a {pending.planName} · {usage.usedUsers}/{pending.maxUsers ?? "∞"} usuarios · {usage.activeBranches}/{pending.maxBranches ?? "∞"} sucursales
+                        </small>
+                      ) : null;
+                    })()}
+                  </td>
                   <td style={td}>
                     {resolveSaasCurrency(c, "USD")}
                   </td>

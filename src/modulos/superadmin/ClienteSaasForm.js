@@ -1,7 +1,10 @@
 import React, { useEffect, useState } from "react";
-import { addDoc, collection, doc, updateDoc } from "firebase/firestore";
+import { addDoc, collection, deleteField, doc, getDocs, query, updateDoc, where } from "firebase/firestore";
 import { db } from "../../firebase";
+import {escucharInvitacionesPorCliente} from "../../firebase/invitacionesUsuarios";
 import {nextSaasBillingDate} from "../../domain/saasBillingState";
+import {calculateSaasResourceUsage} from "../../domain/saasEntitlementUsage";
+import {evaluateSaasPlanChange, pendingPlanFields} from "../../domain/saasPlanChange";
 import {
   getSelectablePlans,
   priceAfterCurrencyChange,
@@ -406,6 +409,66 @@ diasCiclo: 7,
     };
 
       if (clienteEditando?.id) {
+        const targetPlanId = dataAGuardar.planId;
+        const currentPlanId = resolveSaasEntitlements(clienteEditando).planId;
+        const planChanged = targetPlanId !== currentPlanId;
+        if (planChanged) {
+          const [usersSnapshot, invitations, branchesSnapshot] = await Promise.all([
+            getDocs(query(collection(db, "usuarios"), where("clienteId", "==", clienteEditando.id))),
+            escucharInvitacionesPorCliente(clienteEditando.id),
+            getDocs(query(collection(db, "sucursales"), where("clienteId", "==", clienteEditando.id))),
+          ]);
+          const usage = calculateSaasResourceUsage({
+            client: clienteEditando,
+            users: usersSnapshot.docs.map((item) => ({uid: item.id, ...item.data()})),
+            invitations,
+            branches: branchesSnapshot.docs.map((item) => ({id: item.id, ...item.data()})),
+          });
+          const change = evaluateSaasPlanChange({currentClient: clienteEditando, targetPlanId, usage});
+          if (change.pendingRequired) {
+            const accepted = window.confirm(
+              `El cliente usa ${usage.usedUsers} usuarios/invitaciones y ${usage.activeBranches} sucursales. ` +
+              `El plan ${change.target.planName} permite ${change.target.maxUsers} usuarios y ${change.target.maxBranches} sucursales. ` +
+              "Se programará el downgrade y el plan/precio actuales seguirán efectivos hasta que el cliente reduzca el uso. ¿Continuar?"
+            );
+            if (!accepted) return;
+            const effective = resolveSaasEntitlements(clienteEditando);
+            Object.assign(dataAGuardar, {
+              planId: effective.planId,
+              plan: clienteEditando.plan || effective.planName,
+              planNombre: clienteEditando.planNombre || effective.planName,
+              billingCycle: effective.billingCycle,
+              frecuenciaCobro: clienteEditando.frecuenciaCobro || (effective.billingCycle === "annual" ? "anual" : "mensual"),
+              diasCiclo: clienteEditando.diasCiclo || (effective.billingCycle === "annual" ? 365 : 30),
+              billingCurrency: effective.currency,
+              currency: effective.currency,
+              price: effective.price,
+              planPrecio: clienteEditando.planPrecio ?? effective.price,
+              mantenimientoMensual: clienteEditando.mantenimientoMensual ?? effective.price,
+              billingAnchorDate: clienteEditando.billingAnchorDate || billingAnchorDate,
+              nextBillingDate: clienteEditando.nextBillingDate || clienteEditando.fechaProximoCargo || "",
+              fechaProximoCargo: clienteEditando.fechaProximoCargo || clienteEditando.nextBillingDate || "",
+              fechaVencimiento: clienteEditando.fechaVencimiento || "",
+              ...pendingPlanFields({
+                planId: targetPlanId,
+                billingCycle: formData.billingCycle,
+                price: precioFinal,
+                billingCurrency: formData.currency,
+              }),
+            });
+          } else {
+            Object.assign(dataAGuardar, {
+              pendingPlanId: deleteField(),
+              pendingBillingCycle: deleteField(),
+              pendingPrice: deleteField(),
+              pendingBillingCurrency: deleteField(),
+              pendingPlanChangeType: deleteField(),
+            });
+          }
+        }
+      }
+
+      if (clienteEditando?.id) {
         await updateDoc(doc(db, "clientes-saas", clienteEditando.id), dataAGuardar);
       } else {
         await addDoc(collection(db, "clientes-saas"), dataAGuardar);
@@ -426,6 +489,13 @@ diasCiclo: 7,
         <h2 style={{ marginTop: 0 }}>
           {clienteEditando ? "Editar cliente SaaS" : "Nuevo cliente SaaS"}
         </h2>
+
+        {clienteEditando?.pendingPlanId && (
+          <div style={{padding: "12px 14px", marginBottom: 16, borderRadius: 10, background: "#fff7ed", border: "1px solid #fdba74", color: "#9a3412"}}>
+            <strong>Downgrade pendiente a {resolveSaasEntitlements({planId: clienteEditando.pendingPlanId}).planName}</strong>
+            <div style={{marginTop: 4, fontSize: 13}}>El plan y el precio actuales continúan efectivos hasta que el cliente ajuste sus recursos.</div>
+          </div>
+        )}
 
       <form onSubmit={handleGuardar} style={form}>
         <div style={campo}>

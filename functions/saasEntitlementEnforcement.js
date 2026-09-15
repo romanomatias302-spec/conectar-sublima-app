@@ -2,7 +2,7 @@
 /* eslint-disable require-jsdoc, max-len */
 
 const crypto = require("node:crypto");
-const {resolveSaasEntitlements} = require("./saasPlanCatalog");
+const {getSaasPlan, isSupportedBillingCycle, resolveSaasEntitlements} = require("./saasPlanCatalog");
 
 const USER_LIMIT_CODE = "SAAS_USER_LIMIT_REACHED";
 const BRANCH_LIMIT_CODE = "SAAS_BRANCH_LIMIT_REACHED";
@@ -123,6 +123,56 @@ function createSaasEntitlementService({db, FieldValue, Timestamp, now = () => ne
   }
 
   return {
+    async completePendingDowngrade({tenantId}) {
+      return db.runTransaction(async (transaction) => {
+        const context = await transactionContext(transaction, tenantId);
+        const pendingPlan = getSaasPlan(context.client.pendingPlanId);
+        if (!pendingPlan || context.client.pendingPlanChangeType !== "downgrade") {
+          throw Object.assign(new Error("PENDING_DOWNGRADE_NOT_FOUND"), {code: "PENDING_DOWNGRADE_NOT_FOUND"});
+        }
+        const pendingCycle = String(context.client.pendingBillingCycle || "").trim().toLowerCase();
+        const pendingCurrency = String(context.client.pendingBillingCurrency || "").trim().toUpperCase();
+        const pendingPrice = Number(context.client.pendingPrice);
+        if (!isSupportedBillingCycle(pendingCycle) || !pendingCurrency || !Number.isFinite(pendingPrice) || pendingPrice < 0) {
+          throw Object.assign(new Error("INVALID_PENDING_DOWNGRADE"), {code: "INVALID_PENDING_DOWNGRADE"});
+        }
+        const eligibility = canDowngradeToPlan({
+          currentUsers: context.usage.activeUsers,
+          pendingInvitations: context.usage.pendingInvitations,
+          currentBranches: context.usage.activeBranches,
+        }, pendingPlan.id);
+        if (!eligibility.allowed) {
+          return {
+            completed: false,
+            userExceeded: eligibility.userExceeded,
+            branchesExceeded: eligibility.branchesExceeded,
+            usage: context.usage,
+          };
+        }
+        context.touchLock();
+        transaction.update(clients.doc(tenantId), {
+          planId: pendingPlan.id,
+          plan: pendingPlan.name,
+          planNombre: pendingPlan.name,
+          billingCycle: pendingCycle,
+          frecuenciaCobro: pendingCycle === "annual" ? "anual" : "mensual",
+          diasCiclo: pendingCycle === "annual" ? 365 : 30,
+          billingCurrency: pendingCurrency,
+          currency: pendingCurrency,
+          price: pendingPrice,
+          planPrecio: pendingPrice,
+          mantenimientoMensual: pendingPrice,
+          pendingPlanId: FieldValue.delete(),
+          pendingBillingCycle: FieldValue.delete(),
+          pendingPrice: FieldValue.delete(),
+          pendingBillingCurrency: FieldValue.delete(),
+          pendingPlanChangeType: FieldValue.delete(),
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        return {completed: true, planId: pendingPlan.id};
+      });
+    },
+
     async createInvitation({tenantId, name, email, role, createdBy}) {
       const token = crypto.randomBytes(32).toString("hex");
       const ref = invitations.doc(token);

@@ -8,13 +8,21 @@ import {
   where,
 } from "firebase/firestore";
 import { db } from "../../firebase";
-import { cambiarEstadoUsuarioSaas } from "../../firebase/saasEntitlements";
+import {cambiarEstadoUsuarioSaas, completarDowngradeSaas} from "../../firebase/saasEntitlements";
 import {
   calculateSaasResourceUsage,
   formatPlanUsage,
   invitationReservesUserSeat,
   planLimitMessage,
 } from "../../domain/saasEntitlementUsage";
+import {
+  buildUserCapacityChanges,
+  canConfirmCapacitySelection,
+  initialUserSeatSelection,
+  invitationSeatId,
+  userSeatId,
+} from "../../domain/saasOverLimitSelection";
+import {pendingPlanEntitlements} from "../../domain/saasPlanChange";
 import {
   cancelarInvitacion,
   crearInvitacionUsuario,
@@ -325,7 +333,7 @@ const MODULOS_PERMISOS = [
   },
 ];
 
-export default function ConfiguracionUsuarios({ perfil }) {
+export default function ConfiguracionUsuarios({ perfil, onEntitlementsChanged }) {
   const [usuarios, setUsuarios] = useState([]);
   const [invitaciones, setInvitaciones] = useState([]);
   const [clienteSaas, setClienteSaas] = useState(null);
@@ -339,6 +347,8 @@ export default function ConfiguracionUsuarios({ perfil }) {
   const [guardando, setGuardando] = useState(false);
   const [mensaje, setMensaje] = useState("");
   const [cancelandoId, setCancelandoId] = useState(null);
+  const [seleccionCupos, setSeleccionCupos] = useState(null);
+  const [aplicandoCupos, setAplicandoCupos] = useState(false);
 
   const [usuarioEditandoPermisos, setUsuarioEditandoPermisos] = useState(null);
   const [permisosEditando, setPermisosEditando] = useState(PERMISOS_DEFAULT_USUARIO);
@@ -567,6 +577,73 @@ const resourceUsage = useMemo(() => calculateSaasResourceUsage({
   client: clienteSaas || {}, users: usuarios, invitations: invitaciones,
   branches: sucursales,
 }), [clienteSaas, usuarios, invitaciones, sucursales]);
+const futureEntitlements = useMemo(() => pendingPlanEntitlements(clienteSaas || {}), [clienteSaas]);
+const pendingUsersOverLimit = Boolean(futureEntitlements && !futureEntitlements.unlimitedUsers &&
+  resourceUsage.usedUsers > futureEntitlements.maxUsers);
+const selectionUsersOverLimit = resourceUsage.usersOverLimit || pendingUsersOverLimit;
+const selectionUserLimit = futureEntitlements?.maxUsers ?? resourceUsage.entitlements.maxUsers;
+
+useEffect(() => {
+  if (!selectionUsersOverLimit) {
+    setSeleccionCupos(null);
+    return;
+  }
+  setSeleccionCupos((actual) => actual || new Set(
+    initialUserSeatSelection(usuarios, invitaciones)
+  ));
+}, [selectionUsersOverLimit, usuarios, invitaciones]);
+
+const alternarCupo = (id) => {
+  setSeleccionCupos((actual) => {
+    const siguiente = new Set(actual || []);
+    if (siguiente.has(id)) siguiente.delete(id);
+    else siguiente.add(id);
+    return siguiente;
+  });
+};
+
+async function aplicarSeleccionCupos() {
+  const limit = selectionUserLimit;
+  if (!seleccionCupos || !canConfirmCapacitySelection(seleccionCupos.size, limit)) return;
+  const selectedNames = [
+    ...usuarios.filter((usuario) => seleccionCupos.has(userSeatId(usuario.uid)))
+      .map((usuario) => usuario.nombre || usuario.email || "Usuario"),
+    ...invitacionesPendientes.filter((item) => seleccionCupos.has(invitationSeatId(item.id)))
+      .map((item) => `${item.nombre || item.email || "Invitación"} (invitación)`),
+  ];
+  const confirmar = window.confirm(
+    `Vas a mantener activos:\n- ${selectedNames.join("\n- ")}\n\n` +
+    "Los demás usuarios quedarán inactivos y las invitaciones no elegidas se cancelarán. No se eliminarán datos ni historial."
+  );
+  if (!confirmar) return;
+  try {
+    setAplicandoCupos(true);
+    setMensaje("");
+    const changes = buildUserCapacityChanges({
+      users: usuarios,
+      invitations: invitaciones,
+      selectedIds: [...seleccionCupos],
+      currentUid: perfil?.uid || perfil?.firebaseUid || "",
+    });
+    for (const invitationId of changes.cancelInvitationIds) {
+      await cancelarInvitacion(invitationId);
+    }
+    for (const uid of changes.deactivateUserIds) {
+      await cambiarEstadoUsuarioSaas({clienteId: perfil.clienteId, uid, activo: false});
+    }
+    setSeleccionCupos(null);
+    await cargarTodo();
+    if (futureEntitlements) await completarDowngradeSaas(perfil.clienteId);
+    onEntitlementsChanged?.();
+    setMensaje("Selección de usuarios aplicada correctamente.");
+  } catch (error) {
+    console.error("Error aplicando selección de usuarios:", error);
+    setMensaje(error.message || "No se pudo aplicar la selección.");
+    await cargarTodo();
+  } finally {
+    setAplicandoCupos(false);
+  }
+}
 
  const sectoresProduccionOrdenados =
   useMemo(() => {
@@ -690,6 +767,7 @@ const resourceUsage = useMemo(() => calculateSaasResourceUsage({
       setMostrarFormulario(false);
 
       await cargarTodo();
+      onEntitlementsChanged?.();
     } catch (error) {
       console.error("Error creando invitación:", error);
       setMensaje(error.message || "No se pudo crear la invitación.");
@@ -703,6 +781,7 @@ const resourceUsage = useMemo(() => calculateSaasResourceUsage({
       setCancelandoId(invitacionId);
       await cancelarInvitacion(invitacionId);
       await cargarTodo();
+      onEntitlementsChanged?.();
     } catch (error) {
       console.error("Error cancelando invitación:", error);
       setMensaje("No se pudo cancelar la invitación.");
@@ -878,6 +957,7 @@ async function cambiarEstadoUsuario(usuario, activo) {
 
     setMensaje(activo ? "Usuario reactivado." : "Usuario anulado.");
     await cargarTodo();
+    onEntitlementsChanged?.();
   } catch (error) {
     console.error("Error cambiando estado de usuario:", error);
     setMensaje(error.message || "No se pudo cambiar el estado del usuario.");
@@ -1083,7 +1163,49 @@ setPermisosEditando((prev) => ({
 
         </div>
 
-                     <div className="container-secundaria">
+        {selectionUsersOverLimit && seleccionCupos && (
+          <div className="entitlement-overlimit-panel">
+            <div className="entitlement-overlimit-head">
+              <div>
+                <strong>Ajustá los usuarios activos</strong>
+                <p>
+                  {futureEntitlements ? "Tu próximo plan" : "Tu plan"} permite {selectionUserLimit} usuarios y actualmente utilizás {resourceUsage.usedUsers}.
+                  Elegí cuáles conservar; no se aplicará ningún cambio hasta confirmar.
+                </p>
+              </div>
+              <span>{seleccionCupos.size} de {selectionUserLimit} seleccionados</span>
+            </div>
+            <div className="entitlement-selection-grid">
+              {usuarios.filter((usuario) => usuario.activo === true && usuario.rol !== "superadmin").map((usuario) => {
+                const id = userSeatId(usuario.uid);
+                const current = usuario.uid === (perfil?.uid || perfil?.firebaseUid);
+                return (
+                  <label key={id} className="entitlement-selection-item">
+                    <input type="checkbox" checked={seleccionCupos.has(id)} disabled={current || aplicandoCupos} onChange={() => alternarCupo(id)} />
+                    <span><strong>{usuario.nombre || usuario.email || "Usuario"}</strong><small>{current ? "Tu usuario · debe permanecer activo" : usuario.email || "Usuario activo"}</small></span>
+                  </label>
+                );
+              })}
+              {invitacionesPendientes.map((invitacion) => {
+                const id = invitationSeatId(invitacion.id);
+                return (
+                  <label key={id} className="entitlement-selection-item">
+                    <input type="checkbox" checked={seleccionCupos.has(id)} disabled={aplicandoCupos} onChange={() => alternarCupo(id)} />
+                    <span><strong>{invitacion.nombre || invitacion.email || "Invitación"}</strong><small>{invitacion.email} · invitación pendiente</small></span>
+                  </label>
+                );
+              })}
+            </div>
+            <div className="entitlement-overlimit-actions">
+              <span>Los usuarios no seleccionados quedarán inactivos y las invitaciones pendientes se cancelarán. No se elimina historial.</span>
+              <button className="btn btn-primary" disabled={aplicandoCupos || !canConfirmCapacitySelection(seleccionCupos.size, selectionUserLimit)} onClick={aplicarSeleccionCupos}>
+                {aplicandoCupos ? "Aplicando..." : "Aplicar selección"}
+              </button>
+            </div>
+          </div>
+        )}
+
+                      <div className="container-secundaria">
 
         <h3 style={{ marginTop: 0 }}>Invitaciones pendientes</h3>
 

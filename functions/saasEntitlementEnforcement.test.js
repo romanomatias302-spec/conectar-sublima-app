@@ -106,11 +106,12 @@ function fakeFirestore(seed = {}) {
 
 function service(seed) {
   const fake = fakeFirestore(seed);
+  const deleted = Symbol("deleted");
   return {
     ...fake,
     service: createSaasEntitlementService({
       db: fake.db,
-      FieldValue: {serverTimestamp: () => "server-time"},
+      FieldValue: {serverTimestamp: () => "server-time", delete: () => deleted},
       Timestamp: {fromDate: (date) => date},
       now: () => now,
     }),
@@ -147,6 +148,51 @@ test("dos sucursales concurrentes y reactivación respetan el límite", async ()
       second.service.setBranchActive({tenantId: "tenant", branchId: "inactive", active: true}),
       {code: "SAAS_BRANCH_LIMIT_REACHED"},
   );
+});
+
+test("downgrade pendiente sólo se completa cuando el uso real entra en el límite", async () => {
+  const blocked = service({
+    "clientes-saas/tenant": {
+      planId: "profesional_plus", price: 79, billingCurrency: "USD",
+      pendingPlanId: "start", pendingBillingCycle: "monthly",
+      pendingPrice: 19, pendingBillingCurrency: "USD", pendingPlanChangeType: "downgrade",
+    },
+    "usuarios/a": {clienteId: "tenant", activo: true, rol: "admin"},
+    "usuarios/b": {clienteId: "tenant", activo: true, rol: "usuario"},
+    "usuarios/c": {clienteId: "tenant", activo: true, rol: "usuario"},
+  });
+  const first = await blocked.service.completePendingDowngrade({tenantId: "tenant"});
+  assert.equal(first.completed, false);
+  assert.equal(blocked.docs.get("clientes-saas/tenant").planId, "profesional_plus");
+  assert.equal(blocked.docs.get("clientes-saas/tenant").pendingPlanId, "start");
+
+  await blocked.service.setUserActive({tenantId: "tenant", uid: "c", active: false});
+  const completed = await blocked.service.completePendingDowngrade({tenantId: "tenant"});
+  assert.equal(completed.completed, true);
+  assert.equal(blocked.docs.get("clientes-saas/tenant").planId, "start");
+  assert.equal(blocked.docs.get("clientes-saas/tenant").price, 19);
+});
+
+test("resolución parcial conserva el downgrade pendiente hasta completar lo restante", async () => {
+  const pendingDowngrade = service({
+    "clientes-saas/tenant": {
+      planId: "profesional_plus", pendingPlanId: "profesional",
+      pendingBillingCycle: "monthly", pendingPrice: 39,
+      pendingBillingCurrency: "USD", pendingPlanChangeType: "downgrade",
+    },
+    ...Object.fromEntries(Array.from({length: 7}, (_, index) => [
+      `usuarios/u${index}`, {clienteId: "tenant", activo: true, rol: index === 0 ? "admin" : "usuario"},
+    ])),
+  });
+  await pendingDowngrade.service.setUserActive({tenantId: "tenant", uid: "u6", active: false});
+  const partial = await pendingDowngrade.service.completePendingDowngrade({tenantId: "tenant"});
+  assert.equal(partial.completed, false);
+  assert.equal(pendingDowngrade.docs.get("clientes-saas/tenant").planId, "profesional_plus");
+  assert.equal(pendingDowngrade.docs.get("clientes-saas/tenant").pendingPlanId, "profesional");
+  await pendingDowngrade.service.setUserActive({tenantId: "tenant", uid: "u5", active: false});
+  const result = await pendingDowngrade.service.completePendingDowngrade({tenantId: "tenant"});
+  assert.equal(result.completed, true);
+  assert.equal(pendingDowngrade.docs.get("clientes-saas/tenant").planId, "profesional");
 });
 
 test("recursos de otro tenant no consumen cupo ni pueden modificarse", async () => {

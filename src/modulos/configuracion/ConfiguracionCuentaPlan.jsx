@@ -2,6 +2,7 @@ import React, {useMemo, useState} from "react";
 import {FaCheck, FaCloud, FaExclamationTriangle, FaStore, FaUsers} from "react-icons/fa";
 import {getSelectablePlans, priceForPlan, resolveSaasEntitlements} from "../../domain/saasPlans";
 import {normalizeBillingProvider} from "../../domain/saasPaymentProvider";
+import {pendingPlanEntitlements} from "../../domain/saasPlanChange";
 
 const STATUS_LABELS = {
   trial: "Prueba",
@@ -34,7 +35,7 @@ function usageLabel(used, limit, unlimited) {
   return unlimited ? `${used} usados · Ilimitado` : `${used} de ${limit} usados`;
 }
 
-export default function ConfiguracionCuentaPlan({account, usage}) {
+export default function ConfiguracionCuentaPlan({account, usage, onManageResources}) {
   const [selectedPlan, setSelectedPlan] = useState(null);
   const entitlements = useMemo(() => resolveSaasEntitlements(account), [account]);
   const plans = getSelectablePlans();
@@ -43,6 +44,7 @@ export default function ConfiguracionCuentaPlan({account, usage}) {
   const nextCharge = account.nextBillingDate || account.fechaProximoCargo || account.fechaVencimiento;
   const suspended = account.suspendidoManual || account.suspendidoPorSistema;
   const status = suspended ? "suspended" : entitlements.subscriptionStatus;
+  const futureEntitlements = pendingPlanEntitlements(account);
 
   return (
     <div className="account-plan-section">
@@ -83,6 +85,20 @@ export default function ConfiguracionCuentaPlan({account, usage}) {
           <div className="account-plan-warning">
             <FaExclamationTriangle />
             <span>Tu uso actual supera el límite del plan. Conservás los recursos existentes, pero no podrás crear ni reactivar más hasta liberar capacidad o mejorar el plan.</span>
+          </div>
+        )}
+
+        {futureEntitlements && (
+          <div className="account-pending-plan">
+            <FaExclamationTriangle />
+            <div>
+              <span className="account-plan-eyebrow">Cambio de plan pendiente</span>
+              <strong>{entitlements.planName} → {futureEntitlements.planName}</strong>
+              <p>
+                Necesitás ajustar {usage.usedUsers} → {futureEntitlements.unlimitedUsers ? "ilimitados" : futureEntitlements.maxUsers} usuarios y {usage.activeBranches} → {futureEntitlements.unlimitedBranches ? "ilimitadas" : futureEntitlements.maxBranches} sucursales. El plan y precio actuales siguen vigentes hasta completar el ajuste.
+              </p>
+              <button className="account-plan-button" onClick={onManageResources}>Administrar recursos</button>
+            </div>
           </div>
         )}
       </div>

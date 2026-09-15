@@ -340,6 +340,12 @@ body.dark-mode .tab-btn.activo {
 .account-usage-card div { display: grid; gap: 2px; }
 .account-usage-card.is-over { color: #c14f20; border-color: #f2b99f; background: #fff8f4; }
 .account-plan-warning { display: flex; align-items: flex-start; gap: 10px; margin-top: 14px; padding: 11px 13px; color: #92451f; background: #fff4eb; border-radius: 9px; font-size: 13px; line-height: 1.45; }
+.account-pending-plan { display: flex; gap: 14px; margin-top: 18px; padding: 18px; border: 1px solid #fdba74; border-radius: 14px; background: #fff7ed; color: #9a3412; }
+.account-pending-plan > svg { flex: 0 0 auto; margin-top: 3px; }
+.account-pending-plan strong { display: block; margin: 4px 0 6px; color: #7c2d12; }
+.account-pending-plan p { margin: 0 0 12px; line-height: 1.5; }
+body.dark-mode .account-pending-plan { background: rgba(154, 52, 18, 0.16); border-color: #9a3412; color: #fed7aa; }
+body.dark-mode .account-pending-plan strong { color: #ffedd5; }
 .account-plans-header p { margin: 2px 0 0; color: #6b7780; font-size: 13px; }
 .account-plans-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 12px; }
 .account-plan-card { display: flex; flex-direction: column; min-width: 0; padding: 16px; border: 1px solid #dce3e8; border-radius: 12px; background: #fff; box-shadow: 0 2px 10px rgba(0,0,0,.04); }
@@ -371,3 +377,23 @@ body.dark-mode .account-usage-card { background: #20272b; border-color: #3b454b;
 
 @media (max-width: 1050px) { .account-plans-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } .account-plan-details { grid-template-columns: repeat(3,minmax(120px,1fr)); } }
 @media (max-width: 600px) { .account-plan-summary { padding: 16px; } .account-plan-heading { align-items: flex-start; } .account-plan-details, .account-usage-grid, .account-plans-grid { grid-template-columns: 1fr; } .account-plan-card { padding: 14px; } }
+
+.entitlement-overlimit-panel { display: grid; gap: 14px; margin: 16px 0; padding: 16px; border: 1px solid #f0b38f; border-radius: 12px; background: #fff9f5; }
+.entitlement-overlimit-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; }
+.entitlement-overlimit-head strong { color: #7d3518; }
+.entitlement-overlimit-head p { max-width: 720px; margin: 5px 0 0; color: #6b4a3b; font-size: 13px; line-height: 1.45; }
+.entitlement-overlimit-head > span { flex: 0 0 auto; padding: 5px 9px; border-radius: 999px; color: #8b3e1d; background: #ffe8da; font-size: 12px; font-weight: 700; }
+.entitlement-selection-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(230px,1fr)); gap: 8px; }
+.entitlement-selection-item { display: flex; align-items: flex-start; gap: 9px; padding: 10px; border: 1px solid #eadbd2; border-radius: 9px; background: #fff; cursor: pointer; }
+.entitlement-selection-item input { width: auto; margin-top: 3px; accent-color: #0096d1; }
+.entitlement-selection-item span { display: grid; min-width: 0; gap: 2px; }
+.entitlement-selection-item strong, .entitlement-selection-item small { overflow: hidden; text-overflow: ellipsis; }
+.entitlement-selection-item small { color: #758087; font-size: 11px; }
+.entitlement-overlimit-actions { display: flex; justify-content: space-between; align-items: center; gap: 14px; }
+.entitlement-overlimit-actions > span { color: #6b4a3b; font-size: 12px; }
+.entitlement-overlimit-actions button { flex: 0 0 auto; }
+body.dark-mode .entitlement-overlimit-panel { border-color: #76503d; background: #302923; }
+body.dark-mode .entitlement-selection-item { border-color: #4d4540; background: #252a2d; }
+body.dark-mode .entitlement-overlimit-head strong, body.dark-mode .entitlement-overlimit-head p, body.dark-mode .entitlement-overlimit-actions > span { color: #f0c7b2; }
+
+@media (max-width: 600px) { .entitlement-overlimit-head, .entitlement-overlimit-actions { flex-direction: column; } .entitlement-overlimit-actions button { width: 100%; } }

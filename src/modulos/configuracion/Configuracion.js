@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import "./Configuracion.css";
 import {
   FaMoon,
@@ -26,6 +26,7 @@ import ConfiguracionSucursales from "./ConfiguracionSucursales";
 import ConfiguracionProduccion from "./ConfiguracionProduccion";
 import { accountPaymentAction } from "../../domain/saasPaymentProvider";
 import { calculateSaasResourceUsage } from "../../domain/saasEntitlementUsage";
+import {resolveSaasEntitlements} from "../../domain/saasPlans";
 import { obtenerUsuariosPorCliente } from "../../firebase/usuariosConfig";
 import { escucharInvitacionesPorCliente } from "../../firebase/invitacionesUsuarios";
 import ConfiguracionCuentaPlan from "./ConfiguracionCuentaPlan";
@@ -40,6 +41,7 @@ export default function Configuracion({ modoOscuro, setModoOscuro, perfil, onAct
   const [nombreVisible, setNombreVisible] = useState("");
   const [cuentaSaas, setCuentaSaas] = useState(null);
   const [usoCuenta, setUsoCuenta] = useState(null);
+  const [revisionEntitlements, setRevisionEntitlements] = useState(0);
   const [guardandoConfig, setGuardandoConfig] = useState(false);
   const [mensajeConfig, setMensajeConfig] = useState("");
   const [moneda, setMoneda] = useState(perfil?.moneda || "ARS");
@@ -198,6 +200,36 @@ export default function Configuracion({ modoOscuro, setModoOscuro, perfil, onAct
 
 cargarConfigCliente();
 }, [perfil?.clienteId, perfil?.rol]);
+
+const refrescarUsoCuenta = useCallback(async () => {
+  if (!perfil?.clienteId || perfil?.rol === "superadmin") return;
+  const [clienteSnapshot, usuarios, invitaciones, sucursalesSnap] = await Promise.all([
+    getDoc(doc(db, "clientes-saas", perfil.clienteId)),
+    obtenerUsuariosPorCliente(perfil.clienteId),
+    escucharInvitacionesPorCliente(perfil.clienteId),
+    getDocs(query(collection(db, "sucursales"), where("clienteId", "==", perfil.clienteId))),
+  ]);
+  if (!clienteSnapshot.exists()) return;
+  const cliente = {id: clienteSnapshot.id, ...clienteSnapshot.data()};
+  setCuentaSaas((actual) => ({...actual, ...cliente}));
+  setUsoCuenta(calculateSaasResourceUsage({
+    client: cliente,
+    users: usuarios,
+    invitations: invitaciones,
+    branches: sucursalesSnap.docs.map((documento) => ({id: documento.id, ...documento.data()})),
+  }));
+}, [perfil?.clienteId, perfil?.rol]);
+
+useEffect(() => {
+  if (pestañaActiva !== "cuenta") return;
+  refrescarUsoCuenta().catch((error) => {
+    console.error("No se pudo refrescar el uso del plan:", error);
+  });
+}, [pestañaActiva, refrescarUsoCuenta, revisionEntitlements]);
+
+const notificarCambioEntitlements = useCallback(() => {
+  setRevisionEntitlements((revision) => revision + 1);
+}, []);
 
 
 
@@ -572,7 +604,7 @@ const pagarPeriodoMercadoPago = async (periodo) => {
           <p className="config-note">
             Invitá y administrá los accesos del equipo.
           </p>
-          <ConfiguracionUsuarios perfil={perfil} />
+          <ConfiguracionUsuarios perfil={perfil} onEntitlementsChanged={notificarCambioEntitlements} />
         </section>
       )}
 
@@ -582,7 +614,7 @@ const pagarPeriodoMercadoPago = async (periodo) => {
           <p className="config-note">
             Administrá los locales o puntos de trabajo del negocio.
           </p>
-          <ConfiguracionSucursales perfil={perfil} />
+          <ConfiguracionSucursales perfil={perfil} onEntitlementsChanged={notificarCambioEntitlements} />
         </section>
       )}
 
@@ -604,7 +636,15 @@ const pagarPeriodoMercadoPago = async (periodo) => {
           ) : (
             <>
               {usoCuenta ? (
-                <ConfiguracionCuentaPlan account={cuentaSaas} usage={usoCuenta} />
+                <ConfiguracionCuentaPlan
+                  account={cuentaSaas}
+                  usage={usoCuenta}
+                  onManageResources={() => {
+                    const pending = resolveSaasEntitlements({planId: cuentaSaas.pendingPlanId});
+                    const usersNeedAdjustment = !pending.unlimitedUsers && usoCuenta.usedUsers > pending.maxUsers;
+                    setPestañaActiva(usersNeedAdjustment ? "usuarios" : "sucursales");
+                  }}
+                />
               ) : (
                 <p>Cargando uso y límites del plan...</p>
               )}

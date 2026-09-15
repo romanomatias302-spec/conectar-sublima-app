@@ -13,6 +13,7 @@ import ActionMenu from "../../comunes/componentes/ActionMenu";
 import {
   asegurarSucursalPrincipalSaas,
   cambiarEstadoSucursalSaas,
+  completarDowngradeSaas,
   crearSucursalSaas,
 } from "../../firebase/saasEntitlements";
 import {
@@ -20,10 +21,16 @@ import {
   formatPlanUsage,
   planLimitMessage,
 } from "../../domain/saasEntitlementUsage";
+import {
+  buildBranchCapacityChanges,
+  canConfirmCapacitySelection,
+  initialBranchSelection,
+} from "../../domain/saasOverLimitSelection";
+import {pendingPlanEntitlements} from "../../domain/saasPlanChange";
 
 const SUCURSAL_PRINCIPAL_ID = "principal";
 
-export default function ConfiguracionSucursales({ perfil }) {
+export default function ConfiguracionSucursales({ perfil, onEntitlementsChanged }) {
   const [sucursales, setSucursales] = useState([]);
   const [busqueda, setBusqueda] = useState("");
   const [modalCrear, setModalCrear] = useState(false);
@@ -33,6 +40,8 @@ export default function ConfiguracionSucursales({ perfil }) {
   const [guardando, setGuardando] = useState(false);
   const [mensaje, setMensaje] = useState("");
   const [clienteSaas, setClienteSaas] = useState(null);
+  const [seleccionSucursales, setSeleccionSucursales] = useState(null);
+  const [aplicandoSeleccion, setAplicandoSeleccion] = useState(false);
 
   useEffect(() => {
     if (!perfil?.clienteId) return;
@@ -79,6 +88,61 @@ if (!tienePrincipal && lista.length === 0) {
   const resourceUsage = useMemo(() => calculateSaasResourceUsage({
     client: clienteSaas || {}, branches: sucursales,
   }), [clienteSaas, sucursales]);
+  const futureEntitlements = useMemo(() => pendingPlanEntitlements(clienteSaas || {}), [clienteSaas]);
+  const pendingBranchesOverLimit = Boolean(futureEntitlements && !futureEntitlements.unlimitedBranches &&
+    resourceUsage.activeBranches > futureEntitlements.maxBranches);
+  const selectionBranchesOverLimit = resourceUsage.branchesOverLimit || pendingBranchesOverLimit;
+  const selectionBranchLimit = futureEntitlements?.maxBranches ?? resourceUsage.entitlements.maxBranches;
+
+  useEffect(() => {
+    if (!selectionBranchesOverLimit) {
+      setSeleccionSucursales(null);
+      return;
+    }
+    setSeleccionSucursales((actual) => actual || new Set(initialBranchSelection(sucursales)));
+  }, [selectionBranchesOverLimit, sucursales]);
+
+  const alternarSucursalSeleccionada = (id) => {
+    setSeleccionSucursales((actual) => {
+      const siguiente = new Set(actual || []);
+      if (siguiente.has(id)) siguiente.delete(id);
+      else siguiente.add(id);
+      return siguiente;
+    });
+  };
+
+  const aplicarSeleccionSucursales = async () => {
+    const limit = selectionBranchLimit;
+    if (!seleccionSucursales || !canConfirmCapacitySelection(seleccionSucursales.size, limit)) return;
+    const selectedNames = sucursales
+      .filter((sucursal) => seleccionSucursales.has(sucursal.firebaseId))
+      .map((sucursal) => sucursal.nombre || "Sucursal");
+    const confirmar = window.confirm(
+      `Vas a mantener activas:\n- ${selectedNames.join("\n- ")}\n\n` +
+      "Las demás sucursales quedarán inactivas. No se eliminará información ni historial."
+    );
+    if (!confirmar) return;
+    try {
+      setAplicandoSeleccion(true);
+      setMensaje("");
+      const ids = buildBranchCapacityChanges({
+        branches: sucursales,
+        selectedIds: [...seleccionSucursales],
+      });
+      for (const sucursalId of ids) {
+        await cambiarEstadoSucursalSaas({clienteId: perfil.clienteId, sucursalId, activa: false});
+      }
+      setSeleccionSucursales(null);
+      if (futureEntitlements) await completarDowngradeSaas(perfil.clienteId);
+      onEntitlementsChanged?.();
+      setMensaje("Selección de sucursales aplicada correctamente.");
+    } catch (error) {
+      console.error("Error aplicando selección de sucursales:", error);
+      setMensaje(error.message || "No se pudo aplicar la selección.");
+    } finally {
+      setAplicandoSeleccion(false);
+    }
+  };
 
   const sucursalesFiltradas = useMemo(() => {
     const texto = busqueda.trim().toLowerCase();
@@ -129,6 +193,7 @@ const cerrarModalCrear = () => {
       });
 
       cerrarModalCrear();
+      onEntitlementsChanged?.();
     } catch (error) {
       console.error("Error creando sucursal:", error);
       setMensaje(error.message || "No se pudo crear la sucursal.");
@@ -194,6 +259,7 @@ const actualizarSucursal = async () => {
         sucursalId: sucursal.firebaseId,
         activa: sucursal.activa === false,
       });
+      onEntitlementsChanged?.();
     } catch (error) {
       console.error("Error cambiando estado de sucursal:", error);
       setMensaje(error.message || "No se pudo cambiar el estado de la sucursal.");
@@ -237,6 +303,38 @@ const actualizarSucursal = async () => {
             + Crear sucursal
           </button>
         </div>
+
+        {selectionBranchesOverLimit && seleccionSucursales && (
+          <div className="entitlement-overlimit-panel">
+            <div className="entitlement-overlimit-head">
+              <div>
+                <strong>Ajustá las sucursales activas</strong>
+                <p>
+                  {futureEntitlements ? "Tu próximo plan" : "Tu plan"} permite {selectionBranchLimit} sucursales y actualmente tenés {resourceUsage.activeBranches} activas.
+                  Elegí cuáles conservar; no se aplicará ningún cambio hasta confirmar.
+                </p>
+              </div>
+              <span>{seleccionSucursales.size} de {selectionBranchLimit} seleccionadas</span>
+            </div>
+            <div className="entitlement-selection-grid">
+              {sucursales.filter((sucursal) => sucursal.activa !== false).map((sucursal) => {
+                const id = sucursal.firebaseId;
+                return (
+                  <label key={id} className="entitlement-selection-item">
+                    <input type="checkbox" checked={seleccionSucursales.has(id)} disabled={sucursal.esPrincipal || aplicandoSeleccion} onChange={() => alternarSucursalSeleccionada(id)} />
+                    <span><strong>{sucursal.nombre || "Sucursal"}</strong><small>{sucursal.esPrincipal ? "Sucursal principal · debe permanecer activa" : sucursal.direccion || "Sucursal activa"}</small></span>
+                  </label>
+                );
+              })}
+            </div>
+            <div className="entitlement-overlimit-actions">
+              <span>Las sucursales no seleccionadas quedarán inactivas. Sus datos e historial se conservan.</span>
+              <button className="btn btn-primary" disabled={aplicandoSeleccion || !canConfirmCapacitySelection(seleccionSucursales.size, selectionBranchLimit)} onClick={aplicarSeleccionSucursales}>
+                {aplicandoSeleccion ? "Aplicando..." : "Aplicar selección"}
+              </button>
+            </div>
+          </div>
+        )}
 
         <input
           value={busqueda}

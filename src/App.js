@@ -39,6 +39,7 @@ import ProveedoresPage from "./modulos/proveedores/ProveedoresPage";
 import ListasPreciosPage from "./modulos/listasPrecios/ListasPreciosPage";
 import { resolverVistaInicio } from "./modulos/inicio/inicioNavegacion";
 import { accountPaymentAction } from "./domain/saasPaymentProvider";
+import { canAccessWithProfile } from "./domain/saasAccess";
 
 
 
@@ -264,7 +265,7 @@ useEffect(() => {
 
           const dataPerfil = snap.data();
 
-          if (dataPerfil.activo !== true) {
+          if (!canAccessWithProfile(dataPerfil)) {
             setPerfil(null);
             setMensajeBloqueo("Tu usuario está suspendido. Contactá al administrador.");
             setAuthLoading(false);

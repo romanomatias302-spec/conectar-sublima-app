@@ -882,6 +882,8 @@ function canReadMovimientos(clienteId) {
           "frecuenciaCobro", "billingCycle",
           "billingCurrency", "currency",
           "planPrecio", "mantenimientoMensual", "price",
+          "pendingPlanId", "pendingBillingCycle", "pendingPrice",
+          "pendingBillingCurrency", "pendingPlanChangeType",
           "estado", "estadoSuscripcion", "subscriptionStatus",
           "suspendidoManual", "suspendidoPorSistema",
           "maxUsers", "maxBranches", "entitlements"

@@ -202,6 +202,8 @@ test('admin tenant no puede alterar plan, precio ni estado comercial SaaS', asyn
   await assertFails(updateDoc(ref, {subscriptionStatus: 'active'}));
   await assertFails(updateDoc(ref, {maxUsers: 999, maxBranches: 999}));
   await assertFails(updateDoc(ref, {entitlements: {unlimitedUsers: true}}));
+  await assertFails(updateDoc(ref, {pendingPlanId: 'start'}));
+  await assertFails(updateDoc(ref, {pendingPrice: 1, pendingBillingCurrency: 'ARS'}));
 });
 
 test('altas y reactivaciones con cupo sólo pueden pasar por Functions', async () => {

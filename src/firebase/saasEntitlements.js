@@ -39,3 +39,4 @@ export const cambiarEstadoUsuarioSaas = (data) => call("cambiarEstadoUsuarioSaas
 export const asegurarSucursalPrincipalSaas = (clienteId) => call("asegurarSucursalPrincipalSaas", {clienteId});
 export const crearSucursalSaas = (data) => call("crearSucursalSaas", data);
 export const cambiarEstadoSucursalSaas = (data) => call("cambiarEstadoSucursalSaas", data);
+export const completarDowngradeSaas = (clienteId) => call("completarDowngradeSaas", {clienteId});
