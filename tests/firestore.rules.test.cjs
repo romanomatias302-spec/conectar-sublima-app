@@ -203,7 +203,10 @@ test('admin tenant no puede alterar plan, precio ni estado comercial SaaS', asyn
   await assertFails(updateDoc(ref, {maxUsers: 999, maxBranches: 999}));
   await assertFails(updateDoc(ref, {entitlements: {unlimitedUsers: true}}));
   await assertFails(updateDoc(ref, {pendingPlanId: 'start'}));
-  await assertFails(updateDoc(ref, {pendingPrice: 1, pendingBillingCurrency: 'ARS'}));
+  await assertFails(updateDoc(ref, {pendingBillingCycle: 'annual'}));
+  await assertFails(updateDoc(ref, {pendingPrice: 1}));
+  await assertFails(updateDoc(ref, {pendingBillingCurrency: 'ARS'}));
+  await assertFails(updateDoc(ref, {pendingPlanChangeType: 'downgrade'}));
 });
 
 test('altas y reactivaciones con cupo sólo pueden pasar por Functions', async () => {
@@ -236,6 +239,13 @@ test('ediciones operativas sin consumo de cupo permanecen disponibles', async ()
 test('superadmin conserva administración de contrato SaaS', async () => {
   const ref = doc(authenticatedDb('superadmin'), 'clientes-saas', TENANT_A);
   await assertSucceeds(updateDoc(ref, {planId: 'start', price: 19000}));
+  await assertSucceeds(updateDoc(ref, {
+    pendingPlanId: 'start',
+    pendingBillingCycle: 'monthly',
+    pendingPrice: 19000,
+    pendingBillingCurrency: 'ARS',
+    pendingPlanChangeType: 'downgrade',
+  }));
 });
 
 test('outbox SaaS sólo puede leerse desde frontend por superadmin', async () => {
