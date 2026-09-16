@@ -61,7 +61,7 @@ export default function ConfiguracionCuentaPlan({account, usage, onManageResourc
         <div className="account-plan-details">
           <div><span>Ciclo</span><strong>{CYCLE_LABELS[entitlements.billingCycle] || "No informado"}</strong></div>
           <div><span>Precio</span><strong>{formatMoney(entitlements.price, entitlements.currency)}</strong></div>
-          <div><span>Moneda de facturación</span><strong>{entitlements.currency}</strong></div>
+          
           <div><span>Próximo cobro</span><strong>{formatDate(nextCharge)}</strong></div>
         </div>
 
@@ -99,7 +99,7 @@ export default function ConfiguracionCuentaPlan({account, usage, onManageResourc
       </div>
 
       <div className="account-plans-header">
-        <div><h3>Planes disponibles</h3><p>Elegí más capacidad sin alterar tus datos ni tu historial.</p></div>
+        <div><h3>Planes disponibles</h3></div>
       </div>
       <div className="account-plans-grid">
         {plans.map((plan) => {

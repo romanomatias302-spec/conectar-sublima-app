@@ -595,9 +595,7 @@ const pagarPeriodoMercadoPago = async (periodo) => {
         {pestañaActiva === "productos" && (
           <section className="config-section">
             <h2>Configuración de productos</h2>
-            <p className="config-note">
-              Personalizá los productos base, sus áreas de impresión y atributos disponibles.
-            </p>
+
             <ConfiguracionProductos perfil={perfil} />
           </section>
         )}
@@ -605,9 +603,7 @@ const pagarPeriodoMercadoPago = async (periodo) => {
         {pestañaActiva === "usuarios" && (
         <section className="config-section">
           <h2>Usuarios</h2>
-          <p className="config-note">
-            Invitá y administrá los accesos del equipo.
-          </p>
+
           <ConfiguracionUsuarios perfil={perfil} onEntitlementsChanged={notificarCambioEntitlements} />
         </section>
       )}
@@ -615,9 +611,7 @@ const pagarPeriodoMercadoPago = async (periodo) => {
       {pestañaActiva === "sucursales" && (
         <section className="config-section">
           <h2>Sucursales</h2>
-          <p className="config-note">
-            Administrá los locales o puntos de trabajo del negocio.
-          </p>
+
           <ConfiguracionSucursales perfil={perfil} onEntitlementsChanged={notificarCambioEntitlements} />
         </section>
       )}
@@ -631,9 +625,7 @@ const pagarPeriodoMercadoPago = async (periodo) => {
       {pestañaActiva === "cuenta" && (
         <section className="config-section">
           <h2>Cuenta</h2>
-          <p className="config-note">
-            Consultá el estado de tu suscripción, períodos facturados y pagos registrados.
-          </p>
+
 
           {!cuentaSaas ? (
             <p>Cargando información de cuenta...</p>

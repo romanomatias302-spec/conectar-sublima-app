@@ -27,6 +27,7 @@ import {
   initialBranchSelection,
 } from "../../domain/saasOverLimitSelection";
 import {pendingPlanEntitlements} from "../../domain/saasPlanChange";
+import { FaStore, FaPlus } from "react-icons/fa";
 
 const SUCURSAL_PRINCIPAL_ID = "principal";
 
@@ -260,47 +261,112 @@ const actualizarSucursal = async () => {
         activa: sucursal.activa === false,
       });
       onEntitlementsChanged?.();
-    } catch (error) {
-      console.error("Error cambiando estado de sucursal:", error);
-      setMensaje(error.message || "No se pudo cambiar el estado de la sucursal.");
-    }
+      } catch (error) {
+        console.error("Error cambiando estado de sucursal:", error);
+
+        const mensajeError = String(error?.message || "");
+
+        if (
+          mensajeError.includes("SAAS_BRANCH_LIMIT_REACHED") ||
+          mensajeError.includes("BRANCH_LIMIT")
+        ) {
+          setMensaje(
+            resourceUsage.entitlements.unlimitedBranches
+              ? "No se pudo reactivar la sucursal."
+              : `Tu plan permite hasta ${resourceUsage.entitlements.maxBranches} sucursales activas. Desactivá una sucursal o mejorá tu plan para reactivar otra.`
+          );
+        } else {
+          setMensaje(
+            error?.message ||
+              "No se pudo cambiar el estado de la sucursal."
+          );
+        }
+      }
   };
 
   return (
     <div className="sucursales-page" style={{ display: "grid", gap: 18 }}>
       <div className="container-secundaria">
-<div className="sucursales-head">
-          <div>
-            <h3 style={{ margin: 0 }}>Sucursales</h3>
-            <p style={{margin: "6px 0 0", color: "#475569", fontWeight: 600}}>
-              {formatPlanUsage(
-                resourceUsage.activeBranches,
-                resourceUsage.entitlements.maxBranches,
-                resourceUsage.entitlements.unlimitedBranches
-              )}
-            </p>
-            {!resourceUsage.canAddBranch && (
-              <p className="alert-error" style={{marginTop: 10}}>
-                {planLimitMessage(
-                  resourceUsage.entitlements,
-                  "branches",
-                  resourceUsage.branchesOverLimit
+        <div
+          className="sucursales-head"
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: "16px",
+            flexWrap: "wrap",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "12px",
+            }}
+          >
+            <div
+              style={{
+                width: "42px",
+                height: "42px",
+                borderRadius: "12px",
+                display: "grid",
+                placeItems: "center",
+                background: "#eef8fc",
+                color: "#0796c9",
+                flexShrink: 0,
+              }}
+            >
+              <FaStore size={18} />
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
+                flexWrap: "wrap",
+              }}
+            >
+              <strong style={{ fontSize: "16px" }}>
+                Plan
+              </strong>
+
+              <span
+                style={{
+                  padding: "6px 12px",
+                  borderRadius: "999px",
+                  background: "#eaf7ff",
+                  color: "#0796c9",
+                  fontSize: "13px",
+                  fontWeight: 800,
+                }}
+              >
+                {formatPlanUsage(
+                  resourceUsage.activeBranches,
+                  resourceUsage.entitlements.maxBranches,
+                  resourceUsage.entitlements.unlimitedBranches
                 )}
-              </p>
-            )}
+              </span>
+            </div>
           </div>
 
           <button
             className="btn btn-primary"
             onClick={() => {
-            setSucursalEditando(null);
-            setNombre("");
-            setDireccion("");
-            setModalCrear(true);
+              setSucursalEditando(null);
+              setNombre("");
+              setDireccion("");
+              setModalCrear(true);
             }}
             disabled={!resourceUsage.canAddBranch}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "8px",
+            }}
           >
-            + Crear sucursal
+            <FaPlus />
+            Crear sucursal
           </button>
         </div>
 

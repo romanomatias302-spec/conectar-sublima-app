@@ -34,6 +34,13 @@ import {
   actualizarDatosUsuario,
 } from "../../firebase/usuariosConfig";
 
+import {
+  FaUserPlus,
+  FaUsers,
+  FaSearch,
+  FaEnvelope,
+} from "react-icons/fa";
+
 function formatearFecha(fecha) {
   if (!fecha) return "-";
 
@@ -332,6 +339,22 @@ const MODULOS_PERMISOS = [
     acciones: [{ key: "ver", label: "Ver" }],
   },
 ];
+
+function mensajeLimiteUsuarios(error, resourceUsage) {
+  const mensaje = String(error?.message || "");
+
+  if (!mensaje.includes("SAAS_USER_LIMIT_REACHED")) {
+    return error?.message || "No se pudo completar la operación.";
+  }
+
+  const entitlements = resourceUsage?.entitlements;
+
+  if (!entitlements || entitlements.unlimitedUsers) {
+    return "No se pudo agregar el usuario.";
+  }
+
+  return `Tu plan permite hasta ${entitlements.maxUsers} usuarios. Desactivá un usuario existente o mejorá tu plan para agregar otro.`;
+}
 
 export default function ConfiguracionUsuarios({ perfil, onEntitlementsChanged }) {
   const [usuarios, setUsuarios] = useState([]);
@@ -787,12 +810,10 @@ async function aplicarSeleccionCupos() {
 
       await cargarTodo();
       onEntitlementsChanged?.();
-    } catch (error) {
-      console.error("Error creando invitación:", error);
-      setMensaje(error.message || "No se pudo crear la invitación.");
-    } finally {
-      setGuardando(false);
-    }
+      } catch (error) {
+        console.error("Error creando invitación:", error);
+        setMensaje(mensajeLimiteUsuarios(error, resourceUsage));
+      }
   }
 
   async function manejarCancelarInvitacion(invitacionId) {
@@ -977,10 +998,15 @@ async function cambiarEstadoUsuario(usuario, activo) {
     setMensaje(activo ? "Usuario reactivado." : "Usuario anulado.");
     await cargarTodo();
     onEntitlementsChanged?.();
-  } catch (error) {
-    console.error("Error cambiando estado de usuario:", error);
-    setMensaje(error.message || "No se pudo cambiar el estado del usuario.");
-  }
+    } catch (error) {
+      console.error("Error cambiando estado de usuario:", error);
+
+      setMensaje(
+        activo
+          ? mensajeLimiteUsuarios(error, resourceUsage)
+          : error?.message || "No se pudo cambiar el estado del usuario."
+      );
+    }
 }
 
 function togglePermiso(modulo, accion) {
@@ -1079,18 +1105,144 @@ setPermisosEditando((prev) => ({
     
     <div style={{ display: "grid", gap: "24px" }}>
 
-      {puedeInvitar && mostrarFormulario && (
-        <div className="container-secundaria">
-          <h3 style={{ marginTop: 0 }}>Nueva invitación</h3>
 
-          <div style={{ display: "grid", gap: "14px", maxWidth: "460px" }}>
+
+    <div className="container-secundaria">
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: "16px",
+          flexWrap: "wrap",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "12px",
+          }}
+        >
+          <div
+            style={{
+              width: "42px",
+              height: "42px",
+              borderRadius: "12px",
+              display: "grid",
+              placeItems: "center",
+              background: "#eef8fc",
+              color: "#0796c9",
+              flexShrink: 0,
+            }}
+          >
+            <FaUsers size={18} />
+          </div>
+
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "10px",
+              flexWrap: "wrap",
+            }}
+          >
+            <strong style={{ fontSize: "16px" }}>
+              Plan
+            </strong>
+
+            <span
+              style={{
+                padding: "6px 12px",
+                borderRadius: "999px",
+                background: "#eaf7ff",
+                color: "#0796c9",
+                fontSize: "13px",
+                fontWeight: 800,
+              }}
+            >
+              {formatPlanUsage(
+                resourceUsage.usedUsers,
+                resourceUsage.entitlements.maxUsers,
+                resourceUsage.entitlements.unlimitedUsers
+              )}
+            </span>
+          </div>
+        </div>
+
+        {puedeInvitar && (
+          <button
+            className="btn btn-primary"
+            onClick={() =>
+              setMostrarFormulario((prev) => !prev)
+            }
+            disabled={!resourceUsage.canAddUser}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "8px",
+            }}
+          >
+            <FaUserPlus />
+            {mostrarFormulario
+              ? "Cerrar"
+              : "Invitar usuario"}
+          </button>
+        )}
+      </div>
+
+
+
+      {mensaje && (
+        <div
+          className="alert-error"
+          role="alert"
+          style={{ marginTop: "14px" }}
+        >
+          {mensaje}
+        </div>
+      )}
+
+      {puedeInvitar && mostrarFormulario && (
+        <div
+          style={{
+            marginTop: "18px",
+            padding: "18px",
+            border: "1px solid #dbe7ee",
+            borderRadius: "14px",
+            background: "#f8fbfd",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "9px",
+              marginBottom: "16px",
+            }}
+          >
+            <FaEnvelope color="#0796c9" />
+            <strong>Invitar usuario</strong>
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns:
+                "repeat(auto-fit, minmax(190px, 1fr))",
+              gap: "12px",
+              alignItems: "end",
+            }}
+          >
             <div>
               <label>Nombre</label>
               <input
                 type="text"
                 value={nombre}
-                onChange={(e) => setNombre(e.target.value)}
-                placeholder="Ej: Juan Pérez"
+                onChange={(e) =>
+                  setNombre(e.target.value)
+                }
+                placeholder="Juan Pérez"
               />
             </div>
 
@@ -1099,25 +1251,44 @@ setPermisosEditando((prev) => ({
               <input
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Ej: juan@mail.com"
+                onChange={(e) =>
+                  setEmail(e.target.value)
+                }
+                placeholder="juan@mail.com"
               />
             </div>
 
             <div>
               <label>Rol</label>
-              <select value={rol} onChange={(e) => setRol(e.target.value)}>
-                <option value="usuario">Usuario</option>
+              <select
+                value={rol}
+                onChange={(e) =>
+                  setRol(e.target.value)
+                }
+              >
+                <option value="usuario">
+                  Usuario
+                </option>
               </select>
             </div>
 
-            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+            <div
+              style={{
+                display: "flex",
+                gap: "8px",
+              }}
+            >
               <button
                 className="btn btn-primary"
                 onClick={manejarCrearInvitacion}
-                disabled={guardando || !resourceUsage.canAddUser}
+                disabled={
+                  guardando ||
+                  !resourceUsage.canAddUser
+                }
               >
-                {guardando ? "Creando..." : "Crear invitación"}
+                {guardando
+                  ? "Creando..."
+                  : "Enviar invitación"}
               </button>
 
               <button
@@ -1135,54 +1306,6 @@ setPermisosEditando((prev) => ({
           </div>
         </div>
       )}
-
-      <div className="container-secundaria">
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "flex-start",
-            gap: "12px",
-            flexWrap: "wrap",
-          }}
-        >
-          <div>
-            <h3 style={{ margin: 0 }}>Nueva invitación</h3>
-            <p style={{ margin: "6px 0 0", color: "#666" }}>
-              Invitá nuevos usuarios para que activen su cuenta.
-            </p>
-            <p style={{ margin: "6px 0 0", color: "#475569", fontWeight: 600 }}>
-              Usuarios: {formatPlanUsage(
-                resourceUsage.usedUsers,
-                resourceUsage.entitlements.maxUsers,
-                resourceUsage.entitlements.unlimitedUsers
-              )}
-            </p>
-            {!resourceUsage.canAddUser && (
-              <p className="alert-error" style={{ marginTop: 10 }}>
-                {planLimitMessage(
-                  resourceUsage.entitlements,
-                  "users",
-                  resourceUsage.usersOverLimit
-                )}
-              </p>
-            )}
-
-          {puedeInvitar && (
-            <button
-              className="btn btn-primary"
-              onClick={() => setMostrarFormulario((prev) => !prev)}
-              disabled={!resourceUsage.canAddUser}
-            >
-              {mostrarFormulario ? "Cerrar" : "Invitar usuario"}
-            </button>
-          )}
-          </div>
-
-
-        </div>
-
-        {mensaje && <p className="alert-error" role="alert">{mensaje}</p>}
 
         {selectionUsersOverLimit && seleccionCupos && (
           <div className="entitlement-overlimit-panel">
@@ -1415,10 +1538,8 @@ setPermisosEditando((prev) => ({
         >
          
           <div>
-            <h3 style={{ margin: 0 }}>Usuarios activos</h3>
-            <p style={{ margin: "6px 0 0", color: "#666" }}>
-              Usuarios del equipo que ya activaron su cuenta.
-            </p>
+            <h3 style={{ margin: 10 }}>Usuarios activos</h3>
+
           </div>
 
 
