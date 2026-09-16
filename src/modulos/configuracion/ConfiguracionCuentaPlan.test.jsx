@@ -33,8 +33,8 @@ test("el cambio abre un paso informativo y no confirma cargos ni persistencia", 
   render(<ConfiguracionCuentaPlan account={{planId: "start", billingCurrency: "USD"}} usage={usage} />);
 
   fireEvent.click(screen.getAllByRole("button", {name: "Cambiar plan"})[0]);
-  expect(screen.getByRole("dialog")).toHaveTextContent("Este paso no modifica tu plan ni genera cargos");
-  expect(screen.getByText(/checkout se habilitarán cuando el circuito comercial/)).toBeInTheDocument();
+  expect(screen.getByRole("dialog")).toHaveTextContent("Este paso no modifica tu plan");
+  expect(screen.queryByText(/checkout|proveedor|disponibilidad/i)).not.toBeInTheDocument();
 });
 
 test("muestra el plan efectivo separado del downgrade pendiente y permite administrar recursos", () => {
@@ -44,8 +44,14 @@ test("muestra el plan efectivo separado del downgrade pendiente y permite admini
     usage={{...usage, usedUsers: 10, activeBranches: 5}}
     onManageResources={manage}
   />);
-  expect(screen.getByText("Profesional Plus → Profesional")).toBeInTheDocument();
-  expect(screen.getByText(/plan y precio actuales siguen vigentes/)).toBeInTheDocument();
+  expect(screen.getByText("Tu plan cambiará a Profesional")).toBeInTheDocument();
+  expect(screen.getByText(/no se elimina ningún dato/)).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", {name: "Administrar recursos"}));
   expect(manage).toHaveBeenCalledTimes(1);
+});
+
+test("no muestra el proveedor de facturación en la vista del cliente", () => {
+  render(<ConfiguracionCuentaPlan account={{planId: "start", billingCurrency: "USD", metodoCobro: "manual"}} usage={usage} />);
+  expect(screen.queryByText("Proveedor")).not.toBeInTheDocument();
+  expect(screen.queryByText("Manual")).not.toBeInTheDocument();
 });

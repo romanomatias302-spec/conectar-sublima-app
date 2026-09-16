@@ -30,6 +30,23 @@ import {resolveSaasEntitlements} from "../../domain/saasPlans";
 import { obtenerUsuariosPorCliente } from "../../firebase/usuariosConfig";
 import { escucharInvitacionesPorCliente } from "../../firebase/invitacionesUsuarios";
 import ConfiguracionCuentaPlan from "./ConfiguracionCuentaPlan";
+import {subscribeSaasAccountState} from "../../firebase/saasAccountRealtime";
+
+function resumirPeriodosCuenta(movimientos = []) {
+  return Object.values(movimientos.filter((mov) => mov.anulado !== true && mov.periodoFacturado).reduce((acc, mov) => {
+    const periodo = mov.periodoFacturado;
+    const monto = Number(mov.monto || 0);
+    const tipo = mov.tipoMovimiento || "pago";
+    if (!acc[periodo]) acc[periodo] = {periodo, cargos: 0, pagos: 0, saldo: 0, fechaVencimiento: mov.fechaVencimiento || ""};
+    if (tipo === "cargo" || tipo === "ajuste") {
+      acc[periodo].cargos += monto;
+      acc[periodo].fechaVencimiento = mov.fechaVencimiento || acc[periodo].fechaVencimiento;
+    }
+    if (tipo === "pago" || tipo === "credito") acc[periodo].pagos += monto;
+    acc[periodo].saldo = acc[periodo].cargos - acc[periodo].pagos;
+    return acc;
+  }, {})).sort((a, b) => (a.periodo < b.periodo ? 1 : -1));
+}
 
 export default function Configuracion({ modoOscuro, setModoOscuro, perfil, onActualizarPerfil, }) {
   const [pestañaActiva, setPestañaActiva] = useState(
@@ -41,7 +58,7 @@ export default function Configuracion({ modoOscuro, setModoOscuro, perfil, onAct
   const [nombreVisible, setNombreVisible] = useState("");
   const [cuentaSaas, setCuentaSaas] = useState(null);
   const [usoCuenta, setUsoCuenta] = useState(null);
-  const [revisionEntitlements, setRevisionEntitlements] = useState(0);
+  const [, setRevisionEntitlements] = useState(0);
   const [guardandoConfig, setGuardandoConfig] = useState(false);
   const [mensajeConfig, setMensajeConfig] = useState("");
   const [moneda, setMoneda] = useState(perfil?.moneda || "ARS");
@@ -201,31 +218,18 @@ export default function Configuracion({ modoOscuro, setModoOscuro, perfil, onAct
 cargarConfigCliente();
 }, [perfil?.clienteId, perfil?.rol]);
 
-const refrescarUsoCuenta = useCallback(async () => {
-  if (!perfil?.clienteId || perfil?.rol === "superadmin") return;
-  const [clienteSnapshot, usuarios, invitaciones, sucursalesSnap] = await Promise.all([
-    getDoc(doc(db, "clientes-saas", perfil.clienteId)),
-    obtenerUsuariosPorCliente(perfil.clienteId),
-    escucharInvitacionesPorCliente(perfil.clienteId),
-    getDocs(query(collection(db, "sucursales"), where("clienteId", "==", perfil.clienteId))),
-  ]);
-  if (!clienteSnapshot.exists()) return;
-  const cliente = {id: clienteSnapshot.id, ...clienteSnapshot.data()};
-  setCuentaSaas((actual) => ({...actual, ...cliente}));
-  setUsoCuenta(calculateSaasResourceUsage({
-    client: cliente,
-    users: usuarios,
-    invitations: invitaciones,
-    branches: sucursalesSnap.docs.map((documento) => ({id: documento.id, ...documento.data()})),
-  }));
-}, [perfil?.clienteId, perfil?.rol]);
-
 useEffect(() => {
-  if (pestañaActiva !== "cuenta") return;
-  refrescarUsoCuenta().catch((error) => {
-    console.error("No se pudo refrescar el uso del plan:", error);
+  if (pestañaActiva !== "cuenta" || !perfil?.clienteId || perfil?.rol === "superadmin") return undefined;
+  return subscribeSaasAccountState({
+    tenantId: perfil.clienteId,
+    onState: ({client, users, invitations, branches, movements}) => {
+      setCuentaSaas((actual) => ({...actual, ...client, moneda: client.billingCurrency || client.currency || "USD"}));
+      setUsoCuenta(calculateSaasResourceUsage({client, users, invitations, branches}));
+      setPeriodosCuenta(resumirPeriodosCuenta(movements));
+    },
+    onError: (error) => console.error("No se pudo sincronizar la cuenta SaaS:", error),
   });
-}, [pestañaActiva, refrescarUsoCuenta, revisionEntitlements]);
+}, [pestañaActiva, perfil?.clienteId, perfil?.rol]);
 
 const notificarCambioEntitlements = useCallback(() => {
   setRevisionEntitlements((revision) => revision + 1);

@@ -304,6 +304,8 @@ const actualizarSucursal = async () => {
           </button>
         </div>
 
+        {mensaje && !modalCrear && <p className="alert-error" role="alert">{mensaje}</p>}
+
         {selectionBranchesOverLimit && seleccionSucursales && (
           <div className="entitlement-overlimit-panel">
             <div className="entitlement-overlimit-head">

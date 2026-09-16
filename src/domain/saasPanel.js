@@ -213,6 +213,20 @@ export function buildSaasPanelMetrics(clients = [], movements = [], now = new Da
   return {counts, churn, mrr, debt, collected, activePayments, paymentsWithoutCurrency};
 }
 
+export function initialSaasBillingRecordStatus(client = {}, movements = []) {
+  const planId = normalizeSaasText(client.planId);
+  const classification = classifySaasClient(client);
+  const modernPaidPlan = RECURRING_PLAN_IDS.has(planId);
+  const paidLegacy = planId === "legacy" && hasRecurringSaasSubscription(client) && Number(resolveSaasPrice(client) || 0) > 0;
+  const applicable = (modernPaidPlan || paidLegacy) && !["trial", "cancelled"].includes(classification.group);
+  if (!applicable) return {applicable: false, complete: true, needsAttention: false};
+  const movementEvidence = movements.some((movement) =>
+    movement.clienteSaasId === client.id && movement.anulado !== true && movement.estado !== "anulado" &&
+    ["cargo", "pago"].includes(movement.tipoMovimiento));
+  const complete = Boolean(client.ultimoPeriodoFacturado || client.ultimoPago || movementEvidence);
+  return {applicable: true, complete, needsAttention: !complete};
+}
+
 export function matchesSaasClientSearch(client = {}, search = "") {
   const needle = normalizeSaasText(search);
   if (!needle) return true;

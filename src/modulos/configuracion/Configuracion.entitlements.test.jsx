@@ -2,7 +2,7 @@ import React from "react";
 import "@testing-library/jest-dom";
 import {fireEvent, render, screen, waitFor} from "@testing-library/react";
 import Configuracion from "./Configuracion";
-import {getDoc, getDocs} from "firebase/firestore";
+import {getDoc, getDocs, onSnapshot} from "firebase/firestore";
 import {obtenerUsuariosPorCliente} from "../../firebase/usuariosConfig";
 import {escucharInvitacionesPorCliente} from "../../firebase/invitacionesUsuarios";
 
@@ -20,6 +20,7 @@ jest.mock("firebase/firestore", () => ({
     data: () => ({planId: "start", billingCurrency: "USD", moneda: "ARS"}),
   })),
   getDocs: jest.fn(async () => ({docs: []})),
+  onSnapshot: jest.fn(() => jest.fn()),
 }));
 jest.mock("../../firebase/usuariosConfig", () => ({obtenerUsuariosPorCliente: jest.fn(async () => [])}));
 jest.mock("../../firebase/invitacionesUsuarios", () => ({escucharInvitacionesPorCliente: jest.fn(async () => [])}));
@@ -51,6 +52,7 @@ beforeEach(() => {
   getDocs.mockResolvedValue({docs: []});
   obtenerUsuariosPorCliente.mockResolvedValue([]);
   escucharInvitacionesPorCliente.mockResolvedValue([]);
+  onSnapshot.mockImplementation(() => jest.fn());
 });
 
 test.each([
@@ -66,8 +68,8 @@ test.each([
   await waitFor(() => expect(obtenerUsuariosPorCliente).toHaveBeenCalled());
   fireEvent.click(screen.getByRole("button", {name: tab}));
   fireEvent.click(screen.getByRole("button", {name: action}));
-  const callsBeforeAccount = obtenerUsuariosPorCliente.mock.calls.length;
+  const listenersBeforeAccount = onSnapshot.mock.calls.length;
   fireEvent.click(screen.getByRole("button", {name: "Cuenta"}));
-  await waitFor(() => expect(obtenerUsuariosPorCliente.mock.calls.length).toBeGreaterThan(callsBeforeAccount));
+  await waitFor(() => expect(onSnapshot.mock.calls.length).toBeGreaterThan(listenersBeforeAccount));
   expect(screen.getByText("Uso actualizado")).toBeInTheDocument();
 });

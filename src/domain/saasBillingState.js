@@ -43,6 +43,16 @@ export function recurringSaasPeriodKey(client = {}, referenceDate = new Date()) 
   return "";
 }
 
+export function resolveRecurringChargePeriod(client = {}, requestedPeriod = "", referenceDate = new Date()) {
+  const expected = recurringSaasPeriodKey(client, referenceDate);
+  const requested = String(requestedPeriod || "").trim();
+  if (!expected) throw new Error("El cliente no tiene un ciclo de facturación válido.");
+  if (requested && requested !== expected) {
+    throw new Error(`El período seleccionado no coincide con el próximo ciclo. Período esperado: ${expected}.`);
+  }
+  return expected;
+}
+
 export function buildRecurringChargeAdvancePatch(client = {}, periodKey, referenceDate = new Date()) {
   const rawCycle = String(client.billingCycle || client.frecuenciaCobro || "").toLowerCase();
   const cycle = ["annual", "anual"].includes(rawCycle)

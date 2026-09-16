@@ -5,6 +5,7 @@ import {
   onSnapshot,
 } from "firebase/firestore";
 import { signOut } from "firebase/auth";
+import {FaExclamationCircle} from "react-icons/fa";
 import { auth, db } from "../../firebase";
 import { cambiarEstadoUsuarioSaas } from "../../firebase/saasEntitlements";
 import {
@@ -34,6 +35,7 @@ import {
   filterSaasClients,
   formatSaasMoney,
   getSaasTabFromSearch,
+  initialSaasBillingRecordStatus,
   isInteractiveSaasTarget,
   refreshAfterSaasMutation,
   resolveSaasCurrency,
@@ -47,6 +49,7 @@ import "./css/DuenoSaasSidebar.css";
 import "./css/DuenoSaasClientes.css";
 import "./css/DuenoSaasEstadisticas.css";
 import DuenoSaasSidebar from "./DuenoSaasSidebar";
+import {recurringSaasPeriodKey} from "../../domain/saasBillingState";
 
 export default function DuenoSaasPanel() {
   const [clientes, setClientes] = useState([]);
@@ -638,6 +641,9 @@ const planesDisponibles = [
       .filter(Boolean)
   ),
 ];
+const periodoCargoEsperado = clienteCuentaCorriente
+  ? recurringSaasPeriodKey(clienteCuentaCorriente, formPago.fechaPago)
+  : "";
 
 const clientesParaCargoMasivo = clientes.filter((c) => {
   const planCliente = c.planNombre || c.plan;
@@ -893,7 +899,12 @@ return (
                       }
                     >
                       <div>
-                        <strong>{c.nombre || c.nombreCliente || c.empresa || c.id || "—"}</strong>
+                        <strong>
+                          {c.nombre || c.nombreCliente || c.empresa || c.id || "—"}
+                          {initialSaasBillingRecordStatus(c, movimientosSaas).needsAttention && (
+                            <FaExclamationCircle title="Falta registrar el primer cargo o pago de este cliente." aria-label="Falta registrar el primer cargo o pago" style={{marginLeft: 7, color: "#d97706", verticalAlign: "-2px"}} />
+                          )}
+                        </strong>
                         <span>{resolveSaasPlanLabel(c)}{c.pendingPlanId ? ` · pendiente a ${pendingPlanEntitlements(c)?.planName}` : ""}</span>
                       </div>
 
@@ -986,7 +997,12 @@ return (
                     }
                   }}
                 >
-                  <td style={td}>{c.nombre || c.nombreCliente || c.empresa || c.id || "—"}</td>
+                  <td style={td}>
+                    {c.nombre || c.nombreCliente || c.empresa || c.id || "—"}
+                    {initialSaasBillingRecordStatus(c, movimientosSaas).needsAttention && (
+                      <FaExclamationCircle title="Falta registrar el primer cargo o pago de este cliente." aria-label="Falta registrar el primer cargo o pago" style={{marginLeft: 7, color: "#d97706", verticalAlign: "-2px"}} />
+                    )}
+                  </td>
                   <td style={td}>{c.email || "—"}</td>
                   <td style={td}>
                     <div>{resolveSaasPlanLabel(c)}</div>
@@ -1358,6 +1374,7 @@ return (
                     tipoMovimiento: "cargo",
                     concepto: "mensualidad",
                     medioPago: "",
+                    periodoFacturado: recurringSaasPeriodKey(clienteCuentaCorriente, prev.fechaPago),
                   }));
                   setMostrarPago(true);
                 }}
@@ -1747,6 +1764,9 @@ return (
                   : e.target.value === "pago"
                   ? "pago"
                   : "ajuste",
+              periodoFacturado: e.target.value === "cargo"
+                ? recurringSaasPeriodKey(clienteCuentaCorriente, prev.fechaPago)
+                : prev.periodoFacturado,
             }))
           }
           style={input}
@@ -1770,7 +1790,13 @@ return (
           type="date"
           value={formPago.fechaPago}
           onChange={(e) =>
-            setFormPago((prev) => ({ ...prev, fechaPago: e.target.value }))
+            setFormPago((prev) => ({
+              ...prev,
+              fechaPago: e.target.value,
+              periodoFacturado: prev.tipoMovimiento === "cargo"
+                ? recurringSaasPeriodKey(clienteCuentaCorriente, e.target.value)
+                : prev.periodoFacturado,
+            }))
           }
           style={input}
         />
@@ -1786,7 +1812,10 @@ return (
           }
           style={input}
         >
-          <option value="">Sin período</option>
+          {formPago.tipoMovimiento !== "cargo" && <option value="">Sin período</option>}
+          {periodoCargoEsperado && !periodosDisponibles.includes(periodoCargoEsperado) && (
+            <option value={periodoCargoEsperado}>{periodoCargoEsperado}</option>
+          )}
           {periodosDisponibles.map((periodo) => (
             <option key={periodo} value={periodo}>
               {periodo}

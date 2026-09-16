@@ -398,6 +398,25 @@ const [sucursalesPermitidasEditando, setSucursalesPermitidasEditando] = useState
   }, [perfil?.clienteId]);
 
   useEffect(() => {
+    if (!perfil?.clienteId) return undefined;
+    const tenant = perfil.clienteId;
+    const unsubscribers = [
+      onSnapshot(query(collection(db, "usuarios"), where("clienteId", "==", tenant)), (snapshot) => {
+        setUsuarios(snapshot.docs.map((item) => ({uid: item.id, ...item.data()})).sort((a, b) =>
+          (a.nombre || a.email || "").localeCompare(b.nombre || b.email || "")));
+      }),
+      onSnapshot(query(collection(db, "invitaciones_usuarios"), where("clienteId", "==", tenant)), (snapshot) => {
+        setInvitaciones(snapshot.docs.map((item) => ({id: item.id, ...item.data()})).sort((a, b) =>
+          Number(b.createdAt?.seconds || 0) - Number(a.createdAt?.seconds || 0)));
+      }),
+      onSnapshot(doc(db, "clientes-saas", tenant), (snapshot) => {
+        setClienteSaas(snapshot.exists() ? {id: snapshot.id, ...snapshot.data()} : null);
+      }),
+    ];
+    return () => unsubscribers.forEach((unsubscribe) => unsubscribe());
+  }, [perfil?.clienteId]);
+
+  useEffect(() => {
   if (!perfil?.clienteId) return;
 
   const q = query(
@@ -1163,6 +1182,8 @@ setPermisosEditando((prev) => ({
 
         </div>
 
+        {mensaje && <p className="alert-error" role="alert">{mensaje}</p>}
+
         {selectionUsersOverLimit && seleccionCupos && (
           <div className="entitlement-overlimit-panel">
             <div className="entitlement-overlimit-head">
@@ -1208,17 +1229,6 @@ setPermisosEditando((prev) => ({
                       <div className="container-secundaria">
 
         <h3 style={{ marginTop: 0 }}>Invitaciones pendientes</h3>
-
-
-
-        {mensaje && (
-
-          <p style={{ color: "#64748b", marginTop: 0 }}>{mensaje}</p>
-
-        )}
-
-
-
         <div style={{ display: "grid", gap: "10px" }}>
 
           {invitacionesPendientes.length === 0 ? (

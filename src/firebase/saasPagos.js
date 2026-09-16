@@ -16,6 +16,7 @@ import {
   buildSaasReactivationPatch,
   deterministicSaasChargeId,
   recurringSaasPeriodKey,
+  resolveRecurringChargePeriod,
 } from "../domain/saasBillingState";
 
 export async function registrarMovimientoSaas({
@@ -39,7 +40,7 @@ export async function registrarMovimientoSaas({
   )) throw new Error("No se puede generar un cargo recurrente mientras la cuenta está suspendida o tiene deuda.");
   const esCargoRecurrente = tipoMovimiento === "cargo" && ["mensualidad", "anualidad"].includes(concepto);
   const periodoRecurrente = esCargoRecurrente
-    ? periodoFacturado || recurringSaasPeriodKey(clienteSaas, fechaPago)
+    ? resolveRecurringChargePeriod(clienteSaas, periodoFacturado, fechaPago)
     : periodoFacturado;
   if (esCargoRecurrente && !periodoRecurrente) throw new Error("El cargo recurrente requiere un período de facturación válido.");
   const billingCurrency = String(

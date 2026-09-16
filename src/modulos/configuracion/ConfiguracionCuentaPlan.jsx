@@ -1,7 +1,6 @@
 import React, {useMemo, useState} from "react";
 import {FaCheck, FaCloud, FaExclamationTriangle, FaStore, FaUsers} from "react-icons/fa";
 import {getSelectablePlans, priceForPlan, resolveSaasEntitlements} from "../../domain/saasPlans";
-import {normalizeBillingProvider} from "../../domain/saasPaymentProvider";
 import {pendingPlanEntitlements} from "../../domain/saasPlanChange";
 
 const STATUS_LABELS = {
@@ -13,7 +12,6 @@ const STATUS_LABELS = {
 };
 
 const CYCLE_LABELS = {monthly: "Mensual", annual: "Anual"};
-const PROVIDER_LABELS = {hotmart: "Hotmart", mercadopago: "Mercado Pago", manual: "Manual"};
 
 function formatMoney(value, currency) {
   if (value === null || value === undefined || value === "") return "A confirmar";
@@ -39,8 +37,6 @@ export default function ConfiguracionCuentaPlan({account, usage, onManageResourc
   const [selectedPlan, setSelectedPlan] = useState(null);
   const entitlements = useMemo(() => resolveSaasEntitlements(account), [account]);
   const plans = getSelectablePlans();
-  const provider = normalizeBillingProvider(account);
-  const providerAvailable = Boolean(account.billingProvider || account.metodoCobro);
   const nextCharge = account.nextBillingDate || account.fechaProximoCargo || account.fechaVencimiento;
   const suspended = account.suspendidoManual || account.suspendidoPorSistema;
   const status = suspended ? "suspended" : entitlements.subscriptionStatus;
@@ -67,7 +63,6 @@ export default function ConfiguracionCuentaPlan({account, usage, onManageResourc
           <div><span>Precio</span><strong>{formatMoney(entitlements.price, entitlements.currency)}</strong></div>
           <div><span>Moneda de facturación</span><strong>{entitlements.currency}</strong></div>
           <div><span>Próximo cobro</span><strong>{formatDate(nextCharge)}</strong></div>
-          {providerAvailable && <div><span>Proveedor</span><strong>{PROVIDER_LABELS[provider]}</strong></div>}
         </div>
 
         <div className="account-usage-grid">
@@ -93,9 +88,9 @@ export default function ConfiguracionCuentaPlan({account, usage, onManageResourc
             <FaExclamationTriangle />
             <div>
               <span className="account-plan-eyebrow">Cambio de plan pendiente</span>
-              <strong>{entitlements.planName} → {futureEntitlements.planName}</strong>
+              <strong>Tu plan cambiará a {futureEntitlements.planName}</strong>
               <p>
-                Necesitás ajustar {usage.usedUsers} → {futureEntitlements.unlimitedUsers ? "ilimitados" : futureEntitlements.maxUsers} usuarios y {usage.activeBranches} → {futureEntitlements.unlimitedBranches ? "ilimitadas" : futureEntitlements.maxBranches} sucursales. El plan y precio actuales siguen vigentes hasta completar el ajuste.
+                Para completar el cambio, elegí qué {futureEntitlements.unlimitedUsers ? "usuarios" : futureEntitlements.maxUsers + " usuarios"} y {futureEntitlements.unlimitedBranches ? "sucursales" : futureEntitlements.maxBranches + " sucursales"} querés mantener activos. Tus recursos se conservan y no se elimina ningún dato.
               </p>
               <button className="account-plan-button" onClick={onManageResources}>Administrar recursos</button>
             </div>
@@ -138,12 +133,11 @@ export default function ConfiguracionCuentaPlan({account, usage, onManageResourc
           <div className="account-plan-modal" role="dialog" aria-modal="true" aria-labelledby="plan-change-title" onMouseDown={(event) => event.stopPropagation()}>
             <span className="account-plan-eyebrow">Siguiente paso</span>
             <h3 id="plan-change-title">Cambiar a {selectedPlan.name}</h3>
-            <p>Revisaremos disponibilidad, moneda y medio de cobro antes de confirmar. Este paso no modifica tu plan ni genera cargos.</p>
+            <p>Este paso no modifica tu plan. Tus usuarios, sucursales e historial permanecen intactos.</p>
             <div className="account-plan-modal-note">
               <strong>Tu cuenta permanece intacta</strong>
               <span>No se eliminan usuarios, sucursales, historial ni datos comerciales.</span>
             </div>
-            <p className="account-plan-flow-note">El envío de la solicitud y el checkout se habilitarán cuando el circuito comercial del proveedor esté confirmado.</p>
             <div className="account-plan-modal-actions">
               <button className="account-plan-button secondary" onClick={() => setSelectedPlan(null)}>Volver</button>
               <button className="account-plan-button" onClick={() => setSelectedPlan(null)}>Entendido</button>

@@ -4,6 +4,7 @@ import {
   deterministicSaasChargeId,
   nextSaasBillingDate,
   recurringSaasPeriodKey,
+  resolveRecurringChargePeriod,
 } from "./saasBillingState";
 
 const suspended = {suspendidoPorSistema: true, frecuenciaCobro: "mensual"};
@@ -36,6 +37,13 @@ test("cargo manual y scheduler resuelven el mismo período", () => {
   const client = {billingCycle: "monthly", nextBillingDate: "2026-09-30", billingCycleSequence: 2};
   expect(recurringSaasPeriodKey(client, new Date("2026-09-01T00:00:00Z"))).toBe("2026-09");
   expect(recurringSaasPeriodKey({...client, billingCycle: "annual"})).toBe("2026-09-30-ANUAL");
+});
+
+test("cargo manual normaliza período vacío y explica un período UI incompatible", () => {
+  const client = {billingCycle: "monthly", nextBillingDate: "2026-10-15"};
+  expect(resolveRecurringChargePeriod(client, "", "2026-09-15")).toBe("2026-10");
+  expect(() => resolveRecurringChargePeriod(client, "2026-09", "2026-09-15"))
+    .toThrow("Período esperado: 2026-10");
 });
 
 test("cargo recurrente manual avanza el ciclo de calendario", () => {

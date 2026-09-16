@@ -9,6 +9,7 @@ import {
   getSaasTabFromSearch,
   groupActiveClientsByCountry,
   groupActiveSubscriptionsByBillingCycle,
+  initialSaasBillingRecordStatus,
   isInteractiveSaasTarget,
   matchesSaasClientSearch,
   refreshAfterSaasMutation,
@@ -17,6 +18,16 @@ import {
   resolveSaasPlanLabel,
   syncSaasTabFromLocation,
 } from "./saasPanel";
+
+test("indicador inicial distingue plan pago completo, incompleto y legacy gratuito", () => {
+  const client = {id: "paid", planId: "start", billingCycle: "monthly", subscriptionStatus: "active"};
+  expect(initialSaasBillingRecordStatus(client, [])).toMatchObject({applicable: true, needsAttention: true});
+  expect(initialSaasBillingRecordStatus(client, [{clienteSaasId: "paid", tipoMovimiento: "cargo", anulado: false}]))
+    .toMatchObject({complete: true, needsAttention: false});
+  expect(initialSaasBillingRecordStatus({...client, ultimoPago: "2026-09-01"}, [])).toMatchObject({complete: true});
+  expect(initialSaasBillingRecordStatus({id: "legacy", planId: "legacy", billingCycle: "monthly", price: 0}, []))
+    .toMatchObject({applicable: false, needsAttention: false});
+});
 
 test("moneda comercial del cliente nunca cae en moneda operativa", () => {
   expect(resolveSaasCurrency({
