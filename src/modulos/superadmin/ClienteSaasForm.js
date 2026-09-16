@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { addDoc, collection, doc, updateDoc } from "firebase/firestore";
 import { db } from "../../firebase";
+import { camposPlanParaEnforcement } from "./clienteSaasPlanCompatibility";
 
 export default function ClienteSaasForm({
   clienteEditando,
@@ -296,6 +297,7 @@ try {
 
     const dataAGuardar = {
       ...formData,
+      ...camposPlanParaEnforcement(formData.planNombre, clienteEditando || {}),
 
     plan: formData.planNombre,
     planNombre: formData.planNombre,

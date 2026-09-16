@@ -4,11 +4,12 @@ import {
   signOut,
   updateProfile,
 } from "firebase/auth";
-import { doc, serverTimestamp, setDoc } from "firebase/firestore";
-import { auth, db } from "../../firebase";
+
+import { auth, functions } from "../../firebase";
+import { httpsCallable } from "firebase/functions";
 import {
   invitacionEstaVencida,
-  marcarInvitacionComoUsada,
+  
   obtenerInvitacionPorToken,
 } from "../../firebase/invitacionesUsuarios";
 import "./Login.css";
@@ -161,48 +162,19 @@ export default function ActivarCuenta() {
         displayName: nombre.trim(),
       });
 
-      console.log("Paso 3: guardando usuario en Firestore...");
+console.log("Paso 3: aceptando invitación en backend...");
 
-      await setDoc(doc(db, "usuarios", nuevoUsuario.uid), {
-        nombre: nombre.trim(),
-        email: invitacion.email,
-        rol: invitacion.rol || "usuario",
-        activo: true,
-        clienteId: invitacion.clienteId,
-        createdAt: serverTimestamp(),
-        invitacionId: invitacion.id,
-        permisos: {
-          inicio: {
-            ver: true,
-            verPedidos: true,
-            verClientes: false,
-            verIngresos: false,
-            verProduccion: true,
-            verAtrasados: true,
-            verGrafico: true,
-            verCuelloBotella: true,
-          },
-          clientes: { ver: false, crear: false, editar: false, eliminar: false },
-          pedidos: { ver: true, crear: false, editar: false, eliminar: false },
-          produccion: {
-            ver: true,
-            mover: true,
-            editarDetalle: true,
-            asignarUsuario: false,
-          },
-          ventas: { ver: false, crear: false, editar: false, eliminar: false },
-          movimientos: { ver: false },
-          configuracion: { ver: false },
-        },
-      });
+const aceptarInvitacion = httpsCallable(
+  functions,
+  "aceptarInvitacionUsuarioSaas"
+);
 
-      console.log("Paso 4: marcando invitación como usada...");
+await aceptarInvitacion({
+  invitacionId: invitacion.id,
+  nombre: nombre.trim(),
+});
 
-      await marcarInvitacionComoUsada({
-        invitacionId: invitacion.id,
-        usuarioCreadoUid: nuevoUsuario.uid,
-        dbInstance: db,
-      });
+console.log("Paso 4: invitación aceptada.");
 
       console.log("Paso 5: cerrando sesión secundaria...");
 

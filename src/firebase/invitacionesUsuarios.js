@@ -9,7 +9,9 @@ import {
   updateDoc,
   where,
 } from "firebase/firestore";
-import { db } from "../firebase";
+import { httpsCallable } from "firebase/functions";
+import { db, functions } from "../firebase";
+
 
 const INVITACIONES_COLLECTION = "invitaciones_usuarios";
 
@@ -30,7 +32,6 @@ export async function crearInvitacionUsuario({
   nombre,
   email,
   rol = "usuario",
-  creadoPor = null,
 }) {
   const nombreLimpio = (nombre || "").trim();
   const emailLimpio = (email || "").trim().toLowerCase();
@@ -39,44 +40,35 @@ export async function crearInvitacionUsuario({
   if (!nombreLimpio) throw new Error("Completá el nombre");
   if (!emailLimpio) throw new Error("Completá el email");
 
-  const existentePendiente = query(
-    collection(db, INVITACIONES_COLLECTION),
-    where("clienteId", "==", clienteId),
-    where("email", "==", emailLimpio),
-    where("estado", "==", "pendiente")
+  const crearInvitacionSaas = httpsCallable(
+    functions,
+    "crearInvitacionUsuarioSaas"
   );
 
-  const existenteSnap = await getDocs(existentePendiente);
+  try {
+    const resultado = await crearInvitacionSaas({
+      clienteId,
+      nombre: nombreLimpio,
+      email: emailLimpio,
+      rol,
+    });
 
-  if (!existenteSnap.empty) {
-    throw new Error("Ya existe una invitación pendiente para ese email");
+    const data = resultado.data || {};
+
+    return {
+      id: data.token,
+      token: data.token,
+      expiraAt: data.expiration || null,
+    };
+  } catch (error) {
+    console.error("Error creando invitación SaaS:", error);
+
+    const mensaje =
+      error?.message ||
+      "No se pudo crear la invitación.";
+
+    throw new Error(mensaje);
   }
-
-  const token = generarTokenSeguro();
-  const expiraAt = sumarDias(new Date(), 7);
-
-  const ref = doc(db, INVITACIONES_COLLECTION, token);
-
-  await setDoc(ref, {
-    clienteId,
-    nombre: nombreLimpio,
-    email: emailLimpio,
-    rol,
-    token,
-    estado: "pendiente", // pendiente | usada | vencida | cancelada
-    createdAt: serverTimestamp(),
-    expiraAt,
-    creadoPorUid: creadoPor?.uid || null,
-    creadoPorNombre: creadoPor?.nombre || creadoPor?.email || null,
-    usadoAt: null,
-    usuarioCreadoUid: null,
-  });
-
-  return {
-    id: token,
-    token,
-    expiraAt,
-  };
 }
 
 export async function obtenerInvitacionPorToken(token) {
@@ -139,14 +131,29 @@ export async function escucharInvitacionesPorCliente(clienteId) {
 }
 
 export async function cancelarInvitacion(invitacionId) {
-  const ref = doc(db, INVITACIONES_COLLECTION, invitacionId);
-  const snap = await getDoc(ref);
-
-  if (!snap.exists()) {
-    throw new Error("La invitación no existe");
+  if (!invitacionId) {
+    throw new Error("Falta invitacionId");
   }
 
-  await updateDoc(ref, {
-    estado: "cancelada",
-  });
+  const cancelarInvitacionSaas = httpsCallable(
+    functions,
+    "cancelarInvitacionUsuarioSaas"
+  );
+
+  try {
+    const resultado = await cancelarInvitacionSaas({
+      invitacionId,
+    });
+
+    return resultado.data;
+  } catch (error) {
+    console.error("Error cancelando invitación SaaS:", error);
+
+    const mensaje =
+      error?.message ||
+      "No se pudo cancelar la invitación.";
+
+    throw new Error(mensaje);
+  }
 }
+
