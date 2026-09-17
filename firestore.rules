@@ -877,16 +877,13 @@ function canReadMovimientos(clienteId) {
         isAdmin()
         && isActiveUser()
         && clienteId == profile().clienteId
-        && !changedKeys().hasAny([
-          "plan", "planNombre", "planId",
-          "frecuenciaCobro", "billingCycle",
-          "billingCurrency", "currency",
-          "planPrecio", "mantenimientoMensual", "price",
-          "pendingPlanId", "pendingBillingCycle", "pendingPrice",
-          "pendingBillingCurrency", "pendingPlanChangeType",
-          "estado", "estadoSuscripcion", "subscriptionStatus",
-          "suspendidoManual", "suspendidoPorSistema",
-          "maxUsers", "maxBranches", "entitlements"
+        && changedKeys().hasOnly([
+          "nombreVisible", "logoUrl",
+          "moneda", "localeMoneda", "timezone",
+          "productosBaseInicializados",
+          "ultimoNumeroVenta", "ultimoNumeroRecibo",
+          "ultimoNumeroPedido", "ultimoNumeroCotizacion",
+          "updatedAt"
         ])
       )
 

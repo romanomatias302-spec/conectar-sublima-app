@@ -13,6 +13,7 @@ const {
   collection,
   collectionGroup,
   deleteDoc,
+  deleteField,
   doc,
   getDoc,
   getDocs,
@@ -207,6 +208,104 @@ test('admin tenant no puede alterar plan, precio ni estado comercial SaaS', asyn
   await assertFails(updateDoc(ref, {pendingPrice: 1}));
   await assertFails(updateDoc(ref, {pendingBillingCurrency: 'ARS'}));
   await assertFails(updateDoc(ref, {pendingPlanChangeType: 'downgrade'}));
+});
+
+const operationalCounters = ['ultimoNumeroVenta', 'ultimoNumeroRecibo', 'ultimoNumeroPedido', 'ultimoNumeroCotizacion'];
+const sensitiveTenantFields = {
+  saldoCuentaCorriente: 0, nextBillingDate: '2099-01-01',
+  fechaProximoCargo: '2099-01-01', fechaVencimiento: '2099-01-01',
+  billingProvider: 'hotmart', metodoCobro: 'manual', billingAnchorDate: '2099-01-01',
+  diasGracia: 999, ultimoPeriodoFacturado: '2099-01', billingCycleSequence: 999,
+  hotmartSubscriptionId: 'test-subscription', providerSubscriptionId: 'test-provider',
+  hotmartSubscriberCode: 'test-subscriber', hotmartLastTransactionId: 'test-transaction',
+  hotmartLastEventId: 'test-event', hotmartSubscriptionStatus: 'ACTIVE', hotmartCancelled: true,
+  pendingPlanId: 'empresa', pendingBillingCycle: 'annual', pendingPrice: 1,
+  pendingBillingCurrency: 'ARS', pendingPlanChangeType: 'downgrade', pendingUnknown: true,
+  trialEndDate: '2099-01-01', trialStartDate: '2099-01-01',
+  suspensionReason: 'test', fechaSuspension: '2099-01-01', motivoSuspension: 'test',
+  fechaReactivacion: '2099-01-01', suspendidoAt: '2099-01-01',
+  estadoCuenta: 'al_dia', fechaAlta: '2099-01-01', diasCiclo: 999,
+  costoInstalacion: 0, ultimoPago: '2099-01-01', ultimoPagoMonto: 999, ultimoPagoMedio: 'test',
+};
+
+test('admin tenant conserva configuración y todos los contadores operativos', async () => {
+  const ref = doc(authenticatedDb('admin-a'), 'clientes-saas', TENANT_A);
+  for (const patch of [
+    {nombreVisible: 'Comercio'}, {logoUrl: 'https://example.test/logo.png'},
+    {moneda: 'ARS', localeMoneda: 'es-AR', timezone: 'America/Argentina/Buenos_Aires'},
+    {productosBaseInicializados: true},
+    ...operationalCounters.map(key => ({[key]: 1, updatedAt: new Date()})),
+  ]) await assertSucceeds(updateDoc(ref, patch));
+});
+
+for (const [field, value] of Object.entries(sensitiveTenantFields)) {
+  test(`admin tenant no puede crear, cambiar ni eliminar ${field}`, async () => {
+    const ref = doc(authenticatedDb('admin-a'), 'clientes-saas', TENANT_A);
+    await assertFails(updateDoc(ref, {[field]: value}));
+    await environment.withSecurityRulesDisabled(async context => {
+      await updateDoc(doc(context.firestore(), 'clientes-saas', TENANT_A), {[field]: 'existing-value'});
+    });
+    await assertFails(updateDoc(ref, {[field]: value}));
+    await assertFails(updateDoc(ref, {[field]: deleteField()}));
+  });
+}
+
+test('admin tenant rechaza campo desconocido y actualización mixta', async () => {
+  const ref = doc(authenticatedDb('admin-a'), 'clientes-saas', TENANT_A);
+  await assertFails(updateDoc(ref, {campoDesconocido: true}));
+  await assertFails(updateDoc(ref, {nombreVisible: 'Comercio', saldoCuentaCorriente: 0}));
+});
+
+for (const planId of ['legacy', 'custom']) {
+  test(`configuración operativa preserva campos adicionales de ${planId} aun suspendido`, async () => {
+    const existing = {estado: 'suspendido', planId, plan: planId === 'legacy' ? 'Mensual' : 'Personalizado',
+      billingCycle: 'monthly', price: 123, saldoCuentaCorriente: 456,
+      campoHistorico: {conservar: true}, fechaProximoCargo: '2026-10-01'};
+    await environment.withSecurityRulesDisabled(async context => {
+      await setDoc(doc(context.firestore(), 'clientes-saas', TENANT_A), existing);
+    });
+    const ref = doc(authenticatedDb('admin-a'), 'clientes-saas', TENANT_A);
+    const patch = {logoUrl: 'https://example.test/logo.png', moneda: 'ARS'};
+    await assertSucceeds(updateDoc(ref, patch));
+    assert.deepEqual((await getDoc(ref)).data(), {...existing, ...patch});
+  });
+}
+
+test('usuario común conserva cada contador sólo con el permiso correspondiente', async () => {
+  const permissions = [
+    {ventas: {crear: true}}, {ventas: {editar: true}},
+    {pedidos: {crear: true}}, {ventas: {crearCotizacion: true}},
+  ];
+  for (let index = 0; index < operationalCounters.length; index += 1) {
+    await environment.withSecurityRulesDisabled(async context => {
+      await updateDoc(doc(context.firestore(), 'usuarios', 'reader-a'), {permisos: permissions[index]});
+    });
+    const ref = doc(authenticatedDb('reader-a'), 'clientes-saas', TENANT_A);
+    await assertSucceeds(updateDoc(ref, {[operationalCounters[index]]: index + 1, updatedAt: new Date()}));
+    await assertFails(updateDoc(ref, {nombreVisible: 'No permitido'}));
+    await assertFails(updateDoc(ref, {saldoCuentaCorriente: 0}));
+    await assertFails(updateDoc(ref, {[operationalCounters[index]]: 99, nombreVisible: 'No permitido'}));
+    await assertFails(updateDoc(doc(authenticatedDb('without-sales-access'), 'clientes-saas', TENANT_A),
+      {[operationalCounters[index]]: 99}));
+  }
+});
+
+test('superadmin conserva escritura financiera, contrato, suspensión y downgrade', async () => {
+  await assertSucceeds(updateDoc(doc(authenticatedDb('superadmin'), 'clientes-saas', TENANT_A), {
+    ...sensitiveTenantFields, planId: 'empresa', billingCycle: 'annual',
+    billingCurrency: 'USD', currency: 'USD', price: 999,
+    estado: 'suspendido', estadoSuscripcion: 'suspendida', subscriptionStatus: 'suspended',
+    suspendidoManual: true, suspendidoPorSistema: false,
+  }));
+});
+
+test('allow-list operativa no autoriza otro tenant, anónimo ni admin inactivo', async () => {
+  await assertFails(updateDoc(doc(authenticatedDb('admin-a'), 'clientes-saas', TENANT_B), {nombreVisible: 'No'}));
+  await assertFails(updateDoc(doc(environment.unauthenticatedContext().firestore(), 'clientes-saas', TENANT_A), {moneda: 'ARS'}));
+  await environment.withSecurityRulesDisabled(async context => {
+    await updateDoc(doc(context.firestore(), 'usuarios', 'admin-a'), {activo: false});
+  });
+  await assertFails(updateDoc(doc(authenticatedDb('admin-a'), 'clientes-saas', TENANT_A), {logoUrl: 'https://example.test/logo.png'}));
 });
 
 test('altas y reactivaciones con cupo sólo pueden pasar por Functions', async () => {
