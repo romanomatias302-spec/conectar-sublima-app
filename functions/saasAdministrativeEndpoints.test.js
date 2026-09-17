@@ -86,7 +86,7 @@ test("diagnóstico individual acepta claim superadmin y no escribe en pago/trial
   assert.equal(f.writes(), 0);
 });
 
-test("callables administrativas seguras delegan a los mismos internos; legacy y scheduler permanecen", async () => {
+test("callables seguras delegan a los mismos internos; migración HTTP retirada y billing legacy preservado", async () => {
   const f = fixture({rol: "superadmin"});
   vm.runInContext("procesarCargosSaas = async (options) => options; migrarMiniaturasProduccion = async (options) => options;", f.context);
   const auth = {uid: "s", token: {}};
@@ -98,6 +98,6 @@ test("callables administrativas seguras delegan a los mismos internos; legacy y 
   assert.equal(migration.clienteId, "paid");
   assert.equal(migration.soloUna, false);
   assert.equal(f.endpoints.ejecutarCargosSaasAhora.type, "onRequest");
-  assert.equal(f.endpoints.migrarMiniaturasProduccion.type, "onRequest");
+  assert.equal(f.endpoints.migrarMiniaturasProduccion, undefined);
   assert.equal(f.endpoints.emitirCargosSaasAutomaticos.type, "scheduler");
 });

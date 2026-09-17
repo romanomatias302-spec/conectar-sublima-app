@@ -1222,33 +1222,3 @@ exports.migrarMiniaturasProduccionSeguro = onCall(async (request) => {
     soloUna: request.data?.modo !== "todos",
   });
 });
-
-exports.migrarMiniaturasProduccion = onRequest(async (req, res) => {
-  try {
-    const token = req.query.token;
-    const clienteId = req.query.clienteId;
-    const modo = req.query.modo || "uno";
-
-    if (token !== "zalfro-miniaturas-2026-seguro") {
-      res.status(403).json({ error: "No autorizado" });
-      return;
-    }
-
-    if (!clienteId) {
-      res.status(400).json({ error: "Falta clienteId" });
-      return;
-    }
-
-    const resultado = await migrarMiniaturasProduccion({
-      clienteId,
-      soloUna: modo !== "todos",
-    });
-
-    res.json(resultado);
-  } catch (error) {
-    console.error("Error migrando miniaturas:", error);
-    res.status(500).json({
-      error: error.message || "Error migrando miniaturas",
-    });
-  }
-});
