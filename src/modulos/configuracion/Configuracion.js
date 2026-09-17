@@ -222,11 +222,81 @@ useEffect(() => {
   if (pestañaActiva !== "cuenta" || !perfil?.clienteId || perfil?.rol === "superadmin") return undefined;
   return subscribeSaasAccountState({
     tenantId: perfil.clienteId,
-    onState: ({client, users, invitations, branches, movements}) => {
-      setCuentaSaas((actual) => ({...actual, ...client, moneda: client.billingCurrency || client.currency || "USD"}));
-      setUsoCuenta(calculateSaasResourceUsage({client, users, invitations, branches}));
-      setPeriodosCuenta(resumirPeriodosCuenta(movements));
-    },
+onState: ({
+  client,
+  users,
+  invitations,
+  branches,
+  movements,
+}) => {
+  const cuentaActualizada = {
+    ...client,
+
+    planNombre:
+      client.planNombre ||
+      client.plan ||
+      "Sin plan",
+
+    estadoSuscripcion:
+      client.estadoSuscripcion ||
+      client.estado ||
+      "activo",
+
+    fechaVencimiento:
+      client.fechaVencimiento ||
+      client.fechaProximoCargo ||
+      "",
+
+    planPrecio:
+      client.planPrecio ??
+      client.mantenimientoMensual ??
+      0,
+
+    saldoCuentaCorriente:
+      client.saldoCuentaCorriente ?? 0,
+
+    moneda:
+      client.billingCurrency ||
+      client.currency ||
+      "USD",
+
+    ultimoPago:
+      client.ultimoPago || "",
+
+    pais:
+      client.pais || "-",
+
+    metodoCobro:
+      client.metodoCobro || "manual",
+
+    billingProvider:
+      client.billingProvider || "",
+
+    hotmartSubscriptionId:
+      client.hotmartSubscriptionId || "",
+
+    suspendidoPorSistema:
+      client.suspendidoPorSistema || false,
+
+    suspendidoManual:
+      client.suspendidoManual || false,
+  };
+
+  setCuentaSaas(cuentaActualizada);
+
+  setUsoCuenta(
+    calculateSaasResourceUsage({
+      client: cuentaActualizada,
+      users,
+      invitations,
+      branches,
+    })
+  );
+
+  setPeriodosCuenta(
+    resumirPeriodosCuenta(movements)
+  );
+},
     onError: (error) => console.error("No se pudo sincronizar la cuenta SaaS:", error),
   });
 }, [pestañaActiva, perfil?.clienteId, perfil?.rol]);

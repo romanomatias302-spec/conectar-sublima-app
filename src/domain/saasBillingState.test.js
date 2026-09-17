@@ -39,11 +39,10 @@ test("cargo manual y scheduler resuelven el mismo período", () => {
   expect(recurringSaasPeriodKey({...client, billingCycle: "annual"})).toBe("2026-09-30-ANUAL");
 });
 
-test("cargo manual normaliza período vacío y explica un período UI incompatible", () => {
+test("cargo manual usa el período esperado si está vacío y acepta otro período solicitado", () => {
   const client = {billingCycle: "monthly", nextBillingDate: "2026-10-15"};
   expect(resolveRecurringChargePeriod(client, "", "2026-09-15")).toBe("2026-10");
-  expect(() => resolveRecurringChargePeriod(client, "2026-09", "2026-09-15"))
-    .toThrow("Período esperado: 2026-10");
+  expect(resolveRecurringChargePeriod(client, "2026-09", "2026-09-15")).toBe("2026-09");
 });
 
 test("cargo recurrente manual avanza el ciclo de calendario", () => {

@@ -675,7 +675,11 @@ async function aplicarSeleccionCupos() {
     }
     setSeleccionCupos(null);
     await cargarTodo();
-    if (futureEntitlements) await completarDowngradeSaas(perfil.clienteId);
+    if (futureEntitlements) {
+      const resultadoDowngrade =
+        await completarDowngradeSaas(perfil.clienteId);
+
+    }
     onEntitlementsChanged?.();
     setMensaje("Selección de usuarios aplicada correctamente.");
   } catch (error) {
@@ -800,7 +804,7 @@ async function aplicarSeleccionCupos() {
         await navigator.clipboard.writeText(link);
         setMensaje("Invitación creada. El link quedó copiado al portapapeles.");
       } catch {
-        setMensaje(`Invitación creada. Copiá este link manualmente: ${link}`);
+        setMensaje("Invitación creada. Podés copiar el link desde la invitación pendiente.");
       }
 
       setNombre("");

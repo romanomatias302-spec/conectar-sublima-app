@@ -56,6 +56,7 @@ export default function ConfiguracionSucursales({ perfil, onEntitlementsChanged 
         ...d.data(),
       }));
 
+
 const tienePrincipal = lista.some(
   (s) => s.esPrincipal === true || s.codigo === SUCURSAL_PRINCIPAL_ID
 );
@@ -134,9 +135,19 @@ if (!tienePrincipal && lista.length === 0) {
         await cambiarEstadoSucursalSaas({clienteId: perfil.clienteId, sucursalId, activa: false});
       }
       setSeleccionSucursales(null);
-      if (futureEntitlements) await completarDowngradeSaas(perfil.clienteId);
+
+      if (futureEntitlements) {
+        const resultadoDowngrade =
+          await completarDowngradeSaas(perfil.clienteId);
+
+
+      }
+
       onEntitlementsChanged?.();
-      setMensaje("Selección de sucursales aplicada correctamente.");
+
+      setMensaje(
+        "Selección de sucursales aplicada correctamente."
+      );
     } catch (error) {
       console.error("Error aplicando selección de sucursales:", error);
       setMensaje(error.message || "No se pudo aplicar la selección.");

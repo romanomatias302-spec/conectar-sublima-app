@@ -353,6 +353,7 @@ export function matchesSaasClientSearch(client = {}, search = "") {
 export function filterSaasClients(clients = [], filters = {}, now = new Date()) {
   return clients.filter((client) => {
     if (!matchesSaasClientSearch(client, filters.search)) return false;
+    if (filters.paidMonthly && (!isCommerciallyActivePaidClient(client) || resolveActiveSaasBillingCycle(client) !== "monthly")) return false;
     const classification = classifySaasClient(client, now);
     if (filters.state && filters.state !== "todos") {
       if (filters.state === "mora" && Number(client.saldoCuentaCorriente || 0) <= 0) return false;

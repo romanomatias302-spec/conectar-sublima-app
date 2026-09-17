@@ -88,13 +88,46 @@ if (esCargoRecurrente) {
       ["suspendida", "suspended", "gracia", "past_due"].includes(currentStatus) ||
       Number(currentClient.saldoCuentaCorriente || 0) > 0
     ) throw new Error("La cuenta cambió de estado y ya no admite un cargo recurrente.");
-    if (recurringSaasPeriodKey(currentClient, fechaPago) !== periodoRecurrente) {
-      throw new Error("El período de facturación cambió. Volvé a intentar.");
-    }
-    const advancePatch = buildRecurringChargeAdvancePatch(currentClient, periodoRecurrente, fechaPago);
-    if (!advancePatch) throw new Error("No se pudo determinar el siguiente ciclo de facturación.");
-    transaction.set(cargoRef, {...movimiento, idempotencyKey: cargoRef.id, periodKey: periodoRecurrente});
-    transaction.update(clienteRef, {...advancePatch, updatedAt: serverTimestamp()});
+      const periodoEsperado = recurringSaasPeriodKey(
+        currentClient,
+        fechaPago
+      );
+
+      if (!periodoEsperado) {
+        throw new Error(
+          "El cliente no tiene un ciclo de facturación válido."
+        );
+      }
+
+      const correspondeAlCicloActual =
+        periodoRecurrente === periodoEsperado;
+
+      transaction.set(cargoRef, {
+        ...movimiento,
+        idempotencyKey: cargoRef.id,
+        periodKey: periodoRecurrente,
+        correspondeAlCicloActual,
+      });
+
+      if (correspondeAlCicloActual) {
+        const advancePatch =
+          buildRecurringChargeAdvancePatch(
+            currentClient,
+            periodoRecurrente,
+            fechaPago
+          );
+
+        if (!advancePatch) {
+          throw new Error(
+            "No se pudo determinar el siguiente ciclo de facturación."
+          );
+        }
+
+        transaction.update(clienteRef, {
+          ...advancePatch,
+          updatedAt: serverTimestamp(),
+        });
+      }
   });
 } else {
   await addDoc(collection(db, "saas_pagos"), movimiento);

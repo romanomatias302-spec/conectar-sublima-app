@@ -43,14 +43,29 @@ export function recurringSaasPeriodKey(client = {}, referenceDate = new Date()) 
   return "";
 }
 
-export function resolveRecurringChargePeriod(client = {}, requestedPeriod = "", referenceDate = new Date()) {
-  const expected = recurringSaasPeriodKey(client, referenceDate);
-  const requested = String(requestedPeriod || "").trim();
-  if (!expected) throw new Error("El cliente no tiene un ciclo de facturación válido.");
-  if (requested && requested !== expected) {
-    throw new Error(`El período seleccionado no coincide con el próximo ciclo. Período esperado: ${expected}.`);
+export function resolveRecurringChargePeriod(
+  client = {},
+  requestedPeriod = "",
+  referenceDate = new Date()
+) {
+  const expected = recurringSaasPeriodKey(
+    client,
+    referenceDate
+  );
+
+  const requested = String(
+    requestedPeriod || ""
+  ).trim();
+
+  if (!expected) {
+    throw new Error(
+      "El cliente no tiene un ciclo de facturación válido."
+    );
   }
-  return expected;
+
+  // En una carga manual permitimos imputar el cargo
+  // a otro período sin alterar el ciclo vigente.
+  return requested || expected;
 }
 
 export function buildRecurringChargeAdvancePatch(client = {}, periodKey, referenceDate = new Date()) {

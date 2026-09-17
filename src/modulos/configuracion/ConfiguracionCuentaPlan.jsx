@@ -133,7 +133,7 @@ export default function ConfiguracionCuentaPlan({account, usage, onManageResourc
           <div className="account-plan-modal" role="dialog" aria-modal="true" aria-labelledby="plan-change-title" onMouseDown={(event) => event.stopPropagation()}>
             <span className="account-plan-eyebrow">Siguiente paso</span>
             <h3 id="plan-change-title">Cambiar a {selectedPlan.name}</h3>
-            <p>Este paso no modifica tu plan. Tus usuarios, sucursales e historial permanecen intactos.</p>
+
             <div className="account-plan-modal-note">
               <strong>Tu cuenta permanece intacta</strong>
               <span>No se eliminan usuarios, sucursales, historial ni datos comerciales.</span>

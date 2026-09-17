@@ -45,7 +45,6 @@ import {
   resolveSaasPrice,
   restoreSaasSection,
   persistSaasSection,
-  resolveActiveSaasBillingCycle,
 } from "../../domain/saasPanel";
 import "./css/DuenoSaasLayout.css";
 import "./css/DuenoSaasSidebar.css";
@@ -83,6 +82,7 @@ export default function DuenoSaasPanel() {
 const [filtroEstado, setFiltroEstado] = useState("todos");
 const [busquedaCliente, setBusquedaCliente] = useState("");
 const [filtroPlan, setFiltroPlan] = useState([]);
+const [filtroPagosMensuales, setFiltroPagosMensuales] = useState(false);
 const [mostrarFiltroPlanes, setMostrarFiltroPlanes] = useState(false);
 const filtroPlanesRef = useRef(null);
 const [filtroPais, setFiltroPais] = useState("todos");
@@ -288,14 +288,32 @@ const mapearUsoClientes = (snapshot) => {
   };
 
 useEffect(() => {
-  cargarClientes().then((clientesIniciales) => {
-    if (Array.isArray(clientesIniciales) && clientesIniciales.length > 0) {
-      cargarInvitaciones(clientesIniciales);
-    }
-  });
   cargarUsuarios();
   cargarSucursales();
   cargarMovimientosSaas();
+
+  const unsubClientes = onSnapshot(
+    collection(db, "clientes-saas"),
+    (snapshot) => {
+      const lista = snapshot.docs.map((docu) => ({
+        id: docu.id,
+        ...docu.data(),
+      }));
+
+      setClientes(lista);
+      setLoading(false);
+
+      cargarInvitaciones(lista);
+    },
+    (error) => {
+      console.error(
+        "Error escuchando clientes SaaS:",
+        error
+      );
+
+      setLoading(false);
+    }
+  );
 
   const unsubUso = onSnapshot(
     collection(db, "clientes-saas-uso"),
@@ -303,11 +321,15 @@ useEffect(() => {
       mapearUsoClientes(snapshot);
     },
     (error) => {
-      console.error("Error escuchando uso SaaS:", error);
+      console.error(
+        "Error escuchando uso SaaS:",
+        error
+      );
     }
   );
 
   return () => {
+    unsubClientes();
     unsubUso();
   };
 }, []);
@@ -546,6 +568,7 @@ const resumenDashboard = {
 
 const planesFiltro = [...new Set([...clientes.map(resolveSaasPlanLabel), "Legacy mensual", "Legacy anual", "Personalizado"])].sort();
 const alternarPlanFiltro = (plan) => {
+  setFiltroPagosMensuales(false);
   setFiltroPlan((actual) => {
     const lista = Array.isArray(actual) ? actual : [];
 
@@ -556,36 +579,13 @@ const alternarPlanFiltro = (plan) => {
 };
 
 const limpiarFiltroPlanes = () => {
+  setFiltroPagosMensuales(false);
   setFiltroPlan([]);
 };
 
 const seleccionarPlanesPagosMensuales = () => {
-  const planesMensuales = [
-    ...new Set(
-      clientes
-        .filter((cliente) => {
-          const plan = resolveSaasPlanLabel(cliente);
-
-          if (
-            [
-              "Prueba gratis 7 días",
-              "Legacy anual",
-              "Personalizado",
-              "Sin plan",
-            ].includes(plan)
-          ) {
-            return false;
-          }
-
-          return (
-            resolveActiveSaasBillingCycle(cliente) === "monthly"
-          );
-        })
-        .map((cliente) => resolveSaasPlanLabel(cliente))
-    ),
-  ];
-
-  setFiltroPlan(planesMensuales);
+  setFiltroPlan([]);
+  setFiltroPagosMensuales(true);
 };
 const paisesFiltro = [...new Set(clientes.map((c) => c.pais).filter(Boolean))].sort();
 const monedasFiltro = [
@@ -600,6 +600,7 @@ const clientesFiltrados = useMemo(() => filterSaasClients(clientes, {
     search: busquedaCliente,
     state: filtroEstado,
     plan: filtroPlan,
+    paidMonthly: filtroPagosMensuales,
     country: filtroPais,
     currency: filtroMoneda,
   })
@@ -626,7 +627,7 @@ const clientesFiltrados = useMemo(() => filterSaasClients(clientes, {
   }
 
     return 0;
-  }), [clientes, busquedaCliente, filtroEstado, filtroPlan, filtroPais, filtroMoneda, ordenClientes]);
+  }), [clientes, busquedaCliente, filtroEstado, filtroPlan, filtroPagosMensuales, filtroPais, filtroMoneda, ordenClientes]);
 
 const periodoActual = new Date().toISOString().slice(0, 7);
 
@@ -1002,7 +1003,7 @@ return (
                 }}
               >
                 <span>
-                  {filtroPlan.length === 0
+                  {filtroPagosMensuales ? "Planes pagos mensuales" : filtroPlan.length === 0
                     ? "Todos los planes"
                     : filtroPlan.length === 1
                     ? filtroPlan[0]
@@ -1121,7 +1122,7 @@ return (
             </div>
 
             <button type="button" style={{...selectFiltro, order: 7, background: "transparent", color: "#64748b"}} onClick={() => {
-              setBusquedaCliente(""); setFiltroEstado("todos"); setFiltroPlan([]);
+              setBusquedaCliente(""); setFiltroEstado("todos"); setFiltroPlan([]); setFiltroPagosMensuales(false);
               setFiltroPais("todos"); setFiltroMoneda("todos"); setOrdenClientes("recientes");
             }}>Limpiar filtros</button>
 </div>

@@ -33,7 +33,8 @@ test("el cambio abre un paso informativo y no confirma cargos ni persistencia", 
   render(<ConfiguracionCuentaPlan account={{planId: "start", billingCurrency: "USD"}} usage={usage} />);
 
   fireEvent.click(screen.getAllByRole("button", {name: "Cambiar plan"})[0]);
-  expect(screen.getByRole("dialog")).toHaveTextContent("Este paso no modifica tu plan");
+  expect(screen.getByRole("dialog")).toHaveTextContent("Tu cuenta permanece intacta");
+  expect(screen.getByRole("dialog")).toHaveTextContent("No se eliminan usuarios, sucursales, historial ni datos comerciales.");
   expect(screen.queryByText(/checkout|proveedor|disponibilidad/i)).not.toBeInTheDocument();
 });
 
