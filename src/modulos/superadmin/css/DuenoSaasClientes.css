@@ -2,18 +2,48 @@
   display: none;
 }
 
-.saas-clientes-table-scroll {
-  max-height: calc(100vh - 320px);
-  overflow: auto;
+/* ==============================
+   TABLA DESKTOP
+   ============================== */
+
+.saas-clientes-table-shell {
+  width: 100%;
   border-radius: 12px;
+  overflow: hidden;
+  background: #ffffff;
 }
 
-.saas-clientes-table-desktop thead th {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  background: #ffffff;
-  box-shadow: 0 1px 0 #e5e7eb;
+.saas-clientes-table-desktop {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.saas-clientes-table-header {
+  display: table;
+  width: 100%;
+  margin: 0;
+}
+
+.saas-clientes-table-header thead th {
+  background: #0796c9 !important;
+  color: #ffffff !important;
+  position: static !important;
+}
+
+.saas-clientes-table-scroll {
+  width: 100%;
+  height: calc(100vh - 360px);
+  min-height: 320px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.saas-clientes-table-body {
+  display: table;
+  width: 100%;
+  margin: 0;
 }
 
 .saas-clientes-table-desktop tbody tr[role="button"]:focus-visible {
@@ -21,7 +51,34 @@
   outline-offset: -3px;
 }
 
+/* ==============================
+   FILTROS
+   ============================== */
+
+.saas-client-filters > input {
+  flex: 2 1 240px;
+  min-width: 0;
+}
+
+.saas-client-filters > select {
+  flex: 1 1 150px;
+  min-width: 0;
+}
+
+.saas-client-filters > button {
+  flex: 0 0 auto;
+}
+
+/* ==============================
+   MOBILE
+   ============================== */
+
 @media (max-width: 800px) {
+
+  .saas-clientes-table-shell {
+    display: none;
+  }
+
   .saas-clientes-table-desktop {
     display: none;
   }
@@ -107,3 +164,19 @@
     font-weight: 800;
   }
 }
+
+@media (max-width: 600px) {
+
+  .saas-client-filters > input,
+  .saas-client-filters > select {
+    flex-basis: 100%;
+    width: 100%;
+  }
+
+  .saas-client-filters > button {
+    margin-left: auto;
+  }
+}
+
+
+

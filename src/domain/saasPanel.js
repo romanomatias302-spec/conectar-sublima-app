@@ -1,4 +1,4 @@
-import {normalizeBillingCycle, normalizeSubscriptionStatus} from "./saasPlans";
+import {normalizeBillingCycle} from "./saasPlans";
 
 export const SAAS_TABS = ["clientes", "estadisticas", "comercial", "auditoria"];
 
@@ -63,10 +63,12 @@ export function resolveSaasPlanLabel(client = {}) {
     profesional: "Profesional",
     profesional_plus: "Profesional Plus",
     empresa: "Empresa",
-    trial: "Prueba",
+    trial: "Prueba gratis 7 días",
   };
   if (labels[planId]) return labels[planId];
   const rawPlan = String(client.planNombre || client.plan || "").trim();
+  if ((!planId || planId === "legacy") && normalizeSaasText(rawPlan) === "personalizado") return "Personalizado";
+  if (!planId && (normalizeSaasText(rawPlan).startsWith("prueba") || normalizeSaasText(rawPlan) === "trial")) return "Prueba gratis 7 días";
   const cycle = normalizeSaasText(client.billingCycle || client.frecuenciaCobro);
   if (planId === "legacy" || normalizeSaasText(rawPlan).includes("mensual") || normalizeSaasText(rawPlan).includes("anual")) {
     if (["annual", "anual"].includes(cycle) || normalizeSaasText(rawPlan).includes("anual")) return "Legacy anual";
@@ -76,20 +78,26 @@ export function resolveSaasPlanLabel(client = {}) {
   return rawPlan || "Sin plan";
 }
 
+export function resolveSaasClientStatus(client = {}) {
+  const values = [client.subscriptionStatus, client.estadoSuscripcion, client.estado].map(normalizeSaasText).filter(Boolean);
+  if (values.some((v) => ["cancelled", "canceled", "cancelado", "cancelada"].includes(v))) return "canceled";
+  if (client.activo === false || values.some((v) => ["inactive", "inactivo", "inactiva"].includes(v))) return "inactive";
+  if (client.suspendidoManual === true || client.suspendidoPorSistema === true || values.some((v) => ["suspended", "suspendido", "suspendida"].includes(v))) return "suspended";
+  if (values.some((v) => ["past_due", "grace", "gracia", "mora"].includes(v))) return "grace";
+  if (normalizeSaasText(client.planId) === "trial" || resolveSaasPlanLabel(client) === "Prueba gratis 7 días" || values.some((v) => ["trial", "prueba"].includes(v))) return "trial";
+  if (!values.length || values.some((v) => ["active", "activo", "activa"].includes(v))) return "active";
+  return "inactive";
+}
+export const SAAS_STATUS_LABELS = {active: "Activo", grace: "En gracia", suspended: "Suspendido", canceled: "Cancelado", inactive: "Inactivo", trial: "Prueba"};
+
 export function classifySaasClient(client = {}, now = new Date()) {
-  const subscription = normalizeSubscriptionStatus(
-    client.subscriptionStatus || client.estadoSuscripcion || client.estado,
-    client
-  );
-  const state = normalizeSaasText(client.estado);
-  const plan = normalizeSaasText(client.planNombre || client.plan);
-  const trial = normalizeSaasText(client.planId) === "trial" || subscription === "trial" || plan.includes("prueba");
+  const status = resolveSaasClientStatus(client);
+  const trial = status === "trial";
   if (trial) return {group: "trial", label: "Prueba", churn: null, suspensionDays: null};
-  if (["cancelled", "cancelado"].includes(subscription) || state === "inactivo") {
-    return {group: "cancelled", label: "Inactivo / cancelado", churn: null, suspensionDays: null};
+  if (["canceled", "inactive"].includes(status)) {
+    return {group: "cancelled", label: SAAS_STATUS_LABELS[status], churn: null, suspensionDays: null};
   }
-  const suspended = client.suspendidoManual === true || client.suspendidoPorSistema === true ||
-    ["suspended", "suspendida", "suspendido"].includes(subscription) || state === "suspendido";
+  const suspended = status === "suspended";
   if (suspended) {
     const suspendedAt = asDate(client.fechaSuspension || client.suspendidoAt);
     const current = asDate(now);
@@ -97,11 +105,11 @@ export function classifySaasClient(client = {}, now = new Date()) {
       ? Math.max(0, Math.floor((current.getTime() - suspendedAt.getTime()) / 86400000))
       : null;
     if (days === null) return {group: "suspended", label: "Suspendido", churn: "unclassified", suspensionDays: null};
-    if (days <= 30) return {group: "suspended", label: "Suspendido reciente", churn: "risk", suspensionDays: days};
-    if (days <= 60) return {group: "suspended", label: "En recuperación", churn: "recovery", suspensionDays: days};
-    return {group: "churn", label: "No recuperado", churn: "not_recovered", suspensionDays: days};
+    if (days <= 30) return {group: "suspended", label: "Suspendido", churn: "risk", suspensionDays: days};
+    if (days <= 60) return {group: "suspended", label: "Suspendido", churn: "recovery", suspensionDays: days};
+    return {group: "churn", label: "Suspendido", churn: "not_recovered", suspensionDays: days};
   }
-  if (["past_due", "gracia"].includes(subscription)) return {group: "grace", label: "En gracia", churn: null, suspensionDays: null};
+  if (status === "grace") return {group: "grace", label: "En gracia", churn: null, suspensionDays: null};
   return {group: "active", label: "Activo", churn: null, suspensionDays: null};
 }
 
@@ -227,6 +235,106 @@ export function initialSaasBillingRecordStatus(client = {}, movements = []) {
   return {applicable: true, complete, needsAttention: !complete};
 }
 
+export function saasBalanceStatus(client = {}) {
+  const raw = Number(client.saldoCuentaCorriente ?? 0);
+  const balance = Number.isFinite(raw) ? raw : 0;
+  return {balance, label: balance > 0 ? "Con deuda" : balance < 0 ? "Crédito a favor" : "Al día",
+    color: balance > 0 ? "#dc2626" : balance < 0 ? "#2563eb" : "#15803d"};
+}
+
+export function isCommerciallyActivePaidClient(client = {}) {
+    if (!["active", "grace"].includes(classifySaasClient(client).group)) return false;
+    if (!["monthly", "annual"].includes(resolveActiveSaasBillingCycle(client))) return false;
+    const name = normalizeSaasText(client.planNombre || client.plan);
+    if (["personalizado", "sin plan"].includes(name) || name.includes("instalacion") || name.includes("prueba")) return false;
+    const id = normalizeSaasText(client.planId);
+    return RECURRING_PLAN_IDS.has(id) || resolveSaasPlanLabel(client).startsWith("Legacy");
+}
+
+export function getActivePaidSaasClients(clients = []) {
+  return clients.filter(isCommerciallyActivePaidClient);
+}
+
+export function buildPaidSaasSummary(clients = []) {
+  const active = getActivePaidSaasClients(clients);
+  const monthly = {}, annual = {}, countries = new Map();
+  for (const client of active) {
+    const cycle = resolveActiveSaasBillingCycle(client);
+    const price = resolveSaasPrice(client);
+    if (price !== null && price > 0 && ["monthly", "annual"].includes(cycle)) {
+      addCurrency(cycle === "monthly" ? monthly : annual, resolveSaasCurrency(client), price);
+    }
+    const country = String(client.pais || "").trim() || "Sin país";
+    const plan = resolveSaasPlanLabel(client);
+    const row = countries.get(country) || {country, total: 0, monthly: 0, annual: 0, plans: {}};
+    row[cycle] += 1;
+    row.total += 1; row.plans[plan] = (row.plans[plan] || 0) + 1;
+    countries.set(country, row);
+  }
+  const columns = [...new Set(active.map(resolveSaasPlanLabel))].sort();
+  const rows = [...countries.values()].sort((a, b) => b.total - a.total || a.country.localeCompare(b.country));
+  const totals = {total: active.length, monthly: 0, annual: 0, plans: {}};
+  for (const row of rows) { totals.monthly += row.monthly; totals.annual += row.annual; }
+  for (const row of rows) for (const plan of columns) totals.plans[plan] = (totals.plans[plan] || 0) + (row.plans[plan] || 0);
+  return {active, monthly, annual, columns, rows, totals};
+}
+
+export function sumSaasPlanRows(rows = []) {
+  return rows.reduce((total, row) => {
+    for (const key of ["total", "active", "grace", "suspended", "trial"]) total[key] += row[key] || 0;
+    return total;
+  }, {total: 0, active: 0, grace: 0, suspended: 0, trial: 0});
+}
+
+export function restoreSaasSection(storage, search = "") {
+  const urlTab = new URLSearchParams(search).get("tab");
+  if (SAAS_TABS.includes(urlTab)) return urlTab;
+  try {
+    const saved = storage?.getItem("duenoSaasSeccionActiva");
+    return SAAS_TABS.includes(saved) ? saved : "clientes";
+  } catch { return "clientes"; }
+}
+
+export function persistSaasSection(storage, section) {
+  if (!SAAS_TABS.includes(section)) return;
+  try { storage?.setItem("duenoSaasSeccionActiva", section); } catch { /* Storage no disponible. */ }
+}
+
+export function indexInitialSaasBilling(clients = [], movements = []) {
+  const recorded = new Set(movements.filter((m) => m.anulado !== true && m.estado !== "anulado" &&
+    ["cargo", "pago"].includes(m.tipoMovimiento)).map((m) => m.clienteSaasId));
+  return Object.fromEntries(clients.map((client) => [client.id,
+    initialSaasBillingRecordStatus(client, recorded.has(client.id) ? [{clienteSaasId: client.id, tipoMovimiento: "cargo"}] : [])]));
+}
+
+export function groupActiveClientsByCountryAndPlan(clients = []) {
+  const countries = new Map();
+  for (const client of getActiveSaasClients(clients)) {
+    const country = String(client.pais || "").trim() || "Sin país";
+    const plan = resolveSaasPlanLabel(client).startsWith("Legacy") ? "Legacy" : resolveSaasPlanLabel(client);
+    const row = countries.get(country) || {country, total: 0, plans: {}};
+    row.total += 1;
+    row.plans[plan] = (row.plans[plan] || 0) + 1;
+    countries.set(country, row);
+  }
+  return [...countries.values()].sort((a, b) => b.total - a.total || a.country.localeCompare(b.country));
+}
+
+export function summarizeSaasMovements(movements = []) {
+  const expected = {}, collected = {}, pending = {};
+  let withoutCurrency = 0;
+  for (const movement of movements) {
+    if (movement.anulado === true || movement.estado === "anulado" || !["cargo", "pago"].includes(movement.tipoMovimiento)) continue;
+    const currency = resolveSaasMovementCurrency(movement);
+    if (!currency) { withoutCurrency += 1; continue; }
+    addCurrency(movement.tipoMovimiento === "cargo" ? expected : collected, currency, Number(movement.monto));
+  }
+  for (const currency of new Set([...Object.keys(expected), ...Object.keys(collected)])) {
+    pending[currency] = (expected[currency] || 0) - (collected[currency] || 0);
+  }
+  return {expected, collected, pending, withoutCurrency};
+}
+
 export function matchesSaasClientSearch(client = {}, search = "") {
   const needle = normalizeSaasText(search);
   if (!needle) return true;
@@ -249,9 +357,16 @@ export function filterSaasClients(clients = [], filters = {}, now = new Date()) 
     if (filters.state && filters.state !== "todos") {
       if (filters.state === "mora" && Number(client.saldoCuentaCorriente || 0) <= 0) return false;
       else if (filters.state === "saldo_favor" && Number(client.saldoCuentaCorriente || 0) >= 0) return false;
-      else if (!["mora", "saldo_favor"].includes(filters.state) && classification.group !== filters.state) return false;
+      else if (filters.state === "suspended" && resolveSaasClientStatus(client) !== "suspended") return false;
+      else if (!["mora", "saldo_favor", "suspended"].includes(filters.state) && classification.group !== filters.state) return false;
     }
-    if (filters.plan && filters.plan !== "todos" && resolveSaasPlanLabel(client) !== filters.plan) return false;
+    if (
+      Array.isArray(filters.plan) &&
+      filters.plan.length > 0 &&
+      !filters.plan.includes(resolveSaasPlanLabel(client))
+    ) {
+      return false;
+    }
     if (filters.country && filters.country !== "todos" && String(client.pais || "") !== filters.country) return false;
     if (
       filters.currency &&

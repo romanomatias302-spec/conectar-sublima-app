@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   collection,
   getDocs,
@@ -17,7 +17,6 @@ import {pendingPlanEntitlements} from "../../domain/saasPlanChange";
 import ClienteSaasForm from "./ClienteSaasForm";
 import {
   crearInvitacionUsuario,
-  escucharInvitacionesPorCliente,
   cancelarInvitacion,
 } from "../../firebase/invitacionesUsuarios";
 import {
@@ -32,17 +31,21 @@ import {
   buildSaasPanelMetrics,
   buildSaasTabUrl,
   classifySaasClient,
+  resolveSaasClientStatus,
   filterSaasClients,
   formatSaasMoney,
   getSaasTabFromSearch,
-  initialSaasBillingRecordStatus,
+  indexInitialSaasBilling,
+  saasBalanceStatus,
   isInteractiveSaasTarget,
   refreshAfterSaasMutation,
   resolveSaasCurrency,
   resolveSaasMovementCurrency,
   resolveSaasPlanLabel,
   resolveSaasPrice,
-  syncSaasTabFromLocation,
+  restoreSaasSection,
+  persistSaasSection,
+  resolveActiveSaasBillingCycle,
 } from "../../domain/saasPanel";
 import "./css/DuenoSaasLayout.css";
 import "./css/DuenoSaasSidebar.css";
@@ -79,7 +82,9 @@ export default function DuenoSaasPanel() {
 
 const [filtroEstado, setFiltroEstado] = useState("todos");
 const [busquedaCliente, setBusquedaCliente] = useState("");
-const [filtroPlan, setFiltroPlan] = useState("todos");
+const [filtroPlan, setFiltroPlan] = useState([]);
+const [mostrarFiltroPlanes, setMostrarFiltroPlanes] = useState(false);
+const filtroPlanesRef = useRef(null);
 const [filtroPais, setFiltroPais] = useState("todos");
 const [filtroMoneda, setFiltroMoneda] = useState("todos");
 const [ordenClientes, setOrdenClientes] = useState("recientes");
@@ -88,7 +93,7 @@ const [mostrarPago, setMostrarPago] = useState(false);
 const [mostrarCargoMasivo, setMostrarCargoMasivo] = useState(false);
 const [menuClienteAbierto, setMenuClienteAbierto] = useState(null);
 const [seccionActiva, setSeccionActiva] = useState(() =>
-  typeof window === "undefined" ? "clientes" : getSaasTabFromSearch(window.location.search)
+  typeof window === "undefined" ? "clientes" : restoreSaasSection(window.localStorage, window.location.search)
 );
 
 const [posicionMenuCliente, setPosicionMenuCliente] = useState(null);
@@ -270,16 +275,12 @@ const mapearUsoClientes = (snapshot) => {
 
   const cargarInvitaciones = async (clientesActuales = clientes) => {
     try {
-      const todas = [];
-      for (const cliente of clientesActuales) {
-        const lista = await escucharInvitacionesPorCliente(cliente.id);
-        todas.push(
-          ...lista.map((inv) => ({
-            ...inv,
-            clienteNombre: cliente.nombre || cliente.id,
-          }))
-        );
-      }
+      const nombres = new Map(clientesActuales.map((cliente) => [cliente.id, cliente.nombre || cliente.id]));
+      const snapshot = await getDocs(collection(db, "invitaciones_usuarios"));
+      const todas = snapshot.docs.map((item) => ({...item.data(), id: item.id}))
+        .filter((inv) => nombres.has(inv.clienteId))
+        .map((inv) => ({...inv, clienteNombre: nombres.get(inv.clienteId)}))
+        .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
       setInvitaciones(todas);
     } catch (error) {
       console.error("Error cargando invitaciones:", error);
@@ -325,15 +326,17 @@ const usoEntitlementsCliente = (cliente) => calculateSaasResourceUsage({
 });
 
 useEffect(() => {
-  const syncTab = () => syncSaasTabFromLocation(window.location, setSeccionActiva);
+  const syncTab = () => setSeccionActiva(restoreSaasSection(window.localStorage, window.location.search));
   window.addEventListener("popstate", syncTab);
-  const current = getSaasTabFromSearch(window.location.search);
+  const current = restoreSaasSection(window.localStorage, window.location.search);
   const raw = new URLSearchParams(window.location.search).get("tab");
   if (raw && raw !== current) {
     window.history.replaceState(null, "", buildSaasTabUrl(window.location, current));
   }
   return () => window.removeEventListener("popstate", syncTab);
 }, []);
+
+useEffect(() => { persistSaasSection(window.localStorage, seccionActiva); }, [seccionActiva]);
 
 const cambiarSeccion = (tab) => {
   const nextUrl = buildSaasTabUrl(window.location, tab);
@@ -366,6 +369,25 @@ const refrescarDatosSaas = async (kind) => {
     window.removeEventListener("resize", cerrarMenu);
   };
 }, []);
+
+useEffect(() => {
+  function handleClickOutside(event) {
+    if (
+      filtroPlanesRef.current &&
+      !filtroPlanesRef.current.contains(event.target)
+    ) {
+      setMostrarFiltroPlanes(false);
+    }
+  }
+
+  if (mostrarFiltroPlanes) {
+    document.addEventListener("mousedown", handleClickOutside);
+  }
+
+  return () => {
+    document.removeEventListener("mousedown", handleClickOutside);
+  };
+}, [mostrarFiltroPlanes]);
 
   const abrirNuevoCliente = () => {
     setClienteEditando(null);
@@ -476,6 +498,7 @@ const movimientosSaasActivos = useMemo(
   () => movimientosSaas.filter((m) => m.anulado !== true),
   [movimientosSaas]
 );
+const initialBillingIndex = useMemo(() => indexInitialSaasBilling(clientes, movimientosSaas), [clientes, movimientosSaas]);
 
 const pagosSaasActivos = useMemo(
   () => movimientosSaasActivos.filter((m) => m.tipoMovimiento === "pago"),
@@ -521,7 +544,49 @@ const resumenDashboard = {
   pagosRegistrados: pagosSaasActivos.length,
 };
 
-const planesFiltro = [...new Set(clientes.map(resolveSaasPlanLabel))].sort();
+const planesFiltro = [...new Set([...clientes.map(resolveSaasPlanLabel), "Legacy mensual", "Legacy anual", "Personalizado"])].sort();
+const alternarPlanFiltro = (plan) => {
+  setFiltroPlan((actual) => {
+    const lista = Array.isArray(actual) ? actual : [];
+
+    return lista.includes(plan)
+      ? lista.filter((item) => item !== plan)
+      : [...lista, plan];
+  });
+};
+
+const limpiarFiltroPlanes = () => {
+  setFiltroPlan([]);
+};
+
+const seleccionarPlanesPagosMensuales = () => {
+  const planesMensuales = [
+    ...new Set(
+      clientes
+        .filter((cliente) => {
+          const plan = resolveSaasPlanLabel(cliente);
+
+          if (
+            [
+              "Prueba gratis 7 días",
+              "Legacy anual",
+              "Personalizado",
+              "Sin plan",
+            ].includes(plan)
+          ) {
+            return false;
+          }
+
+          return (
+            resolveActiveSaasBillingCycle(cliente) === "monthly"
+          );
+        })
+        .map((cliente) => resolveSaasPlanLabel(cliente))
+    ),
+  ];
+
+  setFiltroPlan(planesMensuales);
+};
 const paisesFiltro = [...new Set(clientes.map((c) => c.pais).filter(Boolean))].sort();
 const monedasFiltro = [
   ...new Set(
@@ -552,8 +617,8 @@ const clientesFiltrados = useMemo(() => filterSaasClients(clientes, {
   }
 
   if (ordenClientes === "estado") {
-    const aActivo = (a.estado || "activo") !== "suspendido";
-    const bActivo = (b.estado || "activo") !== "suspendido";
+    const aActivo = ["active", "grace"].includes(resolveSaasClientStatus(a));
+    const bActivo = ["active", "grace"].includes(resolveSaasClientStatus(b));
 
     if (aActivo === bActivo) return 0;
 
@@ -830,8 +895,9 @@ return (
 
       <div style={card}>
         <h2 style={{ marginTop: 0 }}>Clientes SaaS</h2>
-          <div style={filtrosBar}>
+          <div className="saas-client-filters" style={filtrosBar}>
             <input
+              aria-label="Buscar cliente"
               value={busquedaCliente}
               onChange={(e) => setBusquedaCliente(e.target.value)}
               placeholder="Buscar nombre, email, ID, país o plan..."
@@ -840,10 +906,11 @@ return (
 
             <select
               value={filtroEstado}
+              aria-label="Estado y situación de cobro"
               onChange={(e) => setFiltroEstado(e.target.value)}
               style={selectFiltro}
             >
-              <option value="todos">Todos</option>
+              <option value="todos">Estado / cobro: todos</option>
               <option value="active">Activos</option>
               <option value="grace">En gracia</option>
               <option value="suspended">Suspendidos recuperables</option>
@@ -855,34 +922,208 @@ return (
             </select>
             <select
               value={ordenClientes}
+              aria-label="Orden del listado"
               onChange={(e) => setOrdenClientes(e.target.value)}
-              style={selectFiltro}
+              style={{...selectFiltro, order: 4}}
             >
               <option value="recientes">Más recientes primero</option>
               <option value="antiguos">Más antiguos primero</option>
               <option value="nombre">Nombre A-Z</option>
               <option value="estado">Activos primero</option>
             </select>
-            <select
-              value={filtroPlan}
-              onChange={(e) => setFiltroPlan(e.target.value)}
-              style={selectFiltro}
-            >
-              <option value="todos">Todos los planes</option>
-              {planesFiltro.map((plan) => (
-                <option key={plan} value={plan}>
-                  {plan}
-                </option>
-              ))}
-            </select>
-            <select value={filtroPais} onChange={(e) => setFiltroPais(e.target.value)} style={selectFiltro}>
+
+            <select aria-label="País" value={filtroPais} onChange={(e) => setFiltroPais(e.target.value)} style={{...selectFiltro, order: 5}}>
               <option value="todos">Todos los países</option>
               {paisesFiltro.map((pais) => <option key={pais} value={pais}>{pais}</option>)}
             </select>
-            <select value={filtroMoneda} onChange={(e) => setFiltroMoneda(e.target.value)} style={selectFiltro}>
-              <option value="todos">Todas las monedas</option>
-              {monedasFiltro.map((moneda) => <option key={moneda} value={moneda}>{moneda}</option>)}
-            </select>
+              <div
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 4,
+                  padding: 4,
+                  border: "1px solid #e2e8f0",
+                  borderRadius: 10,
+                  background: "#f8fafc",
+                  order: 6,
+                }}
+              >
+                {[
+                  ["todos", "Todas"],
+                  ["ARS", "$ ARS"],
+                  ["USD", "US$ USD"],
+                ].map(([value, label]) => {
+                  const activo = filtroMoneda === value;
+
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setFiltroMoneda(value)}
+                      style={{
+                        border: 0,
+                        borderRadius: 7,
+                        padding: "6px 9px",
+                        background: activo ? "#fff" : "transparent",
+                        color: activo ? "#0284c7" : "#64748b",
+                        fontWeight: activo ? 700 : 500,
+                        cursor: "pointer",
+                        boxShadow: activo
+                          ? "0 1px 4px rgba(15,23,42,.10)"
+                          : "none",
+                      }}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div
+                ref={filtroPlanesRef}
+                style={{
+                  position: "relative",
+                  order: 3,
+                }}
+              >
+              <button
+                type="button"
+                onClick={() =>
+                  setMostrarFiltroPlanes((actual) => !actual)
+                }
+                style={{
+                  ...selectFiltro,
+                  width: 190,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  cursor: "pointer",
+                  background: "#fff",
+                }}
+              >
+                <span>
+                  {filtroPlan.length === 0
+                    ? "Todos los planes"
+                    : filtroPlan.length === 1
+                    ? filtroPlan[0]
+                    : `${filtroPlan.length} planes`}
+                </span>
+
+                <span style={{ fontSize: 11 }}>▼</span>
+              </button>
+
+              {mostrarFiltroPlanes && (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "calc(100% + 6px)",
+                    left: 0,
+                    zIndex: 30,
+                    width: 280,
+                    maxHeight: 360,
+                    overflowY: "auto",
+                    padding: "12px",
+                    background: "#fff",
+                    border: "1px solid #dbe3ee",
+                    borderRadius: 14,
+                    boxShadow: "0 16px 35px rgba(15, 23, 42, 0.16)",
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={seleccionarPlanesPagosMensuales}
+                    style={{
+                      width: "100%",
+                      border: 0,
+                      borderRadius: 8,
+                      padding: "9px 10px",
+                      marginBottom: 8,
+                      background: "#eef8fc",
+                      color: "#0284c7",
+                      fontWeight: 700,
+                      textAlign: "left",
+                      cursor: "pointer",
+                    }}
+                  >
+                    Planes pagos mensuales
+                  </button>
+
+                  <div
+                    style={{
+                      height: 1,
+                      background: "#e2e8f0",
+                      margin: "6px 0 8px",
+                    }}
+                  />
+
+                {planesFiltro.map((plan) => (
+                  <label
+                    key={plan}
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "18px 1fr",
+                      alignItems: "start",
+                      columnGap: 10,
+                      padding: "9px 8px",
+                      cursor: "pointer",
+                      fontSize: 14,
+                      borderRadius: 8,
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={filtroPlan.includes(plan)}
+                      onChange={() => alternarPlanFiltro(plan)}
+                      style={{
+                        marginTop: 2,
+                        width: 15,
+                        height: 15,
+                        accentColor: "#0284c7",
+                      }}
+                    />
+
+                    <span
+                      style={{
+                        lineHeight: 1.25,
+                        color: "#111827",
+                        fontWeight: filtroPlan.includes(plan) ? 700 : 500,
+                      }}
+                    >
+                      {plan}
+                    </span>
+                  </label>
+                ))}
+
+                  <div
+                    style={{
+                      height: 1,
+                      background: "#e2e8f0",
+                      margin: "8px 0",
+                    }}
+                  />
+
+                  <button
+                    type="button"
+                    onClick={limpiarFiltroPlanes}
+                    style={{
+                      border: 0,
+                      background: "transparent",
+                      color: "#64748b",
+                      cursor: "pointer",
+                      padding: "6px",
+                      fontSize: 13,
+                    }}
+                  >
+                    Mostrar todos
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <button type="button" style={{...selectFiltro, order: 7, background: "transparent", color: "#64748b"}} onClick={() => {
+              setBusquedaCliente(""); setFiltroEstado("todos"); setFiltroPlan([]);
+              setFiltroPais("todos"); setFiltroMoneda("todos"); setOrdenClientes("recientes");
+            }}>Limpiar filtros</button>
 </div>
 
            <div className="saas-clientes-mobile">
@@ -901,11 +1142,14 @@ return (
                       <div>
                         <strong>
                           {c.nombre || c.nombreCliente || c.empresa || c.id || "—"}
-                          {initialSaasBillingRecordStatus(c, movimientosSaas).needsAttention && (
+                          {initialBillingIndex[c.id]?.needsAttention && (
                             <FaExclamationCircle title="Falta registrar el primer cargo o pago de este cliente." aria-label="Falta registrar el primer cargo o pago" style={{marginLeft: 7, color: "#d97706", verticalAlign: "-2px"}} />
                           )}
                         </strong>
                         <span>{resolveSaasPlanLabel(c)}{c.pendingPlanId ? ` · pendiente a ${pendingPlanEntitlements(c)?.planName}` : ""}</span>
+                        <span style={{color: saasBalanceStatus(c).color}} title={saasBalanceStatus(c).label}>
+                          {formatSaasMoney(saasBalanceStatus(c).balance, resolveSaasCurrency(c, "USD"))}
+                        </span>
                       </div>
 
                       <b>{abierto ? "▲" : "▼"}</b>
@@ -925,7 +1169,33 @@ return (
                           </strong>
                         </p>
                         <p><span>País</span><strong>{c.pais || "—"}</strong></p>
-                        <p><span>Próximo cobro</span><strong>{formatearFecha(c.nextBillingDate || c.fechaProximoCargo)}</strong></p>
+                        <p>
+                          <span>Próximo cobro</span>
+
+                          <strong
+                            style={{
+                              display: "flex",
+                              flexDirection: "column",
+                              alignItems: "flex-end",
+                              gap: 2,
+                            }}
+                          >
+                            <span>
+                              {formatearFecha(
+                                c.nextBillingDate || c.fechaProximoCargo
+                              )}
+                            </span>
+
+                            <span
+                              style={{
+                                color: "#d97706",
+                                fontSize: 12,
+                              }}
+                            >
+                              Vence: {formatearFecha(c.fechaVencimiento)}
+                            </span>
+                          </strong>
+                        </p>
 
                         <div className="saas-cliente-card-actions">
                           <button type="button" onClick={() => abrirEditarCliente(c)}>
@@ -960,28 +1230,62 @@ return (
 
             
           
-          <div className="saas-clientes-table-scroll">
-          <table className="saas-clientes-table-desktop" style={table}>
-            <thead>
-              <tr>
-                <th style={th}>Empresa</th>
-                <th style={th}>Email</th>
-                <th style={th}>Plan</th>
-                <th style={th}>Moneda</th>
-                <th style={th}>Precio</th>
-                <th style={th}>Estado</th>
-                <th style={th}>País</th>
-                <th style={th}>Próximo cobro</th>
-                <th style={th}>Acciones</th>
-              </tr>
-            </thead>
+          <div className="saas-clientes-table-shell">
 
-            <tbody>
+            <table
+              className="saas-clientes-table-desktop saas-clientes-table-header"
+              style={table}
+            >
+              <colgroup>
+                <col style={{ width: "17%" }} />
+                <col style={{ width: "17%" }} />
+                <col style={{ width: "12%" }} />
+                <col style={{ width: "10%" }} />
+                <col style={{ width: "10%" }} />
+                <col style={{ width: "10%" }} />
+                <col style={{ width: "9%" }} />
+                <col style={{ width: "11%" }} />
+                <col style={{ width: "5%" }} />
+              </colgroup>
+
+              <thead>
+                <tr>
+                  <th style={th}>Empresa</th>
+                  <th style={th}>Email</th>
+                  <th style={th}>Plan</th>
+                  <th style={th}>Saldo</th>
+                  <th style={th}>Precio</th>
+                  <th style={th}>Estado</th>
+                  <th style={th}>País</th>
+                  <th style={th}>Cobro / vencimiento</th>
+                  <th style={{ ...th, textAlign: "center" }}>Acciones</th>
+                </tr>
+              </thead>
+            </table>
+
+            <div className="saas-clientes-table-scroll">
+              <table
+                className="saas-clientes-table-desktop saas-clientes-table-body"
+                style={table}
+              >
+                <colgroup>
+                  <col style={{ width: "17%" }} />
+                  <col style={{ width: "17%" }} />
+                  <col style={{ width: "12%" }} />
+                  <col style={{ width: "10%" }} />
+                  <col style={{ width: "10%" }} />
+                  <col style={{ width: "10%" }} />
+                  <col style={{ width: "9%" }} />
+                  <col style={{ width: "11%" }} />
+                  <col style={{ width: "5%" }} />
+                </colgroup>
+
+                <tbody>
               {clientesFiltrados.map((c) => (
                 <tr
                   key={c.id}
                   style={
-                    (c.estado || "activo") === "suspendido"
+                    resolveSaasClientStatus(c) === "suspended"
                       ? {...filaSuspendida, cursor: "pointer"}
                       : {cursor: "pointer"}
                   }
@@ -999,7 +1303,7 @@ return (
                 >
                   <td style={td}>
                     {c.nombre || c.nombreCliente || c.empresa || c.id || "—"}
-                    {initialSaasBillingRecordStatus(c, movimientosSaas).needsAttention && (
+                    {initialBillingIndex[c.id]?.needsAttention && (
                       <FaExclamationCircle title="Falta registrar el primer cargo o pago de este cliente." aria-label="Falta registrar el primer cargo o pago" style={{marginLeft: 7, color: "#d97706", verticalAlign: "-2px"}} />
                     )}
                   </td>
@@ -1017,7 +1321,10 @@ return (
                     })()}
                   </td>
                   <td style={td}>
-                    {resolveSaasCurrency(c, "USD")}
+                    <span style={{color: saasBalanceStatus(c).color, fontWeight: 700}} title={saasBalanceStatus(c).label}>
+                      {formatSaasMoney(saasBalanceStatus(c).balance, resolveSaasCurrency(c, "USD"))}
+                    </span>
+                    <small style={{display: "block", color: saasBalanceStatus(c).color}}>{saasBalanceStatus(c).label}</small>
                   </td>
 
                   <td style={td}>
@@ -1028,9 +1335,45 @@ return (
                   </td>
                   <td style={td}>{classifySaasClient(c).label}</td>
                   <td style={td}>{c.pais || "—"}</td>
-                  <td style={td}>{formatearFecha(c.nextBillingDate || c.fechaProximoCargo)}</td>
+                  <td style={td}>
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 3,
+                      }}
+                    >
+                      <span
+                        style={{
+                          color: "#111827",
+                          fontWeight: 600,
+                        }}
+                      >
+                        {formatearFecha(
+                          c.nextBillingDate || c.fechaProximoCargo
+                        )}
+                      </span>
 
-                    <td style={td}>
+                      <span
+                        style={{
+                          color: "#d97706",
+                          fontSize: 12,
+                          fontWeight: 700,
+                        }}
+                      >
+                        Vence: {formatearFecha(c.fechaVencimiento)}
+                      </span>
+                    </div>
+                  </td>
+
+                    <td
+                      style={{
+                        ...td,
+                        textAlign: "center",
+                        paddingLeft: 6,
+                        paddingRight: 6,
+                      }}
+                    >
                       <button
                         type="button"
                         style={btnMenuCliente}
@@ -1074,6 +1417,7 @@ return (
               )}
             </tbody>
           </table>
+          </div>
           </div>
         )}
       </div>
@@ -1141,41 +1485,48 @@ return (
 
                   <div style={dropdownDivider} />
 
-                  <button
-                    type="button"
-                    style={{
-                      ...dropdownItemCliente,
-                      color:
-                        (c.estado || "activo") === "activo"
-                          ? "#dc2626"
-                          : "#16a34a",
-                      fontWeight: 700,
-                    }}
-                    onClick={async () => {
-                      const nuevoEstado =
-                        (c.estado || "activo") === "activo"
-                          ? "suspendido"
-                          : "activo";
+                {(() => {
+                  const estadoCanonico = resolveSaasClientStatus(c);
+                  const estaSuspendido = estadoCanonico === "suspended";
 
-                      try {
-                        await cambiarSuspensionManualSaas(c.id, nuevoEstado);
-                      } catch (error) {
-                        console.error("No se pudo cambiar la suspensión SaaS:", error);
-                        alert(error.message || "No se pudo actualizar el estado del cliente.");
-                        return;
-                      }
+                  return (
+                    <button
+                      type="button"
+                      style={{
+                        ...dropdownItemCliente,
+                        color: estaSuspendido ? "#16a34a" : "#dc2626",
+                        fontWeight: 700,
+                      }}
+                      onClick={async () => {
+                        try {
+                          await cambiarSuspensionManualSaas(
+                            c.id,
+                            estaSuspendido ? "activo" : "suspendido"
+                          );
 
-                      await refrescarDatosSaas("suspension");
-                      
+                          await refrescarDatosSaas("suspension");
 
-                      setMenuClienteAbierto(null);
-                      setPosicionMenuCliente(null);
-                    }}
-                  >
-                    {(c.estado || "activo") === "activo"
-                      ? "Suspender manualmente"
-                      : "Reactivar"}
-                  </button>
+                          setMenuClienteAbierto(null);
+                          setPosicionMenuCliente(null);
+                        } catch (error) {
+                          console.error(
+                            "No se pudo cambiar la suspensión SaaS:",
+                            error
+                          );
+
+                          alert(
+                            error?.message ||
+                              "No se pudo actualizar el estado del cliente."
+                          );
+                        }
+                      }}
+                    >
+                      {estaSuspendido
+                        ? "Reactivar"
+                        : "Suspender manualmente"}
+                    </button>
+                  );
+                })()}
                 </>
               );
             })()}
@@ -2134,7 +2485,8 @@ const gridDosColumnas = {
 
 const table = {
   width: "100%",
-  borderCollapse: "collapse",
+  borderCollapse: "separate",
+  borderSpacing: 0,
 };
 
 const th = {

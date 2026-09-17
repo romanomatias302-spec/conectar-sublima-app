@@ -677,3 +677,8 @@
     grid-template-columns: 1fr;
   }
 }
+.saas-neon-kpis.saas-executive-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.saas-dark-table tfoot { font-weight: 700; border-top: 2px solid #475569; }
+@media (max-width: 600px) {
+  .saas-neon-kpis.saas-executive-kpis { grid-template-columns: 1fr; }
+}

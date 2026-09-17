@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { addDoc, collection, deleteField, doc, getDocs, query, updateDoc, where } from "firebase/firestore";
 import { db } from "../../firebase";
+import {formPlanSelection, selectHistoricalFormPlan, preserveHistoricalCommercialFields} from "../../domain/saasFormPlans";
+import {resolveSaasClientStatus, resolveSaasPlanLabel, SAAS_STATUS_LABELS} from "../../domain/saasPanel";
 import {escucharInvitacionesPorCliente} from "../../firebase/invitacionesUsuarios";
 import {nextSaasBillingDate} from "../../domain/saasBillingState";
 import {calculateSaasResourceUsage} from "../../domain/saasEntitlementUsage";
@@ -67,9 +69,6 @@ diasCiclo: 7,
 
   const [loading, setLoading] = useState(false);
   const [commercialFieldsDirty, setCommercialFieldsDirty] = useState(false);
-  const clienteOriginalLegacy = resolveSaasEntitlements(
-    clienteEditando || {}
-  ).isLegacy;
 
   useEffect(() => {
     if (clienteEditando) {
@@ -85,19 +84,20 @@ diasCiclo: 7,
 
 
         plan: clienteEditando.plan || "instalacion",
-        planNombre: clienteEditando.planNombre || clienteEditando.plan || "",
+        planNombre: resolveSaasPlanLabel(clienteEditando),
         planPrecio:
           clienteEditando.planPrecio ??
           clienteEditando.mantenimientoMensual ??
           0,
         ...nuevoModelo,
+        ...(formPlanSelection(clienteEditando) === "custom" ? {billingCycle: clienteEditando.billingCycle || ""} : {}),
         currency:
           clienteEditando.billingCurrency ||
           clienteEditando.currency ||
           "USD",
         currencyExplicit: true,
-        frecuenciaCobro: clienteEditando.frecuenciaCobro || "mensual",
-        diasCiclo: clienteEditando.diasCiclo || 30,
+        frecuenciaCobro: clienteEditando.frecuenciaCobro || (formPlanSelection(clienteEditando) === "custom" ? "" : "mensual"),
+        diasCiclo: clienteEditando.diasCiclo ?? (formPlanSelection(clienteEditando) === "custom" ? 0 : 30),
 
         pais: clienteEditando.pais || "Argentina",
         metodoCobro: clienteEditando.metodoCobro || "manual",
@@ -199,6 +199,11 @@ diasCiclo: 7,
 
     const handleChange = (e) => {
         const { name, value } = e.target;
+        if (name === "planId" && ["custom", "legacy_monthly", "legacy_annual"].includes(value)) {
+          setCommercialFieldsDirty(true);
+          setFormData((previous) => selectHistoricalFormPlan(previous, value));
+          return;
+        }
         if (["planId", "billingCycle", "currency", "price", "subscriptionStatus"].includes(name)) {
           setCommercialFieldsDirty(true);
         }
@@ -218,21 +223,47 @@ diasCiclo: 7,
             [name]: nuevoValor,
         };
 
-    if (name === "planId") {
-      if (value === "trial") {
-        nuevoForm.planNombre = "Prueba gratis 7 días";
-        nuevoForm.subscriptionStatus = "trial";
-        nuevoForm.price = 0;
-        nuevoForm.planPrecio = 0;
-      } else {
-        const plan = getSelectablePlans().find((item) => item.id === value);
-        nuevoForm.planNombre = plan?.name || "";
-        if (nuevoForm.subscriptionStatus === "trial") nuevoForm.subscriptionStatus = "active";
-        const catalogPrice = priceForPlan(value, nuevoForm.currency, nuevoForm.billingCycle);
-        nuevoForm.price = catalogPrice ?? "";
-        nuevoForm.planPrecio = catalogPrice ?? "";
+      if (name === "planId") {
+        if (value === "trial") {
+          nuevoForm.planNombre = "Prueba gratis 7 días";
+
+          nuevoForm.billingCycle = "monthly";
+          nuevoForm.frecuenciaCobro = "prueba";
+          nuevoForm.diasCiclo = 7;
+
+          nuevoForm.subscriptionStatus = "trial";
+
+          nuevoForm.price = 0;
+          nuevoForm.planPrecio = 0;
+          nuevoForm.mantenimientoMensual = 0;
+        } else {
+          const plan = getSelectablePlans().find(
+            (item) => item.id === value
+          );
+
+          nuevoForm.planNombre = plan?.name || "";
+
+          // Los planes actuales vuelven siempre a ciclo mensual
+          // al seleccionarlos.
+          nuevoForm.billingCycle = "monthly";
+          nuevoForm.frecuenciaCobro = "mensual";
+          nuevoForm.diasCiclo = 30;
+
+          if (nuevoForm.subscriptionStatus === "trial") {
+            nuevoForm.subscriptionStatus = "active";
+          }
+
+          const catalogPrice = priceForPlan(
+            value,
+            nuevoForm.currency,
+            "monthly"
+          );
+
+          nuevoForm.price = catalogPrice ?? "";
+          nuevoForm.planPrecio = catalogPrice ?? "";
+          nuevoForm.mantenimientoMensual = catalogPrice ?? "";
+        }
       }
-    }
 
       if (name === "currency") {
         nuevoForm.currencyExplicit = true;
@@ -259,8 +290,8 @@ diasCiclo: 7,
       nuevoForm.frecuenciaCobro = value === "annual" ? "anual" : "mensual";
       nuevoForm.diasCiclo = value === "annual" ? 365 : 30;
       const catalogPrice = priceForPlan(nuevoForm.planId, nuevoForm.currency, value);
-      nuevoForm.price = catalogPrice ?? "";
-      nuevoForm.planPrecio = catalogPrice ?? "";
+      nuevoForm.price = catalogPrice ?? prev.price;
+      nuevoForm.planPrecio = catalogPrice ?? prev.planPrecio;
     }
 
     if (name === "planNombre") {
@@ -314,7 +345,7 @@ diasCiclo: 7,
   const resolved = resolveSaasEntitlements(formData);
   const validation = validateSaasSubscription({
     planId: formData.planId,
-    billingCycle: formData.billingCycle,
+    billingCycle: formPlanSelection(formData) === "custom" ? "monthly" : formData.billingCycle,
     currency: formData.currency,
     price: formData.price,
     subscriptionStatus: formData.subscriptionStatus,
@@ -407,6 +438,11 @@ diasCiclo: 7,
       estado: formData.estado === "suspendido" ? "suspendido" : "activo",
       estadoSuscripcion: estadoSuscripcionLegacy,
     };
+    if (formPlanSelection(formData) === "custom" && !["monthly", "annual"].includes(formData.billingCycle)) {
+      Object.assign(dataAGuardar, {billingCycle: formData.billingCycle, frecuenciaCobro: formData.frecuenciaCobro,
+        diasCiclo: formData.diasCiclo, nextBillingDate: clienteEditando?.nextBillingDate || "",
+        fechaProximoCargo: formData.fechaProximoCargo || "", fechaVencimiento: formData.fechaVencimiento || ""});
+    }
 
       if (clienteEditando?.id) {
         const targetPlanId = dataAGuardar.planId;
@@ -469,7 +505,7 @@ diasCiclo: 7,
       }
 
       if (clienteEditando?.id) {
-        await updateDoc(doc(db, "clientes-saas", clienteEditando.id), dataAGuardar);
+        await updateDoc(doc(db, "clientes-saas", clienteEditando.id), preserveHistoricalCommercialFields(dataAGuardar, clienteEditando, commercialFieldsDirty));
       } else {
         await addDoc(collection(db, "clientes-saas"), dataAGuardar);
       }
@@ -482,6 +518,8 @@ diasCiclo: 7,
       setLoading(false);
     }
   };
+
+
 
   return (
     <div style={overlay}>
@@ -544,13 +582,11 @@ diasCiclo: 7,
         <label style={label}>Estado del cliente</label>
         <select
           name="estado"
-          value={formData.estado}
-          onChange={handleChange}
+          value={resolveSaasClientStatus(clienteEditando || formData)}
+          disabled
           style={input}
         >
-          <option value="activo">Activo</option>
-          <option value="mora">Mora</option>
-          <option value="suspendido">Suspendido</option>
+          {Object.entries(SAAS_STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select>
       </div>
 
@@ -558,17 +594,21 @@ diasCiclo: 7,
         <label style={label}>Plan</label>
         <select
           name="planId"
-          value={formData.planId}
+          value={formPlanSelection(formData)}
           onChange={handleChange}
           style={input}
         >
-          {clienteOriginalLegacy && (
-            <option value="legacy">Legacy — conserva límites ilimitados</option>
-          )}
+          <optgroup label="Planes actuales">
           <option value="trial">Prueba gratis 7 días</option>
           {getSelectablePlans().map((plan) => (
             <option key={plan.id} value={plan.id}>{plan.name}</option>
           ))}
+          </optgroup>
+          <optgroup label="Planes históricos / especiales">
+            <option value="legacy_monthly">Legacy mensual</option>
+            <option value="legacy_annual">Legacy anual</option>
+            <option value="custom">Personalizado</option>
+          </optgroup>
         </select>
         {formData.planId === "legacy" && (
           <small style={{ color: "#64748b" }}>
@@ -580,6 +620,7 @@ diasCiclo: 7,
       <div style={campo}>
         <label style={label}>Ciclo de facturación</label>
         <select name="billingCycle" value={formData.billingCycle} onChange={handleChange} style={input} disabled={formData.planId === "trial"}>
+          {!["monthly", "annual"].includes(formData.billingCycle) && <option value={formData.billingCycle}>{formData.billingCycle || "Sin ciclo estándar"}</option>}
           <option value="monthly">Mensual</option>
           <option value="annual">Anual (precio manual)</option>
         </select>

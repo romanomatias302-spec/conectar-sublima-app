@@ -17,7 +17,152 @@ import {
   resolveSaasMovementCurrency,
   resolveSaasPlanLabel,
   syncSaasTabFromLocation,
+  saasBalanceStatus,
+  indexInitialSaasBilling,
+  groupActiveClientsByCountryAndPlan,
+  summarizeSaasMovements,
+  buildPaidSaasSummary,
+  sumSaasPlanRows,
+  restoreSaasSection,
+  persistSaasSection,
+  isCommerciallyActivePaidClient,
+  resolveSaasClientStatus,
 } from "./saasPanel";
+
+test.each([
+  [{estado: "activo", subscriptionStatus: "active"}, "active"],
+  [{estado: "activo", subscriptionStatus: "suspended"}, "suspended"],
+  [{suspendidoManual: true}, "suspended"], [{suspendidoPorSistema: true}, "suspended"],
+  [{subscriptionStatus: "past_due"}, "grace"], [{estadoSuscripcion: "gracia"}, "grace"],
+  [{estadoSuscripcion: "mora"}, "grace"], [{estado: "cancelado"}, "canceled"],
+  [{subscriptionStatus: "canceled"}, "canceled"], [{planId: "trial"}, "trial"],
+  [{planId: "trial", suspendidoManual: true}, "suspended"],
+  [{estado: "cancelado", suspendidoManual: true}, "canceled"],
+  [{activo: false, subscriptionStatus: "active"}, "inactive"],
+])("estado canónico %j -> %s", (client, expected) => {
+  expect(resolveSaasClientStatus(client)).toBe(expected);
+  expect(classifySaasClient(client).label).toBe({active: "Activo", suspended: "Suspendido", grace: "En gracia", canceled: "Cancelado", inactive: "Inactivo", trial: "Prueba"}[expected]);
+});
+
+test.each(["Prueba", "Prueba 7 dias", "Prueba gratis", "Prueba gratis 7 días", "trial"])("alias %s se agrupa como trial único", (planNombre) => {
+  expect(resolveSaasPlanLabel({planNombre})).toBe("Prueba gratis 7 días");
+  expect(resolveSaasClientStatus({planNombre})).toBe("trial");
+});
+
+test("planId canónico tiene prioridad y filtros usan suspensión canónica", () => {
+  expect(resolveSaasPlanLabel({planId: "start", planNombre: "Prueba"})).toBe("Start");
+  const client = {id: "a", estado: "activo", subscriptionStatus: "suspended"};
+  expect(filterSaasClients([client], {state: "active"})).toEqual([]);
+  expect(filterSaasClients([client], {state: "suspended"})).toEqual([client]);
+});
+
+test("ingresos separan ciclos y monedas sin prorratear ni usar moneda operativa", () => {
+  const clients = [
+    {planId: "start", billingCycle: "monthly", price: 40, billingCurrency: "USD", currency: "ARS"},
+    {planId: "empresa", billingCycle: "annual", price: 1200, currency: "USD"},
+    {plan: "Mensual", price: 3000, currency: "ARS"},
+    {planId: "start", billingCycle: "monthly", price: 100, moneda: "MXN"},
+  ];
+  const result = buildPaidSaasSummary(clients);
+  expect(result.monthly).toEqual({USD: 40, ARS: 3000});
+  expect(result.annual).toEqual({USD: 1200});
+});
+
+test.each([
+  {planId: "start", subscriptionStatus: "suspended"},
+  {planId: "trial"}, {plan: "Prueba gratis 7 días"},
+  {plan: "Personalizado"}, {plan: "instalacion"}, {},
+  {planId: "start", estado: "inactivo"},
+  {planId: "start", subscriptionStatus: "cancelled"},
+])("excluye categorías no pagas/activas: %j", (fields) => {
+  const result = buildPaidSaasSummary([{billingCycle: "monthly", price: 99, currency: "USD", ...fields}]);
+  expect(result.active).toHaveLength(0);
+  expect(result.monthly).toEqual({});
+  expect(result.rows).toEqual([]);
+});
+
+test("país/plan distingue Legacy mensual/anual y suma columnas y total", () => {
+  const result = buildPaidSaasSummary([
+    {plan: "Mensual", pais: "Argentina"}, {plan: "Anual", pais: "Argentina"},
+    {planId: "start", billingCycle: "monthly", pais: "México"}, {planId: "start", pais: "Argentina", estado: "suspendido"},
+  ]);
+  expect(result.totals).toEqual({total: 3, monthly: 2, annual: 1, plans: {"Legacy anual": 1, "Legacy mensual": 1, Start: 1}});
+  expect(result.rows.find((row) => row.country === "Argentina").total).toBe(2);
+});
+
+test.each(["active", "past_due", "gracia", "mora"])("estado %s cuenta como vigente pago", (subscriptionStatus) => {
+  expect(isCommerciallyActivePaidClient({planId: "start", billingCycle: "monthly", subscriptionStatus})).toBe(true);
+});
+
+test("15 activos y 12 gracia legacy mensual son 27 vigentes", () => {
+  const clients = Array.from({length: 27}, (_, i) => ({plan: "Mensual", pais: "Argentina", price: 10, billingCurrency: "USD", estadoSuscripcion: i < 15 ? "activo" : "gracia"}));
+  const result = buildPaidSaasSummary(clients);
+  expect(result.active).toHaveLength(27);
+  expect(result.totals).toMatchObject({total: 27, monthly: 27, annual: 0});
+  expect(result.rows[0].plans["Legacy mensual"]).toBe(27);
+  expect(result.monthly).toEqual({USD: 270});
+});
+
+test("gracia anual suma importe completo y totales coinciden con ciclos", () => {
+  const result = buildPaidSaasSummary([
+    {plan: "Anual", estadoSuscripcion: "gracia", price: 1200, currency: "USD"},
+    {planId: "start", billingCycle: "monthly", subscriptionStatus: "past_due", price: 20, currency: "USD"},
+  ]);
+  expect(result.annual).toEqual({USD: 1200});
+  expect(result.monthly).toEqual({USD: 20});
+  expect(result.active.length).toBe(result.totals.monthly + result.totals.annual);
+  expect(result.rows[0].total).toBe(result.rows[0].monthly + result.rows[0].annual);
+});
+
+test("plan pago sin ciclo no se inventa como mensual ni anual", () => {
+  expect(isCommerciallyActivePaidClient({planId: "start", subscriptionStatus: "past_due"})).toBe(false);
+});
+
+test("fila TOTAL suma activos de filas sin sumar suspendidos", () => {
+  expect(sumSaasPlanRows([{total: 10, active: 9, suspended: 1}, {total: 5, active: 2, grace: 3}]))
+    .toEqual({total: 15, active: 11, suspended: 1, grace: 3, trial: 0});
+});
+
+test("sección restaura valores válidos, respeta URL y tolera storage inválido", () => {
+  const storage = {getItem: () => "estadisticas", setItem: jest.fn()};
+  expect(restoreSaasSection(storage)).toBe("estadisticas");
+  expect(restoreSaasSection(storage, "?tab=comercial")).toBe("comercial");
+  expect(restoreSaasSection({getItem: () => "otra"})).toBe("clientes");
+  expect(restoreSaasSection({getItem: () => {throw new Error();}})).toBe("clientes");
+  persistSaasSection(storage, "auditoria");
+  expect(storage.setItem).toHaveBeenCalledWith("duenoSaasSeccionActiva", "auditoria");
+});
+
+test.each([[40, "Con deuda"], [0, "Al día"], [-10, "Crédito a favor"]])("saldo %s: %s", (balance, label) => {
+  expect(saasBalanceStatus({saldoCuentaCorriente: balance})).toMatchObject({balance, label});
+});
+
+test("index inicial conserva evidencia y excluye movimientos anulados", () => {
+  const clients = [{id: "a", planId: "start"}, {id: "b", planId: "trial"}];
+  expect(indexInitialSaasBilling(clients, [{clienteSaasId: "a", tipoMovimiento: "cargo", anulado: true}]).a.needsAttention).toBe(true);
+  expect(indexInitialSaasBilling(clients, [{clienteSaasId: "a", tipoMovimiento: "pago"}]).a.needsAttention).toBe(false);
+  expect(indexInitialSaasBilling(clients, []).b.needsAttention).toBe(false);
+});
+
+test("país y plan mantienen Legacy y excluyen cancelados", () => {
+  const clients = [{pais: "Argentina", planId: "start"},
+    {pais: "Argentina", planId: "legacy", billingCycle: "monthly"},
+    {pais: "Argentina", planId: "empresa", estado: "inactivo"}];
+  expect(groupActiveClientsByCountryAndPlan(clients)).toEqual([
+    {country: "Argentina", total: 2, plans: {Start: 1, Legacy: 1}},
+  ]);
+});
+
+test("cargos y pagos se separan por moneda, sin anulados ni moneda operativa", () => {
+  expect(summarizeSaasMovements([
+    {tipoMovimiento: "cargo", monto: 100, billingCurrency: "USD", currency: "ARS"},
+    {tipoMovimiento: "pago", monto: 30, currency: "USD"},
+    {tipoMovimiento: "cargo", monto: 1000, moneda: "ARS"},
+    {tipoMovimiento: "pago", monto: 800, moneda: "ARS"},
+    {tipoMovimiento: "cargo", monto: 9999, currency: "USD", anulado: true},
+    {tipoMovimiento: "pago", monto: 2},
+  ])).toEqual({expected: {USD: 100, ARS: 1000}, collected: {USD: 30, ARS: 800}, pending: {USD: 70, ARS: 200}, withoutCurrency: 1});
+});
 
 test("indicador inicial distingue plan pago completo, incompleto y legacy gratuito", () => {
   const client = {id: "paid", planId: "start", billingCycle: "monthly", subscriptionStatus: "active"};
