@@ -541,33 +541,46 @@ exports.emitirCargosSaasAutomaticos = onSchedule(
   }
 );
 
-exports.probarCargosSaasAutomaticos = onRequest(async (req, res) => {
+async function authorizeSaasDiagnosticRequest(request) {
+  const profileSnap = request.auth?.uid
+    ? await db.collection("usuarios").doc(request.auth.uid).get()
+    : null;
+  const authorization = authorizeSaasOwner(
+    request.auth,
+    profileSnap?.exists ? profileSnap.data() : null
+  );
+  if (!authorization.authorized) {
+    throw new HttpsError(
+      authorization.code === "UNAUTHENTICATED" ? "unauthenticated" : "permission-denied",
+      "Se requieren privilegios de propietario SaaS."
+    );
+  }
+}
+
+exports.probarCargosSaasAutomaticos = onCall(async (request) => {
+  await authorizeSaasDiagnosticRequest(request);
   try {
-    const resultado = await procesarCargosSaas({ modoPrueba: true });
-    res.json(resultado);
+    return await procesarCargosSaas({ modoPrueba: true });
   } catch (error) {
     console.error(error);
-    res.status(500).json({
-      error: error.message || "Error ejecutando prueba",
-    });
+    throw new HttpsError("internal", "Error ejecutando prueba");
   }
 });
 
-exports.probarCargoClienteSaas = onRequest(async (req, res) => {
+exports.probarCargoClienteSaas = onCall(async (request) => {
+  await authorizeSaasDiagnosticRequest(request);
   try {
-    const clienteId = req.query.id;
+    const clienteId = String(request.data?.id || "").trim();
 
     if (!clienteId) {
-      res.status(400).json({ error: "Falta id del cliente SaaS" });
-      return;
+      throw new HttpsError("invalid-argument", "Falta id del cliente SaaS");
     }
 
     const hoy = inicioDia(new Date());
     const docu = await db.collection("clientes-saas").doc(clienteId).get();
 
     if (!docu.exists) {
-      res.status(404).json({ error: "Cliente SaaS no encontrado" });
-      return;
+      throw new HttpsError("not-found", "Cliente SaaS no encontrado");
     }
 
     const cliente = {
@@ -583,18 +596,17 @@ exports.probarCargoClienteSaas = onRequest(async (req, res) => {
     });
 
     if (resultadoPrueba.procesado) {
-      res.json({
+      return {
         clienteId,
         clienteNombre: cliente.nombre || "",
         tipo: "prueba",
         resultado: resultadoPrueba,
-      });
-      return;
+      };
     }
 
     const evaluacion = evaluateBillingCandidate(cliente, hoy);
 
-    res.json({
+    return {
       clienteId,
       action: evaluacion.action,
       code: evaluacion.code,
@@ -602,12 +614,11 @@ exports.probarCargoClienteSaas = onRequest(async (req, res) => {
       monto: evaluacion.amount || 0,
       moneda: evaluacion.currency || null,
       periodo: evaluacion.period || null,
-    });
+    };
   } catch (error) {
+    if (error instanceof HttpsError) throw error;
     console.error(error);
-    res.status(500).json({
-      error: error.message || "Error probando cliente SaaS",
-    });
+    throw new HttpsError("internal", "Error probando cliente SaaS");
   }
 });
 
