@@ -622,27 +622,6 @@ exports.probarCargoClienteSaas = onCall(async (request) => {
   }
 });
 
-exports.ejecutarCargosSaasAhora = onRequest(async (req, res) => {
-  try {
-    const token = req.query.token;
-
-    if (token !== "zalfro-cargos-2026-seguro") {
-      res.status(403).json({
-        error: "No autorizado",
-      });
-      return;
-    }
-
-    const resultado = await procesarCargosSaas({modoPrueba: false});
-    res.json(resultado);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({
-      error: error.message || "Error ejecutando cargos reales",
-    });
-  }
-});
-
 exports.ejecutarCargosSaasAhoraSeguro = onCall(async (request) => {
   const profileSnap = request.auth?.uid
     ? await db.collection("usuarios").doc(request.auth.uid).get()

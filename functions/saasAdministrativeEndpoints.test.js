@@ -86,9 +86,9 @@ test("diagnóstico individual acepta claim superadmin y no escribe en pago/trial
   assert.equal(f.writes(), 0);
 });
 
-test("callables seguras delegan a los mismos internos; migración HTTP retirada y billing legacy preservado", async () => {
+test("callables y scheduler delegan a los mismos internos; exports HTTP legacy retirados", async () => {
   const f = fixture({rol: "superadmin"});
-  vm.runInContext("procesarCargosSaas = async (options) => options; migrarMiniaturasProduccion = async (options) => options;", f.context);
+  vm.runInContext("var billingCalls = []; procesarCargosSaas = async (options) => { billingCalls.push(options.modoPrueba); return options; }; migrarMiniaturasProduccion = async (options) => options;", f.context);
   const auth = {uid: "s", token: {}};
   const real = await f.endpoints.ejecutarCargosSaasAhoraSeguro.handler({auth});
   assert.equal(real.modoPrueba, false);
@@ -97,7 +97,10 @@ test("callables seguras delegan a los mismos internos; migración HTTP retirada 
   const migration = await f.endpoints.migrarMiniaturasProduccionSeguro.handler({auth, data: {clienteId: "paid", modo: "todos"}});
   assert.equal(migration.clienteId, "paid");
   assert.equal(migration.soloUna, false);
-  assert.equal(f.endpoints.ejecutarCargosSaasAhora.type, "onRequest");
+  assert.equal(f.endpoints.ejecutarCargosSaasAhora, undefined);
+  assert.equal(f.endpoints.ejecutarCargosSaasAhoraSeguro.type, "onCall");
   assert.equal(f.endpoints.migrarMiniaturasProduccion, undefined);
   assert.equal(f.endpoints.emitirCargosSaasAutomaticos.type, "scheduler");
+  await f.endpoints.emitirCargosSaasAutomaticos.handler();
+  assert.deepEqual(Array.from(f.context.billingCalls), [false, true, false]);
 });
