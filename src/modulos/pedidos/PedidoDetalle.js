@@ -375,15 +375,20 @@ const resumirTalles = (producto) => {
   }));
 };
 
-  const obtenerObservaciones = (producto) => {
-    const atributos = producto?.atributosExtra || {};
-    return (
-      atributos.Observaciones ||
-      atributos.observaciones ||
-      producto?.observaciones ||
-      "-"
-    );
-  };
+const resumirAtributos = (producto) => {
+  const atributos = producto?.atributosExtra || {};
+
+  if (!atributos || typeof atributos !== "object" || Array.isArray(atributos)) {
+    return [];
+  }
+
+  return Object.entries(atributos)
+    .filter(([, valor]) => String(valor ?? "").trim() !== "")
+    .map(([nombre, valor]) => ({
+      nombre,
+      valor: String(valor).trim(),
+    }));
+};
 
    const resumirDetallesCostura = (producto) => {
     const detalles = producto?.detallesCostura || {};
@@ -469,15 +474,27 @@ case "detalle": {
   );
 }
 
-case "observaciones": {
-  const observaciones = obtenerObservaciones(producto);
+case "atributos": {
+  const atributos = resumirAtributos(producto);
+
+  if (!atributos.length) return "-";
 
   return (
-    <div
-      className="celda-texto-controlado"
-      title={observaciones !== "-" ? observaciones : ""}
-    >
-      {observaciones}
+    <div className="detalle-costura-resumen">
+      {atributos.map((item, index) => (
+        <div
+          key={`${item.nombre}-${index}`}
+          className="detalle-costura-item"
+        >
+          <span className="detalle-costura-nombre">
+            {item.nombre}:
+          </span>
+
+          <span className="detalle-costura-valor">
+            {item.valor}
+          </span>
+        </div>
+      ))}
     </div>
   );
 }
@@ -625,10 +642,8 @@ const columnaTieneContenido = (columnaKey) => {
       case "detalle":
         return String(producto?.detalle || "").trim() !== "";
 
-      case "observaciones": {
-        const observaciones = obtenerObservaciones(producto);
-        return String(observaciones || "").trim() !== "" && observaciones !== "-";
-      }
+      case "atributos":
+        return resumirAtributos(producto).length > 0;
 
       case "zonasResumen": {
         const zonas = resumirZonas(producto);
@@ -669,10 +684,10 @@ const columnasImprimibles =
     case "detalle":
       return String(producto?.detalle || "");
 
-    case "observaciones": {
-      const valor = obtenerObservaciones(producto);
-      return valor === "-" ? "" : String(valor || "");
-    }
+  case "atributos":
+    return resumirAtributos(producto)
+      .map((item) => `${item.nombre}: ${item.valor}`)
+      .join(" ");
 
     case "zonasResumen": {
       const valor = resumirZonas(producto);
@@ -720,11 +735,11 @@ const limitesColumnasImpresion = {
     base: 12,
   },
 
-  observaciones: {
-    minimo: 11,
-    maximo: 24,
-    base: 13,
-  },
+atributos: {
+  minimo: 11,
+  maximo: 24,
+  base: 13,
+},
 
   zonasResumen: {
     minimo: 9,
@@ -1254,8 +1269,21 @@ if (!pedido) {
 
                         {col.key === "detalle" && (p.detalle || "-")}
 
-                        {col.key === "observaciones" &&
-                          obtenerObservaciones(p)}
+                        {col.key === "atributos" &&
+                          (resumirAtributos(p).length ? (
+                            <div className="pedido-print-costura-list">
+                              {resumirAtributos(p).map((atributo, index) => (
+                                <div
+                                  key={`${atributo.nombre}-${index}`}
+                                  className="pedido-print-costura-item"
+                                >
+                                  <strong>{atributo.nombre}:</strong> {atributo.valor}
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            "-"
+                          ))}
 
                         {col.key === "zonasResumen" &&
                           (zonasImpresion.length ? (
@@ -1435,7 +1463,7 @@ if (!pedido) {
             const abierto = productosAbiertos[p.id];
             const talles = resumirTalles(p);
             const portadaUrl = obtenerImagenPortada(p);
-            const observaciones = obtenerObservaciones(p);
+            const atributos = resumirAtributos(p);
 
             return (
               <div
@@ -1482,11 +1510,18 @@ if (!pedido) {
         </div>
         )}
 
-        {!!observaciones && observaciones !== "-" && (
-        <div className="producto-mobile-line">
-        <small>Obs:</small>
-        <p>{observaciones}</p>
-        </div>
+        {!!atributos.length && (
+          <div className="producto-mobile-line">
+            <small>Atributos:</small>
+
+            <div>
+              {atributos.map((item, index) => (
+                <div key={`${item.nombre}-${index}`}>
+                  <strong>{item.nombre}:</strong> {item.valor}
+                </div>
+              ))}
+            </div>
+          </div>
         )}
 
         {!!talles.length && (

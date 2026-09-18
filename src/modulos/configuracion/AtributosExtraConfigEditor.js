@@ -8,14 +8,13 @@ export default function AtributosExtraConfigEditor({
 }) {
   const [atributos, setAtributos] = useState([]);
 
-  useEffect(() => {
-    // Si no hay atributos cargados, se inicializa con un campo genérico
-    setAtributos(
-      atributosIniciales.length > 0
-        ? atributosIniciales
-        : [{ nombre: "Observaciones", valor: "" }]
-    );
-  }, [atributosIniciales]);
+useEffect(() => {
+  setAtributos(
+    Array.isArray(atributosIniciales)
+      ? atributosIniciales
+      : []
+  );
+}, [atributosIniciales]);
 
   // ➕ Agregar atributo
   const agregarAtributo = () => {
@@ -62,7 +61,7 @@ export default function AtributosExtraConfigEditor({
       <h2>Atributos adicionales</h2>
       <p className="descripcion">
         Agregá campos personalizados para tus productos.  
-        Por ejemplo: <strong>Material</strong>, <strong>Marca</strong>, <strong>Observaciones</strong>, etc.  
+        Por ejemplo: <strong>Material</strong>, <strong>Marca</strong>, <strong>Tipo de tela</strong>, etc.  
         Estos aparecerán en el formulario de pedidos y podés reordenarlos.
       </p>
 
