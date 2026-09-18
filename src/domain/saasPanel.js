@@ -56,6 +56,15 @@ export function formatSaasMoney(value, currency) {
   }
 }
 
+export function formatRecentSaasPayment(payment = {}) {
+  const value = payment.monto;
+  if ((typeof value !== "number" && typeof value !== "string") ||
+      (typeof value === "string" && !value.trim()) || !Number.isFinite(Number(value))) return "—";
+  const currency = resolveSaasMovementCurrency(payment);
+  if (currency) return formatSaasMoney(value, currency);
+  return `${Number(value).toLocaleString("es-AR", {maximumFractionDigits: 2})} · moneda no informada`;
+}
+
 export function resolveSaasPlanLabel(client = {}) {
   const planId = normalizeSaasText(client.planId);
   const labels = {

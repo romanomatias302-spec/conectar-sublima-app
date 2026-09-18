@@ -5,6 +5,7 @@ import {
   classifySaasClient,
   filterSaasClients,
   formatSaasMoney,
+  formatRecentSaasPayment,
   getActiveSaasClients,
   getSaasTabFromSearch,
   groupActiveClientsByCountry,
@@ -28,6 +29,17 @@ import {
   isCommerciallyActivePaidClient,
   resolveSaasClientStatus,
 } from "./saasPanel";
+
+test.each([undefined, null, "", " ", "invalid", NaN, Infinity, true, {}])("pago reciente rechaza monto inválido %p", (monto) => {
+  expect(formatRecentSaasPayment({monto})).toBe("—");
+});
+test("pago reciente conserva moneda explícita y no inventa moneda histórica", () => {
+  expect(formatRecentSaasPayment({monto: 1234, billingCurrency: "USD"})).toBe(formatSaasMoney(1234, "USD"));
+  expect(formatRecentSaasPayment({monto: 1234})).toBe("1.234 · moneda no informada");
+  expect(formatRecentSaasPayment({monto: 0})).toBe("0 · moneda no informada");
+  expect(formatRecentSaasPayment({monto: 0, currency: "ARS"})).toBe(formatSaasMoney(0, "ARS"));
+  expect(formatSaasMoney(1234, "")).toBe("—");
+});
 
 test.each([
   [{estado: "activo", subscriptionStatus: "active"}, "active"],

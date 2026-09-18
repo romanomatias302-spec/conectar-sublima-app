@@ -182,6 +182,7 @@ async function registrarPagoSaas({
   referenciaExterna = "",
   mercadoPagoPaymentId = "",
   hotmartTransactionId = "",
+  currency,
 }) {
   if (!clienteSaasId || !periodoFacturado || Number(monto || 0) <= 0) {
     throw new Error("Datos inválidos para registrar pago SaaS");
@@ -197,6 +198,11 @@ async function registrarPagoSaas({
   const cliente = clienteSnap.data();
 
   const pagoBase = {
+    ...(typeof currency === "string" &&
+      Intl.supportedValuesOf("currency").includes(currency.trim().toUpperCase())
+      ? {billingCurrency: currency.trim().toUpperCase(),
+        currency: currency.trim().toUpperCase(), moneda: currency.trim().toUpperCase()}
+      : {}),
     clienteSaasId,
     clienteNombre: cliente.nombre || "",
     tipoMovimiento: "pago",
@@ -950,6 +956,7 @@ exports.webhookMercadoPagoSaas = onRequest(
       observacion: `Pago Mercado Pago - paymentId ${paymentId}`,
       referenciaExterna: String(paymentId),
       mercadoPagoPaymentId: String(paymentId),
+      currency: pago.currency_id,
     });
 
       res.status(200).json({

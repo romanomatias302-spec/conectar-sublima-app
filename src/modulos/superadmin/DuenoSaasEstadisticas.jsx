@@ -1,5 +1,5 @@
 import React, {useMemo} from "react";
-import {buildPaidSaasSummary, classifySaasClient, formatSaasMoney, resolveSaasMovementCurrency, resolveSaasPlanLabel, saasBalanceStatus, sumSaasPlanRows} from "../../domain/saasPanel";
+import {buildPaidSaasSummary, classifySaasClient, formatSaasMoney, formatRecentSaasPayment, resolveSaasPlanLabel, saasBalanceStatus, sumSaasPlanRows} from "../../domain/saasPanel";
 
 export default function DuenoSaasEstadisticas({clientes = [], movimientosSaas = [], usoClientes = {}, pagosPorCliente = {}, formatearFecha = (value) => value || "—"}) {
   const data = useMemo(() => {
@@ -60,7 +60,7 @@ export default function DuenoSaasEstadisticas({clientes = [], movimientosSaas = 
       <Panel title="Últimos pagos recibidos">
         <div className="saas-last-payments">{recent.payments.map((payment) => <div className="saas-last-payment-row" key={payment.id}>
           <div><strong>{payment.clienteNombre || "Cliente SaaS"}</strong><span>{formatearFecha(payment.fechaPago || payment.createdAt)} · {payment.medioPago || "Sin medio"}</span></div>
-          <b>{formatSaasMoney(payment.monto, resolveSaasMovementCurrency(payment))}</b>
+          <b>{formatRecentSaasPayment(payment)}</b>
         </div>)}{!recent.payments.length && <div className="saas-empty-state">No hay pagos registrados.</div>}</div>
       </Panel>
       <Panel wide title="Últimos usos de la aplicación">
