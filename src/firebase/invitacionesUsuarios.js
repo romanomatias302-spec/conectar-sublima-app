@@ -20,7 +20,6 @@ export async function crearInvitacionUsuario({
   nombre,
   email,
   rol = "usuario",
-  creadoPor = null,
 }) {
   const nombreLimpio = (nombre || "").trim();
   const emailLimpio = (email || "").trim().toLowerCase();
@@ -29,13 +28,17 @@ export async function crearInvitacionUsuario({
   if (!nombreLimpio) throw new Error("Completá el nombre");
   if (!emailLimpio) throw new Error("Completá el email");
 
-  return crearInvitacionSaas({
+  const data = await crearInvitacionSaas({
     clienteId,
     nombre: nombreLimpio,
     email: emailLimpio,
     rol,
-    creadoPorUid: creadoPor?.uid || null,
   });
+  return {
+    ...data,
+    id: data.token,
+    expiraAt: data.expiration || null,
+  };
 }
 
 export async function obtenerInvitacionPorToken(token) {
@@ -96,5 +99,6 @@ export async function escucharInvitacionesPorCliente(clienteId) {
 }
 
 export async function cancelarInvitacion(invitacionId) {
+  if (!invitacionId) throw new Error("Falta invitacionId");
   return cancelarInvitacionSaas(invitacionId);
 }

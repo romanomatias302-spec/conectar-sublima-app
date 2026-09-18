@@ -18,6 +18,7 @@ import ClienteSaasForm from "./ClienteSaasForm";
 import {
   crearInvitacionUsuario,
   cancelarInvitacion,
+  escucharInvitacionesPorCliente,
 } from "../../firebase/invitacionesUsuarios";
 import {
   registrarMovimientoSaas,
@@ -69,6 +70,7 @@ export default function DuenoSaasPanel() {
 
   const [mostrarInvitacion, setMostrarInvitacion] = useState(false);
   const [linkGenerado, setLinkGenerado] = useState("");
+  const [creandoInvitacion, setCreandoInvitacion] = useState(false);
 
 
 
@@ -432,27 +434,64 @@ useEffect(() => {
     setMostrarInvitacion(true);
   };
 
-  const crearInvitacion = async () => {
-    try {
-      const res = await crearInvitacionUsuario({
-        clienteId: formInvitacion.clienteId,
-        nombre: formInvitacion.nombre,
-        email: formInvitacion.email,
-        rol: formInvitacion.rol,
-        creadoPor: {
-          uid: auth.currentUser?.uid,
-          email: auth.currentUser?.email,
-        },
-      });
+const crearInvitacion = async () => {
+  if (creandoInvitacion) return;
 
-      const link = `${window.location.origin}/activar-cuenta?token=${res.token}`;
-      setLinkGenerado(link);
-      await cargarInvitaciones();
-    } catch (error) {
-      console.error(error);
-      alert(error.message || "No se pudo crear la invitación.");
-    }
-  };
+  try {
+    setCreandoInvitacion(true);
+
+    const res = await crearInvitacionUsuario({
+      clienteId: formInvitacion.clienteId,
+      nombre: formInvitacion.nombre,
+      email: formInvitacion.email,
+      rol: formInvitacion.rol,
+      creadoPor: {
+        uid: auth.currentUser?.uid,
+        email: auth.currentUser?.email,
+      },
+    });
+
+    const link = `${window.location.origin}/activar-cuenta?token=${res.token}`;
+    setLinkGenerado(link);
+
+    // Refrescar únicamente las invitaciones del cliente afectado.
+    const clienteActual = clientes.find(
+      (c) => c.id === formInvitacion.clienteId
+    );
+
+    const nuevasInvitaciones =
+      await escucharInvitacionesPorCliente(
+        formInvitacion.clienteId
+      );
+
+    setInvitaciones((prev) => [
+      ...prev.filter(
+        (inv) =>
+          inv.clienteId !== formInvitacion.clienteId
+      ),
+      ...nuevasInvitaciones.map((inv) => ({
+        ...inv,
+        clienteNombre:
+          clienteActual?.nombre ||
+          formInvitacion.clienteId,
+      })),
+    ]);
+  } catch (error) {
+    console.error(error);
+
+    const mensaje =
+      String(error?.message || "").includes(
+        "INVITATION_ALREADY_PENDING"
+      )
+        ? "Ya existe una invitación pendiente para este email."
+        : error?.message ||
+          "No se pudo crear la invitación.";
+
+    alert(mensaje);
+  } finally {
+    setCreandoInvitacion(false);
+  }
+};
 
   const copiarLink = async (link) => {
     try {
@@ -464,18 +503,28 @@ useEffect(() => {
     }
   };
 
-  const cancelarInvitacionPanel = async (id) => {
-    const ok = window.confirm("¿Cancelar esta invitación?");
-    if (!ok) return;
+ const cancelarInvitacionPanel = async (id) => {
+  const ok = window.confirm("¿Cancelar esta invitación?");
+  if (!ok) return;
 
-    try {
-      await cancelarInvitacion(id);
-      await cargarInvitaciones();
-    } catch (error) {
-      console.error(error);
-      alert("No se pudo cancelar la invitación.");
-    }
-  };
+  try {
+    await cancelarInvitacion(id);
+
+    setInvitaciones((prev) =>
+      prev.map((inv) =>
+        inv.id === id
+          ? { ...inv, estado: "cancelada" }
+          : inv
+      )
+    );
+  } catch (error) {
+    console.error(error);
+    alert(
+      error?.message ||
+        "No se pudo cancelar la invitación."
+    );
+  }
+};
 
   const suspenderUsuario = async (usuario) => {
     const ok = window.confirm(`¿Suspender usuario ${usuario.email}?`);
@@ -2374,9 +2423,9 @@ return (
                   type="button"
                   onClick={crearInvitacion}
                   style={btnPri}
-                  disabled={!clienteUsuariosUsage.canAddUser}
+                  disabled={creandoInvitacion || !clienteUsuariosUsage.canAddUser}
                 >
-                  Crear invitación
+                  {creandoInvitacion ? "Creando..." : "Crear invitación"}
                 </button>
               </div>
             </div>
