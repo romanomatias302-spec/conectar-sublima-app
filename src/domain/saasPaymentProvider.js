@@ -24,3 +24,20 @@ export function accountPaymentAction(account = {}) {
   }
   return {provider, label: "Informar pago", url: "", createsSubscription: false};
 }
+
+export function resolveSaasPaymentCurrency(account = {}) {
+  return String(account.billingCurrency || account.currency || "USD")
+    .trim()
+    .toUpperCase();
+}
+
+export function canPaySuspendedAccountWithMercadoPago(account = {}) {
+  return (
+    account.usuarioActivo === true &&
+    account.rolUsuario === "admin" &&
+    String(account.pais || "").trim().toLowerCase() === "argentina" &&
+    resolveSaasPaymentCurrency(account) === "ARS" &&
+    normalizeBillingProvider(account) === "mercadopago" &&
+    Number(account.saldoCuentaCorriente) > 0
+  );
+}

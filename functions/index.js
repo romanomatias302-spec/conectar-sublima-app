@@ -27,6 +27,9 @@ const {
   USER_LIMIT_CODE,
   BRANCH_LIMIT_CODE,
 } = require("./saasEntitlementEnforcement");
+const {
+  createSaasMercadoPagoPreferenceHandler,
+} = require("./saasMercadoPagoPreference");
 
 admin.initializeApp();
 
@@ -182,6 +185,7 @@ async function registrarPagoSaas({
   referenciaExterna = "",
   mercadoPagoPaymentId = "",
   hotmartTransactionId = "",
+  currency,
 }) {
   if (!clienteSaasId || !periodoFacturado || Number(monto || 0) <= 0) {
     throw new Error("Datos inválidos para registrar pago SaaS");
@@ -197,6 +201,14 @@ async function registrarPagoSaas({
   const cliente = clienteSnap.data();
 
   const pagoBase = {
+    ...(typeof currency === "string" &&
+      Intl.supportedValuesOf("currency").includes(currency.trim().toUpperCase())
+      ? {
+        billingCurrency: currency.trim().toUpperCase(),
+        currency: currency.trim().toUpperCase(),
+        moneda: currency.trim().toUpperCase(),
+      }
+      : {}),
     clienteSaasId,
     clienteNombre: cliente.nombre || "",
     tipoMovimiento: "pago",
@@ -812,6 +824,17 @@ exports.crearPreferenciaMercadoPago = onRequest(
   }
 );
 
+exports.crearPreferenciaMercadoPagoSeguro = onCall(
+  {secrets: [MP_ACCESS_TOKEN_PROD]},
+  createSaasMercadoPagoPreferenceHandler({
+    db,
+    HttpsError,
+    fetchImpl: (...args) => fetch(...args),
+    getAccessToken: () => MP_ACCESS_TOKEN_PROD.value(),
+    logger: console,
+  })
+);
+
 exports.webhookMercadoPagoSaas = onRequest(
   {
     secrets: [MP_ACCESS_TOKEN_PROD, MP_WEBHOOK_SECRET_PROD],
@@ -950,6 +973,7 @@ exports.webhookMercadoPagoSaas = onRequest(
       observacion: `Pago Mercado Pago - paymentId ${paymentId}`,
       referenciaExterna: String(paymentId),
       mercadoPagoPaymentId: String(paymentId),
+      currency: pago.currency_id,
     });
 
       res.status(200).json({

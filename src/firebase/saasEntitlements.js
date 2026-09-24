@@ -6,6 +6,15 @@ const MESSAGES = {
   SAAS_BRANCH_LIMIT_REACHED: "Alcanzaste el límite de sucursales de tu plan.",
   INVITATION_ALREADY_PENDING: "Ya existe una invitación pendiente para ese email.",
   INVITATION_NOT_VALID: "La invitación venció o ya no está disponible.",
+  SAAS_PAYMENT_NO_DEBT: "No encontramos deuda pendiente para pagar.",
+  SAAS_PAYMENT_UNSUPPORTED_COUNTRY:
+    "Mercado Pago está disponible para cuentas de Argentina.",
+  SAAS_PAYMENT_UNSUPPORTED_CURRENCY:
+    "Mercado Pago está disponible para suscripciones facturadas en ARS.",
+  SAAS_PAYMENT_UNSUPPORTED_PROVIDER:
+    "La cuenta no utiliza Mercado Pago como proveedor de cobro.",
+  SAAS_PAYMENT_PROVIDER_ERROR:
+    "Mercado Pago no pudo iniciar el pago. Intentá nuevamente más tarde.",
 };
 
 function entitlementError(error, operation, data = {}) {
@@ -46,3 +55,5 @@ export const asegurarSucursalPrincipalSaas = (clienteId) => call("asegurarSucurs
 export const crearSucursalSaas = (data) => call("crearSucursalSaas", data);
 export const cambiarEstadoSucursalSaas = (data) => call("cambiarEstadoSucursalSaas", data);
 export const completarDowngradeSaas = (clienteId) => call("completarDowngradeSaas", {clienteId});
+export const crearPreferenciaMercadoPagoSaas = (data = {}) =>
+  call("crearPreferenciaMercadoPagoSeguro", data);

@@ -4,10 +4,6 @@ import {
   doc,
   getDoc,
   onSnapshot,
-  collection,
-  query,
-  where,
-  getDocs,
 } from "firebase/firestore";
 import { auth, db } from "./firebase";
 import Login from "./modulos/auth/Login";
@@ -38,8 +34,12 @@ import { puedeHacer as puedeHacerPerfil } from "./utils/permisos";
 import ProveedoresPage from "./modulos/proveedores/ProveedoresPage";
 import ListasPreciosPage from "./modulos/listasPrecios/ListasPreciosPage";
 import { resolverVistaInicio } from "./modulos/inicio/inicioNavegacion";
-import { accountPaymentAction } from "./domain/saasPaymentProvider";
+import {
+  accountPaymentAction,
+  canPaySuspendedAccountWithMercadoPago,
+} from "./domain/saasPaymentProvider";
 import { canAccessWithProfile } from "./domain/saasAccess";
+import { crearPreferenciaMercadoPagoSaas } from "./firebase/saasEntitlements";
 
 
 
@@ -53,8 +53,6 @@ export default function App() {
   const [clienteBloqueado, setClienteBloqueado] = useState(null);
   const [pagandoCuentaBloqueada, setPagandoCuentaBloqueada] = useState(false);
 
-  const URL_CREAR_PREFERENCIA_MP =
-    "https://us-central1-conectarsublimados-7881e.cloudfunctions.net/crearPreferenciaMercadoPago";
   const [errorConexionPerfil, setErrorConexionPerfil] = useState(false);
 
   const [vista, setVista] = useState(() => {
@@ -302,9 +300,14 @@ useEffect(() => {
               nombre: clienteSaasData.nombre || "",
                pais: clienteSaasData.pais || "",
                moneda: clienteSaasData.moneda || "",
+               billingCurrency: clienteSaasData.billingCurrency || "",
+               currency: clienteSaasData.currency || "",
                billingProvider: clienteSaasData.billingProvider || "",
                metodoCobro: clienteSaasData.metodoCobro || "manual",
                hotmartSubscriptionId: clienteSaasData.hotmartSubscriptionId || "",
+               saldoCuentaCorriente: clienteSaasData.saldoCuentaCorriente,
+               rolUsuario: dataPerfil.rol || "",
+               usuarioActivo: dataPerfil.activo === true,
             });
 
               setPerfil(null);
@@ -524,93 +527,9 @@ irAVista("venta-detalle", {
       try {
         if (!clienteBloqueado?.id) return;
 
-        const pais = String(
-          clienteBloqueado?.pais || ""
-        )
-          .trim()
-          .toLowerCase();
-
-        const moneda = String(
-          clienteBloqueado?.moneda || ""
-        )
-          .trim()
-          .toUpperCase();
-
-        if (
-          pais !== "argentina" ||
-          moneda !== "ARS"
-        ) {
-          alert(
-            "El pago online con Mercado Pago está disponible actualmente para cuentas de Argentina en ARS. Contactá al administrador para regularizar tu suscripción."
-          );
-          return;
-        }
-
         setPagandoCuentaBloqueada(true);
-
-        const pagosRef = collection(db, "saas_pagos");
-        const pagosQuery = query(
-          pagosRef,
-          where("clienteSaasId", "==", clienteBloqueado.id)
-        );
-
-        const pagosSnap = await getDocs(pagosQuery);
-
-        const periodos = Object.values(
-          pagosSnap.docs
-            .map((docu) => docu.data())
-            .filter((mov) => mov.anulado !== true && mov.periodoFacturado)
-            .reduce((acc, mov) => {
-              const periodo = mov.periodoFacturado;
-              const monto = Number(mov.monto || 0);
-              const tipo = mov.tipoMovimiento || "pago";
-
-              if (!acc[periodo]) {
-                acc[periodo] = {
-                  periodo,
-                  cargos: 0,
-                  pagos: 0,
-                  saldo: 0,
-                };
-              }
-
-              if (tipo === "cargo" || tipo === "ajuste") {
-                acc[periodo].cargos += monto;
-              }
-
-              if (tipo === "pago" || tipo === "credito") {
-                acc[periodo].pagos += monto;
-              }
-
-              acc[periodo].saldo = acc[periodo].cargos - acc[periodo].pagos;
-
-              return acc;
-            }, {})
-        )
-          .filter((p) => Number(p.saldo || 0) > 0)
-          .sort((a, b) => (a.periodo > b.periodo ? 1 : -1));
-
-        const periodoPendiente = periodos[0];
-
-        if (!periodoPendiente) {
-          alert("No encontramos un período pendiente para pagar. Contactá a soporte.");
-          return;
-        }
-
-        const response = await fetch(URL_CREAR_PREFERENCIA_MP, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            clienteSaasId: clienteBloqueado.id,
-            periodoFacturado: periodoPendiente.periodo,
-            monto: Number(periodoPendiente.saldo || 0),
-          }),
-        });
-
-        const data = await response.json();
-        const urlPago = data.init_point;
+        const data = await crearPreferenciaMercadoPagoSaas();
+        const urlPago = data.initPoint;
 
         if (!urlPago) {
           throw new Error("No se recibió URL de pago");
@@ -619,28 +538,14 @@ irAVista("venta-detalle", {
         window.location.href = urlPago;
       } catch (error) {
         console.error(error);
-        alert("No se pudo iniciar el pago.");
+        alert(error?.message || "No se pudo iniciar el pago.");
       } finally {
         setPagandoCuentaBloqueada(false);
       }
     };
 
-    const paisCuentaBloqueada = String(
-      clienteBloqueado?.pais || ""
-    )
-      .trim()
-      .toLowerCase();
-
-    const monedaCuentaBloqueada = String(
-      clienteBloqueado?.moneda || ""
-    )
-      .trim()
-      .toUpperCase();
-
     const puedePagarCuentaBloqueadaConMercadoPago =
-      paisCuentaBloqueada === "argentina" &&
-      monedaCuentaBloqueada === "ARS" &&
-      accountPaymentAction(clienteBloqueado).provider === "mercadopago";
+      canPaySuspendedAccountWithMercadoPago(clienteBloqueado);
     const accionCuentaBloqueada = accountPaymentAction(clienteBloqueado || {});
 
     if (esRutaActivacion) {
