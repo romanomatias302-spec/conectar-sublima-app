@@ -53,6 +53,32 @@ test("habilita pago suspendido sólo al admin activo elegible y usa moneda SaaS"
   expect(canPaySuspendedAccountWithMercadoPago({...eligible, saldoCuentaCorriente: 0})).toBe(false);
 });
 
+test.each([
+  ["anónimo", null],
+  ["perfil todavía cargando", undefined],
+  ["estado inicial vacío", {}],
+  ["usuario común", {usuarioActivo: true, rolUsuario: "usuario"}],
+])("%s nunca queda autorizado durante autenticación o carga", (_case, account) => {
+  expect(canPaySuspendedAccountWithMercadoPago(account)).toBe(false);
+  expect(() => accountPaymentAction(account)).not.toThrow();
+  expect(() => resolveSaasPaymentCurrency(account)).not.toThrow();
+});
+
+test("recarga con sesión habilita sólo después de cargar la empresa suspendida elegible", () => {
+  const loadingAccount = null;
+  const suspendedAccount = {
+    usuarioActivo: true,
+    rolUsuario: "admin",
+    pais: "Argentina",
+    billingProvider: "mercadopago",
+    billingCurrency: "ARS",
+    saldoCuentaCorriente: 100,
+  };
+
+  expect(canPaySuspendedAccountWithMercadoPago(loadingAccount)).toBe(false);
+  expect(canPaySuspendedAccountWithMercadoPago(suspendedAccount)).toBe(true);
+});
+
 test("resuelve billingCurrency, luego currency y finalmente USD sin usar moneda", () => {
   expect(resolveSaasPaymentCurrency({billingCurrency: "ARS", currency: "USD"})).toBe("ARS");
   expect(resolveSaasPaymentCurrency({currency: "ARS", moneda: "USD"})).toBe("ARS");

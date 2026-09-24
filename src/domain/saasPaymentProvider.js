@@ -1,7 +1,12 @@
 export const HOTMART_SUBSCRIPTION_PORTAL_URL = "https://consumer.hotmart.com";
 
+function safeAccount(account) {
+  return account && typeof account === "object" ? account : {};
+}
+
 export function normalizeBillingProvider(account = {}) {
-  const value = String(account.billingProvider || account.metodoCobro || "")
+  const currentAccount = safeAccount(account);
+  const value = String(currentAccount.billingProvider || currentAccount.metodoCobro || "")
     .trim()
     .toLowerCase();
   if (value === "mercadopago") return "mercadopago";
@@ -26,18 +31,20 @@ export function accountPaymentAction(account = {}) {
 }
 
 export function resolveSaasPaymentCurrency(account = {}) {
-  return String(account.billingCurrency || account.currency || "USD")
+  const currentAccount = safeAccount(account);
+  return String(currentAccount.billingCurrency || currentAccount.currency || "USD")
     .trim()
     .toUpperCase();
 }
 
 export function canPaySuspendedAccountWithMercadoPago(account = {}) {
+  const currentAccount = safeAccount(account);
   return (
-    account.usuarioActivo === true &&
-    account.rolUsuario === "admin" &&
-    String(account.pais || "").trim().toLowerCase() === "argentina" &&
-    resolveSaasPaymentCurrency(account) === "ARS" &&
-    normalizeBillingProvider(account) === "mercadopago" &&
-    Number(account.saldoCuentaCorriente) > 0
+    currentAccount.usuarioActivo === true &&
+    currentAccount.rolUsuario === "admin" &&
+    String(currentAccount.pais || "").trim().toLowerCase() === "argentina" &&
+    resolveSaasPaymentCurrency(currentAccount) === "ARS" &&
+    normalizeBillingProvider(currentAccount) === "mercadopago" &&
+    Number(currentAccount.saldoCuentaCorriente) > 0
   );
 }
