@@ -139,19 +139,50 @@ async function createRecurringChargeTransaction({db, clientRef, chargeRef, expec
       transaction.get(clientRef), transaction.get(chargeRef),
     ]);
     if (!clientSnapshot.exists) return {created: false, code: "CLIENT_NOT_FOUND"};
-    if (chargeSnapshot.exists) return {created: false, code: "ALREADY_BILLED_PERIOD"};
+    let targetChargeRef = chargeRef;
+    if (chargeSnapshot.exists) {
+      const existingCharge = chargeSnapshot.data();
+      if (existingCharge.anulado !== true) {
+        return {created: false, code: "ALREADY_BILLED_PERIOD"};
+      }
+
+      const latestReissueId = String(existingCharge.ultimaReemisionCargoId || "").trim();
+      if (latestReissueId) {
+        const latestReissueRef = chargeRef.parent.doc(latestReissueId);
+        const latestReissueSnapshot = await transaction.get(latestReissueRef);
+        if (latestReissueSnapshot.exists && latestReissueSnapshot.data().anulado !== true) {
+          return {created: false, code: "ALREADY_BILLED_PERIOD"};
+        }
+      }
+
+      const nextSequence = Number(existingCharge.reemisionSecuencia || 0) + 1;
+      targetChargeRef = chargeRef.parent.doc(`${chargeRef.id}_r${nextSequence}`);
+      const targetSnapshot = await transaction.get(targetChargeRef);
+      if (targetSnapshot.exists) {
+        return {created: false, code: "REISSUE_ID_CONFLICT"};
+      }
+
+      transaction.update(chargeRef, {
+        ultimaReemisionCargoId: targetChargeRef.id,
+        reemisionSecuencia: nextSequence,
+      });
+    }
     const client = {id: clientSnapshot.id, ...clientSnapshot.data()};
     const evaluation = evaluateBillingCandidate(client, now);
     if (evaluation.action !== "CHARGE" || evaluation.period.periodKey !== expectedPeriodKey) {
       return {created: false, code: evaluation.code || "BILLING_STATE_CHANGED"};
     }
     const period = evaluation.period;
-    transaction.create(chargeRef, {
+    transaction.create(targetChargeRef, {
       ...movement,
       monto: evaluation.amount,
       billingCurrency: evaluation.currency,
       moneda: evaluation.currency,
       currency: evaluation.currency,
+      idempotencyKey: targetChargeRef.id,
+      ...(targetChargeRef.id !== chargeRef.id
+        ? {reemisionDeCargoId: chargeRef.id}
+        : {}),
     });
     transaction.update(clientRef, {
       nextBillingDate: period.nextBillingDate,
@@ -161,7 +192,7 @@ async function createRecurringChargeTransaction({db, clientRef, chargeRef, expec
       billingCycleSequence: period.sequence,
       updatedAt,
     });
-    return {created: true};
+    return {created: true, chargeId: targetChargeRef.id};
   });
 }
 

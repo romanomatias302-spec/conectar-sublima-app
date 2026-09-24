@@ -69,7 +69,8 @@ test("reactivada retoma desde una fecha explícita sin facturar meses congelados
 
 function fakeFirestore(client) {
   const docs = new Map([["client", {...client}]]);
-  const ref = (path) => ({path});
+  const collection = {doc: (path) => ref(path)};
+  const ref = (path) => ({path, id: path, parent: collection});
   return {
     docs, clientRef: ref("client"), chargeRef: ref("charge"),
     db: {runTransaction: async (callback) => callback({
@@ -79,6 +80,53 @@ function fakeFirestore(client) {
     })},
   };
 }
+
+test("cargo anulado permite reemitir con ID propio y el vigente vuelve a bloquear", async () => {
+  const fake = fakeFirestore(activeMonthly);
+  fake.docs.set("charge", {tipoMovimiento: "cargo", anulado: true, currency: "ARS"});
+  const args = {
+    db: fake.db,
+    clientRef: fake.clientRef,
+    chargeRef: fake.chargeRef,
+    expectedPeriodKey: "2026-09",
+    now: new Date("2026-08-22T00:00:00Z"),
+    movement: {tipoMovimiento: "cargo"},
+    updatedAt: "server-time",
+  };
+
+  const reissue = await createRecurringChargeTransaction(args);
+  const duplicate = await createRecurringChargeTransaction(args);
+
+  assert.deepEqual(reissue, {created: true, chargeId: "charge_r1"});
+  assert.equal(duplicate.code, "ALREADY_BILLED_PERIOD");
+  assert.equal(fake.docs.get("charge").anulado, true);
+  assert.equal(fake.docs.get("charge_r1").reemisionDeCargoId, "charge");
+  assert.equal(fake.docs.get("charge_r1").currency, "ARS");
+});
+
+test("varios cargos anulados avanzan la secuencia sin sobrescribir historial", async () => {
+  const fake = fakeFirestore(activeMonthly);
+  fake.docs.set("charge", {
+    tipoMovimiento: "cargo",
+    anulado: true,
+    ultimaReemisionCargoId: "charge_r1",
+    reemisionSecuencia: 1,
+  });
+  fake.docs.set("charge_r1", {tipoMovimiento: "cargo", anulado: true});
+  const result = await createRecurringChargeTransaction({
+    db: fake.db,
+    clientRef: fake.clientRef,
+    chargeRef: fake.chargeRef,
+    expectedPeriodKey: "2026-09",
+    now: new Date("2026-08-22T00:00:00Z"),
+    movement: {tipoMovimiento: "cargo"},
+    updatedAt: "server-time",
+  });
+
+  assert.equal(result.chargeId, "charge_r2");
+  assert.equal(fake.docs.get("charge_r1").anulado, true);
+  assert.equal(fake.docs.get("charge").ultimaReemisionCargoId, "charge_r2");
+});
 
 test("scheduler, manual y retry convergen en un único cargo", async () => {
   const fake = fakeFirestore(activeMonthly);

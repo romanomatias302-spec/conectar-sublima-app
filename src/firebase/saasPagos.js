@@ -79,8 +79,37 @@ if (esCargoRecurrente) {
       transaction.get(cargoRef),
       transaction.get(clienteRef),
     ]);
-    if (existing.exists()) throw new Error("Ya existe un cargo para este cliente y período.");
     if (!currentClientSnapshot.exists()) throw new Error("El cliente SaaS ya no existe.");
+    let targetCargoRef = cargoRef;
+
+    if (existing.exists()) {
+      const existingCharge = existing.data();
+      if (existingCharge.anulado !== true) {
+        throw new Error("Ya existe un cargo para este cliente y período.");
+      }
+
+      const latestReissueId = String(existingCharge.ultimaReemisionCargoId || "").trim();
+      if (latestReissueId) {
+        const latestReissueRef = doc(db, "saas_pagos", latestReissueId);
+        const latestReissueSnapshot = await transaction.get(latestReissueRef);
+        if (latestReissueSnapshot.exists() && latestReissueSnapshot.data().anulado !== true) {
+          throw new Error("Ya existe un cargo para este cliente y período.");
+        }
+      }
+
+      const nextSequence = Number(existingCharge.reemisionSecuencia || 0) + 1;
+      targetCargoRef = doc(db, "saas_pagos", `${cargoRef.id}_r${nextSequence}`);
+      const targetSnapshot = await transaction.get(targetCargoRef);
+      if (targetSnapshot.exists()) {
+        throw new Error("No se pudo reservar un identificador para la reemisión.");
+      }
+
+      transaction.update(cargoRef, {
+        ultimaReemisionCargoId: targetCargoRef.id,
+        reemisionSecuencia: nextSequence,
+      });
+    }
+
     const currentClient = {id: currentClientSnapshot.id, ...currentClientSnapshot.data()};
     const currentStatus = String(currentClient.subscriptionStatus || currentClient.estadoSuscripcion || "").toLowerCase();
     if (
@@ -102,11 +131,14 @@ if (esCargoRecurrente) {
       const correspondeAlCicloActual =
         periodoRecurrente === periodoEsperado;
 
-      transaction.set(cargoRef, {
+      transaction.set(targetCargoRef, {
         ...movimiento,
-        idempotencyKey: cargoRef.id,
+        idempotencyKey: targetCargoRef.id,
         periodKey: periodoRecurrente,
         correspondeAlCicloActual,
+        ...(targetCargoRef.id !== cargoRef.id
+          ? {reemisionDeCargoId: cargoRef.id}
+          : {}),
       });
 
       if (correspondeAlCicloActual) {
