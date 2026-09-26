@@ -291,20 +291,59 @@ export async function cambiarSuspensionManualSaas(clienteSaasId, nuevoEstado) {
       throw new Error("No se puede reactivar la cuenta mientras exista deuda pendiente.");
     }
 
-    const estadoNormalizado = String(cliente.subscriptionStatus || cliente.estadoSuscripcion || "").toLowerCase();
-    const esTrial = cliente.planId === "trial" || ["trial", "prueba"].includes(estadoNormalizado);
-    const reactivationPatch = nuevoEstado === "activo" && !esTrial
-      ? buildSaasReactivationPatch({...cliente, suspendidoManual: false, suspendidoPorSistema: true}, 0, new Date())
-      : null;
-    if (nuevoEstado === "activo" && !esTrial && !reactivationPatch) {
-      throw new Error("La suscripción no tiene un ciclo válido para reactivarse.");
-    }
+  const estadoNormalizado = String(
+    cliente.subscriptionStatus ||
+    cliente.estadoSuscripcion ||
+    ""
+  ).toLowerCase();
+
+  const esTrial =
+    cliente.planId === "trial" ||
+    ["trial", "prueba"].includes(estadoNormalizado);
+
+  const esSuspensionManual =
+    cliente.suspendidoManual === true;
+
+  // Una suspensión manual no debe reiniciar
+  // el calendario de facturación.
+  const requiereReactivacionAutomatica =
+    nuevoEstado === "activo" &&
+    !esTrial &&
+    !esSuspensionManual;
+
+  const reactivationPatch = requiereReactivacionAutomatica
+    ? buildSaasReactivationPatch(
+        {
+          ...cliente,
+          suspendidoManual: false,
+        },
+        0,
+        new Date()
+      )
+    : null;
+
+  if (
+    requiereReactivacionAutomatica &&
+    !reactivationPatch
+  ) {
+    throw new Error(
+      "La suscripción no tiene un ciclo válido para reactivarse."
+    );
+  }
 
     transaction.update(clienteRef, {
       estado: nuevoEstado,
       suspendidoManual: nuevoEstado === "suspendido",
       suspendidoPorSistema: false,
       motivoSuspension: nuevoEstado === "suspendido" ? "manual" : "",
+      ...(nuevoEstado === "activo" &&
+      esSuspensionManual &&
+      !esTrial
+        ? {
+            estadoSuscripcion: "activa",
+            subscriptionStatus: "active",
+          }
+        : {}),
       ...(reactivationPatch || {}),
       updatedAt: serverTimestamp(),
     });

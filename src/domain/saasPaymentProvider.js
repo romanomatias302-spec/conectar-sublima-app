@@ -44,7 +44,7 @@ export function canPaySuspendedAccountWithMercadoPago(account = {}) {
     currentAccount.rolUsuario === "admin" &&
     String(currentAccount.pais || "").trim().toLowerCase() === "argentina" &&
     resolveSaasPaymentCurrency(currentAccount) === "ARS" &&
-    normalizeBillingProvider(currentAccount) === "mercadopago" &&
+    normalizeBillingProvider(currentAccount) !== "hotmart" &&
     Number(currentAccount.saldoCuentaCorriente) > 0
   );
 }

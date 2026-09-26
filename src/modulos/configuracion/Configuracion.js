@@ -31,6 +31,7 @@ import { obtenerUsuariosPorCliente } from "../../firebase/usuariosConfig";
 import { escucharInvitacionesPorCliente } from "../../firebase/invitacionesUsuarios";
 import ConfiguracionCuentaPlan from "./ConfiguracionCuentaPlan";
 import {subscribeSaasAccountState} from "../../firebase/saasAccountRealtime";
+import { crearPreferenciaMercadoPagoSaas } from "../../firebase/saasEntitlements";
 
 function resumirPeriodosCuenta(movimientos = []) {
   return Object.values(movimientos.filter((mov) => mov.anulado !== true && mov.periodoFacturado).reduce((acc, mov) => {
@@ -73,8 +74,7 @@ export default function Configuracion({ modoOscuro, setModoOscuro, perfil, onAct
 
   const [periodosCuenta, setPeriodosCuenta] = useState([]);
   const [periodoPagando, setPeriodoPagando] = useState(null);
-  const URL_CREAR_PREFERENCIA_MP =
-  "https://us-central1-conectarsublimados-7881e.cloudfunctions.net/crearPreferenciaMercadoPago";
+
 
   const MONEDAS_CONFIG = {
     ARS: { moneda: "ARS", localeMoneda: "es-AR", label: "ARS - Peso argentino" },
@@ -429,40 +429,26 @@ const tdCuenta = {
 };
 
 const pagarPeriodoMercadoPago = async (periodo) => {
+  if (!periodo?.periodo || Number(periodo.saldo) <= 0) {
+    alert("Este período no tiene saldo pendiente.");
+    return;
+  }
+
+  if (periodoPagando) return;
+
   try {
-    if (!periodo?.periodo || Number(periodo?.saldo || 0) <= 0) {
-      alert("Este período no tiene saldo pendiente.");
-      return;
-    }
-
-    if (periodoPagando === periodo.periodo) return;
-
     setPeriodoPagando(periodo.periodo);
 
-    const response = await fetch(URL_CREAR_PREFERENCIA_MP, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        clienteSaasId: perfil.clienteId,
-        periodoFacturado: periodo.periodo,
-        monto: Number(periodo.saldo || 0),
-      }),
-    });
+    const data = await crearPreferenciaMercadoPagoSaas();
 
-    const data = await response.json();
-
-    const urlPago = data.init_point; 
-
-    if (!urlPago) {
-      throw new Error("No se recibió URL de pago");
+    if (!data?.initPoint) {
+      throw new Error("No se recibió la URL de pago.");
     }
 
-    window.location.href = urlPago;
+    window.location.href = data.initPoint;
   } catch (error) {
-    console.error(error);
-    alert("No se pudo iniciar el pago.");
+    console.error("Error iniciando Mercado Pago:", error);
+    alert(error?.message || "No se pudo iniciar el pago.");
     setPeriodoPagando(null);
   }
 };
@@ -794,10 +780,24 @@ const pagarPeriodoMercadoPago = async (periodo) => {
                               return;
                             }
 
-                            if (cuentaSaas.metodoCobro === "mercadopago") {
-                              pagarPeriodoMercadoPago(p);
-                              return;
-                            }
+                      const proveedor = accountPaymentAction(cuentaSaas).provider;
+
+                      const monedaFacturacion = String(
+                        cuentaSaas.billingCurrency ||
+                        cuentaSaas.currency ||
+                        "USD"
+                      ).toUpperCase();
+
+                      const puedePagarConMercadoPago =
+                        perfil?.rol === "admin" &&
+                        String(cuentaSaas.pais || "").trim().toLowerCase() === "argentina" &&
+                        monedaFacturacion === "ARS" &&
+                        proveedor !== "hotmart";
+
+                      if (puedePagarConMercadoPago) {
+                        pagarPeriodoMercadoPago(p);
+                        return;
+                      }
 
                             const action = accountPaymentAction(cuentaSaas);
                             if (action.provider === "hotmart") {
@@ -815,7 +815,18 @@ const pagarPeriodoMercadoPago = async (periodo) => {
                         >
                           {periodoPagando === p.periodo
                             ? "Procesando..."
-                            : accountPaymentAction(cuentaSaas).label}
+                            : (
+                          perfil?.rol === "admin" &&
+                          String(cuentaSaas.pais || "").trim().toLowerCase() === "argentina" &&
+                          String(
+                            cuentaSaas.billingCurrency ||
+                            cuentaSaas.currency ||
+                            "USD"
+                          ).toUpperCase() === "ARS" &&
+                          accountPaymentAction(cuentaSaas).provider !== "hotmart"
+                        )
+                          ? "Pagar con Mercado Pago"
+                          : accountPaymentAction(cuentaSaas).label}
                         </button>
                           ) : (
                             "-"

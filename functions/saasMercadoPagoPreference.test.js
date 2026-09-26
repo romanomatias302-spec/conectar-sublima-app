@@ -99,6 +99,33 @@ test('admin activo argentino crea preferencia ARS aunque la moneda operativa sea
   assert.equal(f.fetchCalls[0].body.metadata.clienteSaasId, 'tenant');
 });
 
+test('permite pagar con Mercado Pago a un cliente con cobro Manual', async () => {
+  const client = {
+    ...eligibleClient,
+    billingProvider: 'manual',
+    metodoCobro: 'manual',
+  };
+
+  const f = fixture({
+    profile: adminProfile,
+    client,
+    movements: debt,
+  });
+
+  const result = await f.handler({
+    auth: { uid: 'user', token: {} },
+    data: { clienteSaasId: 'tenant' },
+  });
+
+  assert.equal(result.currency, 'ARS');
+  assert.equal(result.monto, 10000);
+  assert.equal(f.fetchCalls.length, 1);
+  assert.equal(
+    f.fetchCalls[0].body.items[0].currency_id,
+    'ARS',
+  );
+});
+
 for (const [name, request, profile, code] of [
   ['anónimo', { auth: null, data: {} }, null, 'unauthenticated'],
   [
@@ -135,8 +162,8 @@ for (const [name, client, expectedCode] of [
   ],
   ['otro país', { ...eligibleClient, pais: 'Uruguay' }, 'SAAS_PAYMENT_UNSUPPORTED_COUNTRY'],
   [
-    'otro proveedor',
-    { ...eligibleClient, billingProvider: 'manual' },
+    'Hotmart',
+    { ...eligibleClient, billingProvider: 'hotmart' },
     'SAAS_PAYMENT_UNSUPPORTED_PROVIDER',
   ],
 ]) {

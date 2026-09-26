@@ -90,10 +90,11 @@ function createSaasMercadoPagoPreferenceHandler({
     }
 
     const provider = normalize(client.billingProvider || client.metodoCobro);
-    if (provider !== 'mercadopago') {
+
+    if (provider === 'hotmart') {
       fail(
         PAYMENT_ERROR_CODES.UNSUPPORTED_PROVIDER,
-        'La cuenta no utiliza Mercado Pago como proveedor de cobro.',
+        'Esta suscripción se administra mediante Hotmart.',
       );
     }
 
