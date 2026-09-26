@@ -53,9 +53,29 @@ export function resolveRecurringChargePeriod(
     referenceDate
   );
 
-  const requested = String(
-    requestedPeriod || ""
-  ).trim();
+  const requested = String(requestedPeriod || "").trim();
+
+  // Si existe un período seleccionado manualmente,
+  // permitimos utilizarlo aunque el cliente tenga
+  // datos históricos incompletos sobre su ciclo.
+  if (requested) {
+    const esMensual = /^\d{4}-(0[1-9]|1[0-2])$/.test(
+      requested
+    );
+
+    const esAnual =
+      /^\d{4}-(0[1-9]|1[0-2])-\d{2}-ANUAL$/.test(
+        requested
+      );
+
+    if (!esMensual && !esAnual) {
+      throw new Error(
+        "Seleccioná un período de facturación válido."
+      );
+    }
+
+    return requested;
+  }
 
   if (!expected) {
     throw new Error(
@@ -63,9 +83,7 @@ export function resolveRecurringChargePeriod(
     );
   }
 
-  // En una carga manual permitimos imputar el cargo
-  // a otro período sin alterar el ciclo vigente.
-  return requested || expected;
+  return expected;
 }
 
 export function buildRecurringChargeAdvancePatch(client = {}, periodKey, referenceDate = new Date()) {

@@ -1775,7 +1775,11 @@ return (
                     tipoMovimiento: "cargo",
                     concepto: "mensualidad",
                     medioPago: "",
-                    periodoFacturado: recurringSaasPeriodKey(clienteCuentaCorriente, prev.fechaPago),
+                    periodoFacturado:
+                      recurringSaasPeriodKey(
+                        clienteCuentaCorriente,
+                        prev.fechaPago
+                      ) || prev.fechaPago.slice(0, 7),
                   }));
                   setMostrarPago(true);
                 }}
@@ -2165,9 +2169,12 @@ return (
                   : e.target.value === "pago"
                   ? "pago"
                   : "ajuste",
-              periodoFacturado: e.target.value === "cargo"
-                ? recurringSaasPeriodKey(clienteCuentaCorriente, prev.fechaPago)
-                : prev.periodoFacturado,
+                  periodoFacturado: e.target.value === "cargo"
+                    ? recurringSaasPeriodKey(
+                        clienteCuentaCorriente,
+                        prev.fechaPago
+                      ) || prev.fechaPago.slice(0, 7)
+                    : prev.periodoFacturado,
             }))
           }
           style={input}
@@ -2195,7 +2202,10 @@ return (
               ...prev,
               fechaPago: e.target.value,
               periodoFacturado: prev.tipoMovimiento === "cargo"
-                ? recurringSaasPeriodKey(clienteCuentaCorriente, e.target.value)
+                ? recurringSaasPeriodKey(
+                    clienteCuentaCorriente,
+                    e.target.value
+                  ) || e.target.value.slice(0, 7)
                 : prev.periodoFacturado,
             }))
           }
@@ -2292,6 +2302,14 @@ return (
             style={btnPri}
             onClick={async () => {
               try {
+                if (
+                  formPago.tipoMovimiento === "cargo" &&
+                  !formPago.periodoFacturado
+                ) {
+                  alert("Seleccioná un período antes de emitir el cargo.");
+                  return;
+                }
+
                 await registrarMovimientoSaas({
                   clienteSaas: clienteCuentaCorriente,
                   ...formPago,

@@ -117,19 +117,17 @@ if (esCargoRecurrente) {
       ["suspendida", "suspended", "gracia", "past_due"].includes(currentStatus) ||
       Number(currentClient.saldoCuentaCorriente || 0) > 0
     ) throw new Error("La cuenta cambió de estado y ya no admite un cargo recurrente.");
-      const periodoEsperado = recurringSaasPeriodKey(
-        currentClient,
-        fechaPago
-      );
+    const periodoEsperado = recurringSaasPeriodKey(
+      currentClient,
+      fechaPago
+    );
 
-      if (!periodoEsperado) {
-        throw new Error(
-          "El cliente no tiene un ciclo de facturación válido."
-        );
-      }
-
-      const correspondeAlCicloActual =
-        periodoRecurrente === periodoEsperado;
+    // Un cargo manual con período explícito puede
+    // registrarse aunque el ciclo histórico sea inválido.
+    // En ese caso no avanzamos el calendario del cliente.
+    const correspondeAlCicloActual =
+      Boolean(periodoEsperado) &&
+      periodoRecurrente === periodoEsperado;
 
       transaction.set(targetCargoRef, {
         ...movimiento,
