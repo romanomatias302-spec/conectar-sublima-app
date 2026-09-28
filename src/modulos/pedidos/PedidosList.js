@@ -3,6 +3,7 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDoc,
   updateDoc,
   query,
   where,
@@ -57,6 +58,7 @@ export default function PedidosList({
   const [loadingMas, setLoadingMas] = useState(false);
   const [ultimoDoc, setUltimoDoc] = useState(null);
   const [hayMas, setHayMas] = useState(true);
+  const [limiteEscucha, setLimiteEscucha] = useState(100);
   const listenerInicializadoRef = useRef(false);
   const versionListadoRef = useRef(0);
 
@@ -121,13 +123,13 @@ export default function PedidosList({
         ? query(
             pedidosRef,
             orderBy("createdAt", "desc"),
-            limit(PAGE_SIZE)
+            limit(limiteEscucha)
           )
         : query(
             pedidosRef,
             where("clienteId", "==", perfil.clienteId),
             orderBy("createdAt", "desc"),
-            limit(PAGE_SIZE)
+            limit(limiteEscucha)
           );
 
     const unsubscribe = onSnapshot(
@@ -138,16 +140,15 @@ export default function PedidosList({
           ...docu.data(),
         }));
 
-        if (!listenerInicializadoRef.current) {
-          setPedidos(lista);
-          setUltimoDoc(snapshot.docs.length ? snapshot.docs[snapshot.docs.length - 1] : null);
-          setHayMas(snapshot.docs.length === PAGE_SIZE);
-          listenerInicializadoRef.current = true;
-        } else {
-          setPedidos((actuales) =>
-            fusionarDocumentosPaginados({ actuales, entrantes: lista })
-          );
-        }
+      setPedidos(lista);
+
+      setUltimoDoc(
+        snapshot.docs.length
+          ? snapshot.docs[snapshot.docs.length - 1]
+          : null
+      );
+
+      setHayMas(snapshot.docs.length === limiteEscucha);
         setLoading(false);
       },
       (error) => {
@@ -161,6 +162,18 @@ export default function PedidosList({
 
   const cargarMasPedidos = async () => {
     try {
+      if (
+        !estadoFiltro &&
+        !fechaDesde &&
+        !fechaHasta &&
+        !debeVerSoloAsignados
+      ) {
+        if (!perfil || !hayMas || loadingMas) return;
+
+        setLoadingMas(true);
+        setLimiteEscucha((actual) => actual + PAGE_SIZE);
+        return;
+      }
       if (!perfil || !ultimoDoc || !hayMas) return;
 
       setLoadingMas(true);
@@ -263,7 +276,20 @@ export default function PedidosList({
     debeVerSoloAsignados,
     uidActual,
     columnasProduccion,
+    limiteEscucha,
   ]);
+
+  useEffect(() => {
+  setLimiteEscucha(PAGE_SIZE);
+}, [
+  perfil?.clienteId,
+  perfil?.rol,
+  estadoFiltro,
+  fechaDesde,
+  fechaHasta,
+  debeVerSoloAsignados,
+  uidActual,
+]);
 
   useEffect(() => {
     const texto = busqueda.trim();
@@ -344,22 +370,25 @@ useEffect(() => {
     }
   };
 
-  const actualizarEstado = async (firebaseId, nuevaEtapaONuevoEstado) => {
-    try {
-      if (!puedeEditarPedidos) return; 
-      const pedidoActual = pedidos.find((p) => p.firebaseId === firebaseId);
-      if (!pedidoActual) return;
-      if (!perfil?.clienteId) return;
+const actualizarEstado = async (firebaseId, nuevaEtapaONuevoEstado) => {
+  try {
+    if (!puedeEditarPedidos || !perfil?.clienteId) return;
 
-      if (nuevaEtapaONuevoEstado === "Cancelado") {
-        await sincronizarPedidoDesdeEstadoManual({
-          pedidoActual,
-          nuevoEstado: "Cancelado",
-          clienteId: perfil.clienteId,
-        });
-        return;
-      }
+    const pedidoActual =
+      pedidos.find((p) => p.firebaseId === firebaseId) ||
+      busquedaRemota?.pedidos?.find(
+        (p) => p.firebaseId === firebaseId
+      );
 
+    if (!pedidoActual) return;
+
+    if (nuevaEtapaONuevoEstado === "Cancelado") {
+      await sincronizarPedidoDesdeEstadoManual({
+        pedidoActual,
+        nuevoEstado: "Cancelado",
+        clienteId: perfil.clienteId,
+      });
+    } else {
       const columnaDestino = columnasProduccion.find(
         (c) => c.nombre === nuevaEtapaONuevoEstado
       );
@@ -381,17 +410,143 @@ useEffect(() => {
         clienteId: perfil.clienteId,
         columnaDestinoManualId: columnaDestino.id,
       });
-    } catch (error) {
-      console.error("Error al actualizar etapa/estado:", error);
     }
-  };
+
+    // Recuperar los datos definitivos de Firestore.
+    const snapshot = await getDoc(
+      doc(db, "pedidos", firebaseId)
+    );
+
+    if (!snapshot.exists()) return;
+
+    const pedidoActualizado = {
+      ...snapshot.data(),
+      firebaseId: snapshot.id,
+    };
+
+    // Actualizar el listado, incluidas las páginas adicionales.
+    setPedidos((actuales) =>
+      actuales.map((p) =>
+        p.firebaseId === firebaseId ? pedidoActualizado : p
+      )
+    );
+
+    // Actualizar también los resultados de búsqueda global.
+    setBusquedaRemota((actual) => {
+      if (!actual) return actual;
+
+      return {
+        ...actual,
+        pedidos: actual.pedidos.map((p) =>
+          p.firebaseId === firebaseId ? pedidoActualizado : p
+        ),
+      };
+    });
+  } catch (error) {
+    console.error("Error al actualizar etapa/estado:", error);
+  }
+};
+
+
 
 const textoBusquedaActual = normalizarTexto(busqueda);
+
 const pedidosRemotosActuales =
-  busquedaRemota?.texto === textoBusquedaActual ? busquedaRemota.pedidos : [];
+  busquedaRemota?.texto === textoBusquedaActual
+    ? busquedaRemota.pedidos
+    : [];
+
+const idsPedidosBusquedaSinEscucha = pedidosRemotosActuales
+  .filter(
+    (pedido) =>
+      pedido?.firebaseId &&
+      !pedidos.some(
+        (cargado) => cargado.firebaseId === pedido.firebaseId
+      )
+  )
+  .map((pedido) => pedido.firebaseId)
+  .sort()
+  .join("|");
+
+useEffect(() => {
+  if (!idsPedidosBusquedaSinEscucha) return;
+
+  const textoEscuchado = textoBusquedaActual;
+  const ids = idsPedidosBusquedaSinEscucha.split("|");
+
+  const unsubscribes = ids.map((firebaseId) =>
+    onSnapshot(
+      doc(db, "pedidos", firebaseId),
+      (snapshot) => {
+        setBusquedaRemota((actual) => {
+          if (!actual || actual.texto !== textoEscuchado) {
+            return actual;
+          }
+
+          if (
+            !actual.pedidos.some(
+              (pedido) => pedido.firebaseId === firebaseId
+            )
+          ) {
+            return actual;
+          }
+
+          if (!snapshot.exists()) {
+            return {
+              ...actual,
+              pedidos: actual.pedidos.filter(
+                (pedido) => pedido.firebaseId !== firebaseId
+              ),
+            };
+          }
+
+          const pedidoActualizado = {
+            firebaseId: snapshot.id,
+            ...snapshot.data(),
+          };
+
+          return {
+            ...actual,
+            pedidos: actual.pedidos.map((pedido) =>
+              pedido.firebaseId === firebaseId
+                ? pedidoActualizado
+                : pedido
+            ),
+          };
+        });
+      },
+      (error) => {
+        console.error(
+          "Error escuchando pedido de búsqueda:",
+          firebaseId,
+          error
+        );
+      }
+    )
+  );
+
+  return () => {
+    unsubscribes.forEach((unsubscribe) => unsubscribe());
+  };
+}, [
+  idsPedidosBusquedaSinEscucha,
+  textoBusquedaActual,
+]);
+
 const pedidosPorId = new Map();
-[...pedidos, ...(pedidosRemotosActuales || [])].forEach((pedido) => {
-  if (pedido?.firebaseId) pedidosPorId.set(pedido.firebaseId, pedido);
+
+// Incorporar primero los resultados de búsqueda.
+(pedidosRemotosActuales || []).forEach((pedido) => {
+  if (pedido?.firebaseId) {
+    pedidosPorId.set(pedido.firebaseId, pedido);
+  }
+});
+
+// Priorizar los datos actualizados del listado.
+pedidos.forEach((pedido) => {
+  if (pedido?.firebaseId) {
+    pedidosPorId.set(pedido.firebaseId, pedido);
+  }
 });
 const pedidosFiltrados = Array.from(pedidosPorId.values()).filter((p) => {
   if (debeVerSoloAsignados) {
