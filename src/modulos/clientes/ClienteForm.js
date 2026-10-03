@@ -38,28 +38,61 @@ export default function ClienteForm({ cliente, onVolver, onCancelar, onGuardar, 
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
-  const buscarClienteExistentePorDni = async (dni) => {
+const buscarClienteExistentePorDni = async (dni) => {
   const dniNormalizado = String(dni || "").trim();
 
   if (!dniNormalizado) return null;
 
-  const q = query(
-    collection(db, "clientes"),
-    where("clienteId", "==", perfil?.clienteId || ""),
-    where("dni", "==", dniNormalizado),
-    limit(5)
+  if (!perfil?.clienteId && perfil?.rol !== "superadmin") {
+    return null;
+  }
+
+  const clientesRef = collection(db, "clientes");
+
+  const consultas = [
+    query(
+      clientesRef,
+      where("clienteId", "==", perfil?.clienteId || ""),
+      where("dni", "==", dniNormalizado),
+      limit(5)
+    ),
+  ];
+
+  const dniNumerico = Number(dniNormalizado);
+
+  if (
+    dniNormalizado !== "" &&
+    Number.isFinite(dniNumerico) &&
+    String(dniNumerico) === dniNormalizado
+  ) {
+    consultas.push(
+      query(
+        clientesRef,
+        where("clienteId", "==", perfil?.clienteId || ""),
+        where("dni", "==", dniNumerico),
+        limit(5)
+      )
+    );
+  }
+
+  const resultados = await Promise.all(
+    consultas.map((consulta) => getDocs(consulta))
   );
 
-  const snapshot = await getDocs(q);
+  const encontradosPorId = new Map();
 
-  const encontrados = snapshot.docs
-    .map((d) => ({
-      firebaseId: d.id,
-      ...d.data(),
-    }))
-    .filter((c) => c.firebaseId !== cliente?.firebaseId);
+  resultados.forEach((snapshot) => {
+    snapshot.docs.forEach((documento) => {
+      if (documento.id === cliente?.firebaseId) return;
 
-  return encontrados[0] || null;
+      encontradosPorId.set(documento.id, {
+        firebaseId: documento.id,
+        ...documento.data(),
+      });
+    });
+  });
+
+  return Array.from(encontradosPorId.values())[0] || null;
 };
 
   const guardarCliente = async () => {
@@ -91,14 +124,14 @@ export default function ClienteForm({ cliente, onVolver, onCancelar, onGuardar, 
         );
         return;
       }
-      console.log("PERFIL EN ClienteForm:", perfil);
+      
       const datosAGuardar = {
         ...formData,
         dni: formData.dni.toString(),
         clienteId: perfil?.clienteId || "",
         updatedAt: serverTimestamp(),
       };
-        console.log("DATOS A GUARDAR CLIENTE:", datosAGuardar);
+        
 
 
       let clienteGuardado;
@@ -148,7 +181,7 @@ export default function ClienteForm({ cliente, onVolver, onCancelar, onGuardar, 
             value={formData.dni}
             onChange={handleChange}
             type="text"
-            disabled={(!!cliente && !!cliente.dni) || soloLectura}
+            disabled={soloLectura}
           />
         </div>
 
