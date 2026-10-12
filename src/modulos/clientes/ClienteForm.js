@@ -1,16 +1,8 @@
 import React, { useState } from "react";
 import {
-  collection,
-  doc,
-  addDoc,
-  updateDoc,
-  getDocs,
-  query,
-  where,
-  limit,
-  serverTimestamp,
-} from "firebase/firestore";
-import { db } from "../../firebase";
+  actualizarCliente,
+  crearCliente,
+} from "../../firebase/clientes";
 import { puedeHacer } from "../../utils/permisos";
 
 export default function ClienteForm({ cliente, onVolver, onCancelar, onGuardar, perfil }) {
@@ -38,62 +30,7 @@ export default function ClienteForm({ cliente, onVolver, onCancelar, onGuardar, 
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
-const buscarClienteExistentePorDni = async (dni) => {
-  const dniNormalizado = String(dni || "").trim();
 
-  if (!dniNormalizado) return null;
-
-  if (!perfil?.clienteId && perfil?.rol !== "superadmin") {
-    return null;
-  }
-
-  const clientesRef = collection(db, "clientes");
-
-  const consultas = [
-    query(
-      clientesRef,
-      where("clienteId", "==", perfil?.clienteId || ""),
-      where("dni", "==", dniNormalizado),
-      limit(5)
-    ),
-  ];
-
-  const dniNumerico = Number(dniNormalizado);
-
-  if (
-    dniNormalizado !== "" &&
-    Number.isFinite(dniNumerico) &&
-    String(dniNumerico) === dniNormalizado
-  ) {
-    consultas.push(
-      query(
-        clientesRef,
-        where("clienteId", "==", perfil?.clienteId || ""),
-        where("dni", "==", dniNumerico),
-        limit(5)
-      )
-    );
-  }
-
-  const resultados = await Promise.all(
-    consultas.map((consulta) => getDocs(consulta))
-  );
-
-  const encontradosPorId = new Map();
-
-  resultados.forEach((snapshot) => {
-    snapshot.docs.forEach((documento) => {
-      if (documento.id === cliente?.firebaseId) return;
-
-      encontradosPorId.set(documento.id, {
-        firebaseId: documento.id,
-        ...documento.data(),
-      });
-    });
-  });
-
-  return Array.from(encontradosPorId.values())[0] || null;
-};
 
   const guardarCliente = async () => {
      if (!cliente && !puedeCrearClientes) {
@@ -116,53 +53,47 @@ const buscarClienteExistentePorDni = async (dni) => {
     }
 
     try {
-      const clienteExistente = await buscarClienteExistentePorDni(formData.dni);
-
-      if (clienteExistente) {
-        setError(
-          `Ya existe un cliente con el DNI ${formData.dni}: ${clienteExistente.nombre || "Sin nombre"}. Revisá si corresponde usar ese cliente en lugar de crear uno nuevo.`
-        );
-        return;
-      }
-      
-      const datosAGuardar = {
-        ...formData,
-        dni: formData.dni.toString(),
-        clienteId: perfil?.clienteId || "",
-        updatedAt: serverTimestamp(),
-      };
-        
-
-
       let clienteGuardado;
 
       if (cliente?.firebaseId) {
-        const ref = doc(db, "clientes", cliente.firebaseId);
-        await updateDoc(ref, datosAGuardar);
-
-        clienteGuardado = {
+        clienteGuardado = await actualizarCliente({
+          perfil,
           firebaseId: cliente.firebaseId,
-          ...datosAGuardar,
-        };
-      } else {
-        const docRef = await addDoc(collection(db, "clientes"), {
-          ...datosAGuardar,
-          createdAt: serverTimestamp(),
+          datos: formData,
         });
-
-        clienteGuardado = {
-          firebaseId: docRef.id,
-          ...datosAGuardar,
-        };
+      } else {
+        clienteGuardado = await crearCliente({
+          perfil,
+          datos: formData,
+        });
       }
 
       setError("");
 
-      if (onGuardar) onGuardar(clienteGuardado);
-      else volver();
+      if (onGuardar) {
+        onGuardar(clienteGuardado);
+      } else {
+        volver();
+      }
     } catch (e) {
+      if (e?.code === "DNI_DUPLICADO") {
+        const existente = e.clienteExistente;
+
+        setError(
+          `Ya existe un cliente con el DNI ${formData.dni}: ${
+            existente?.nombre || "Sin nombre"
+          }. Revisá si corresponde usar ese cliente en lugar de crear uno nuevo.`
+        );
+
+        return;
+      }
+
       console.error("Error al guardar cliente:", e);
-      setError(`Error al guardar el cliente: ${e.message}`);
+      setError(
+        e?.message
+          ? `Error al guardar el cliente: ${e.message}`
+          : "Error al guardar el cliente."
+      );
     }
   };
 
